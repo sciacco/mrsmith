@@ -27,15 +27,15 @@ Fatto e verificato:
 
 Interazione da tenere presente: la fase (c) **aumenta** manual_review → il workstream C (senza sito) e la UX della coda (workstream D) ne assorbono l'impatto. Sequenza consigliata: C e D prima o insieme a (c).
 
-## Workstream B — Policy siti di gruppo (decisione di Salvatore, in valutazione)
+## Workstream B — Policy siti di gruppo **[DECISO 2026-07-02: B1 + fatto persistito]**
 
-Caso: filiale italiana la cui presenza web è il sito del gruppo (HORSA ONE PRO → horsa.com, WEBGAINS ITALY → webgains.es). Il sito porta la P.IVA del gruppo (o nessuna P.IVA italiana) → identità mai `verified` per la filiale: `assumed` strutturale, quindi con la fase (c) accesa questi finiscono stabilmente in manual_review.
+Caso: filiale italiana la cui presenza web è il sito del gruppo (HORSA ONE PRO → horsa.com, WEBGAINS ITALY → webgains.es). Il sito porta la P.IVA del gruppo → identità mai `verified` per la filiale: `assumed` strutturale, quindi con la fase (c) accesa questi finirebbero stabilmente in manual_review senza policy.
 
-Dimensioni della valutazione (annotate, non decise):
-- **Cosa si giudica**: accettare il sito di gruppo significa classificare la filiale sul business *del gruppo* — spesso informativo (HORSA ONE PRO fa ciò che horsa.com descrive), a volte fuorviante (gruppo diversificato).
-- **Cosa NON si contamina**: i finanziari e l'ATECO della filiale arrivano per P.IVA e restano suoi; il rischio è confinato al verdetto settoriale.
-- **Perimetro reale della policy**: molte tesi escludono già l'appartenenza a grandi gruppi (filtri soci/holding) — la policy rileva soprattutto per gruppi piccoli/medi non esclusi a monte.
-- **Opzione meccanica** se si decide di ammetterli: conferma-gruppo dell'operatore = `vouched` a livello gruppo (variante del rimedio associate-domain, marcata "sito di gruppo"), così il verdetto ha autorità ma resta tracciato che l'evidenza è group-level.
+**Decisione (B1 — conferma operatore):** il sospetto sito-di-gruppo diventa motivo di prima classe nella coda manual_review con rimedio dedicato "Conferma sito di gruppo" → registro domini `vouched` con flag group-site. Il gate giudica sul contenuto del gruppo con piena autorità; resta tracciato che l'evidenza è group-level. L'operatore risponde all'unica domanda difficile ("il business del gruppo rappresenta la filiale?"), one-time per azienda grazie al registro. Automazione futura evidence-gated (B2: auto-accettazione con verdetto mai-scarta) solo se la misura mostrerà conferme quasi-sempre-sì.
+
+**Fatto persistito (IMPLEMENTATO 2026-07-02):** `MAGroupSiteHint {domain, identifier, source}` — candidato brand-compatibile con P.IVA di un'altra società — catturato ai tre punti di rigetto (name-match, brand-trust, deep-verify su pagina legale = il più forte, sovrascrive) e persistito dentro `domain_response` JSONB (**nessuna migrazione**, nessuna finestra di rottura con air) su validazioni risolte E irrisolte. La P.IVA estranea catturata nomina l'entità madre (futura group-linkage). Visibile: reason "Possibile sito di gruppo: …" sulla decisione irrisolta, probe `/test/sector-classification`, sector-eval (`groupSiteHint` per item + `metrics.domain.groupSiteSuspected`). Il rimedio operatore (variante di associate-domain marcata group-site) si implementa con la coda D2.
+
+Note residue: i finanziari/ATECO della filiale non si contaminano mai (arrivano per P.IVA); il rilevamento è anche un segnale "appartiene a un gruppo" spendibile in tesi/scoring (da valutare in sede scoring, non nel gate).
 
 ## Workstream C — Verdetto "senza sito"
 

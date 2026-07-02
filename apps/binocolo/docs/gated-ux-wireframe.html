@@ -1,0 +1,849 @@
+<title>Binocolo — Wireframe D1</title>
+<style>
+  :root{
+    --ink:#0f172a; --ink-2:#475569; --muted:#94a3b8; --faint:#cbd5e1;
+    --border:#e2e8f0; --border-soft:#f0f3f7;
+    --accent:#635bff; --accent-2:#7c6cff;
+    --accent-subtle:rgba(99,91,255,.08); --accent-muted:rgba(99,91,255,.15); --accent-glow:rgba(99,91,255,.25);
+    --danger:#ef4444; --danger-strong:#b91c1c; --danger-subtle:rgba(239,68,68,.08);
+    --warn:#f59e0b; --warn-strong:#b45309; --warn-subtle:rgba(245,158,11,.12);
+    --ok:#10b981; --ok-bg:#ecfdf5;
+    --info-strong:#075985; --info-subtle:rgba(14,116,144,.10);
+    --doc-bg:#eef1f6; --doc-ink:#1e293b;
+    --sans:"DM Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    --mono:"JetBrains Mono","SF Mono",ui-monospace,Menlo,monospace;
+    --r-sm:6px; --r-md:10px; --r-lg:14px; --r-xl:20px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--doc-bg);color:var(--doc-ink);font:400 15px/1.55 var(--sans)}
+
+  /* ---------- review-document chrome ---------- */
+  .doc{max-width:1060px;margin:0 auto;padding:40px 24px 96px}
+  .doc-head{margin-bottom:8px}
+  .doc-head .eyebrow{font:600 11px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2)}
+  .doc-head h1{margin:10px 0 6px;font-size:1.75rem;font-weight:700;letter-spacing:-.04em;color:var(--ink);text-wrap:balance}
+  .doc-head p{margin:0;max-width:64ch;color:var(--ink-2)}
+  .legend{display:flex;gap:16px;align-items:center;margin:18px 0 0;font-size:.8125rem;color:var(--ink-2)}
+  .legend .m{margin-right:2px}
+
+  .statenav{position:sticky;top:0;z-index:20;display:flex;gap:8px;flex-wrap:wrap;padding:12px 0;margin:20px 0 8px;
+    background:linear-gradient(180deg,var(--doc-bg) 78%,rgba(238,241,246,0))}
+  .statenav a{font:600 12px/1 var(--mono);letter-spacing:.04em;text-decoration:none;color:var(--ink-2);
+    padding:8px 12px;border:1px solid var(--border);border-radius:999px;background:#fff}
+  .statenav a:hover{border-color:var(--accent);color:var(--accent)}
+  .statenav a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  .flow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:22px 0 34px;padding:16px 18px;
+    background:#fff;border:1px solid var(--border);border-radius:var(--r-lg);font-size:.8125rem}
+  .flow b{font-weight:600;color:var(--ink)}
+  .flow .step{padding:7px 12px;border:1px solid var(--border);border-radius:999px;background:#fbfcfe;white-space:nowrap}
+  .flow .step.hot{border-color:var(--accent-muted);background:var(--accent-subtle);color:var(--accent)}
+  .flow .arr{color:var(--faint)}
+  .flow .off{color:var(--muted)}
+
+  section.state{margin:56px 0 0}
+  .state-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  .state-head .sid{font:700 12px/1 var(--mono);letter-spacing:.1em;color:#fff;background:var(--ink);
+    padding:6px 10px;border-radius:6px}
+  .state-head h2{margin:0;font-size:1.15rem;font-weight:700;letter-spacing:-.02em;color:var(--ink)}
+  .state-head .ref{font:500 11px/1 var(--mono);color:var(--muted)}
+  .state-intent{margin:8px 0 18px;max-width:72ch;color:var(--ink-2);font-size:.875rem}
+
+  /* ---------- annotation markers & notes ---------- */
+  .m{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;
+    background:var(--ink);color:#fff;font:700 10.5px/1 var(--mono);vertical-align:2px;flex:none}
+  .notes{margin:16px 0 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px 22px;padding:0;list-style:none}
+  .notes li{display:flex;gap:9px;font-size:.8125rem;color:var(--ink-2)}
+  .notes li .m{margin-top:1px}
+  .notes li b{color:var(--ink);font-weight:600}
+  .notes li .ref{font:500 10.5px/1.5 var(--mono);color:var(--muted);white-space:nowrap}
+
+  /* ---------- viewport frame ---------- */
+  .frame{background:#fff;border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;
+    box-shadow:0 10px 24px -14px rgba(15,23,42,.18)}
+  .frame-bar{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border-soft);background:#fbfcfe}
+  .frame-bar .dots{display:flex;gap:5px}
+  .frame-bar .dots i{width:9px;height:9px;border-radius:50%;background:var(--faint)}
+  .frame-bar .url{font:500 11px/1 var(--mono);color:var(--muted);background:#fff;border:1px solid var(--border-soft);
+    border-radius:999px;padding:5px 12px}
+  .crop{border:1px dashed var(--faint);border-radius:var(--r-lg);background:#fff;overflow:hidden}
+  .crop-tag{font:600 10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+    padding:8px 14px;border-bottom:1px dashed var(--border-soft);background:#fbfcfe}
+  .croprow{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px;align-items:start}
+
+  /* ---------- clean-theme app inside frames ---------- */
+  .app{background:
+      radial-gradient(circle at top left, rgba(99,91,255,.06), transparent 28%),
+      linear-gradient(180deg,#f8fafc 0%,#eef2ff 100%);
+    color:var(--ink)}
+  .app-head{display:flex;align-items:center;gap:10px;padding:0 22px;height:52px;background:rgba(255,255,255,.85);
+    border-bottom:1px solid var(--border)}
+  .app-logo{width:26px;height:26px;border-radius:7px;background:var(--accent);color:#fff;display:flex;
+    align-items:center;justify-content:center;font:700 13px/1 var(--sans)}
+  .app-name{font-weight:700;font-size:.9375rem}
+  .app-back{margin-left:18px;font-size:.8125rem;color:var(--ink-2)}
+  .app-back b{color:var(--accent);font-weight:600}
+  .app-user{margin-left:auto;font-size:.8125rem;color:var(--muted)}
+  .app-body{max-width:720px;margin:0 auto;padding:28px 24px 40px;display:flex;flex-direction:column;gap:16px}
+  .page-title{font-size:1.35rem;font-weight:700;letter-spacing:-.03em;margin:0}
+  .page-sub{margin:2px 0 6px;font-size:.8125rem;color:var(--ink-2);max-width:60ch}
+
+  .card{background:#fff;border:1px solid var(--border);border-radius:var(--r-lg);padding:20px 22px}
+  .card.compact{padding:14px 18px}
+  .lab{display:flex;align-items:center;gap:7px;font-size:.75rem;font-weight:600;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--ink-2);margin:0 0 8px}
+  .hint{font-size:.8125rem;color:var(--muted)}
+  .req-dot{width:6px;height:6px;border-radius:50%;background:var(--danger);flex:none}
+
+  .textarea{min-height:132px;border:1.5px solid var(--border);border-radius:var(--r-md);padding:12px 14px;
+    font-size:.9375rem;color:var(--muted);background:#fff}
+  .textarea.filled{color:var(--ink)}
+  .guide{display:flex;flex-direction:column;gap:6px;margin-top:12px;padding:12px 14px;border-radius:var(--r-md);
+    background:var(--info-subtle);color:var(--info-strong);font-size:.8125rem}
+  .guide b{font-weight:600}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 20px;
+    border-radius:999px;font-weight:700;font-size:.875rem;border:1px solid transparent;white-space:nowrap}
+  .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;
+    box-shadow:0 4px 14px var(--accent-glow)}
+  .btn.secondary{background:#f1f5f9;border-color:var(--border);color:var(--ink)}
+  .btn.disabled{opacity:.5;box-shadow:none}
+  .actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .actions .aside{font-size:.75rem;color:var(--muted)}
+
+  /* request collapsed */
+  .req-collapsed{display:flex;gap:12px;align-items:flex-start}
+  .req-collapsed p{margin:0;font-size:.8125rem;color:var(--ink-2);flex:1}
+  .linkbtn{font-size:.8125rem;font-weight:600;color:var(--accent);white-space:nowrap}
+
+  /* concepts */
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border-radius:999px;font-size:.8125rem;font-weight:600}
+  .chip.core{background:var(--accent-subtle);border:1px solid var(--accent-muted);color:var(--accent)}
+  .chip.adj{background:#fff;border:1px dashed var(--faint);color:var(--ink-2)}
+  .chip .fit{font:600 9.5px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;padding:3px 6px;border-radius:5px}
+  .chip.core .fit{background:var(--accent-muted)}
+  .chip.adj .fit{background:var(--border-soft);color:var(--muted)}
+  .chev{display:flex;align-items:center;gap:6px;margin-top:12px;font-size:.8125rem;font-weight:600;color:var(--ink-2)}
+  .chev svg{flex:none}
+  .chev-panel{margin-top:10px;border:1px solid var(--border-soft);border-radius:var(--r-md);background:#fbfcfe;padding:12px 14px}
+  .div-row{display:flex;gap:10px;align-items:baseline;padding:6px 0;font-size:.8125rem}
+  .div-row+.div-row{border-top:1px solid var(--border-soft)}
+  .div-code{font:600 11px/1.6 var(--mono);color:var(--ink);white-space:nowrap}
+  .div-title{color:var(--ink-2);flex:1}
+  .codes{display:flex;flex-wrap:wrap;gap:5px}
+  .code{font:500 10.5px/1 var(--mono);color:var(--ink-2);background:#fff;border:1px solid var(--border-soft);
+    border-radius:5px;padding:3px 6px}
+  .thesis{display:inline-flex;align-items:center;gap:8px;padding:7px 12px;border-radius:999px;
+    background:var(--ok-bg);border:1px solid rgba(16,185,129,.25);color:#047857;font-size:.8125rem;font-weight:600}
+  .thesis small{font-weight:400;color:#059669}
+
+  /* territory & constraints */
+  .terr{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .terr .val{font-weight:600;font-size:.9375rem}
+  .warnbox{display:flex;gap:9px;align-items:flex-start;margin-top:12px;padding:10px 13px;border-radius:var(--r-md);
+    background:var(--warn-subtle);color:var(--warn-strong);font-size:.8125rem}
+  .fields{display:grid;grid-template-columns:1fr 1fr;gap:14px 18px}
+  .field .lab{margin-bottom:5px}
+  .inputrow{display:flex;align-items:center;gap:8px}
+  .input{flex:1;min-width:0;border:1.5px solid var(--border);border-radius:var(--r-md);padding:9px 12px;
+    font-size:.875rem;color:var(--ink);background:#fff;font-variant-numeric:tabular-nums}
+  .input.ph{color:var(--muted)}
+  .dash{color:var(--faint)}
+  .addc{grid-column:1/-1;display:inline-flex;align-items:center;gap:7px;font-size:.8125rem;font-weight:600;color:var(--accent)}
+
+  /* estimate preview */
+  .bignum{font-size:2.4rem;font-weight:700;letter-spacing:-.04em;line-height:1.1;font-variant-numeric:tabular-nums}
+  .bignum small{font-size:.9375rem;font-weight:500;letter-spacing:0;color:var(--ink-2)}
+  .prov{margin-top:14px;display:flex;flex-direction:column;gap:7px}
+  .prov-row{display:grid;grid-template-columns:150px 1fr 52px 26px;gap:10px;align-items:center;font-size:.8125rem}
+  .prov-row .name{color:var(--ink);font-weight:600}
+  .prov-row .bar{height:8px;border-radius:999px;background:var(--border-soft);overflow:hidden}
+  .prov-row .bar i{display:block;height:100%;border-radius:999px;background:var(--accent-muted)}
+  .prov-row.zero .name{color:var(--muted);font-weight:400}
+  .prov-row .n{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-2)}
+  .prov-row .x{font-size:.75rem;color:var(--muted);text-align:center}
+  .dangerbox{display:flex;gap:9px;align-items:flex-start;padding:11px 13px;border-radius:var(--r-md);
+    background:var(--danger-subtle);color:var(--danger-strong);font-size:.8125rem}
+  .emptybox{display:flex;flex-direction:column;align-items:center;gap:8px;padding:36px 24px;text-align:center}
+  .emptybox .ico{width:56px;height:56px;border-radius:var(--r-xl);background:#f1f5f9;color:var(--faint);
+    display:flex;align-items:center;justify-content:center}
+  .emptybox b{font-size:.9375rem;color:var(--ink-2)}
+  .emptybox p{margin:0;font-size:.8125rem;color:var(--muted);max-width:44ch}
+
+  /* modal mock */
+  .modal{max-width:400px;margin:0 auto;background:#fff;border:1px solid var(--border);border-radius:var(--r-lg);
+    box-shadow:0 20px 25px -5px rgba(15,23,42,.08);padding:18px 20px}
+  .modal h4{margin:0 0 12px;font-size:.9375rem}
+  .pills{display:flex;flex-wrap:wrap;gap:7px}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;font-size:.8125rem;
+    border:1px solid var(--border);color:var(--ink-2);background:#fff}
+  .pill.on{background:var(--accent-subtle);border-color:var(--accent-muted);color:var(--accent);font-weight:600}
+  .modal .search{margin-bottom:12px}
+
+  /* ---------- D2: funnel, tabs, tables, queue ---------- */
+  .stages{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .stage{background:#fff;border:1px solid var(--border);border-radius:var(--r-md);padding:14px 16px}
+  .stage .st-name{font-size:.8125rem;font-weight:700;color:var(--ink)}
+  .stage .st-state{display:inline-flex;align-items:center;gap:6px;margin-top:6px;font-size:.6875rem;font-weight:600;
+    letter-spacing:.06em;text-transform:uppercase;padding:4px 9px;border-radius:999px}
+  .st-done{background:var(--ok-bg);color:#047857}
+  .st-live{background:var(--accent-subtle);color:var(--accent)}
+  .st-wait{background:#f1f5f9;color:var(--muted)}
+  .stage .st-n{margin-top:8px;font-size:1.3rem;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .stage .st-n small{font-size:.75rem;font-weight:500;color:var(--muted)}
+  .funnelbar{display:flex;height:14px;border-radius:999px;overflow:hidden;margin-top:14px;background:var(--border-soft)}
+  .funnelbar i{display:block;height:100%}
+  .fb-keep{background:var(--accent)}
+  .fb-forse{background:var(--accent-muted)}
+  .fb-review{background:var(--warn-subtle)}
+  .fb-scarta{background:#e2e8f0}
+  .buckets{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:.8125rem;color:var(--ink-2)}
+  .buckets b{color:var(--ink);font-variant-numeric:tabular-nums}
+  .buckets .dot{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+  .statuspill{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:999px;font-size:.75rem;font-weight:700}
+  .statuspill.run{background:var(--accent-subtle);color:var(--accent)}
+  .statuspill.done{background:var(--ok-bg);color:#047857}
+  .pulse{width:8px;height:8px;border-radius:50%;background:currentColor}
+  @media (prefers-reduced-motion:no-preference){.pulse{animation:pu 1.6s ease-in-out infinite}@keyframes pu{50%{opacity:.35}}}
+  .summarystrip{display:flex;gap:0;align-items:center;flex-wrap:wrap;font-size:.8125rem;color:var(--ink-2)}
+  .summarystrip b{color:var(--ink);font-variant-numeric:tabular-nums}
+  .summarystrip .sep{margin:0 10px;color:var(--faint)}
+  .tabs{display:flex;gap:22px;border-bottom:1px solid var(--border);margin-top:4px}
+  .tab{padding:10px 2px;font-size:.8125rem;font-weight:600;color:var(--muted);border-bottom:2px solid transparent}
+  .tab.on{color:var(--ink);border-bottom-color:var(--accent)}
+  .tab .badge{margin-left:6px;font:700 10.5px/1 var(--mono);background:var(--warn-subtle);color:var(--warn-strong);
+    padding:3px 7px;border-radius:999px}
+  .tab .badge.gray{background:#f1f5f9;color:var(--muted)}
+  table.wt{width:100%;border-collapse:collapse;font-size:.8125rem}
+  table.wt th{font:600 10.5px/1.4 var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+    text-align:left;padding:9px 10px;border-bottom:1px solid var(--border)}
+  table.wt td{padding:10px;border-bottom:1px solid var(--border-soft);color:var(--ink-2);font-variant-numeric:tabular-nums}
+  table.wt td.co{font-weight:600;color:var(--ink)}
+  .bkt{display:inline-flex;padding:4px 10px;border-radius:999px;font-size:.6875rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+  .bkt-az{background:var(--accent-subtle);color:var(--accent)}
+  .bkt-dv{background:var(--warn-subtle);color:var(--warn-strong)}
+  .bkt-so{background:#f1f5f9;color:var(--muted)}
+  .stars{color:var(--warn);letter-spacing:2px}
+  .stars .off{color:var(--faint)}
+  .qrow{display:flex;gap:14px;align-items:flex-start;padding:14px 4px;border-bottom:1px solid var(--border-soft)}
+  .qrow .qmain{flex:1;min-width:0}
+  .qrow .qname{font-weight:700;font-size:.875rem;color:var(--ink)}
+  .qrow .qwhy{margin-top:3px;font-size:.8125rem;color:var(--ink-2)}
+  .qrow .qwhy.group{color:var(--warn-strong)}
+  .qacts{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+  .btn.sm{min-height:32px;padding:0 14px;font-size:.78rem}
+  .qstate{display:inline-flex;align-items:center;gap:8px;font-size:.8125rem;color:var(--accent);font-weight:600}
+  .ghost{opacity:.55}
+
+  .footer-note{margin-top:64px;padding-top:18px;border-top:1px solid var(--border);font-size:.8125rem;color:var(--muted);max-width:72ch}
+  @media (max-width:680px){
+    .fields{grid-template-columns:1fr}
+    .prov-row{grid-template-columns:110px 1fr 48px 22px}
+  }
+  @media (prefers-reduced-motion:no-preference){
+    section.state{animation:rise .5s cubic-bezier(.16,1,.3,1) both}
+    @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  }
+</style>
+
+<div class="doc">
+  <header class="doc-head">
+    <span class="eyebrow">Binocolo · Workstream D · GATED-UX-PRD.md — iterazione 8</span>
+    <h1>Wireframe — Ricerca gated (D1 + D2)</h1>
+    <p>Mid-fidelity sul clean theme di <code style="font:500 12px var(--mono)">docs/UI-UX.md</code>. <b>D1</b> (<code style="font:500 12px var(--mono)">/ricerche/nuova</code>): S1 → S6, approvato. <b>D2</b> (<code style="font:500 12px var(--mono)">/ricerche/:id</code>): S7 → S10, in revisione.</p>
+    <div class="legend"><span><span class="m">1</span> = nota di revisione ancorata al PRD — non fa parte della UI.</span></div>
+  </header>
+
+  <nav class="statenav" aria-label="Stati">
+    <a href="#s1">S1 · Richiesta</a>
+    <a href="#s2">S2 · Perimetro</a>
+    <a href="#s3">S3 · Stima OK</a>
+    <a href="#s4">S4 · Troppo ampia</a>
+    <a href="#s5">S5 · Vuota</a>
+    <a href="#s6">S6 · Degradati</a>
+    <a href="#s7">S7 · Run in corso</a>
+    <a href="#s8">S8 · Risultati</a>
+    <a href="#s9">S9 · Coda verifica</a>
+    <a href="#s10">S10 · Scarti</a>
+  </nav>
+
+  <div class="flow" aria-label="Flusso">
+    <b>Flusso:</b>
+    <span class="step">Richiesta</span><span class="arr">→</span>
+    <span class="step">Perimetro</span><span class="arr">→</span>
+    <span class="step">Stima</span><span class="arr">→</span>
+    <span class="step hot">Run in corso</span><span class="arr">→</span>
+    <span class="step hot">Risultati + Coda + Scarti</span>
+  </div>
+
+  <!-- ============================ S1 ============================ -->
+  <section class="state" id="s1">
+    <div class="state-head"><span class="sid">S1</span><h2>Richiesta in linguaggio naturale</h2><span class="ref">PRD §2.1</span></div>
+    <p class="state-intent">Stato iniziale della pagina. La textarea è l'unico protagonista: niente selettori LLM, niente codici, niente limite risultati.</p>
+    <div class="frame">
+      <div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span><span class="url">binocolo.local/ricerche/nuova</span></div>
+      <div class="app">
+        <div class="app-head">
+          <span class="app-logo">B</span><span class="app-name">Binocolo</span>
+          <span class="app-back">← <b>Ricerche</b></span>
+          <span class="app-user">Agent Sciacco</span>
+        </div>
+        <div class="app-body">
+          <div>
+            <h3 class="page-title">Nuova ricerca</h3>
+            <p class="page-sub">Descrizione del perimetro in linguaggio naturale. Il sistema riconosce ambiti di attività, territorio e vincoli.</p>
+          </div>
+          <div class="card">
+            <p class="lab"><span class="req-dot" aria-hidden="true"></span>Richiesta <span class="m">1</span></p>
+            <div class="textarea">Descrivi in dettaglio le attività delle aziende cercate: cosa fanno, per quali clienti, con quali tecnologie o servizi. Aggiungi territorio e vincoli (fatturato, dipendenti, età del titolare…).</div>
+            <div class="guide">
+              <span><b>Più la descrizione è ricca, più la ricerca è mirata.</b> Il sistema valuta cosa fanno davvero le aziende, non solo la classificazione formale.</span>
+              <span>Non servono codici ATECO: descrivere gli ambiti di business in modo discorsivo. <span class="m">2</span></span>
+              <span>Esempio: «Aziende che sviluppano software gestionale per la logistica e l'automazione di magazzino, anche system integrator specializzati; escluse le web agency. Province di Milano e Monza, fatturato tra 1 e 5 milioni, titolare vicino alla pensione.» <span class="m">3</span></span>
+            </div>
+            <div class="actions" style="margin-top:16px">
+              <span class="btn primary disabled">Analizza la richiesta</span>
+              <span class="aside">Attivo con una descrizione sufficiente <span class="m">4</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><span class="m">1</span><span><b>Unico campo obbligatorio</b> della pagina (pallino rosso da design system, niente asterisco). <span class="ref">UI-UX §12</span></span></li>
+      <li><span class="m">2</span><span>La guida scoraggia i codici ATECO ma non li vieta: se incollati, S2 li converte in concetti via reverse-KB. <span class="ref">PRD §2.2 R5</span></span></li>
+      <li><span class="m">3</span><span><b>Un esempio completo</b> insegna il livello di dettaglio atteso (ambiti + esclusioni + territorio + vincoli + segnale di tesi) meglio di regole astratte.</span></li>
+      <li><span class="m">4</span><span>Nessuna validazione semantica client: il giudizio sul contenuto arriva dalla decomposizione (S2/S6). Il bottone si attiva su lunghezza minima.</span></li>
+    </ul>
+  </section>
+
+  <!-- ============================ S2 ============================ -->
+  <section class="state" id="s2">
+    <div class="state-head"><span class="sid">S2</span><h2>Perimetro riconosciuto</h2><span class="ref">PRD §2.2–2.6</span></div>
+    <p class="state-intent">Dopo la decomposizione la richiesta collassa in testata compatta e compare il perimetro: concetti (sola lettura), tesi derivata, territorio, vincoli editabili.</p>
+    <div class="frame">
+      <div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span><span class="url">binocolo.local/ricerche/nuova</span></div>
+      <div class="app">
+        <div class="app-head">
+          <span class="app-logo">B</span><span class="app-name">Binocolo</span>
+          <span class="app-back">← <b>Ricerche</b></span>
+          <span class="app-user">Agent Sciacco</span>
+        </div>
+        <div class="app-body">
+          <div class="card compact">
+            <div class="req-collapsed">
+              <p><b style="color:var(--ink)">Richiesta.</b> «Aziende che sviluppano software gestionale per la logistica e l'automazione di magazzino, anche system integrator specializzati; escluse le web agency. Province di Milano e Monza, fatturato tra 1 e 5 milioni, titolare vicino alla pensione.»</p>
+              <span class="linkbtn">Modifica <span class="m">1</span></span>
+            </div>
+          </div>
+
+          <div class="card">
+            <p class="lab">Ambiti riconosciuti <span class="m">2</span></p>
+            <div class="chips">
+              <span class="chip core">Software gestionale / ERP <span class="fit">core</span></span>
+              <span class="chip core">Automazione di magazzino / WMS <span class="fit">core</span></span>
+              <span class="chip core">System integration <span class="fit">core</span></span>
+              <span class="chip adj">Sviluppo software su commessa <span class="fit">adiacente</span></span>
+              <span class="chip adj">Consulenza IT <span class="fit">adiacente</span></span>
+            </div>
+            <div class="chev">
+              <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 2l5 4-5 4" fill="none" stroke="currentColor" stroke-width="1.6" transform="rotate(90 6 6)"/></svg>
+              Settori ATECO utilizzati <span class="m">3</span>
+            </div>
+            <div class="chev-panel">
+              <div class="div-row"><span class="div-code">62</span><span class="div-title">Produzione di software, consulenza informatica e attività connesse</span></div>
+              <div class="div-row" style="border-top:0;padding-top:0">
+                <span class="codes"><span class="code">62.10</span><span class="code">62.20.1</span><span class="code">62.20.9</span><span class="code">62.90</span></span>
+              </div>
+              <div class="div-row"><span class="div-code">63</span><span class="div-title">Attività dei servizi d'informazione e altri servizi informatici</span></div>
+              <div class="div-row" style="border-top:0;padding-top:0">
+                <span class="codes"><span class="code">63.10.1</span><span class="code">63.10.2</span><span class="code">63.99</span></span>
+              </div>
+              <p class="hint" style="margin:10px 0 0">La ricerca esplora le divisioni per intero; il giudizio di aderenza avviene sull'attività reale. <span class="m">4</span></p>
+            </div>
+            <div style="margin-top:14px">
+              <span class="thesis">Tesi: Successione <small>· derivata dalla richiesta, modificabile dopo l'esecuzione</small> <span class="m">5</span></span>
+            </div>
+          </div>
+
+          <div class="card">
+            <p class="lab">Territorio</p>
+            <div class="terr">
+              <span class="val">Milano, Monza e Brianza</span>
+              <span class="hint">2 province</span>
+              <span class="linkbtn" style="margin-left:auto">Modifica province <span class="m">6</span></span>
+            </div>
+          </div>
+
+          <div class="card">
+            <p class="lab">Vincoli</p>
+            <div class="fields">
+              <div class="field">
+                <p class="lab" style="text-transform:none;letter-spacing:0">Fatturato (€)</p>
+                <div class="inputrow"><span class="input">1.000.000</span><span class="dash">–</span><span class="input">5.000.000</span></div>
+              </div>
+              <div class="field">
+                <p class="lab" style="text-transform:none;letter-spacing:0">Età minima titolare</p>
+                <div class="inputrow"><span class="input">60</span></div>
+              </div>
+              <span class="addc">+ aggiungi vincolo <span class="m">7</span></span>
+            </div>
+          </div>
+
+          <div class="actions">
+            <span class="btn primary">Calcola stima</span>
+            <span class="aside">La stima richiede qualche istante <span class="m">8</span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><span class="m">1</span><span><b>Modifica</b> riapre S1 con il testo: ogni cambio alla richiesta rifà la decomposizione e invalida stima e preview. <span class="ref">PRD §2.7.1 freshness</span></span></li>
+      <li><span class="m">2</span><span>Concetti KB persistiti alla creazione (R1) con modalità di retrieval (R1b). Sola lettura: nessun editing dei codici in fase 1. <span class="ref">PRD §2.2</span></span></li>
+      <li><span class="m">3</span><span>Chevron chiuso di default; qui è mostrato aperto. Divisioni + codici della superficie espansa, in sola consultazione.</span></li>
+      <li><span class="m">4</span><span>Una riga spiega il metodo (superficie larga + gate sull'attività reale) senza gergo di pipeline. Niente costi. <span class="ref">vincolo costi-interni</span></span></li>
+      <li><span class="m">5</span><span>Tesi derivata, chip informativa non interattiva. Il cambio tesi vive nel rescore post-esecuzione. <span class="ref">PRD §2.5</span></span></li>
+      <li><span class="m">6</span><span>Recap sintetico (nome regione se coperta per intero); il modal è l'unico punto di editing del territorio. <span class="ref">PRD §2.3</span></span></li>
+      <li><span class="m">7</span><span>Pattern attuale riusato: campi opzionali nascosti finché non valorizzati (ricavo/dipendente, soci, forme giuridiche…). L'età titolare è visibile perché estratta dalla richiesta. <span class="ref">PRD §2.4</span></span></li>
+      <li><span class="m">8</span><span>Stima asincrona: al click il bottone passa a skeleton nel pannello S3, nessuno spinner. <span class="ref">PRD §2.7 · UI-UX §13</span></span></li>
+    </ul>
+
+    <div class="croprow" style="margin-top:22px">
+      <div>
+        <div class="crop">
+          <div class="crop-tag">Variante · modal province</div>
+          <div style="padding:20px;background:linear-gradient(180deg,#f8fafc,#eef2ff)">
+            <div class="modal">
+              <h4>Province</h4>
+              <div class="search"><span class="input ph" style="display:block">Cerca provincia…</span></div>
+              <div class="pills">
+                <span class="pill on">Milano ✕</span><span class="pill on">Monza e Brianza ✕</span>
+                <span class="pill">Bergamo</span><span class="pill">Brescia</span><span class="pill">Como</span>
+                <span class="pill">Lodi</span><span class="pill">Pavia</span><span class="pill">Varese</span>
+              </div>
+              <div class="actions" style="margin-top:16px"><span class="btn primary" style="min-height:34px">Applica</span><span class="btn secondary" style="min-height:34px">Annulla</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="crop">
+          <div class="crop-tag">Variante · territorio oltre una regione <span style="letter-spacing:0;text-transform:none">(PRD §2.3.1)</span></div>
+          <div style="padding:20px;background:linear-gradient(180deg,#f8fafc,#eef2ff)">
+            <div class="card">
+              <p class="lab">Territorio</p>
+              <div class="terr"><span class="val">Lombardia, Veneto</span><span class="hint">19 province</span><span class="linkbtn" style="margin-left:auto">Modifica province</span></div>
+              <div class="warnbox"><span aria-hidden="true">⚠</span><span><b>Perimetro territoriale ampio.</b> La stima sarà più lenta e la ricerca meno mirata. Preferire una regione o poche province.</span></div>
+            </div>
+            <p class="hint" style="margin:10px 4px 0">Avviso <b>non bloccante</b>, ripetuto accanto a «Calcola stima». Il blocco vero è in S4, sui numeri reali.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ S3 ============================ -->
+  <section class="state" id="s3">
+    <div class="state-head"><span class="sid">S3</span><h2>Preview — perimetro eseguibile</h2><span class="ref">PRD §2.7.1 · stato 1</span></div>
+    <p class="state-intent">Il pannello stima compare sotto i blocchi di S2. Ritaglio del solo pannello.</p>
+    <div class="crop">
+      <div class="crop-tag">Dettaglio · pannello stima</div>
+      <div style="padding:22px;background:linear-gradient(180deg,#f8fafc,#eef2ff)">
+        <div class="card" style="max-width:640px;margin:0 auto">
+          <p class="lab">Stima della ricerca</p>
+          <div class="bignum">612 <small>aziende nel perimetro</small> <span class="m">1</span></div>
+          <div class="prov">
+            <div class="prov-row"><span class="name">Milano</span><span class="bar"><i style="width:70%"></i></span><span class="n">428</span><span class="x" title="Rimuovi">✕</span></div>
+            <div class="prov-row"><span class="name">Monza e Brianza</span><span class="bar"><i style="width:30%"></i></span><span class="n">184</span><span class="x" title="Rimuovi">✕</span></div>
+          </div>
+          <p class="hint" style="margin:12px 0 0">Ripartizione per provincia. Rimuovere una provincia aggiorna il perimetro e richiede una nuova stima. <span class="m">2</span></p>
+          <div class="actions" style="margin-top:18px">
+            <span class="btn primary">Conferma e avvia</span>
+            <span class="btn secondary">Rivedi perimetro</span>
+          </div>
+          <p class="hint" style="margin:10px 0 0">L'analisi è asincrona: l'avanzamento è consultabile nella pagina della ricerca. <span class="m">3</span></p>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><span class="m">1</span><span><b>Il numero è la decisione.</b> Nessun costo, nessuna percentuale, nessun tempo stimato inventato. <span class="ref">vincolo costi-interni</span></span></li>
+      <li><span class="m">2</span><span>Ripartizione mostrata solo con ≥2 province; province a zero in coda, non nascoste. La ✕ è la leva territoriale a un click (riapre il flusso di stima). <span class="ref">PRD §2.7.1</span></span></li>
+      <li><span class="m">3</span><span>Aspettativa onesta sull'asincronia; alla conferma → redirect a <code style="font:500 11px var(--mono)">/ricerche/:id</code> (D2).</span></li>
+    </ul>
+  </section>
+
+  <!-- ============================ S4 ============================ -->
+  <section class="state" id="s4">
+    <div class="state-head"><span class="sid">S4</span><h2>Preview — perimetro troppo ampio</h2><span class="ref">PRD §2.7.1 · stato 2 · bloccante</span></div>
+    <p class="state-intent">Il totale supera il cap (o il vendor risponde «too broad»): la conferma non esiste, coerente col rifiuto up-front del backend.</p>
+    <div class="crop">
+      <div class="crop-tag">Dettaglio · pannello stima</div>
+      <div style="padding:22px;background:linear-gradient(180deg,#f8fafc,#eef2ff)">
+        <div class="card" style="max-width:640px;margin:0 auto">
+          <p class="lab">Stima della ricerca</p>
+          <div class="bignum">più di 1.000 <small>aziende nel perimetro</small> <span class="m">1</span></div>
+          <div class="dangerbox" style="margin-top:12px"><span aria-hidden="true">●</span><span><b>Il perimetro supera la capacità di una ricerca completa.</b> Restringere il territorio o gli ambiti di attività per procedere. <span class="m">2</span></span></div>
+          <div class="prov">
+            <div class="prov-row"><span class="name">Milano</span><span class="bar"><i style="width:100%"></i></span><span class="n">714</span><span class="x" title="Rimuovi">✕</span></div>
+            <div class="prov-row"><span class="name">Bergamo</span><span class="bar"><i style="width:24%"></i></span><span class="n">168</span><span class="x" title="Rimuovi">✕</span></div>
+            <div class="prov-row"><span class="name">Brescia</span><span class="bar"><i style="width:21%"></i></span><span class="n">147</span><span class="x" title="Rimuovi">✕</span></div>
+            <div class="prov-row"><span class="name">Monza e Brianza</span><span class="bar"><i style="width:19%"></i></span><span class="n">132</span><span class="x" title="Rimuovi">✕</span></div>
+            <div class="prov-row"><span class="name">altre 8 province…</span><span class="bar"><i style="width:12%"></i></span><span class="n">—</span><span class="x"></span></div>
+          </div>
+          <div class="actions" style="margin-top:18px">
+            <span class="btn secondary">Rivedi perimetro</span> <span class="m">3</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><span class="m">1</span><span>«più di 1.000» = lower bound reale dei probe, mai un numero inventato. <span class="ref">PRD §2.7.1</span></span></li>
+      <li><span class="m">2</span><span>Copy senza soglie numeriche visibili (il cap è governo interno): dice cosa fare, non quanto costa.</span></li>
+      <li><span class="m">3</span><span><b>Nessuna conferma renderizzata</b> (non un bottone disabilitato): lo stato non è «quasi pronto», è «da restringere». La ripartizione è la leva.</span></li>
+    </ul>
+  </section>
+
+  <!-- ============================ S5 ============================ -->
+  <section class="state" id="s5">
+    <div class="state-head"><span class="sid">S5</span><h2>Preview — perimetro vuoto</h2><span class="ref">PRD §2.7.1 · stato 3</span></div>
+    <p class="state-intent">Zero aziende: empty state da design system, con i due rimedi possibili.</p>
+    <div class="crop">
+      <div class="crop-tag">Dettaglio · pannello stima</div>
+      <div style="padding:22px;background:linear-gradient(180deg,#f8fafc,#eef2ff)">
+        <div class="card" style="max-width:640px;margin:0 auto">
+          <div class="emptybox">
+            <span class="ico"><svg width="28" height="28" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="21" cy="21" r="12"/><path d="M30 30l10 10"/></svg></span>
+            <b>Nessuna azienda nel perimetro</b>
+            <p>Ampliare gli ambiti di attività descritti nella richiesta, oppure estendere il territorio. <span class="m">1</span></p>
+            <div class="actions" style="margin-top:6px"><span class="btn secondary">Rivedi perimetro</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><span class="m">1</span><span>Caso distinto dal «settore non riconosciuto» (S6-A), che emerge già alla decomposizione: qui il perimetro è valido ma il mercato è vuoto con questi vincoli.</span></li>
+    </ul>
+  </section>
+
+  <!-- ============================ S6 ============================ -->
+  <section class="state" id="s6">
+    <div class="state-head"><span class="sid">S6</span><h2>Decomposizione — stati degradati</h2><span class="ref">PRD §2.2.1 · A, B bloccanti · C degradato</span></div>
+    <p class="state-intent">Varianti del blocco «Ambiti riconosciuti» di S2. In A e B la stima non è raggiungibile (R7); in C il flusso procede.</p>
+    <div class="croprow">
+      <div>
+        <div class="crop">
+          <div class="crop-tag">A · settore non riconosciuto — bloccante</div>
+          <div style="padding:20px;background:linear-gradient(180deg,#f8fafc,#eef2ff)">
+            <div class="card">
+              <p class="lab">Ambiti riconosciuti</p>
+              <div class="dangerbox"><span aria-hidden="true">●</span><span><b>Ambiti non riconosciuti.</b> Il sistema è attualmente configurato per settori ICT e adiacenti. Riformulare la richiesta descrivendo in concreto le attività svolte. <span class="m">1</span></span></div>
+              <div class="actions" style="margin-top:14px"><span class="btn secondary">Modifica la richiesta</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="crop">
+          <div class="crop-tag">B · perimetro positivo mancante — bloccante</div>
+          <div style="padding:20px;background:linear-gradient(180deg,#f8fafc,#eef2ff)">
+            <div class="card">
+              <p class="lab">Ambiti riconosciuti</p>
+              <div class="dangerbox"><span aria-hidden="true">●</span><span><b>La richiesta non descrive cosa fanno le aziende cercate.</b> Indicare gli ambiti di business, anche in modo ampio: il giudizio di aderenza si basa su questa descrizione. <span class="m">2</span></span></div>
+              <p class="hint" style="margin:10px 0 0">Variante solo-esclusioni: «La richiesta indica solo cosa escludere. Descrivere anche gli ambiti cercati.»</p>
+              <div class="actions" style="margin-top:14px"><span class="btn secondary">Modifica la richiesta</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="crop">
+          <div class="crop-tag">C · fallback catalogo — non bloccante</div>
+          <div style="padding:20px;background:linear-gradient(180deg,#f8fafc,#eef2ff)">
+            <div class="card">
+              <p class="lab">Ambiti riconosciuti</p>
+              <div class="warnbox" style="margin:0 0 12px"><span aria-hidden="true">⚠</span><span>Perimetro derivato dal catalogo ATECO. <span class="m">3</span></span></div>
+              <div class="chev-panel" style="margin:0">
+                <div class="div-row"><span class="div-code">62</span><span class="div-title">Produzione di software, consulenza informatica e attività connesse</span></div>
+                <div class="div-row"><span class="div-code">63</span><span class="div-title">Attività dei servizi d'informazione e altri servizi informatici</span></div>
+              </div>
+              <div class="actions" style="margin-top:14px"><span class="btn primary" style="min-height:34px">Calcola stima</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><span class="m">1</span><span>Verdetto autorevole del retrieval (sotto-floor), copy di copertura ratificato. Senza candidati la stima degraderebbe alla superficie province-only: mai raggiungibile da qui. <span class="ref">R7</span></span></li>
+      <li><span class="m">2</span><span>Tono «il metodo ha bisogno di sapere cosa cerchi», non «hai sbagliato». Copre anche la ricerca solo-strutturale (es. pura successione senza settore).</span></li>
+      <li><span class="m">3</span><span>Embedder/KB indisponibili: niente concetti, divisioni dal catalogo con nota sobria. Stima e flusso procedono normalmente. <span class="ref">PRD §2.2.1-C</span></span></li>
+    </ul>
+  </section>
+
+  <!-- ============================ S7 ============================ -->
+  <section class="state" id="s7">
+    <div class="state-head"><span class="sid">S7</span><h2>D2 — Run in corso</h2><span class="ref">PRD §3.1 · endpoint §3.1.1 · R10</span></div>
+    <p class="state-intent">Il funnel è il protagonista. Tutti i numeri arrivano dall'endpoint di progresso (aggregazione read-only, polling solo mentre la ricerca corre).</p>
+    <div class="frame">
+      <div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span><span class="url">binocolo.local/ricerche/8f2a…</span></div>
+      <div class="app">
+        <div class="app-head">
+          <span class="app-logo">B</span><span class="app-name">Binocolo</span>
+          <span class="app-back">← <b>Ricerche</b></span>
+          <span class="app-user">Agent Sciacco</span>
+        </div>
+        <div class="app-body" style="max-width:780px">
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+            <h3 class="page-title" style="margin-right:auto">Software gestionale e WMS — Milano, Monza</h3>
+            <span class="statuspill run"><span class="pulse" aria-hidden="true"></span>Ricerca in corso</span>
+          </div>
+          <div class="card">
+            <p class="lab">Avanzamento <span class="m">1</span></p>
+            <div class="stages">
+              <div class="stage">
+                <div class="st-name">Superficie</div>
+                <span class="st-state st-done">Completato</span>
+                <div class="st-n">612 <small>aziende individuate</small></div>
+              </div>
+              <div class="stage">
+                <div class="st-name">Gate semantico</div>
+                <span class="st-state st-live">In corso</span>
+                <div class="st-n">480<small> / 612 valutate</small></div>
+              </div>
+              <div class="stage">
+                <div class="st-name">Analisi e punteggio</div>
+                <span class="st-state st-wait">In attesa</span>
+                <div class="st-n">—</div>
+              </div>
+            </div>
+            <div class="funnelbar" aria-hidden="true">
+              <i class="fb-keep" style="width:25%"></i><i class="fb-forse" style="width:17%"></i><i class="fb-review" style="width:5%"></i><i class="fb-scarta" style="width:53%"></i>
+            </div>
+            <div class="buckets"><span class="m">2</span>
+              <span><span class="dot" style="background:var(--accent)"></span>In tesi <b>118</b></span>
+              <span><span class="dot" style="background:var(--accent-muted)"></span>Da approfondire <b>84</b></span>
+              <span><span class="dot" style="background:var(--warn-subtle);border:1px solid var(--warn)"></span>Da verificare <b>26</b></span>
+              <span><span class="dot" style="background:#e2e8f0"></span>Fuori tesi <b>252</b></span>
+            </div>
+            <p class="hint" style="margin:12px 0 0">La valutazione richiede tempo. La pagina si aggiorna da sola. <span class="m">3</span></p>
+          </div>
+          <div class="card compact ghost">
+            <p class="lab">Coda di verifica · 26 <span class="m">4</span></p>
+            <div class="qrow" style="border-bottom:1px solid var(--border-soft)">
+              <div class="qmain"><span class="qname">HORSA ONE PRO SRL</span>
+                <div class="qwhy group">Possibile sito di gruppo: horsa.com (P.IVA di altra società)</div></div>
+              <span class="hint" style="white-space:nowrap">disponibile a ricerca completata</span>
+            </div>
+            <div class="qrow" style="border-bottom:0">
+              <div class="qmain"><span class="qname">CFG ADVISORS SRL</span>
+                <div class="qwhy">Identità non confermata sulle pagine lette</div></div>
+              <span class="hint" style="white-space:nowrap">disponibile a ricerca completata</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><span class="m">1</span><span>Tre stadi con stato e contatore vivo; larghezze del funnel proporzionali ai bucket reali. Nessun costo, nessuna percentuale inventata, nessun tempo stimato. <span class="ref">§3.1</span></span></li>
+      <li><span class="m">2</span><span>Etichette utente per i bucket: In tesi / Da approfondire / Da verificare / Fuori tesi (mappano keep / forse / manual_review / scarta — gergo di pipeline mai esposto).</span></li>
+      <li><span class="m">3</span><span>Polling dell'endpoint §3.1.1 ogni pochi secondi solo mentre <code style="font:500 11px var(--mono)">running</code>.</span></li>
+      <li><span class="m">4</span><span><b>R10</b>: coda visibile subito (le righe si accumulano durante il gate), rimedi disattivi fino a run fermo — race verificata con lo stadio di arricchimento.</span></li>
+    </ul>
+    <div class="croprow" style="margin-top:22px">
+      <div>
+        <div class="crop">
+          <div class="crop-tag">Variante · run fallito — onesto</div>
+          <div style="padding:20px;background:linear-gradient(180deg,#f8fafc,#eef2ff)">
+            <div class="card">
+              <div class="dangerbox"><span aria-hidden="true">●</span><span><b>Ricerca interrotta</b> — errore del fornitore dati durante l'arricchimento. Le aziende già elaborate sono conservate: la ripresa riparte da dove si era fermata.</span></div>
+              <div class="actions" style="margin-top:14px"><span class="btn primary" style="min-height:34px">Riprendi la ricerca</span></div>
+            </div>
+            <p class="hint" style="margin:10px 4px 0">Mai un funnel congelato senza spiegazione; la ripresa sfrutta l'idempotenza per-stadio del job (nessuna doppia elaborazione).</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ S8 ============================ -->
+  <section class="state" id="s8">
+    <div class="state-head"><span class="sid">S8</span><h2>D2 — Run completato · Risultati</h2><span class="ref">PRD §3.2</span></div>
+    <p class="state-intent">Il funnel collassa a riepilogo; il lavoro diventa protagonista su tre superfici (tab). Le funzioni sui risultati restano quelle di oggi.</p>
+    <div class="frame">
+      <div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span><span class="url">binocolo.local/ricerche/8f2a…</span></div>
+      <div class="app">
+        <div class="app-head">
+          <span class="app-logo">B</span><span class="app-name">Binocolo</span>
+          <span class="app-back">← <b>Ricerche</b></span>
+          <span class="app-user">Agent Sciacco</span>
+        </div>
+        <div class="app-body" style="max-width:820px">
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+            <h3 class="page-title" style="margin-right:auto">Software gestionale e WMS — Milano, Monza</h3>
+            <span class="statuspill done">Completata</span>
+          </div>
+          <div class="card compact">
+            <div class="summarystrip"><span class="m">1</span>&nbsp;
+              <span>Superficie <b>612</b></span><span class="sep">→</span>
+              <span>oltre il gate <b>264</b></span><span class="sep">→</span>
+              <span>analizzate <b>258</b></span><span class="sep">·</span>
+              <span>coda <b>35</b></span><span class="sep">·</span>
+              <span>fuori tesi <b>319</b></span>
+              <span class="linkbtn" style="margin-left:auto">dettaglio</span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <span class="thesis">Tesi: Successione</span>
+            <span class="linkbtn">Cambia tesi e ricalcola <span class="m">2</span></span>
+            <span style="margin-left:auto;display:flex;gap:8px">
+              <span class="btn secondary sm">Export</span>
+              <span class="btn secondary sm">Approfondimento</span>
+            </span>
+          </div>
+          <div class="card">
+            <div class="tabs">
+              <span class="tab on">Risultati</span>
+              <span class="tab">Coda di verifica <span class="badge">35</span></span>
+              <span class="tab">Fuori tesi <span class="badge gray">319</span></span>
+            </div>
+            <table class="wt">
+              <thead><tr><th>Azienda</th><th>Prov.</th><th>Esito <span class="m">3</span></th><th style="text-align:right">Punteggio</th><th>Preferenza</th></tr></thead>
+              <tbody>
+                <tr><td class="co">NETX64 SRL</td><td>MI</td><td><span class="bkt bkt-az">Azionabile</span></td><td style="text-align:right">82</td><td class="stars">★★★<span class="off">·</span></td></tr>
+                <tr><td class="co">ENGITEL SPA</td><td>MI</td><td><span class="bkt bkt-az">Azionabile</span></td><td style="text-align:right">77</td><td class="stars">★★<span class="off">··</span></td></tr>
+                <tr><td class="co">SINTESI DIGITALE SRL</td><td>MB</td><td><span class="bkt bkt-dv">Da verificare</span></td><td style="text-align:right">61</td><td class="stars"><span class="off">····</span></td></tr>
+                <tr><td class="co">GERICO SECURITY SRL</td><td>MI</td><td><span class="bkt bkt-dv">Da verificare</span></td><td style="text-align:right">58</td><td class="stars">★<span class="off">···</span></td></tr>
+                <tr><td class="co">LOGIWARE SRL</td><td>MB</td><td><span class="bkt bkt-so">Soppresso</span></td><td style="text-align:right">—</td><td class="stars"><span class="off">····</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><span class="m">1</span><span>Riepilogo compatto del percorso (ri-espandibile al funnel completo). I numeri quadrano per costruzione: 264 sopravvissute, 258 analizzate (6 arricchimenti falliti → in coda), 612 totali.</span></li>
+      <li><span class="m">2</span><span>Il cambio tesi post-esecuzione con rescore è la funzione esistente — è QUI, non nel form D1 (decisione §2.5).</span></li>
+      <li><span class="m">3</span><span>Esito = bucket del routing v3 (azionabile / da verificare / soppresso), sui soli target scorati. I "soppressi" restano visibili in tabella (audit), i "fuori tesi" del gate (mai analizzati) stanno nel terzo tab — due famiglie diverse, mai mescolate.</span></li>
+    </ul>
+  </section>
+
+  <!-- ============================ S9 ============================ -->
+  <section class="state" id="s9">
+    <div class="state-head"><span class="sid">S9</span><h2>D2 — Coda di verifica</h2><span class="ref">PRD §3.3–3.4 · R9 · B1 · C</span></div>
+    <p class="state-intent">Tab attivo sulla coda: motivo derivato dai fatti persistiti, rimedi contestuali al motivo, stato del re-processo sulla riga.</p>
+    <div class="frame">
+      <div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span><span class="url">binocolo.local/ricerche/8f2a…</span></div>
+      <div class="app">
+        <div class="app-body" style="max-width:820px;padding-top:20px">
+          <div class="card">
+            <div class="tabs">
+              <span class="tab">Risultati</span>
+              <span class="tab on">Coda di verifica <span class="badge">35</span></span>
+              <span class="tab">Fuori tesi <span class="badge gray">319</span></span>
+            </div>
+            <div class="qrow">
+              <div class="qmain"><span class="qname">HORSA ONE PRO SRL</span>
+                <div class="qwhy group">Possibile sito di gruppo: horsa.com (P.IVA di altra società) <span class="m">1</span></div></div>
+              <div class="qacts">
+                <span class="btn primary sm">Conferma sito di gruppo</span>
+                <span class="btn secondary sm">Associa dominio</span>
+                <span class="btn secondary sm">Nessun sito</span>
+              </div>
+            </div>
+            <div class="qrow">
+              <div class="qmain"><span class="qname">CFG ADVISORS SRL</span>
+                <div class="qwhy">Identità non confermata sulle pagine lette <span class="m">2</span></div></div>
+              <div class="qacts">
+                <span class="btn secondary sm">Associa dominio</span>
+                <span class="btn secondary sm">Nessun sito</span>
+              </div>
+            </div>
+            <div class="qrow">
+              <div class="qmain"><span class="qname">DAT ITALIA SRL</span>
+                <div class="qwhy">Sito irraggiungibile per la verifica automatica</div></div>
+              <div class="qacts">
+                <span class="btn secondary sm">Associa dominio</span>
+                <span class="btn secondary sm">Nessun sito</span>
+              </div>
+            </div>
+            <div class="qrow">
+              <div class="qmain"><span class="qname">MERZARIO SPA</span>
+                <div class="qwhy">Oltre il gate, analisi non riuscita <span class="m">3</span></div></div>
+              <div class="qacts"><span class="btn secondary sm">Riprova analisi</span></div>
+            </div>
+            <div class="qrow" style="border-bottom:0">
+              <div class="qmain"><span class="qname">WEBGAINS ITALY SRL</span>
+                <div class="qwhy">Sito di gruppo confermato: webgains.es</div></div>
+              <span class="qstate"><span class="pulse" aria-hidden="true"></span>Nuova valutazione in corso <span class="m">4</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><span class="m">1</span><span>Motivo dal fatto persistito <code style="font:500 11px var(--mono)">MAGroupSiteHint</code> — il rimedio B1 (primario) compare SOLO quando l'hint esiste; la conferma registra il dominio <code style="font:500 11px var(--mono)">vouched</code> group-site, cross-sessione. <span class="ref">R9 · B1</span></span></li>
+      <li><span class="m">2</span><span>Derivazione R9: candidati rigettati → "identità non confermata"; fetch falliti → "irraggiungibile". Mai testo generico.</span></li>
+      <li><span class="m">3</span><span>I keep/forse con arricchimento fallito stanno in coda (mai persi in silenzio); rimedio: riprova.</span></li>
+      <li><span class="m">4</span><span>Dopo il rimedio la riga mostra il re-processo per-azienda e all'esito esce verso il suo bucket. Tutti i rimedi sono job durevoli.</span></li>
+    </ul>
+    <div class="croprow" style="margin-top:22px">
+      <div>
+        <div class="crop">
+          <div class="crop-tag">Variante · conferma "Nessun sito ufficiale" (workstream C)</div>
+          <div style="padding:20px;background:linear-gradient(180deg,#f8fafc,#eef2ff)">
+            <div class="modal">
+              <h4>Nessun sito ufficiale</h4>
+              <p style="margin:0 0 6px;font-size:.8125rem;color:var(--ink-2)">CFG ADVISORS SRL viene dichiarata senza sito ufficiale. La dichiarazione è permanente e vale anche per le ricerche future.</p>
+              <p style="margin:0;font-size:.8125rem;color:var(--ink-2)">L'azienda prosegue sui soli dati strutturati, è inclusa nell'analisi completa e resta marcata "nessuna evidenza web".</p>
+              <div class="actions" style="margin-top:16px"><span class="btn primary" style="min-height:34px">Conferma</span><span class="btn secondary" style="min-height:34px">Annulla</span></div>
+            </div>
+            <p class="hint" style="margin:10px 4px 0">Decisione di spesa ratificata: la conferma ammette anche l'analisi completa — un click che dichiara e ammette insieme. Nessun costo in UI.</p>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="crop">
+          <div class="crop-tag">Variante · associa dominio, inline</div>
+          <div style="padding:20px;background:linear-gradient(180deg,#f8fafc,#eef2ff)">
+            <div class="card compact">
+              <div class="qrow" style="border-bottom:0">
+                <div class="qmain"><span class="qname">DAT ITALIA SRL</span>
+                  <div class="inputrow" style="margin-top:8px"><span class="input ph" style="max-width:260px">dominio ufficiale, es. datitalia.it</span><span class="btn primary sm">Associa</span></div>
+                </div>
+              </div>
+            </div>
+            <p class="hint" style="margin:10px 4px 0">Rimedio esistente, invariato: registro <code style="font:500 11px var(--mono)">manual</code> → ri-valutazione automatica della singola azienda.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ S10 ============================ -->
+  <section class="state" id="s10">
+    <div class="state-head"><span class="sid">S10</span><h2>D2 — Fuori tesi (audit del gate)</h2><span class="ref">PRD §3.2.3</span></div>
+    <p class="state-intent">Le scartate dal gate, ispezionabili: verdetto, dominio giudicato ed evidenza. Recall-safety: un errore del gate si vede e si ripesca.</p>
+    <div class="crop">
+      <div class="crop-tag">Dettaglio · tab fuori tesi</div>
+      <div style="padding:22px;background:linear-gradient(180deg,#f8fafc,#eef2ff)">
+        <div class="card" style="max-width:720px;margin:0 auto">
+          <div class="qrow">
+            <div class="qmain"><span class="qname">PIXELFARM SRL</span>
+              <div class="qwhy">Fuori perimetro: produzione video e post-produzione — giudicata su pixelfarm.it <span class="m">1</span></div></div>
+            <div class="qacts"><span class="btn secondary sm">Associa dominio corretto</span></div>
+          </div>
+          <div class="qrow" style="border-bottom:0">
+            <div class="qmain"><span class="qname">TAYLA SRL</span>
+              <div class="qwhy">Fuori perimetro: servizi contabili — giudicata su taylagroup.it</div></div>
+            <div class="qacts"><span class="btn secondary sm">Associa dominio corretto</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><span class="m">1</span><span>Ogni scarto dichiara il dominio su cui è stato giudicato: se è l'azienda sbagliata, l'operatore lo vede e il ripescaggio è "associa il dominio corretto" — unico rimedio da qui. <span class="ref">§3.2</span></span></li>
+    </ul>
+  </section>
+
+  <p class="footer-note">Wireframe di revisione — non specifica di implementazione. Interazioni reali (skeleton di stima, apertura modal, transizioni) seguono i pattern di <code style="font:500 12px var(--mono)">docs/UI-UX.md</code> §8/§13. D1: S3–S5 mutuamente esclusivi nello stesso slot; S6 sostituisce il blocco concetti di S2. D2: S7 e S8 sono la stessa pagina in due momenti; S9/S10 sono tab di S8.</p>
+</div>

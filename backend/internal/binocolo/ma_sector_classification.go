@@ -316,6 +316,7 @@ func (s *maService) testSectorClassification(ctx context.Context, req SectorClas
 		// them regardless. The probe never writes to the registry.
 		var chosen *DomainResolutionCandidate
 		homepageMarkdown := ""
+		groupHintReason := ""
 		if known := s.lookupCompanyDomain(ctx, target); known != nil {
 			reason := "dominio dal registro (verificato in pagina)"
 			if known.Method == maDomainMethodManual {
@@ -334,9 +335,13 @@ func (s *maService) testSectorClassification(ctx context.Context, req SectorClas
 				return SectorClassificationTestResponse{}, err
 			}
 			var identityOK bool
-			chosen, homepageMarkdown, identityOK = s.verifyDomainByScrape(ctx, domainResponse.Candidates, target)
+			var groupHint *MAGroupSiteHint
+			chosen, homepageMarkdown, identityOK, groupHint = s.verifyDomainByScrape(ctx, domainResponse.Candidates, target)
 			if chosen != nil && identityOK {
 				chosen.Reasons = append(chosen.Reasons, "identità on-page verificata (P.IVA/CF)")
+			}
+			if groupHint != nil {
+				groupHintReason = "possibile sito di gruppo: " + groupHint.Domain + " (P.IVA estranea " + groupHint.Identifier + ", " + groupHint.Source + ")"
 			}
 		}
 		if chosen == nil {
@@ -349,15 +354,24 @@ func (s *maService) testSectorClassification(ctx context.Context, req SectorClas
 				Reason:             "Nessun dominio ufficiale verificato.",
 				Reasons:            []string{"Nessun dominio ufficiale verificato (punteggio insufficiente o identità non confermata in pagina)."},
 			}
+			unresolvedReasons := []string(nil)
+			if groupHintReason != "" {
+				decision.Reasons = append(decision.Reasons, groupHintReason)
+				unresolvedReasons = []string{groupHintReason}
+			}
 			return SectorClassificationTestResponse{
 				CompanyName:    target.CompanyName,
 				Evidence:       []string{},
+				DomainReasons:  unresolvedReasons,
 				Classification: maSectorClassification{Verdict: maSectorNoSignal, Confidence: "bassa", Reason: "Nessun dominio ufficiale verificato."},
 				FinalDecision:  decision,
 			}, nil
 		}
 		selectedDomain = chosen.Domain
 		domainReasons = chosen.Reasons
+		if groupHintReason != "" {
+			domainReasons = append(domainReasons, groupHintReason)
+		}
 		var prefetched []string
 		if strings.TrimSpace(homepageMarkdown) != "" {
 			prefetched = []string{homepageMarkdown}

@@ -48,14 +48,15 @@ type SectorEvalItem struct {
 	// Domain-resolution diagnostics (read-only, from the persisted DomainResponse).
 	// resolved = un dominio è stato scelto; retrieval_fail = 0 candidati (il sito non
 	// emerge); acceptance_fail = candidati trovati ma tutti scartati dal cancello.
-	DomainOutcome           string `json:"domainOutcome,omitempty"`
-	DomainConfidence        string `json:"domainConfidence,omitempty"`
-	IdentityState           string `json:"identityState,omitempty"` // verified|vouched|assumed, ""=legacy/unresolved (mig 083)
-	DomainScore             int    `json:"domainScore,omitempty"`
-	DomainCandidateCount    int    `json:"domainCandidateCount"`
-	BestCandidateDomain     string `json:"bestCandidateDomain,omitempty"`
-	BestCandidateScore      int    `json:"bestCandidateScore,omitempty"`
-	BestCandidateConfidence string `json:"bestCandidateConfidence,omitempty"`
+	DomainOutcome           string           `json:"domainOutcome,omitempty"`
+	DomainConfidence        string           `json:"domainConfidence,omitempty"`
+	IdentityState           string           `json:"identityState,omitempty"` // verified|vouched|assumed, ""=legacy/unresolved (mig 083)
+	GroupSiteHint           *MAGroupSiteHint `json:"groupSiteHint,omitempty"` // brand-compatible candidate with another entity's P.IVA (policy B1)
+	DomainScore             int              `json:"domainScore,omitempty"`
+	DomainCandidateCount    int              `json:"domainCandidateCount"`
+	BestCandidateDomain     string           `json:"bestCandidateDomain,omitempty"`
+	BestCandidateScore      int              `json:"bestCandidateScore,omitempty"`
+	BestCandidateConfidence string           `json:"bestCandidateConfidence,omitempty"`
 
 	// A — embed+rerank only (no LLM).
 	DeterministicVerdict string `json:"deterministicVerdict,omitempty"` // confirm/reject/weak/ambiguous/no_signal
@@ -103,6 +104,11 @@ type SectorEvalDomainMetrics struct {
 	// backs each REJECT verdict. Keys: verified|vouched|assumed|legacy.
 	IdentityStates   map[string]int `json:"identityStates,omitempty"`
 	RejectByIdentity map[string]int `json:"rejectByIdentity,omitempty"`
+
+	// GroupSiteSuspected counts validations (resolved AND unresolved) whose
+	// resolution saw a brand-compatible candidate with another entity's P.IVA —
+	// the population policy B1's operator remedy will serve.
+	GroupSiteSuspected int `json:"groupSiteSuspected,omitempty"`
 }
 
 // SectorEvalMetrics aggregates the three predictors plus the operational stats that
@@ -277,6 +283,12 @@ func (s *maService) sectorEvalReport(ctx context.Context, sessionID string) (Sec
 				if item.FinalBucket == maGatedBucketReject {
 					metrics.Domain.RejectByIdentity[identityKey]++
 				}
+			}
+			// Group-site suspicion (policy B1): counted OUTSIDE the resolved guard —
+			// the hint matters most on unresolved rows, which are the queue.
+			if hint := wv.DomainResponse.GroupSiteHint; hint != nil {
+				item.GroupSiteHint = hint
+				metrics.Domain.GroupSiteSuspected++
 			}
 
 			item.Escalated = sectorVerdictNeedsLLM(maSectorVerdict(wv.Summary.DeterministicVerdict))

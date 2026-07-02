@@ -64,11 +64,26 @@ type DomainResolutionCandidate struct {
 	Results    []WebSearchResult `json:"results"`
 }
 
+// MAGroupSiteHint is the persisted fact "a brand-compatible candidate carried
+// another entity's identifier" — the group-subsidiary web-presence pattern
+// (HORSA ONE PRO → horsa.com with the group's P.IVA). Written at resolution
+// time regardless of the outcome; read by the manual-review queue (operator
+// remedy "conferma sito di gruppo", policy B1) and by the sector-eval metrics.
+// The captured identifier names the OTHER entity, enabling future group linkage.
+type MAGroupSiteHint struct {
+	Domain     string `json:"domain"`
+	Identifier string `json:"identifier,omitempty"`
+	Source     string `json:"source"` // name_match | brand_trust | deep_verify
+}
+
 type DomainResolutionResponse struct {
 	Query      string                      `json:"query"`
 	Count      int                         `json:"count"`
 	Candidates []DomainResolutionCandidate `json:"candidates"`
 	Results    []WebSearchResult           `json:"results"`
+	// GroupSiteHint rides the persisted domain_response JSONB (no schema change):
+	// the fact survives on resolved AND unresolved validations alike.
+	GroupSiteHint *MAGroupSiteHint `json:"groupSiteHint,omitempty"`
 }
 
 const (

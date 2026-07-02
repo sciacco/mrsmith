@@ -363,7 +363,11 @@ func (s *maService) buildMAWebValidation(
 	if err != nil {
 		return MAWebValidationUpsertRequest{}, fmt.Errorf("domain resolution: %w", err)
 	}
-	selectedDomain, scrapedMarkdown, identityVerified := s.verifyDomainByScrape(ctx, domainResponse.Candidates, target)
+	selectedDomain, scrapedMarkdown, identityVerified, groupHint := s.verifyDomainByScrape(ctx, domainResponse.Candidates, target)
+	// Fact-at-write: the group-site suspicion rides the persisted domain_response
+	// JSONB on resolved and unresolved validations alike (policy B1 reads it as the
+	// queue reason + remedy precondition).
+	domainResponse.GroupSiteHint = groupHint
 	if selectedDomain == nil {
 		decision := &CandidateMatchFinalDecision{
 			InitialMatchState:  target.MatchState,
@@ -373,6 +377,9 @@ func (s *maService) buildMAWebValidation(
 			Confidence:         "bassa",
 			Reason:             "Nessun dominio ufficiale verificato.",
 			Reasons:            []string{"Nessun dominio ufficiale verificato (punteggio insufficiente o identità non confermata in pagina)."},
+		}
+		if groupHint != nil {
+			decision.Reasons = append(decision.Reasons, "Possibile sito di gruppo: "+groupHint.Domain+" dichiara la P.IVA di un'altra società ("+groupHint.Identifier+").")
 		}
 		return s.assembleWebValidationRequest(target, inputHash, domainResponse, nil, nil, maSectorClassification{}, nil, "", decision), nil
 	}
@@ -704,9 +711,12 @@ func (s *maService) gatherNeutralEvidence(ctx context.Context, domain string, co
 // P.IVA / codice fiscale (strong identity match) — a low-ranked candidate can win
 // this way, rescuing domains the score-only heuristic under-rated. Failing that it
 // accepts the first page carrying the company name (medium). It returns the chosen
-// candidate, its homepage markdown (reused as evidence), and whether the target's
+// candidate, its homepage markdown (reused as evidence), whether the target's
 // identity was confirmed ON-PAGE — the only signal strong enough to feed the
-// cross-session domain registry.
+// cross-session domain registry — and the group-site hint: the fact that a
+// brand-compatible candidate advertised ANOTHER entity's P.IVA (the subsidiary
+// whose web presence is the group's site). The hint is captured regardless of
+// the final outcome; a deep-verify hit (legal page) overwrites a homepage one.
 //
 // Degradation / recall safety:
 //   - scraper disabled (s.scrape == nil)  -> chooseMAWebValidationDomain (today's pick), no markdown.
@@ -717,10 +727,10 @@ func (s *maService) gatherNeutralEvidence(ctx context.Context, domain string, co
 //     target's P.IVA) and it is recall-safe — flagged for review, not rejected.
 //   - no identifier to check, or every scrape failed (transport/4xx) -> fall back to
 //     the score-only pick (with its markdown when we managed to fetch it).
-func (s *maService) verifyDomainByScrape(ctx context.Context, candidates []DomainResolutionCandidate, target MATarget) (*DomainResolutionCandidate, string, bool) {
+func (s *maService) verifyDomainByScrape(ctx context.Context, candidates []DomainResolutionCandidate, target MATarget) (*DomainResolutionCandidate, string, bool, *MAGroupSiteHint) {
 	chosen := chooseMAWebValidationDomain(candidates)
 	if s.scrape == nil {
-		return chosen, "", false
+		return chosen, "", false, nil
 	}
 
 	vat := normalizeIdentifierForPageMatch(target.VATCode)
@@ -730,6 +740,7 @@ func (s *maService) verifyDomainByScrape(ctx context.Context, candidates []Domai
 	markdownByDomain := map[string]string{}
 	anyPageRead := false
 	var nameMatch *DomainResolutionCandidate
+	var groupHint *MAGroupSiteHint
 
 	for i := range candidates {
 		if i >= maDomainVerifyCandidateCap {
@@ -744,7 +755,7 @@ func (s *maService) verifyDomainByScrape(ctx context.Context, candidates []Domai
 		markdownByDomain[cand.Domain] = md
 		if (vat != "" && pageContainsIdentifier(md, vat)) || (tax != "" && pageContainsIdentifier(md, tax)) {
 			winner := cand
-			return &winner, md, true // strong identity match short-circuits
+			return &winner, md, true, nil // strong identity match short-circuits
 		}
 		if nameMatch == nil && pageContainsCompanyName(md, nameTokens) {
 			winner := cand
@@ -770,9 +781,11 @@ func (s *maService) verifyDomainByScrape(ctx context.Context, candidates []Domai
 		// accepting it classifies the target on someone else's business (false
 		// scarta = recall loss). A name-matched page advertising a different
 		// P.IVA falls through to brand-trust/deep-verify/reject instead.
-		if !pageHasForeignIdentifier(markdownByDomain[nameMatch.Domain]) {
-			return nameMatch, markdownByDomain[nameMatch.Domain], false
+		foreignID, foreign := pageForeignIdentifier(markdownByDomain[nameMatch.Domain])
+		if !foreign {
+			return nameMatch, markdownByDomain[nameMatch.Domain], false, groupHint
 		}
+		groupHint = &MAGroupSiteHint{Domain: nameMatch.Domain, Identifier: foreignID, Source: "name_match"}
 	}
 	// Recall-safe brand-label trust: when the score-top candidate's domain LABEL
 	// matches the company name (adawen.it for ADAWEN) and it ranked with high
@@ -784,8 +797,15 @@ func (s *maService) verifyDomainByScrape(ctx context.Context, candidates []Domai
 	// page that DID render and advertises a DIFFERENT P.IVA — that foreign identifier
 	// is the genuine wrong-entity signal (greenteam.it), so leave it for review.
 	if chosen != nil && chosen.Confidence == "alta" && domainLooksCompanyOwned(chosen.Domain, nameTokens) {
-		if !(chosenRead && pageHasForeignIdentifier(markdownByDomain[chosen.Domain])) {
-			return chosen, markdownByDomain[chosen.Domain], false
+		foreignID, foreign := "", false
+		if chosenRead {
+			foreignID, foreign = pageForeignIdentifier(markdownByDomain[chosen.Domain])
+		}
+		if !foreign {
+			return chosen, markdownByDomain[chosen.Domain], false, groupHint
+		}
+		if groupHint == nil {
+			groupHint = &MAGroupSiteHint{Domain: chosen.Domain, Identifier: foreignID, Source: "brand_trust"}
 		}
 	}
 	// Aggressive: an available identifier absent from every page we actually read
@@ -795,18 +815,26 @@ func (s *maService) verifyDomainByScrape(ctx context.Context, candidates []Domai
 	// on-page match there both rescues the company AND certifies it for the registry.
 	if (vat != "" || tax != "") && anyPageRead {
 		for _, cand := range deepVerifyCandidates(chosen, nameMatch, nameTokens) {
-			if s.deepVerifyIdentity(ctx, cand.Domain, vat, tax) {
+			verified, foreignID := s.deepVerifyIdentity(ctx, cand.Domain, vat, tax)
+			if verified {
 				winner := cand
 				winner.Reasons = append(winner.Reasons, "identità confermata su pagina interna (P.IVA/CF)")
-				return &winner, markdownByDomain[cand.Domain], true
+				return &winner, markdownByDomain[cand.Domain], true, groupHint
+			}
+			// A foreign P.IVA on a LEGAL page of a brand-compatible candidate is the
+			// strongest group-site evidence (art. 35: that's where the owner publishes
+			// it) — it overwrites a homepage-level hint. Brand-alien candidates stay
+			// out: a wrong entity is not a group.
+			if foreignID != "" && (domainLooksCompanyOwned(cand.Domain, nameTokens) || (nameMatch != nil && cand.Domain == nameMatch.Domain)) {
+				groupHint = &MAGroupSiteHint{Domain: cand.Domain, Identifier: foreignID, Source: "deep_verify"}
 			}
 		}
-		return nil, "", false
+		return nil, "", false, groupHint
 	}
 	if chosen != nil {
-		return chosen, markdownByDomain[chosen.Domain], false
+		return chosen, markdownByDomain[chosen.Domain], false, groupHint
 	}
-	return nil, "", false
+	return nil, "", false, groupHint
 }
 
 // deepVerifyCandidates selects which rejected candidates deserve the deep
@@ -837,21 +865,23 @@ func deepVerifyCandidates(chosen, nameMatch *DomainResolutionCandidate, nameToke
 // deepVerifyIdentity maps a candidate site (sitemap-first URL discovery, no page
 // content) and scrapes only its identity-bearing pages, reporting whether any
 // carries the target's P.IVA / codice fiscale. A page advertising a DIFFERENT
-// 11-digit identifier is the wrong-entity signal — stop reading that site.
-// Soft on every failure: map/scrape errors just mean "not verified".
-func (s *maService) deepVerifyIdentity(ctx context.Context, domain, vat, tax string) bool {
+// 11-digit identifier is the wrong-entity signal — stop reading that site and
+// return the foreign identifier (on a brand-compatible candidate it names the
+// group entity — group-site hint). Soft on every failure: map/scrape errors
+// just mean "not verified".
+func (s *maService) deepVerifyIdentity(ctx context.Context, domain, vat, tax string) (bool, string) {
 	if s.scrape == nil || (vat == "" && tax == "") {
-		return false
+		return false, ""
 	}
 	hosts := companyPageHosts(domain)
 	if len(hosts) == 0 {
-		return false
+		return false, ""
 	}
 	mctx, cancel := context.WithTimeout(ctx, maMapTimeout)
 	links, err := s.scrape.Map(mctx, "https://"+hosts[0], maCrawlMaxDepth)
 	cancel()
 	if err != nil || len(links) == 0 {
-		return false
+		return false, ""
 	}
 	for _, link := range identityPageLinks(links, domain, maDeepVerifyPageCap) {
 		res, err := s.scrape.ScrapeFull(ctx, link) // full page: the P.IVA lives in the footer
@@ -866,13 +896,13 @@ func (s *maService) deepVerifyIdentity(ctx context.Context, domain, vat, tax str
 			continue
 		}
 		if (vat != "" && pageContainsIdentifier(md, vat)) || (tax != "" && pageContainsIdentifier(md, tax)) {
-			return true
+			return true, ""
 		}
-		if pageHasForeignIdentifier(md) {
-			return false // a legal/contact page with someone else's P.IVA = different entity
+		if foreignID, foreign := pageForeignIdentifier(md); foreign {
+			return false, foreignID // a legal/contact page with someone else's P.IVA = different entity
 		}
 	}
-	return false
+	return false, ""
 }
 
 // identityPagePriority orders the URL-path markers of pages that carry a
@@ -1001,13 +1031,15 @@ func pageContainsIdentifier(markdown, identifier string) bool {
 // match, so any hit is by definition a DIFFERENT entity's identifier.
 var foreignIdentifierRe = regexp.MustCompile(`\b\d{11}\b`)
 
-// pageHasForeignIdentifier reports whether the markdown advertises a P.IVA that is
-// not the target's — the wrong-entity signal that withholds brand-label trust from
-// an otherwise brand-compatible rendered page (e.g. greenteam.it carrying someone
+// pageForeignIdentifier returns the first P.IVA-shaped identifier the markdown
+// advertises — the wrong-entity signal that withholds brand-label trust from an
+// otherwise brand-compatible rendered page (e.g. greenteam.it carrying someone
 // else's P.IVA). Callers use it only past the target-identity short-circuit, so a
-// match here is a foreign identifier, never the target's.
-func pageHasForeignIdentifier(markdown string) bool {
-	return foreignIdentifierRe.MatchString(markdown)
+// match here is a foreign identifier, never the target's. The identifier itself
+// is kept: on a brand-compatible site it names the group/other entity (policy B1).
+func pageForeignIdentifier(markdown string) (string, bool) {
+	id := foreignIdentifierRe.FindString(markdown)
+	return id, id != ""
 }
 
 // pageContainsCompanyName checks the page carries the company's distinctive name
