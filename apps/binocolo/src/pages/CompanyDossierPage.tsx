@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ApiError } from '@mrsmith/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Icon, Modal, useToast } from '@mrsmith/ui';
@@ -922,6 +923,21 @@ export function CompanyDossierPage() {
   }
 
   const busy = start.isPending || status === 'queued' || status === 'running';
+
+  // Deep-link ?vat= (board "Apri dossier" / drawer "Gestione dal dossier"):
+  // precompila e avvia la lookup con ack:false — l'acquisizione a pagamento
+  // resta dietro la conferma esplicita del prompt costo.
+  const [searchParams] = useSearchParams();
+  const autoLookupDone = useRef(false);
+  useEffect(() => {
+    if (autoLookupDone.current) return;
+    const fromQuery = (searchParams.get('vat') ?? '').trim().toUpperCase();
+    if (!fromQuery || !isValidVatOrTax(fromQuery)) return;
+    autoLookupDone.current = true;
+    setVatInput(fromQuery);
+    start.mutate({ v: fromQuery, ack: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   return (
     <div className={styles.page}>
