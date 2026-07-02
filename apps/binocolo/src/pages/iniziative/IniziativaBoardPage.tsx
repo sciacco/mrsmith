@@ -62,6 +62,19 @@ function registryLabel(kind: string) {
   return REGISTRY_LABELS[kind] ?? { label: kind, kind: 'info' as const };
 }
 
+const STATE_COLORS: Record<string, string> = {
+  da_contattare: styles.statusGrey,
+  contattata: styles.statusBlue,
+  in_dialogo: styles.statusIndigo,
+  approfondimento: styles.statusPurple,
+  offerta: styles.statusOrange,
+  chiusa: styles.statusGreen,
+};
+
+function stateBadgeClass(state: string) {
+  return `${styles.statusBadge} ${STATE_COLORS[state] || styles.statusGrey}`;
+}
+
 function collapseStorageKey(initiativeId: string) {
   return `binocolo.iniziative.${initiativeId}.collapsedColumns`;
 }
@@ -120,12 +133,7 @@ export function IniziativaBoardPage() {
       if (!collapsedInitRef.current) {
         collapsedInitRef.current = true;
         const stored = loadCollapsed(id);
-        const next = new Set(stored);
-        for (const state of STATES) {
-          const count = data.cards.filter((c) => c.state === state.key).length;
-          if (count === 0 || state.key === 'chiusa') next.add(state.key);
-        }
-        setCollapsed(next);
+        setCollapsed(new Set(stored));
       }
     } catch (err) {
       setError(errorLabel(err));
@@ -295,19 +303,25 @@ export function IniziativaBoardPage() {
       <div className={styles.boardHead}>
         <div className={styles.titleRow}>
           <h1>{board.initiative.title}</h1>
-          <div className={styles.viewToggle}>
+          <div className={styles.viewToggle} role="tablist" aria-label="Vista">
             <button
               type="button"
+              role="tab"
+              aria-selected={view === 'kanban'}
               className={`${styles.viewToggleBtn} ${view === 'kanban' ? styles.on : ''}`}
               onClick={() => setView('kanban')}
             >
+              <Icon name="list" size={14} style={{ marginRight: 6 }} />
               Kanban
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={view === 'tabella'}
               className={`${styles.viewToggleBtn} ${view === 'tabella' ? styles.on : ''}`}
               onClick={() => setView('tabella')}
             >
+              <Icon name="file-text" size={14} style={{ marginRight: 6 }} />
               Tabella
             </button>
           </div>
@@ -339,6 +353,18 @@ export function IniziativaBoardPage() {
                   className={styles.kcolCollapsed}
                   onClick={() => toggleCollapsed(state.key)}
                   title={`Espandi ${state.label}`}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const companyKey = e.dataTransfer.getData('text/plain');
+                    if (!companyKey) return;
+                    if (state.key === 'chiusa') {
+                      const dropped = (board?.cards ?? []).find((c) => c.companyKey === companyKey);
+                      if (dropped) setCloseModalCard(dropped);
+                      return;
+                    }
+                    void setCardState(companyKey, state.key);
+                  }}
                 >
                   <span className={styles.kcolCount}>{cards.length}</span>
                   <span className={styles.kcolCollapsedLabel}>{state.label}</span>
@@ -390,28 +416,35 @@ export function IniziativaBoardPage() {
                         onDragStart={(e) => e.dataTransfer.setData('text/plain', card.companyKey)}
                         onClick={() => setSelectedCard(card)}
                       >
-                        <span className={styles.kcardName}>{card.companyName}</span>
-                        <span className={styles.kcardMeta}>
-                          {card.province}
+                        <div className={styles.kcardHead}>
+                          <span className={styles.kcardName}>{card.companyName}</span>
+                          <Icon name="more-vertical" size={14} className={styles.hint} />
+                        </div>
+                        <div className={styles.kcardMeta}>
+                          <span className={styles.provinceBadge}>{card.province}</span>
                           {(card.registryFacts ?? []).map((kind) => {
                             const info = registryLabel(kind);
                             return (
-                              <span key={kind} className={`${styles.badge} ${info.kind === 'warn' ? styles.badgeWarn : styles.badgeInfo}`}>
+                              <span key={kind} className={`${styles.badge} ${info.kind === 'warn' ? styles.badgeWarn : styles.badgeInfo}`} title={info.label}>
+                                <Icon name={info.kind === 'warn' ? 'triangle-alert' : 'info'} size={10} style={{ marginRight: 4 }} />
                                 {info.label}
                               </span>
                             );
                           })}
                           {(card.collisions ?? []).map((collision) => (
-                            <span key={collision.initiativeId} className={`${styles.badge} ${styles.badgeLav}`}>
-                              anche in: {collision.initiativeTitle}
+                            <span key={collision.initiativeId} className={`${styles.badge} ${styles.badgeLav}`} title={`Anche in: ${collision.initiativeTitle}`}>
+                              <Icon name="git-branch" size={10} style={{ marginRight: 4 }} />
+                              {collision.initiativeTitle}
                             </span>
                           ))}
-                        </span>
-                        <DossierButton
-                          card={card}
-                          onStart={() => void startDeepDive(card.companyKey)}
-                          onOpen={() => openDossier(card)}
-                        />
+                        </div>
+                        <div className={styles.kcardFoot}>
+                          <DossierButton
+                            card={card}
+                            onStart={() => void startDeepDive(card.companyKey)}
+                            onOpen={() => openDossier(card)}
+                          />
+                        </div>
                       </div>
                     ),
                   )}
@@ -421,75 +454,109 @@ export function IniziativaBoardPage() {
           })}
         </div>
       ) : (
-        <div className={styles.tableView}>
+        <div className={styles.tableContainer}>
           <div className={styles.filters}>
-            <select className={styles.select} value={tableStateFilter} onChange={(e) => setTableStateFilter(e.target.value)}>
-              <option value="">Stato: tutti</option>
-              {STATES.map((state) => (
-                <option key={state.key} value={state.key}>
-                  {state.label}
-                </option>
-              ))}
-            </select>
-            <select className={styles.select} value={tableEsitoFilter} onChange={(e) => setTableEsitoFilter(e.target.value)}>
-              <option value="">Esito: tutti</option>
-              {Object.entries(ESITO_LABELS).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            <input
-              className={`${styles.input} ${styles.searchInput}`}
-              placeholder="Cerca azienda…"
-              value={tableQuery}
-              onChange={(e) => setTableQuery(e.target.value)}
-            />
+            <div className={styles.filterGroup}>
+              <Icon name="filter" size={14} className={styles.hint} />
+              <select className={styles.select} value={tableStateFilter} onChange={(e) => setTableStateFilter(e.target.value)}>
+                <option value="">Tutti gli stati</option>
+                {STATES.map((state) => (
+                  <option key={state.key} value={state.key}>
+                    {state.label}
+                  </option>
+                ))}
+              </select>
+              <select className={styles.select} value={tableEsitoFilter} onChange={(e) => setTableEsitoFilter(e.target.value)}>
+                <option value="">Tutti gli esiti</option>
+                {Object.entries(ESITO_LABELS).map(([key, label]) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className={styles.searchWrapper}>
+              <Icon name="search" size={14} className={styles.searchIcon} />
+              <input
+                className={`${styles.input} ${styles.searchInput}`}
+                placeholder="Cerca per nome azienda…"
+                value={tableQuery}
+                onChange={(e) => setTableQuery(e.target.value)}
+              />
+            </div>
           </div>
           <table className={styles.table}>
             <thead>
               <tr>
                 <th>Azienda</th>
                 <th>Prov.</th>
-                <th>Stato</th>
-                <th>Dossier</th>
-                <th>Registro</th>
-                <th>Ultima attività</th>
+                <th>Stato Lavorazione</th>
+                <th>Dossier & Analisi</th>
+                <th>Registro Fatti</th>
+                <th>Aggiornamento</th>
               </tr>
             </thead>
             <tbody>
-              {filteredTableCards.map((card) => (
-                <tr key={card.companyKey} className={styles.tableRow} onClick={() => setSelectedCard(card)}>
-                  <td>
-                    <b>{card.companyName}</b>
+              {filteredTableCards.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '48px 0' }}>
+                    <p className={styles.hint}>Nessuna azienda corrisponde ai filtri impostati.</p>
                   </td>
-                  <td>{card.province}</td>
-                  <td>
-                    {STATES.find((s) => s.key === card.state)?.label ?? card.state}
-                    {card.esito ? (
-                      <>
-                        {' '}
-                        <span className={`${styles.badge} ${styles.badgeEsito}`}>{ESITO_LABELS[card.esito] ?? card.esito}</span>
-                      </>
-                    ) : null}
-                  </td>
-                  <td>
-                    {card.dossierStatus === 'ready' ? (
-                      <span className={styles.linkBtn}>Apri dossier</span>
-                    ) : card.dossierStatus === 'working' ? (
-                      <span className={`${styles.badge} ${styles.badgeEsito}`}>in corso…</span>
-                    ) : (
-                      <span className={styles.linkBtn}>Avvia analisi</span>
-                    )}
-                  </td>
-                  <td>
-                    {(card.registryFacts ?? []).length > 0
-                      ? card.registryFacts!.map((kind) => registryLabel(kind).label).join(', ')
-                      : '—'}
-                  </td>
-                  <td className={styles.hint}>{dateLabel(card.updatedAt)}</td>
                 </tr>
-              ))}
+              ) : (
+                filteredTableCards.map((card) => (
+                  <tr key={card.companyKey} className={styles.tableRow} onClick={() => setSelectedCard(card)}>
+                    <td className={styles.cellMain}>
+                      <span className={styles.companyNameText}>{card.companyName}</span>
+                    </td>
+                    <td>
+                      <span className={styles.provinceBadge}>{card.province}</span>
+                    </td>
+                    <td>
+                      <div className={styles.statusCell}>
+                        <span className={stateBadgeClass(card.state)}>
+                          {STATES.find((s) => s.key === card.state)?.label ?? card.state}
+                        </span>
+                        {card.esito ? (
+                          <span className={`${styles.badge} ${styles.badgeEsito}`}>
+                            <Icon name="check" size={10} style={{ marginRight: 4 }} />
+                            {ESITO_LABELS[card.esito] ?? card.esito}
+                          </span>
+                        ) : null}
+                      </div>
+                    </td>
+                    <td>
+                      <DossierButton
+                        card={card}
+                        onStart={() => void startDeepDive(card.companyKey)}
+                        onOpen={() => openDossier(card)}
+                      />
+                    </td>
+                    <td>
+                      <div className={styles.registryCell}>
+                        {(card.registryFacts ?? []).length > 0 ? (
+                          card.registryFacts!.map((kind) => {
+                            const info = registryLabel(kind);
+                            return (
+                              <span key={kind} className={`${styles.badge} ${info.kind === 'warn' ? styles.badgeWarn : styles.badgeInfo}`} title={info.label}>
+                                <Icon name={info.kind === 'warn' ? 'triangle-alert' : 'info'} size={10} />
+                              </span>
+                            );
+                          })
+                        ) : (
+                          <span className={styles.dash}>—</span>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <span className={styles.dateCell}>
+                        <Icon name="clock" size={12} style={{ marginRight: 6 }} />
+                        {dateLabel(card.updatedAt)}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -672,12 +739,12 @@ function CardDrawer({
   const loadEvents = useCallback(async () => {
     setLoadingEvents(true);
     try {
-      const data = await api.get<MACardEventListResponse>(
+      const res = await api.get<MACardEventListResponse>(
         `/binocolo/v1/ma/initiatives/${initiativeId}/cards/${encodeURIComponent(card.companyKey)}/events`,
       );
-      setEvents(data.items);
-    } catch (err) {
-      toast(errorLabel(err), 'error');
+      setEvents(res.items);
+    } catch (e) {
+      toast(errorLabel(e, 'Errore nel caricamento del diario'), 'error');
     } finally {
       setLoadingEvents(false);
     }
@@ -708,167 +775,187 @@ function CardDrawer({
   const activeStates = STATES.filter((s) => s.key !== 'chiusa');
 
   return (
-    <Drawer open onClose={onClose} title={card.companyName} size="lg">
-      <div className={styles.drawerSub}>
-        <span>
-          {card.vatCode ? `P.IVA ${card.vatCode}` : ''}
-          {card.province ? ` · ${card.province}` : ''}
-        </span>
-        <button type="button" className={styles.linkBtn} onClick={() => onOpenDossier(card)}>
-          Apri dossier azienda ↗
-        </button>
-      </div>
-
-      {(card.collisions ?? []).length > 0 ? (
-        <div className={styles.drawerSec}>
-          {card.collisions!.map((collision) => (
-            <span key={collision.initiativeId} className={`${styles.badge} ${styles.badgeLav}`}>
-              In lavorazione anche in: {collision.initiativeTitle}
-            </span>
-          ))}
+    <Drawer
+      open
+      onClose={onClose}
+      title={card.companyName}
+      subtitle={
+        <div className={styles.drawerMeta}>
+          {card.vatCode && <span>P.IVA {card.vatCode}</span>}
+          {card.province && <span> · {card.province}</span>}
         </div>
-      ) : null}
-
-      <div className={styles.drawerSec}>
-        <p className={styles.lab}>Stato</p>
-        {card.state === 'chiusa' || card.state === 'rimossa' ? (
-          <div className={styles.actionsRow}>
-            {card.state === 'chiusa' && card.esito ? (
-              <span className={`${styles.badge} ${styles.badgeEsito}`}>{ESITO_LABELS[card.esito] ?? card.esito}</span>
-            ) : null}
-            {card.state === 'rimossa' ? <span className={styles.hint}>Rimossa dalla lavorazione.</span> : null}
-            <Button variant="secondary" size="sm" onClick={() => void onReopen(card.companyKey)}>
-              Riapri
-            </Button>
-          </div>
-        ) : (
-          <div className={styles.stationSel}>
-            {activeStates.map((state) => (
-              <button
-                key={state.key}
-                type="button"
-                className={`${styles.stationBtn} ${card.state === state.key ? styles.on : ''}`}
-                onClick={() => void onSetState(card.companyKey, state.key)}
-              >
-                {state.label}
-              </button>
-            ))}
-            <button type="button" className={styles.stationBtn} onClick={() => onOpenCloseModal(card)}>
-              Chiusa…
-            </button>
-          </div>
-        )}
-        {card.state !== 'chiusa' && card.state !== 'rimossa' ? (
-          <button type="button" className={styles.linkBtn} onClick={() => onOpenRemoveModal(card)}>
-            Rimuovi dalla lavorazione
-          </button>
-        ) : null}
-      </div>
-
-      {(card.provenances ?? []).length > 0 ? (
-        <div className={styles.drawerSec}>
-          <p className={styles.lab}>Provenienze</p>
-          {card.provenances!.map((prov) => (
-            <div key={`${prov.sessionId}-${prov.ratedAt}`} className={styles.provRow}>
-              <span className={styles.provSess}>{prov.sessionTitle}</span>
-              <span className={styles.stars}>
-                {'★'.repeat(Math.max(prov.rating, 0))}
-                <span className={styles.starsOff}>{'☆'.repeat(Math.max(3 - prov.rating, 0))}</span>
-              </span>
-              {prov.scoreAtRating != null ? <span className={styles.provScore}>score {prov.scoreAtRating}</span> : null}
-            </div>
-          ))}
-        </div>
-      ) : null}
-
-      <div className={styles.drawerSec}>
-        <p className={styles.lab}>Scheda azienda</p>
-        {(card.registryFacts ?? []).length > 0 ? (
-          <div className={styles.kcardMeta}>
-            {card.registryFacts!.map((kind) => {
-              const info = registryLabel(kind);
-              return (
-                <span key={kind} className={`${styles.badge} ${info.kind === 'warn' ? styles.badgeWarn : styles.badgeInfo}`}>
-                  {info.label}
-                </span>
-              );
-            })}
-          </div>
-        ) : (
-          <p className={styles.hint}>Nessun fatto registrato.</p>
-        )}
-        <button type="button" className={styles.linkBtn} onClick={() => onOpenDossier(card)}>
-          Gestione dal dossier ↗
-        </button>
-      </div>
-
-      <div className={styles.drawerSec}>
-        <p className={styles.lab}>Analisi completa</p>
-        <div className={styles.actionsRow}>
-          {card.dossierStatus === 'ready' ? (
-            <Button variant="secondary" size="sm" onClick={() => onOpenDossier(card)}>
-              Apri dossier
-            </Button>
-          ) : card.dossierStatus === 'working' ? (
-            <Button variant="secondary" size="sm" disabled className={styles.pulse}>
-              Analisi in corso…
-            </Button>
-          ) : confirmingDeepDive ? (
-            <>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setConfirmingDeepDive(false);
-                  void onDeepDive(card.companyKey);
-                }}
-              >
-                Conferma
-              </Button>
-              <Button variant="secondary" size="sm" onClick={() => setConfirmingDeepDive(false)}>
-                Annulla
-              </Button>
-            </>
-          ) : (
-            <Button variant="secondary" size="sm" onClick={() => setConfirmingDeepDive(true)}>
-              Avvia analisi completa
+      }
+      headerExtra={
+        <div className={styles.drawerActions}>
+          <Button variant="secondary" size="sm" onClick={() => onOpenDossier(card)}>
+            Dossier ↗
+          </Button>
+          {card.state !== 'chiusa' && card.state !== 'rimossa' && (
+            <Button variant="secondary" size="sm" onClick={() => onOpenRemoveModal(card)}>
+              <Icon name="trash" size={14} />
             </Button>
           )}
-          <span className={styles.hint}>Recupero dei dati completi e analisi. Richiede tempo; il dossier resta disponibile qui.</span>
         </div>
-      </div>
-
-      <div className={styles.drawerSec}>
-        <p className={styles.lab}>Diario</p>
-        {loadingEvents ? (
-          <Skeleton rows={3} />
-        ) : (
-          <ul className={styles.timeline}>
-            {events.map((event) => (
-              <li key={event.id} className={styles.timelineItem}>
-                <span>{eventLabel(event)}</span>
-                <span className={styles.timelineWho}>
-                  {event.createdByEmail ?? ''} · {dateLabel(event.createdAt)}
-                </span>
-              </li>
+      }
+      size="xl"
+    >
+      <div className={styles.drawerBody}>
+        <div className={styles.drawerScrollArea}>
+          <div className={styles.pipeline}>
+            {activeStates.map((state, idx) => (
+              <div key={state.key} className={styles.pipelineStep}>
+                <button
+                  type="button"
+                  className={`${styles.stationBtn} ${card.state === state.key ? styles.on : ''}`}
+                  onClick={() => void onSetState(card.companyKey, state.key)}
+                >
+                  <span className={styles.stepCircle}>{idx + 1}</span>
+                  <span className={styles.stepLabel}>{state.label}</span>
+                </button>
+                {idx < activeStates.length - 1 && <div className={styles.stepConnector} />}
+              </div>
             ))}
-            {events.length === 0 ? <li className={styles.hint}>Nessun evento ancora.</li> : null}
-          </ul>
-        )}
+            <div className={styles.pipelineStep}>
+              <button type="button" className={styles.stationBtn} onClick={() => onOpenCloseModal(card)}>
+                <Icon name="check-circle" size={14} />
+                <span className={styles.stepLabel}>Chiudi…</span>
+              </button>
+            </div>
+          </div>
+
+          {(card.collisions ?? []).length > 0 && (
+            <div className={styles.drawerSec} style={{ borderTop: 0, paddingTop: 0 }}>
+              {card.collisions!.map((collision) => (
+                <span key={collision.initiativeId} className={`${styles.badge} ${styles.badgeLav}`}>
+                  In lavorazione anche in: {collision.initiativeTitle}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <Accordion title="Provenienze e Dettagli" initialOpen={false}>
+            {(card.provenances ?? []).length > 0 && (
+              <div className={styles.drawerSec}>
+                <p className={styles.lab}>Provenienze</p>
+                {card.provenances!.map((prov) => (
+                  <div key={`${prov.sessionId}-${prov.ratedAt}`} className={styles.provRow}>
+                    <span className={styles.provSess}>{prov.sessionTitle}</span>
+                    <span className={styles.stars}>
+                      {'★'.repeat(Math.max(prov.rating, 0))}
+                      <span className={styles.starsOff}>{'☆'.repeat(Math.max(3 - prov.rating, 0))}</span>
+                    </span>
+                    {prov.scoreAtRating != null ? <span className={styles.provScore}>score {prov.scoreAtRating}</span> : null}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className={styles.drawerSec}>
+              <p className={styles.lab}>Scheda azienda</p>
+              {(card.registryFacts ?? []).length > 0 ? (
+                <div className={styles.kcardMeta}>
+                  {card.registryFacts!.map((kind) => {
+                    const info = registryLabel(kind);
+                    return (
+                      <span key={kind} className={`${styles.badge} ${info.kind === 'warn' ? styles.badgeWarn : styles.badgeInfo}`}>
+                        {info.label}
+                      </span>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className={styles.hint}>Nessun fatto registrato.</p>
+              )}
+            </div>
+
+            <div className={styles.drawerSec}>
+              <p className={styles.lab}>Analisi completa</p>
+              <div className={styles.actionsRow}>
+                {card.dossierStatus === 'ready' ? (
+                  <Button variant="secondary" size="sm" onClick={() => onOpenDossier(card)}>
+                    Apri dossier
+                  </Button>
+                ) : card.dossierStatus === 'working' ? (
+                  <Button variant="secondary" size="sm" disabled className={styles.pulse}>
+                    Analisi in corso…
+                  </Button>
+                ) : confirmingDeepDive ? (
+                  <>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        setConfirmingDeepDive(false);
+                        void onDeepDive(card.companyKey);
+                      }}
+                    >
+                      Conferma
+                    </Button>
+                    <Button variant="secondary" size="sm" onClick={() => setConfirmingDeepDive(false)}>
+                      Annulla
+                    </Button>
+                  </>
+                ) : (
+                  <Button variant="secondary" size="sm" onClick={() => setConfirmingDeepDive(true)}>
+                    Avvia analisi completa
+                  </Button>
+                )}
+              </div>
+            </div>
+          </Accordion>
+
+          <div className={styles.drawerSec}>
+            <p className={styles.lab}>Diario Attività</p>
+            {loadingEvents ? (
+              <Skeleton rows={3} />
+            ) : (
+              <ul className={styles.timeline}>
+                {events.map((event) => {
+                  const isNote = event.event === 'nota';
+                  return (
+                    <li key={event.id} className={styles.timelineItem}>
+                      <div className={styles.timelineDot} />
+                      <div className={isNote ? styles.timelineNote : styles.timelineEvent}>{eventLabel(event)}</div>
+                      <span className={styles.timelineWho}>
+                        {event.createdByEmail ?? 'Sistema'} · {dateLabel(event.createdAt)}
+                      </span>
+                    </li>
+                  );
+                })}
+                {events.length === 0 ? <li className={styles.hint}>Nessun evento ancora nel diario.</li> : null}
+              </ul>
+            )}
+          </div>
+        </div>
+
         <div className={styles.composer}>
-          <input
+          <textarea
             className={styles.composerInput}
-            placeholder="Aggiungi nota al diario…"
+            placeholder="Aggiungi una nota al diario…"
             value={note}
             onChange={(e) => setNote(e.target.value)}
             maxLength={1000}
+            rows={1}
           />
-          <Button variant="secondary" size="sm" onClick={() => void submitNote()} loading={savingNote}>
-            Aggiungi
+          <Button variant="primary" size="sm" onClick={() => void submitNote()} loading={savingNote} disabled={!note.trim()}>
+            Invia
           </Button>
         </div>
       </div>
     </Drawer>
+  );
+}
+
+function Accordion({ title, children, initialOpen = false }: { title: string; children: ReactNode; initialOpen?: boolean }) {
+  const [open, setOpen] = useState(initialOpen);
+  return (
+    <div className={styles.accordion}>
+      <div className={styles.accordionHead} onClick={() => setOpen(!open)}>
+        <span className={styles.lab} style={{ margin: 0 }}>{title}</span>
+        <Icon name={open ? 'chevron-up' : 'chevron-down'} size={14} />
+      </div>
+      {open && <div className={styles.accordionBody}>{children}</div>}
+    </div>
   );
 }
 
