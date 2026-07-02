@@ -1644,6 +1644,59 @@ func (s *maService) ensureInitiativeCard(ctx context.Context, initiativeID, sess
 // key: mapped to 404 like sql.ErrNoRows.
 var errMACardNotFound = sql.ErrNoRows
 
+// errMACardDossierNotFound signals that a card exists but no target could be
+// resolved for it (sessioni sganciate dopo la creazione della card): the
+// dossier page shows an empty state instead of the 404 generico di sessione.
+var errMACardDossierNotFound = errors.New("ma card dossier target not found")
+
+// MACardDossier is the response of getCardDossier: il target completo
+// (vendor payload + deep + web validation) risolto per (iniziativa,
+// companyKey), più il riferimento alla sessione di provenienza.
+type MACardDossier struct {
+	Target       MATarget         `json:"target"`
+	SessionID    string           `json:"sessionId"`
+	SessionTitle string           `json:"sessionTitle"`
+	Card         MAInitiativeCard `json:"card"`
+}
+
+// getCardDossier risolve il target più recente per (iniziativa, companyKey)
+// fra le sessioni agganciate e lo idrata completamente (PRD §7): la pagina
+// dossier-card mostra le tab del vecchio modale TargetPage a partire da
+// questo target. L'iniziativa archiviata può comunque leggere; la card deve
+// esistere (stesso guard delle altre letture/scritture card).
+func (s *maService) getCardDossier(ctx context.Context, initiativeID, companyKey string) (MACardDossier, error) {
+	if s.store == nil {
+		return MACardDossier{}, errMAStoreUnavailable
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if _, err := s.store.GetMAInitiative(ctx, initiativeID); err != nil {
+		return MACardDossier{}, err
+	}
+	card, err := s.store.GetMAInitiativeCard(ctx, initiativeID, companyKey)
+	if err != nil {
+		return MACardDossier{}, err
+	}
+	if card == nil {
+		return MACardDossier{}, errMACardNotFound
+	}
+	sessionID, targetID, err := s.store.FindMALatestTargetForCard(ctx, initiativeID, companyKey)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return MACardDossier{}, errMACardDossierNotFound
+		}
+		return MACardDossier{}, err
+	}
+	target, err := s.store.GetMATargetByID(ctx, sessionID, targetID)
+	if err != nil {
+		return MACardDossier{}, err
+	}
+	session, err := s.store.GetMASessionState(ctx, sessionID)
+	if err != nil {
+		return MACardDossier{}, err
+	}
+	return MACardDossier{Target: target, SessionID: sessionID, SessionTitle: session.Title, Card: *card}, nil
+}
+
 // getInitiativeBoard assembles the board (B4 passo 1): l'Iniziativa, le
 // sessioni agganciate (chips) e le card decorate con stato dossier,
 // collisioni, badge registro e provenienze — tutto in query batch, mai N+1.

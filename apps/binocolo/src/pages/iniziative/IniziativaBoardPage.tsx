@@ -240,8 +240,7 @@ export function IniziativaBoardPage() {
   };
 
   const openDossier = (card: MAInitiativeCardView) => {
-    const query = card.vatCode ? `vat=${encodeURIComponent(card.vatCode)}` : `vat=${encodeURIComponent(card.companyKey)}`;
-    navigate(`/azienda?${query}`);
+    navigate(`/iniziative/${id}/dossier/${encodeURIComponent(card.companyKey)}`);
   };
 
   const cardsByState = useMemo(() => {

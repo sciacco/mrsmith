@@ -122,6 +122,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/sessions/{id}/initiative", h.handleSetMASessionInitiative)
 	handle("GET /binocolo/v1/ma/initiatives/{id}", h.handleGetMAInitiativeBoard)
 	handle("GET /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/events", h.handleGetMAInitiativeCardEvents)
+	handle("GET /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/dossier", h.handleGetMACardDossier)
 	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/state", h.handleSetMACardState)
 	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/close", h.handleCloseMACard)
 	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/remove", h.handleRemoveMACard)
@@ -433,6 +434,23 @@ func (h *Handler) handleGetMAInitiativeCardEvents(w http.ResponseWriter, r *http
 		return
 	}
 	httputil.JSON(w, http.StatusOK, map[string]any{"items": events})
+}
+
+func (h *Handler) handleGetMACardDossier(w http.ResponseWriter, r *http.Request) {
+	id, ok := maInitiativeID(w, r)
+	if !ok {
+		return
+	}
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	dossier, err := h.ma.getCardDossier(r.Context(), id, companyKey)
+	if err != nil {
+		h.maFailure(w, r, "ma_card_dossier_get", err, "initiative_id", id, "company_key", companyKey)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, dossier)
 }
 
 func (h *Handler) handleSetMACardState(w http.ResponseWriter, r *http.Request) {
@@ -1365,6 +1383,9 @@ func maHTTPError(err error) (int, string, string) {
 	}
 	if errors.Is(err, errAtecoCodeNotFound) {
 		return http.StatusBadRequest, "invalid_ateco_code", "warn"
+	}
+	if errors.Is(err, errMACardDossierNotFound) {
+		return http.StatusNotFound, "ma_card_dossier_not_found", "warn"
 	}
 	if errors.Is(err, sql.ErrNoRows) || strings.Contains(err.Error(), "no rows in result set") {
 		return http.StatusNotFound, "ma_session_not_found", "warn"

@@ -1,0 +1,185 @@
+.section {
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-sm);
+  scroll-margin-top: 84px;
+}
+
+.sectionHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.sectionTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.hint {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.factList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.factRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.factRow:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.factRevoked {
+  opacity: 0.65;
+}
+
+.factBadge {
+  flex-shrink: 0;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.badgeWarn {
+  background: var(--color-warning-subtle, #fef3c7);
+  color: var(--color-warning, #92400e);
+}
+
+.badgeInfo {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.factBody {
+  flex: 1;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.factWho {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.linkBtn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-accent);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.linkBtn:hover {
+  text-decoration: underline;
+}
+
+.historyToggle {
+  margin-top: var(--space-3);
+}
+
+.factActions {
+  margin-top: var(--space-4);
+}
+
+.noteList {
+  list-style: none;
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.noteRow {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.noteRow:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.noteComposer {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.noteInput {
+  flex: 1;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.factModalBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+}
+
+.formLabel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.formSelect,
+.formTextarea {
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 400;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-text);
+  resize: vertical;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}

@@ -1420,6 +1420,10 @@ func (f *fakeMAWorkspaceStore) GetMATargetByID(context.Context, string, string) 
 	return MATarget{}, errors.New("not implemented")
 }
 
+func (f *fakeMAWorkspaceStore) FindMALatestTargetForCard(context.Context, string, string) (string, string, error) {
+	return "", "", errors.New("not implemented")
+}
+
 func (f *fakeMAWorkspaceStore) UpdateMASessionLifecycle(context.Context, string, string, string, string) (bool, error) {
 	return false, errors.New("not implemented")
 }

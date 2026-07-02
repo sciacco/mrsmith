@@ -355,6 +355,16 @@ export interface MAInitiativeCard {
   closedAt?: string;
 }
 
+// MACardDossier is the response of GET .../cards/{companyKey}/dossier: il
+// target più recente risolto per la card (vendor payload + deep + web
+// validation), con il riferimento alla sessione di provenienza (PRD §7).
+export interface MACardDossier {
+  target: MATarget;
+  sessionId: string;
+  sessionTitle: string;
+  card: MAInitiativeCard;
+}
+
 export interface MACardMarker {
   initiativeId: string;
   initiativeTitle: string;

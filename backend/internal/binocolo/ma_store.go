@@ -76,6 +76,7 @@ type maWorkspaceStore interface {
 	ListMASessionsByInitiative(ctx context.Context, initiativeID string) ([]MASessionSummary, error)
 	ListMACardProvenances(ctx context.Context, initiativeID string, companyKeys []string) (map[string][]MACardProvenance, error)
 	ListMAInitiativeCardEvents(ctx context.Context, initiativeID string, sessionIDs []string, companyKey string) ([]MATargetOutcome, error)
+	FindMALatestTargetForCard(ctx context.Context, initiativeID, companyKey string) (sessionID, targetID string, err error)
 }
 
 type maCompanyLegalForm struct {
@@ -1890,6 +1891,37 @@ ORDER BY t.score DESC NULLS LAST, t.company_name
 	}
 	sortMATargetRowsByRating(out)
 	return out, nil
+}
+
+// FindMALatestTargetForCard resolves the most recent target row for
+// (initiative, companyKey) among the sessions anchored to the initiative,
+// so the card-dossier page can hydrate the full MATarget (deep/web
+// validation included) via GetMATargetByID. company_key is derived, not
+// stored, so the lookup replicates the same coalesce used everywhere else
+// (vendor_id > vat_code > tax_code > company_name).
+func (s *SQLStore) FindMALatestTargetForCard(ctx context.Context, initiativeID, companyKey string) (string, string, error) {
+	if s == nil || s.db == nil {
+		return "", "", errors.New("binocolo ma store not configured")
+	}
+	row := s.db.QueryRowContext(ctx, `
+SELECT t.session_id::text, t.id::text
+FROM binocolo.ma_target t
+JOIN binocolo.ma_session s ON s.id = t.session_id
+WHERE s.initiative_id = $1::uuid
+  AND COALESCE(
+        NULLIF(upper(btrim(t.vendor_id)), ''),
+        NULLIF(upper(btrim(t.vat_code)), ''),
+        NULLIF(upper(btrim(t.tax_code)), ''),
+        upper(btrim(t.company_name))
+      ) = $2
+ORDER BY t.created_at DESC
+LIMIT 1
+`, initiativeID, companyKey)
+	var sessionID, targetID string
+	if err := row.Scan(&sessionID, &targetID); err != nil {
+		return "", "", err
+	}
+	return sessionID, targetID, nil
 }
 
 func (s *SQLStore) GetMATargetByID(ctx context.Context, sessionID, targetID string) (MATarget, error) {
