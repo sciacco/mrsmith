@@ -20,12 +20,23 @@
 @keyframes rowEnter {
   from {
     opacity: 0;
-    transform: translateX(-12px);
+    transform: translateX(-12px) scale(0.98);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateX(0) scale(1);
   }
+}
+
+@keyframes glowPulse {
+  0% { box-shadow: 0 0 5px rgba(16, 185, 129, 0); }
+  50% { box-shadow: 0 0 15px rgba(16, 185, 129, 0.2); }
+  100% { box-shadow: 0 0 5px rgba(16, 185, 129, 0); }
+}
+
+@keyframes shimmerMatrix {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
 @keyframes pulse {
@@ -90,6 +101,7 @@
   border-radius: var(--radius-lg);
   background: var(--color-bg-elevated);
   box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(8px);
 }
 
 .panel {
@@ -159,10 +171,16 @@
 
 .rowCard:hover,
 .rowCard:focus-visible {
-  border-color: var(--color-accent-muted);
+  border-color: var(--color-accent);
   background: var(--color-accent-subtle);
   outline: none;
-  transform: translateY(-1px);
+  transform: translateY(-2px) scale(1.005);
+  box-shadow: var(--shadow-md), 0 0 12px rgba(16, 185, 129, 0.15);
+}
+
+.rowCard:active {
+  transform: translateY(0) scale(0.99);
+  transition: transform 0.05s var(--ease-out);
 }
 
 .rowTitle {
@@ -626,28 +644,43 @@
 }
 
 .tabs {
-  border-bottom: 1px solid var(--color-border-subtle);
-  padding: 0 var(--space-5);
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--color-surface);
+  backdrop-filter: blur(8px);
+  border-radius: var(--radius-xl);
+  margin: var(--space-2) var(--space-5) var(--space-4);
+  border: 1px solid var(--color-border-subtle);
 }
 
 .tab {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--space-2);
-  min-height: 48px;
+  min-height: 36px;
+  padding: 0 var(--space-5);
   border: 0;
-  border-bottom: 2px solid transparent;
+  border-radius: var(--radius-lg);
   background: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;
   font: inherit;
-  font-size: 0.8125rem;
-  font-weight: 800;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.tab:hover:not(.tabActive) {
+  background: var(--color-accent-subtle);
+  color: var(--color-text);
 }
 
 .tabActive {
-  border-color: var(--color-accent);
+  background: var(--color-bg-elevated);
   color: var(--color-accent);
+  box-shadow: var(--shadow-sm);
 }
 
 .tabBadge {
