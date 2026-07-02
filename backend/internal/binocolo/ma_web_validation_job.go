@@ -55,6 +55,17 @@ const (
 	// maCrawlPageEvidenceCap bounds evidence chunks taken per crawled page when there
 	// is more than one, so a content-heavy homepage doesn't crowd out the other pages.
 	maCrawlPageEvidenceCap = 4
+	// Crawl-before-reject bounds. Before the aggressive wrong-entity reject fires,
+	// the most credible candidate(s) get a sitemap-first map (URL discovery only,
+	// cheap) plus targeted scrapes of the few identity-bearing pages (/contatti,
+	// /note-legali, ...) where Italian sites actually publish the P.IVA the
+	// homepage omits. Eval 2026-07-02 (365 validated companies): retrieval NEVER
+	// failed, while this reject path held 15% of companies in manual review — 2/3
+	// of them with a brand-compatible top candidate, i.e. very likely the right
+	// site rejected for a homepage-only identity check.
+	maDeepVerifyCandidateCap = 2
+	maDeepVerifyPageCap      = 3
+	maMapTimeout             = 30 * time.Second
 )
 
 // maNeutralEvidenceProbes are the deliberately strategy-agnostic site queries used
@@ -316,6 +327,29 @@ func (s *maService) buildMAWebValidation(
 	subject string,
 	email string,
 ) (MAWebValidationUpsertRequest, error) {
+	// Cross-session domain registry first: a company whose official domain was
+	// already identity-verified (or manually associated) skips retrieval and
+	// verification entirely — zero Brave/scrape spend, and a manual association
+	// done once holds for every future session.
+	if known := s.lookupCompanyDomain(ctx, target); known != nil {
+		reason := "dominio dal registro (verificato in pagina)"
+		if known.Method == maDomainMethodManual {
+			reason = "dominio dal registro (associato manualmente)"
+		}
+		selectedDomain := &DomainResolutionCandidate{
+			Domain:     known.Domain,
+			Score:      100,
+			Confidence: "alta",
+			Reasons:    []string{reason},
+		}
+		scrapedMarkdown, _ := s.scrapeHomepage(ctx, known.Domain) // best-effort; crawl+evidence tolerate empty
+		domainResponse := DomainResolutionResponse{
+			Query:      "registry:" + known.Domain,
+			Candidates: []DomainResolutionCandidate{*selectedDomain},
+		}
+		return s.classifyResolvedDomain(ctx, target, strategy, inputHash, payload, domainResponse, selectedDomain, scrapedMarkdown, false, false, subject, email), nil
+	}
+
 	domainResponse, err := s.resolveDomainCandidates(ctx, DomainResolutionRequest{
 		CompanyName: target.CompanyName,
 		VATCode:     optionalIdentifier(payload.IncludeIdentifiers, target.VATCode),
@@ -327,7 +361,7 @@ func (s *maService) buildMAWebValidation(
 	if err != nil {
 		return MAWebValidationUpsertRequest{}, fmt.Errorf("domain resolution: %w", err)
 	}
-	selectedDomain, scrapedMarkdown := s.verifyDomainByScrape(ctx, domainResponse.Candidates, target)
+	selectedDomain, scrapedMarkdown, identityVerified := s.verifyDomainByScrape(ctx, domainResponse.Candidates, target)
 	if selectedDomain == nil {
 		decision := &CandidateMatchFinalDecision{
 			InitialMatchState:  target.MatchState,
@@ -341,7 +375,7 @@ func (s *maService) buildMAWebValidation(
 		return s.assembleWebValidationRequest(target, inputHash, domainResponse, nil, nil, maSectorClassification{}, nil, "", decision), nil
 	}
 
-	return s.classifyResolvedDomain(ctx, target, strategy, inputHash, payload, domainResponse, selectedDomain, scrapedMarkdown, subject, email), nil
+	return s.classifyResolvedDomain(ctx, target, strategy, inputHash, payload, domainResponse, selectedDomain, scrapedMarkdown, identityVerified, true, subject, email), nil
 }
 
 // classifyResolvedDomain runs the evidence → classification → decision tail of the gate
@@ -350,6 +384,11 @@ func (s *maService) buildMAWebValidation(
 // the site for neutral self-description, classifies against the KB concepts, and escalates
 // ambiguous verdicts to the LLM analyst, producing the web-validation request. A classifier
 // failure (embedder/KB down) is surfaced as analysis_unavailable, never as a hard error.
+//
+// verifiedIdentity carries an on-page P.IVA/CF confirmation already obtained during
+// verification; the crawl below can add its own. registerDomain gates the write to the
+// cross-session domain registry (auto path only — the manual path registers in
+// associateDomainWork with method 'manual', and a registry hit needs no re-write).
 func (s *maService) classifyResolvedDomain(
 	ctx context.Context,
 	target MATarget,
@@ -359,6 +398,8 @@ func (s *maService) classifyResolvedDomain(
 	domainResponse DomainResolutionResponse,
 	selectedDomain *DomainResolutionCandidate,
 	scrapedMarkdown string,
+	verifiedIdentity bool,
+	registerDomain bool,
 	subject string,
 	email string,
 ) MAWebValidationUpsertRequest {
@@ -366,9 +407,13 @@ func (s *maService) classifyResolvedDomain(
 	// self-description (services / about / contacts) classifies far better than the
 	// homepage alone, and an on-page P.IVA on a legal/contact page confirms identity
 	// the homepage often omits. Degrades to homepage-only evidence when disabled/failing.
-	evidencePages, identityVerified := s.crawlResolvedSite(ctx, selectedDomain.Domain, scrapedMarkdown, target)
+	evidencePages, crawlVerified := s.crawlResolvedSite(ctx, selectedDomain.Domain, scrapedMarkdown, target)
+	identityVerified := verifiedIdentity || crawlVerified
 	if identityVerified && selectedDomain.Confidence != "alta" {
 		selectedDomain.Confidence = "alta" // on-page P.IVA is the strongest identity signal
+	}
+	if registerDomain && identityVerified {
+		s.registerCompanyDomain(ctx, target, selectedDomain.Domain, maDomainMethodAutoVerified, subject, email)
 	}
 	evidence, evidenceRuns := s.gatherNeutralEvidence(ctx, selectedDomain.Domain, payload.KeywordCount, subject, email, evidencePages)
 
@@ -438,7 +483,65 @@ func (s *maService) buildMAWebValidationForDomain(
 		Query:      "manual:" + normalized,
 		Candidates: []DomainResolutionCandidate{*selectedDomain},
 	}
-	return s.classifyResolvedDomain(ctx, target, strategy, inputHash, payload, domainResponse, selectedDomain, scrapedMarkdown, subject, email), nil
+	return s.classifyResolvedDomain(ctx, target, strategy, inputHash, payload, domainResponse, selectedDomain, scrapedMarkdown, false, false, subject, email), nil
+}
+
+// lookupCompanyDomain consults the cross-session verified-domain registry for a
+// target. Soft dependency: a lookup failure logs and falls through to normal
+// resolution (nil), never blocking the gate.
+func (s *maService) lookupCompanyDomain(ctx context.Context, target MATarget) *maCompanyDomain {
+	if s.store == nil {
+		return nil
+	}
+	companyKey := normalizeMACompanyKey(target.CompanyKey)
+	if companyKey == "" {
+		companyKey = normalizeMACompanyKey(maTargetDedupeKey(target))
+	}
+	vat := strings.ToUpper(strings.TrimSpace(target.VATCode))
+	tax := strings.ToUpper(strings.TrimSpace(target.TaxCode))
+	record, err := s.store.GetMACompanyDomain(ctx, companyKey, vat, tax)
+	if err != nil {
+		logging.FromContext(ctx).Warn("binocolo domain registry lookup failed",
+			"component", "binocolo", "operation", "ma_company_domain_lookup",
+			"company", target.CompanyName, "error", err)
+		return nil
+	}
+	if record == nil || strings.TrimSpace(record.Domain) == "" {
+		return nil
+	}
+	return record
+}
+
+// registerCompanyDomain upserts a registry entry. Soft dependency: a write
+// failure logs and moves on — the session-scoped validation already carries the
+// domain, the registry only loses the cross-session reuse for this company.
+func (s *maService) registerCompanyDomain(ctx context.Context, target MATarget, domain, method, subject, email string) {
+	if s.store == nil {
+		return
+	}
+	companyKey := normalizeMACompanyKey(target.CompanyKey)
+	if companyKey == "" {
+		companyKey = normalizeMACompanyKey(maTargetDedupeKey(target))
+	}
+	normalized, ok := normalizeDomain(domain)
+	if companyKey == "" || !ok {
+		return
+	}
+	err := s.store.UpsertMACompanyDomain(ctx, maCompanyDomain{
+		CompanyKey:       companyKey,
+		VATCode:          strings.ToUpper(strings.TrimSpace(target.VATCode)),
+		TaxCode:          strings.ToUpper(strings.TrimSpace(target.TaxCode)),
+		CompanyName:      strings.TrimSpace(target.CompanyName),
+		Domain:           normalized,
+		Method:           method,
+		CreatedBySubject: subject,
+		CreatedByEmail:   email,
+	})
+	if err != nil {
+		logging.FromContext(ctx).Warn("binocolo domain registry write failed",
+			"component", "binocolo", "operation", "ma_company_domain_upsert",
+			"company", target.CompanyName, "domain", normalized, "method", method, "error", err)
+	}
 }
 
 func sectorVerdictNeedsLLM(verdict maSectorVerdict) bool {
@@ -588,20 +691,23 @@ func (s *maService) gatherNeutralEvidence(ctx context.Context, domain string, co
 // P.IVA / codice fiscale (strong identity match) — a low-ranked candidate can win
 // this way, rescuing domains the score-only heuristic under-rated. Failing that it
 // accepts the first page carrying the company name (medium). It returns the chosen
-// candidate plus its homepage markdown, which the caller reuses as evidence.
+// candidate, its homepage markdown (reused as evidence), and whether the target's
+// identity was confirmed ON-PAGE — the only signal strong enough to feed the
+// cross-session domain registry.
 //
 // Degradation / recall safety:
 //   - scraper disabled (s.scrape == nil)  -> chooseMAWebValidationDomain (today's pick), no markdown.
-//   - an identifier was available AND >=1 page was read AND none matched -> reject
-//     (nil): the target lands in needs_domain_review (forse), never scarta. This is
-//     the wrong-entity kill (a cinema / turbine maker won't carry the target's
-//     P.IVA) and it is recall-safe — the company is flagged for review, not rejected.
+//   - an identifier was available AND >=1 page was read AND none matched -> deep
+//     identity pass first (map + identity pages, see deepVerifyIdentity), THEN
+//     reject (nil): the target lands in needs_domain_review (forse), never scarta.
+//     This is the wrong-entity kill (a cinema / turbine maker won't carry the
+//     target's P.IVA) and it is recall-safe — flagged for review, not rejected.
 //   - no identifier to check, or every scrape failed (transport/4xx) -> fall back to
 //     the score-only pick (with its markdown when we managed to fetch it).
-func (s *maService) verifyDomainByScrape(ctx context.Context, candidates []DomainResolutionCandidate, target MATarget) (*DomainResolutionCandidate, string) {
+func (s *maService) verifyDomainByScrape(ctx context.Context, candidates []DomainResolutionCandidate, target MATarget) (*DomainResolutionCandidate, string, bool) {
 	chosen := chooseMAWebValidationDomain(candidates)
 	if s.scrape == nil {
-		return chosen, ""
+		return chosen, "", false
 	}
 
 	vat := normalizeIdentifierForPageMatch(target.VATCode)
@@ -625,7 +731,7 @@ func (s *maService) verifyDomainByScrape(ctx context.Context, candidates []Domai
 		markdownByDomain[cand.Domain] = md
 		if (vat != "" && pageContainsIdentifier(md, vat)) || (tax != "" && pageContainsIdentifier(md, tax)) {
 			winner := cand
-			return &winner, md // strong identity match short-circuits
+			return &winner, md, true // strong identity match short-circuits
 		}
 		if nameMatch == nil && pageContainsCompanyName(md, nameTokens) {
 			winner := cand
@@ -644,7 +750,7 @@ func (s *maService) verifyDomainByScrape(ctx context.Context, candidates []Domai
 	// reject / score-only path rather than trusting the speculative name-match.
 	chosenRead := chosen != nil && markdownByDomain[chosen.Domain] != ""
 	if nameMatch != nil && chosen != nil && (chosenRead || nameMatch.Domain == chosen.Domain) {
-		return nameMatch, markdownByDomain[nameMatch.Domain]
+		return nameMatch, markdownByDomain[nameMatch.Domain], false
 	}
 	// Recall-safe brand-label trust: when the score-top candidate's domain LABEL
 	// matches the company name (adawen.it for ADAWEN) and it ranked with high
@@ -657,18 +763,158 @@ func (s *maService) verifyDomainByScrape(ctx context.Context, candidates []Domai
 	// is the genuine wrong-entity signal (greenteam.it), so leave it for review.
 	if chosen != nil && chosen.Confidence == "alta" && domainLooksCompanyOwned(chosen.Domain, nameTokens) {
 		if !(chosenRead && pageHasForeignIdentifier(markdownByDomain[chosen.Domain])) {
-			return chosen, markdownByDomain[chosen.Domain]
+			return chosen, markdownByDomain[chosen.Domain], false
 		}
 	}
 	// Aggressive: an available identifier absent from every page we actually read
-	// means the resolved site is a different entity -> reject.
+	// means the resolved site is a different entity -> reject. But the homepage is
+	// the wrong place to look for a P.IVA — crawl-before-reject gives the credible
+	// candidates one deep identity pass (map + /contatti-class pages) first, and an
+	// on-page match there both rescues the company AND certifies it for the registry.
 	if (vat != "" || tax != "") && anyPageRead {
-		return nil, ""
+		for _, cand := range deepVerifyCandidates(chosen, nameMatch, nameTokens) {
+			if s.deepVerifyIdentity(ctx, cand.Domain, vat, tax) {
+				winner := cand
+				winner.Reasons = append(winner.Reasons, "identità confermata su pagina interna (P.IVA/CF)")
+				return &winner, markdownByDomain[cand.Domain], true
+			}
+		}
+		return nil, "", false
 	}
 	if chosen != nil {
-		return chosen, markdownByDomain[chosen.Domain]
+		return chosen, markdownByDomain[chosen.Domain], false
 	}
-	return nil, ""
+	return nil, "", false
+}
+
+// deepVerifyCandidates selects which rejected candidates deserve the deep
+// identity pass: the score-top pick and the name-match (when distinct), each
+// only when credible — ranker confidence above "bassa" or a brand-compatible
+// domain label. The eval's junk best-candidates (registries, unrelated sites,
+// all low-confidence and brand-alien) stay excluded, so the extra spend
+// concentrates exactly on the likely-right-site population. Pure, cap 2.
+func deepVerifyCandidates(chosen, nameMatch *DomainResolutionCandidate, nameTokens []string) []DomainResolutionCandidate {
+	out := make([]DomainResolutionCandidate, 0, maDeepVerifyCandidateCap)
+	seen := map[string]struct{}{}
+	for _, cand := range []*DomainResolutionCandidate{chosen, nameMatch} {
+		if cand == nil || len(out) >= maDeepVerifyCandidateCap {
+			continue
+		}
+		if _, dup := seen[cand.Domain]; dup {
+			continue
+		}
+		if cand.Confidence == "bassa" && !domainLooksCompanyOwned(cand.Domain, nameTokens) {
+			continue
+		}
+		seen[cand.Domain] = struct{}{}
+		out = append(out, *cand)
+	}
+	return out
+}
+
+// deepVerifyIdentity maps a candidate site (sitemap-first URL discovery, no page
+// content) and scrapes only its identity-bearing pages, reporting whether any
+// carries the target's P.IVA / codice fiscale. A page advertising a DIFFERENT
+// 11-digit identifier is the wrong-entity signal — stop reading that site.
+// Soft on every failure: map/scrape errors just mean "not verified".
+func (s *maService) deepVerifyIdentity(ctx context.Context, domain, vat, tax string) bool {
+	if s.scrape == nil || (vat == "" && tax == "") {
+		return false
+	}
+	hosts := companyPageHosts(domain)
+	if len(hosts) == 0 {
+		return false
+	}
+	mctx, cancel := context.WithTimeout(ctx, maMapTimeout)
+	links, err := s.scrape.Map(mctx, "https://"+hosts[0], maCrawlMaxDepth)
+	cancel()
+	if err != nil || len(links) == 0 {
+		return false
+	}
+	for _, link := range identityPageLinks(links, domain, maDeepVerifyPageCap) {
+		res, err := s.scrape.Scrape(ctx, link)
+		if err != nil {
+			continue
+		}
+		if res.StatusCode != 0 && (res.StatusCode < 200 || res.StatusCode >= 400) {
+			continue
+		}
+		md := strings.TrimSpace(res.Markdown)
+		if md == "" {
+			continue
+		}
+		if (vat != "" && pageContainsIdentifier(md, vat)) || (tax != "" && pageContainsIdentifier(md, tax)) {
+			return true
+		}
+		if pageHasForeignIdentifier(md) {
+			return false // a legal/contact page with someone else's P.IVA = different entity
+		}
+	}
+	return false
+}
+
+// identityPagePriority orders the URL-path markers of pages that carry a
+// company's legal identity in Italy, most likely first: contact pages, then
+// legal/privacy boilerplate (P.IVA is mandatory there), then about pages.
+var identityPagePriority = []string{
+	"contatti", "contact", "note-legali", "notelegali", "legal", "privacy",
+	"termini", "terms", "impressum", "chi-siamo", "chisiamo", "about", "azienda", "company",
+}
+
+// identityPageLinks filters a mapped URL list down to the few same-site pages
+// worth scraping for an identity check, ranked by identityPagePriority and, on
+// ties, by URL length (top-level pages beat deep articles). Pure.
+func identityPageLinks(links []string, domain string, limit int) []string {
+	type scored struct {
+		url      string
+		priority int
+	}
+	seen := map[string]struct{}{}
+	matches := []scored{}
+	for _, link := range links {
+		trimmed := strings.TrimSpace(link)
+		if trimmed == "" {
+			continue
+		}
+		host, ok := normalizeDomain(trimmed)
+		if !ok || !hostMatchesDomain(host, domain) {
+			continue
+		}
+		lower := strings.ToLower(trimmed)
+		if strings.HasSuffix(lower, ".pdf") || strings.HasSuffix(lower, ".jpg") ||
+			strings.HasSuffix(lower, ".png") || strings.HasSuffix(lower, ".xml") {
+			continue
+		}
+		priority := -1
+		for i, marker := range identityPagePriority {
+			if strings.Contains(lower, marker) {
+				priority = i
+				break
+			}
+		}
+		if priority < 0 {
+			continue
+		}
+		if _, dup := seen[lower]; dup {
+			continue
+		}
+		seen[lower] = struct{}{}
+		matches = append(matches, scored{url: trimmed, priority: priority})
+	}
+	sort.SliceStable(matches, func(i, j int) bool {
+		if matches[i].priority != matches[j].priority {
+			return matches[i].priority < matches[j].priority
+		}
+		return len(matches[i].url) < len(matches[j].url)
+	})
+	out := make([]string, 0, limit)
+	for _, m := range matches {
+		if len(out) >= limit {
+			break
+		}
+		out = append(out, m.url)
+	}
+	return out
 }
 
 // scrapeHomepage fetches a candidate company homepage as markdown, trying the
@@ -677,6 +923,9 @@ func (s *maService) verifyDomainByScrape(ctx context.Context, candidates []Domai
 // back to the bare apex. Returns the first non-empty, 2xx markdown, or ok=false
 // when neither variant yields usable content.
 func (s *maService) scrapeHomepage(ctx context.Context, domain string) (string, bool) {
+	if s.scrape == nil {
+		return "", false
+	}
 	for _, host := range companyPageHosts(domain) {
 		res, err := s.scrape.Scrape(ctx, "https://"+host)
 		if err != nil {

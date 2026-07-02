@@ -188,6 +188,13 @@ const (
 	maGatedBucketReject       = "scarta"
 	maGatedBucketManualReview = "manual_review"
 
+	// Cross-session verified-domain registry methods (mig 082). auto_verified =
+	// the target's P.IVA/CF was confirmed on-page during resolution; manual = the
+	// operator associated the domain. The upsert never lets auto_verified
+	// overwrite a manual entry.
+	maDomainMethodAutoVerified = "auto_verified"
+	maDomainMethodManual       = "manual"
+
 	// Valuation defaults (Fase 4), overridable via ma_parameter (sme_haircut_pct,
 	// ebitda_fallback_threshold). Haircut is a percent applied to sector multiples;
 	// below the EBITDA-margin threshold (or EBITDA<=0) valuation falls back to EV/Sales.
@@ -660,23 +667,23 @@ type MAExecutionRun struct {
 }
 
 type MATarget struct {
-	ID               string               `json:"id"`
-	SessionID        string               `json:"sessionId"`
-	RunID            string               `json:"runId"`
-	VendorID         string               `json:"vendorId,omitempty"`
-	CompanyKey       string               `json:"companyKey,omitempty"`
-	CompanyName      string               `json:"companyName"`
-	VATCode          string               `json:"vatCode,omitempty"`
-	TaxCode          string               `json:"taxCode,omitempty"`
-	Province         string               `json:"province,omitempty"`
-	Town             string               `json:"town,omitempty"`
-	ActivityStatus   string               `json:"activityStatus,omitempty"`
-	Turnover         *int                 `json:"turnover,omitempty"`
-	TurnoverYear     *int                 `json:"turnoverYear,omitempty"`
-	Employees        *int                 `json:"employees,omitempty"`
-	AtecoCode        string               `json:"atecoCode,omitempty"`
-	AtecoDescription string               `json:"atecoDescription,omitempty"`
-	Score            int                  `json:"score"`
+	ID               string `json:"id"`
+	SessionID        string `json:"sessionId"`
+	RunID            string `json:"runId"`
+	VendorID         string `json:"vendorId,omitempty"`
+	CompanyKey       string `json:"companyKey,omitempty"`
+	CompanyName      string `json:"companyName"`
+	VATCode          string `json:"vatCode,omitempty"`
+	TaxCode          string `json:"taxCode,omitempty"`
+	Province         string `json:"province,omitempty"`
+	Town             string `json:"town,omitempty"`
+	ActivityStatus   string `json:"activityStatus,omitempty"`
+	Turnover         *int   `json:"turnover,omitempty"`
+	TurnoverYear     *int   `json:"turnoverYear,omitempty"`
+	Employees        *int   `json:"employees,omitempty"`
+	AtecoCode        string `json:"atecoCode,omitempty"`
+	AtecoDescription string `json:"atecoDescription,omitempty"`
+	Score            int    `json:"score"`
 	// ScoreVersion etichetta la revisione dello scoring che ha prodotto Score
 	// (migrazione 081): nil = riga address (mai scorata) o punteggio legacy.
 	// Punteggi con versione diversa non sono confrontabili.
@@ -686,19 +693,19 @@ type MATarget struct {
 	// Bucket è la destinazione di presentazione derivata A LETTURA dai campi
 	// persistiti (mai salvata): principale / da_verificare / azionabile /
 	// soppresso. Vedi maRouteTarget.
-	Bucket   string            `json:"bucket,omitempty"`
-	Rating   *int              `json:"rating,omitempty"`
-	Outcomes []MATargetOutcome `json:"outcomes,omitempty"`
-	Flags            []MATargetFlag       `json:"flags,omitempty"`
-	Rationale        string               `json:"rationale"`
-	MissingCriteria  []string             `json:"missingCriteria"`
-	Evidence         []MATargetEvidence   `json:"evidence"`
-	Adjustments      []MATargetAdjustment `json:"adjustments,omitempty"`
-	Deep             *MADeepAnalysis      `json:"deep,omitempty"`
-	WebValidation    *MAWebValidation     `json:"webValidation,omitempty"`
-	VendorPayload    json.RawMessage      `json:"vendorPayload,omitempty"`
-	EnrichmentLevel  string               `json:"enrichmentLevel,omitempty"`
-	CreatedAt        time.Time            `json:"createdAt"`
+	Bucket          string               `json:"bucket,omitempty"`
+	Rating          *int                 `json:"rating,omitempty"`
+	Outcomes        []MATargetOutcome    `json:"outcomes,omitempty"`
+	Flags           []MATargetFlag       `json:"flags,omitempty"`
+	Rationale       string               `json:"rationale"`
+	MissingCriteria []string             `json:"missingCriteria"`
+	Evidence        []MATargetEvidence   `json:"evidence"`
+	Adjustments     []MATargetAdjustment `json:"adjustments,omitempty"`
+	Deep            *MADeepAnalysis      `json:"deep,omitempty"`
+	WebValidation   *MAWebValidation     `json:"webValidation,omitempty"`
+	VendorPayload   json.RawMessage      `json:"vendorPayload,omitempty"`
+	EnrichmentLevel string               `json:"enrichmentLevel,omitempty"`
+	CreatedAt       time.Time            `json:"createdAt"`
 }
 
 type MATargetEvidence struct {

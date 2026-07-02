@@ -21,6 +21,7 @@ const (
 	scrapePath     = "/v1/scrape"
 	searchPath     = "/v1/search"
 	crawlPath      = "/v1/crawl"
+	mapPath        = "/v1/map"
 	defaultTimeout = 30 * time.Second
 )
 
@@ -213,6 +214,67 @@ type searchResponse struct {
 		Title       string `json:"title"`
 		Description string `json:"description"`
 		Snippet     string `json:"snippet"`
+	} `json:"data"`
+	Error string `json:"error"`
+}
+
+// Map discovers a site's URLs via /v1/map (sitemap-first with BFS fallback,
+// synchronous) WITHOUT fetching page content. Use it as the cheap first pass to
+// decide which pages are worth scraping — binocolo maps a candidate domain and
+// then scrapes only the few identity-bearing pages (/contatti, /note-legali)
+// instead of running a blind multi-page crawl. Requires an API key on managed
+// services.
+func (c *Client) Map(ctx context.Context, target string, maxDepth int) ([]string, error) {
+	reqBody := map[string]any{"url": target}
+	if maxDepth > 0 {
+		reqBody["maxDepth"] = maxDepth
+	}
+	payload, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("scrape: encode map request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+mapPath, bytes.NewReader(payload))
+	if err != nil {
+		return nil, fmt.Errorf("scrape: create map request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	if c.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("scrape: request %s: %w", mapPath, err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("scrape: read map response: %w", err)
+	}
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return nil, &APIError{StatusCode: resp.StatusCode, Body: string(body), Message: parseErrorMessage(body)}
+	}
+
+	var parsed mapResponse
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return nil, fmt.Errorf("scrape: decode map response: %w", err)
+	}
+	if !parsed.Success {
+		return nil, &APIError{StatusCode: resp.StatusCode, Body: string(body), Message: firstNonEmpty(parsed.Error, "success=false")}
+	}
+	return parsed.Data.Links, nil
+}
+
+// mapResponse mirrors the /v1/map wire JSON:
+//
+//	{ "success": true, "data": { "links": ["https://example.com", ...] } }
+type mapResponse struct {
+	Success bool `json:"success"`
+	Data    struct {
+		Links []string `json:"links"`
 	} `json:"data"`
 	Error string `json:"error"`
 }

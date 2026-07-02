@@ -1460,6 +1460,14 @@ func (f *fakeMAWorkspaceStore) InsertMATargetOutcome(context.Context, MATargetOu
 	return nil
 }
 
+func (f *fakeMAWorkspaceStore) GetMACompanyDomain(context.Context, string, string, string) (*maCompanyDomain, error) {
+	return nil, nil
+}
+
+func (f *fakeMAWorkspaceStore) UpsertMACompanyDomain(context.Context, maCompanyDomain) error {
+	return nil
+}
+
 func (f *fakeMAWorkspaceStore) AddMARescoreStrategyVersion(ctx context.Context, sessionID string, strategy MAStrategySpec, createdByEmail string) (*MAStrategyVersion, error) {
 	return f.AddMAStrategyVersion(ctx, sessionID, strategy, createdByEmail)
 }

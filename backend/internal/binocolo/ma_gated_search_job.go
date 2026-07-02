@@ -745,6 +745,10 @@ func (s *maService) associateDomainWork(ctx context.Context, job maJob) error {
 	if _, err := s.upsertTargetWebValidation(ctx, job.SessionID, body, job.CreatedBySubject, job.CreatedByEmail); err != nil {
 		return err
 	}
+	// The operator vouched for this company↔domain identity (independently of the
+	// gate's sector verdict): persist it in the cross-session registry so every
+	// future session resolves it for free instead of re-landing in manual_review.
+	s.registerCompanyDomain(ctx, *target, payload.Domain, maDomainMethodManual, job.CreatedBySubject, job.CreatedByEmail)
 	_ = s.traceEvent(ctx, maTraceEventWrite{
 		EventType: "ma_target_domain_associated",
 		Status:    maTraceEventSucceeded,

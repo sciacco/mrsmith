@@ -259,6 +259,7 @@ type SectorClassificationTestRequest struct {
 type SectorClassificationTestResponse struct {
 	CompanyName    string                          `json:"companyName,omitempty"`
 	SelectedDomain string                          `json:"selectedDomain,omitempty"`
+	DomainReasons  []string                        `json:"domainReasons,omitempty"`
 	Evidence       []string                        `json:"evidence"`
 	Classification maSectorClassification          `json:"classification"`
 	Analysis       *CandidateMatchAnalysisResponse `json:"analysis,omitempty"`
@@ -278,6 +279,7 @@ func (s *maService) testSectorClassification(ctx context.Context, req SectorClas
 		description    string
 		evidenceUsed   []string
 		selectedDomain string
+		domainReasons  []string
 	)
 
 	if strings.TrimSpace(req.SessionID) != "" && strings.TrimSpace(req.TargetID) != "" {
@@ -306,18 +308,33 @@ func (s *maService) testSectorClassification(ctx context.Context, req SectorClas
 		if s.brave == nil {
 			return SectorClassificationTestResponse{}, errMABraveUnavailable
 		}
-		domainResponse, err := s.resolveDomainCandidates(ctx, DomainResolutionRequest{
-			CompanyName: target.CompanyName,
-			VATCode:     target.VATCode,
-			TaxCode:     target.TaxCode,
-			Town:        target.Town,
-			Province:    target.Province,
-			Count:       maWebValidationDefaultDomainCount,
-		})
-		if err != nil {
-			return SectorClassificationTestResponse{}, err
+		// Production domain selection, read-only: registry lookup first, then
+		// resolution + scrape verification (including the crawl-before-reject deep
+		// identity pass) — the same chain buildMAWebValidation runs. Identifiers
+		// stay OUT of the resolution request (production default: the P.IVA in a
+		// search query surfaces only registries); the on-page verification uses
+		// them regardless. The probe never writes to the registry.
+		var chosen *DomainResolutionCandidate
+		homepageMarkdown := ""
+		if known := s.lookupCompanyDomain(ctx, target); known != nil {
+			reason := "dominio dal registro (verificato in pagina)"
+			if known.Method == maDomainMethodManual {
+				reason = "dominio dal registro (associato manualmente)"
+			}
+			chosen = &DomainResolutionCandidate{Domain: known.Domain, Score: 100, Confidence: "alta", Reasons: []string{reason}}
+			homepageMarkdown, _ = s.scrapeHomepage(ctx, known.Domain)
+		} else {
+			domainResponse, err := s.resolveDomainCandidates(ctx, DomainResolutionRequest{
+				CompanyName: target.CompanyName,
+				Town:        target.Town,
+				Province:    target.Province,
+				Count:       maWebValidationDefaultDomainCount,
+			})
+			if err != nil {
+				return SectorClassificationTestResponse{}, err
+			}
+			chosen, homepageMarkdown, _ = s.verifyDomainByScrape(ctx, domainResponse.Candidates, target)
 		}
-		chosen := chooseMAWebValidationDomain(domainResponse.Candidates)
 		if chosen == nil {
 			decision := &CandidateMatchFinalDecision{
 				InitialMatchState:  target.MatchState,
@@ -325,18 +342,23 @@ func (s *maService) testSectorClassification(ctx context.Context, req SectorClas
 				WebValidationState: "domain_unresolved",
 				FinalAction:        "needs_domain_review",
 				Confidence:         "bassa",
-				Reason:             "Nessun dominio ufficiale credibile risolto.",
-				Reasons:            []string{"Nessun dominio ufficiale credibile risolto."},
+				Reason:             "Nessun dominio ufficiale verificato.",
+				Reasons:            []string{"Nessun dominio ufficiale verificato (punteggio insufficiente o identità non confermata in pagina)."},
 			}
 			return SectorClassificationTestResponse{
 				CompanyName:    target.CompanyName,
 				Evidence:       []string{},
-				Classification: maSectorClassification{Verdict: maSectorNoSignal, Confidence: "bassa", Reason: "Nessun dominio ufficiale credibile risolto."},
+				Classification: maSectorClassification{Verdict: maSectorNoSignal, Confidence: "bassa", Reason: "Nessun dominio ufficiale verificato."},
 				FinalDecision:  decision,
 			}, nil
 		}
 		selectedDomain = chosen.Domain
-		evidence, _ := s.gatherNeutralEvidence(ctx, chosen.Domain, maWebValidationEvidenceCount, subject, email, nil)
+		domainReasons = chosen.Reasons
+		var prefetched []string
+		if strings.TrimSpace(homepageMarkdown) != "" {
+			prefetched = []string{homepageMarkdown}
+		}
+		evidence, _ := s.gatherNeutralEvidence(ctx, chosen.Domain, maWebValidationEvidenceCount, subject, email, prefetched)
 		evidenceUsed = evidence.Snippets
 		description = s.representCompany(ctx, evidence, subject, email)
 	} else {
@@ -382,6 +404,7 @@ func (s *maService) testSectorClassification(ctx context.Context, req SectorClas
 	return SectorClassificationTestResponse{
 		CompanyName:    target.CompanyName,
 		SelectedDomain: selectedDomain,
+		DomainReasons:  domainReasons,
 		Evidence:       evidenceUsed,
 		Classification: class,
 		Analysis:       analysis,

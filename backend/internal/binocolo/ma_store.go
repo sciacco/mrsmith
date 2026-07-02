@@ -34,6 +34,8 @@ type maWorkspaceStore interface {
 	MarkMATargetAdvancedEnriched(ctx context.Context, targetID string, vendorPayload json.RawMessage) error
 	UpsertMATargetRating(ctx context.Context, sessionID string, input MATargetRatingRequest, subject, email string) error
 	InsertMATargetOutcome(ctx context.Context, outcome MATargetOutcome) error
+	GetMACompanyDomain(ctx context.Context, companyKey, vatCode, taxCode string) (*maCompanyDomain, error)
+	UpsertMACompanyDomain(ctx context.Context, record maCompanyDomain) error
 	UpsertMAWebValidation(ctx context.Context, input maWebValidationUpsert) (MAWebValidation, error)
 	UpsertMASectorEvalLabel(ctx context.Context, sessionID, companyKey, label, note, subject, email string) error
 	ListMASectorEvalLabels(ctx context.Context, sessionID string) (map[string]MASectorEvalLabel, error)
@@ -58,6 +60,21 @@ type maCompanyLegalForm struct {
 	Code          string
 	DescriptionIT string
 	DescriptionEN string
+}
+
+// maCompanyDomain is one row of the cross-session verified-domain registry
+// (binocolo.ma_company_domain, mig 082): the durable company→official-domain
+// association written on strong identity verification (on-page P.IVA/CF) or
+// manual operator association, consulted by resolution before any retrieval.
+type maCompanyDomain struct {
+	CompanyKey       string
+	VATCode          string
+	TaxCode          string
+	CompanyName      string
+	Domain           string
+	Method           string // maDomainMethodAutoVerified | maDomainMethodManual
+	CreatedBySubject string
+	CreatedByEmail   string
 }
 
 type maWebValidationUpsert struct {
@@ -1574,6 +1591,67 @@ INSERT INTO binocolo.ma_target_outcome (id, session_id, company_key, event, note
 VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, now())
 `, uuid.NewString(), outcome.SessionID, outcome.CompanyKey, outcome.Event, nullString(outcome.Note), nullString(outcome.CreatedBySubject), nullString(outcome.CreatedByEmail)); err != nil {
 		return fmt.Errorf("insert ma target outcome: %w", err)
+	}
+	return nil
+}
+
+// GetMACompanyDomain looks up the verified-domain registry by any of the
+// company's stable identities. Manual entries win over auto-verified ones, an
+// exact company_key match wins over an identifier match, freshest last-resort.
+// A miss is (nil, nil) — only real DB failures return an error.
+func (s *SQLStore) GetMACompanyDomain(ctx context.Context, companyKey, vatCode, taxCode string) (*maCompanyDomain, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	if companyKey == "" && vatCode == "" && taxCode == "" {
+		return nil, nil
+	}
+	row := s.db.QueryRowContext(ctx, `
+SELECT company_key, vat_code, tax_code, company_name, domain, method
+FROM binocolo.ma_company_domain
+WHERE ($1 <> '' AND company_key = $1)
+   OR ($2 <> '' AND vat_code = $2)
+   OR ($3 <> '' AND tax_code = $3)
+ORDER BY (method = 'manual') DESC, (company_key = $1) DESC, verified_at DESC
+LIMIT 1
+`, companyKey, vatCode, taxCode)
+	var rec maCompanyDomain
+	if err := row.Scan(&rec.CompanyKey, &rec.VATCode, &rec.TaxCode, &rec.CompanyName, &rec.Domain, &rec.Method); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get ma company domain: %w", err)
+	}
+	return &rec, nil
+}
+
+// UpsertMACompanyDomain writes a registry entry. The WHERE guard on conflict is
+// the precedence rule: an automatic verification never overwrites an operator's
+// manual association (manual overwrites anything, auto refreshes auto).
+func (s *SQLStore) UpsertMACompanyDomain(ctx context.Context, record maCompanyDomain) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	if record.CompanyKey == "" || record.Domain == "" || record.Method == "" {
+		return errors.New("ma company domain: missing key, domain or method")
+	}
+	if _, err := s.db.ExecContext(ctx, `
+INSERT INTO binocolo.ma_company_domain (
+    company_key, vat_code, tax_code, company_name, domain, method,
+    verified_at, created_by_subject, created_by_email, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, now(), $7, $8, now(), now())
+ON CONFLICT (company_key) DO UPDATE SET
+    domain       = EXCLUDED.domain,
+    method       = EXCLUDED.method,
+    vat_code     = CASE WHEN EXCLUDED.vat_code <> '' THEN EXCLUDED.vat_code ELSE binocolo.ma_company_domain.vat_code END,
+    tax_code     = CASE WHEN EXCLUDED.tax_code <> '' THEN EXCLUDED.tax_code ELSE binocolo.ma_company_domain.tax_code END,
+    company_name = CASE WHEN EXCLUDED.company_name <> '' THEN EXCLUDED.company_name ELSE binocolo.ma_company_domain.company_name END,
+    verified_at  = now(),
+    updated_at   = now()
+WHERE NOT (binocolo.ma_company_domain.method = 'manual' AND EXCLUDED.method = 'auto_verified')
+`, record.CompanyKey, record.VATCode, record.TaxCode, record.CompanyName, record.Domain, record.Method,
+		record.CreatedBySubject, record.CreatedByEmail); err != nil {
+		return fmt.Errorf("upsert ma company domain: %w", err)
 	}
 	return nil
 }
