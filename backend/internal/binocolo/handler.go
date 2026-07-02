@@ -120,6 +120,10 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/initiatives/{id}/archive", h.handleArchiveMAInitiative)
 	handle("POST /binocolo/v1/ma/initiatives/{id}/restore", h.handleRestoreMAInitiative)
 	handle("POST /binocolo/v1/ma/sessions/{id}/initiative", h.handleSetMASessionInitiative)
+	handle("GET /binocolo/v1/ma/companies/{companyKey}/registry", h.handleGetMACompanyRegistry)
+	handle("POST /binocolo/v1/ma/companies/{companyKey}/registry/facts", h.handleCreateMACompanyFact)
+	handle("POST /binocolo/v1/ma/companies/{companyKey}/registry/facts/{factId}/revoke", h.handleRevokeMACompanyFact)
+	handle("POST /binocolo/v1/ma/companies/{companyKey}/registry/notes", h.handleCreateMACompanyNote)
 	handle("GET /binocolo/v1/ma/sessions", h.handleListMASessions)
 	handle("POST /binocolo/v1/ma/sessions", h.handleCreateMASession)
 	handle("GET /binocolo/v1/ma/sessions/{id}", h.handleGetMASession)
@@ -391,6 +395,116 @@ func (h *Handler) handleSetMASessionInitiative(w http.ResponseWriter, r *http.Re
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// maCompanyKeyPath extracts and normalizes the {companyKey} path segment
+// shared by the registry endpoints (B3, PRD §6). Company keys are opaque
+// slugs, not UUIDs, so no format validation beyond normalization + non-empty.
+func maCompanyKeyPath(w http.ResponseWriter, r *http.Request) (string, bool) {
+	companyKey := normalizeMACompanyKey(r.PathValue("companyKey"))
+	if companyKey == "" {
+		httputil.Error(w, http.StatusBadRequest, "invalid_ma_company_key")
+		return "", false
+	}
+	return companyKey, true
+}
+
+func maFactID(w http.ResponseWriter, r *http.Request) (string, bool) {
+	id := strings.TrimSpace(r.PathValue("factId"))
+	if _, err := uuid.Parse(id); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_ma_fact_id")
+		return "", false
+	}
+	return id, true
+}
+
+func (h *Handler) handleGetMACompanyRegistry(w http.ResponseWriter, r *http.Request) {
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	registry, err := h.ma.getCompanyRegistry(r.Context(), companyKey)
+	if err != nil {
+		h.maFailure(w, r, "ma_company_registry_get", err, "company_key", companyKey)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, registry)
+}
+
+type maCompanyFactCreateRequest struct {
+	Kind        string `json:"kind"`
+	Note        string `json:"note"`
+	VATCode     string `json:"vatCode"`
+	TaxCode     string `json:"taxCode"`
+	CompanyName string `json:"companyName"`
+}
+
+func (h *Handler) handleCreateMACompanyFact(w http.ResponseWriter, r *http.Request) {
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	var body maCompanyFactCreateRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	fact, err := h.ma.addCompanyFact(r.Context(), companyKey, body.Kind, body.Note, body.VATCode, body.TaxCode, body.CompanyName, subject, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_company_fact_create", err, "company_key", companyKey)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, fact)
+}
+
+type maCompanyFactRevokeRequest struct {
+	Note string `json:"note"`
+}
+
+func (h *Handler) handleRevokeMACompanyFact(w http.ResponseWriter, r *http.Request) {
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	factID, ok := maFactID(w, r)
+	if !ok {
+		return
+	}
+	var body maCompanyFactRevokeRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	if err := h.ma.revokeCompanyFact(r.Context(), factID, body.Note, subject, email); err != nil {
+		h.maFailure(w, r, "ma_company_fact_revoke", err, "company_key", companyKey, "fact_id", factID)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+type maCompanyNoteCreateRequest struct {
+	Body string `json:"body"`
+}
+
+func (h *Handler) handleCreateMACompanyNote(w http.ResponseWriter, r *http.Request) {
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	var body maCompanyNoteCreateRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	note, err := h.ma.addCompanyNote(r.Context(), companyKey, body.Body, subject, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_company_note_create", err, "company_key", companyKey)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, note)
 }
 
 func (h *Handler) handleArchiveMASession(w http.ResponseWriter, r *http.Request) {
@@ -1075,6 +1189,9 @@ func maHTTPError(err error) (int, string, string) {
 	}
 	if errors.Is(err, errMAInitiativeArchived) {
 		return http.StatusConflict, "ma_initiative_archived", "warn"
+	}
+	if errors.Is(err, errMACompanyFactActive) {
+		return http.StatusBadRequest, "ma_company_fact_already_active", "warn"
 	}
 	if errors.Is(err, errAtecoCodeNotFound) {
 		return http.StatusBadRequest, "invalid_ateco_code", "warn"

@@ -68,6 +68,11 @@ type maWorkspaceStore interface {
 	ListMAInitiativeCards(ctx context.Context, initiativeID string) ([]MAInitiativeCard, error)
 	ListMAActiveCardsByCompany(ctx context.Context, companyKeys []string) (map[string][]MAInitiativeCard, error)
 	ListMARatings(ctx context.Context, sessionID string) (map[string]int, error)
+	InsertMACompanyFact(ctx context.Context, fact MACompanyFact) (MACompanyFact, error)
+	RevokeMACompanyFact(ctx context.Context, id, subject, email, note string) (bool, error)
+	InsertMACompanyNote(ctx context.Context, note MACompanyNote) (MACompanyNote, error)
+	GetMACompanyRegistry(ctx context.Context, companyKey string) (MACompanyRegistry, error)
+	ListMACompanyFactsActive(ctx context.Context, companyKeys []string) (map[string][]string, error)
 }
 
 type maCompanyLegalForm struct {
@@ -2371,6 +2376,180 @@ WHERE company_key IN (%s)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate ma active cards by company: %w", err)
+	}
+	return out, nil
+}
+
+// errMACompanyFactActive signals a violation of ma_company_fact_active_idx
+// (mig 090): a fact of this kind is already active for the company. The
+// service maps it to a 400 (INIZIATIVE-PRD.md §6, B3 done-when).
+var errMACompanyFactActive = errors.New("ma company fact already active")
+
+// InsertMACompanyFact records a new typed fact in the company registry (mig
+// 090). Violating the (company_key, kind) active-uniqueness returns
+// errMACompanyFactActive.
+func (s *SQLStore) InsertMACompanyFact(ctx context.Context, fact MACompanyFact) (MACompanyFact, error) {
+	if s == nil || s.db == nil {
+		return MACompanyFact{}, errors.New("binocolo ma store not configured")
+	}
+	row := s.db.QueryRowContext(ctx, `
+INSERT INTO binocolo.ma_company_fact (
+    id, company_key, vat_code, tax_code, company_name, kind, note,
+    created_by_subject, created_by_email)
+VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING id::text, company_key, vat_code, tax_code, company_name, kind, note,
+          created_by_subject, created_by_email, created_at
+`, fact.ID, fact.CompanyKey, fact.VATCode, fact.TaxCode, fact.CompanyName, fact.Kind, fact.Note,
+		fact.CreatedBySubject, fact.CreatedByEmail)
+	var out MACompanyFact
+	if err := row.Scan(&out.ID, &out.CompanyKey, &out.VATCode, &out.TaxCode, &out.CompanyName, &out.Kind, &out.Note,
+		&out.CreatedBySubject, &out.CreatedByEmail, &out.CreatedAt); err != nil {
+		if strings.Contains(err.Error(), "ma_company_fact_active_idx") || strings.Contains(err.Error(), "duplicate key") {
+			return MACompanyFact{}, errMACompanyFactActive
+		}
+		return MACompanyFact{}, fmt.Errorf("insert ma company fact: %w", err)
+	}
+	return out, nil
+}
+
+// RevokeMACompanyFact revokes an active fact by id. Returns false when no
+// active fact with that id exists (already revoked or unknown id).
+func (s *SQLStore) RevokeMACompanyFact(ctx context.Context, id, subject, email, note string) (bool, error) {
+	if s == nil || s.db == nil {
+		return false, errors.New("binocolo ma store not configured")
+	}
+	var returnedID string
+	err := s.db.QueryRowContext(ctx, `
+UPDATE binocolo.ma_company_fact
+SET revoked_at = now(),
+    revoked_by_subject = $2,
+    revoked_by_email = $3,
+    revoke_note = $4
+WHERE id = $1::uuid
+  AND revoked_at IS NULL
+RETURNING id::text
+`, id, subject, email, note).Scan(&returnedID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("revoke ma company fact: %w", err)
+	}
+	return true, nil
+}
+
+// InsertMACompanyNote appends a free-text note to the company registry.
+func (s *SQLStore) InsertMACompanyNote(ctx context.Context, note MACompanyNote) (MACompanyNote, error) {
+	if s == nil || s.db == nil {
+		return MACompanyNote{}, errors.New("binocolo ma store not configured")
+	}
+	row := s.db.QueryRowContext(ctx, `
+INSERT INTO binocolo.ma_company_note (id, company_key, body, created_by_subject, created_by_email)
+VALUES ($1::uuid, $2, $3, $4, $5)
+RETURNING id::text, company_key, body, created_by_subject, created_by_email, created_at
+`, note.ID, note.CompanyKey, note.Body, note.CreatedBySubject, note.CreatedByEmail)
+	var out MACompanyNote
+	if err := row.Scan(&out.ID, &out.CompanyKey, &out.Body, &out.CreatedBySubject, &out.CreatedByEmail, &out.CreatedAt); err != nil {
+		return MACompanyNote{}, fmt.Errorf("insert ma company note: %w", err)
+	}
+	return out, nil
+}
+
+// GetMACompanyRegistry loads the full registry (facts active + revoked, notes
+// chronological) for the dossier §6 section and the F4/board reads.
+func (s *SQLStore) GetMACompanyRegistry(ctx context.Context, companyKey string) (MACompanyRegistry, error) {
+	if s == nil || s.db == nil {
+		return MACompanyRegistry{}, errors.New("binocolo ma store not configured")
+	}
+	factRows, err := s.db.QueryContext(ctx, `
+SELECT id::text, company_key, vat_code, tax_code, company_name, kind, note,
+       created_by_subject, created_by_email, created_at,
+       revoked_at, COALESCE(revoked_by_subject, ''), COALESCE(revoked_by_email, ''), revoke_note
+FROM binocolo.ma_company_fact
+WHERE company_key = $1
+ORDER BY created_at DESC
+`, companyKey)
+	if err != nil {
+		return MACompanyRegistry{}, fmt.Errorf("list ma company facts: %w", err)
+	}
+	defer factRows.Close()
+	out := MACompanyRegistry{Facts: []MACompanyFact{}, Notes: []MACompanyNote{}}
+	for factRows.Next() {
+		var fact MACompanyFact
+		var revokedAt sql.NullTime
+		if err := factRows.Scan(&fact.ID, &fact.CompanyKey, &fact.VATCode, &fact.TaxCode, &fact.CompanyName, &fact.Kind, &fact.Note,
+			&fact.CreatedBySubject, &fact.CreatedByEmail, &fact.CreatedAt,
+			&revokedAt, &fact.RevokedBySubject, &fact.RevokedByEmail, &fact.RevokeNote); err != nil {
+			return MACompanyRegistry{}, fmt.Errorf("scan ma company fact: %w", err)
+		}
+		if revokedAt.Valid {
+			fact.RevokedAt = &revokedAt.Time
+		}
+		out.Facts = append(out.Facts, fact)
+	}
+	if err := factRows.Err(); err != nil {
+		return MACompanyRegistry{}, fmt.Errorf("iterate ma company facts: %w", err)
+	}
+
+	noteRows, err := s.db.QueryContext(ctx, `
+SELECT id::text, company_key, body, created_by_subject, created_by_email, created_at
+FROM binocolo.ma_company_note
+WHERE company_key = $1
+ORDER BY created_at DESC
+`, companyKey)
+	if err != nil {
+		return MACompanyRegistry{}, fmt.Errorf("list ma company notes: %w", err)
+	}
+	defer noteRows.Close()
+	for noteRows.Next() {
+		var note MACompanyNote
+		if err := noteRows.Scan(&note.ID, &note.CompanyKey, &note.Body, &note.CreatedBySubject, &note.CreatedByEmail, &note.CreatedAt); err != nil {
+			return MACompanyRegistry{}, fmt.Errorf("scan ma company note: %w", err)
+		}
+		out.Notes = append(out.Notes, note)
+	}
+	if err := noteRows.Err(); err != nil {
+		return MACompanyRegistry{}, fmt.Errorf("iterate ma company notes: %w", err)
+	}
+	return out, nil
+}
+
+// ListMACompanyFactsActive batches the badge lookup (B5): for each company
+// key, the kinds of every currently active fact.
+func (s *SQLStore) ListMACompanyFactsActive(ctx context.Context, companyKeys []string) (map[string][]string, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	out := map[string][]string{}
+	if len(companyKeys) == 0 {
+		return out, nil
+	}
+	placeholders := make([]string, len(companyKeys))
+	args := make([]any, len(companyKeys))
+	for i, key := range companyKeys {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		args[i] = key
+	}
+	query := fmt.Sprintf(`
+SELECT company_key, kind
+FROM binocolo.ma_company_fact
+WHERE company_key IN (%s)
+  AND revoked_at IS NULL
+`, strings.Join(placeholders, ", "))
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list ma company facts active: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var companyKey, kind string
+		if err := rows.Scan(&companyKey, &kind); err != nil {
+			return nil, fmt.Errorf("scan ma company fact active: %w", err)
+		}
+		out[companyKey] = append(out[companyKey], kind)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma company facts active: %w", err)
 	}
 	return out, nil
 }

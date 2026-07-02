@@ -475,6 +475,101 @@ func (s *maService) setSessionInitiative(ctx context.Context, sessionID, initiat
 	return nil
 }
 
+// maCompanyFactKinds is the closed vocabulary of the company registry (PRD
+// §6, mig 090): warning kinds (non_vende, in_trattativa_altrui, da_evitare)
+// and informational kinds (gia_cliente, partner).
+var maCompanyFactKinds = map[string]bool{
+	"non_vende":            true,
+	"in_trattativa_altrui": true,
+	"da_evitare":           true,
+	"gia_cliente":          true,
+	"partner":              true,
+}
+
+// errMACompanyFactKindInvalid signals a kind outside the closed vocabulary.
+var errMACompanyFactKindInvalid = fmt.Errorf("%w: kind", errMAStrategyInvalid)
+
+// addCompanyFact records a new typed fact in the company registry (PRD §6).
+// vatCode/taxCode/companyName are an optional snapshot supplied by the
+// caller (mirrors mig 082's ma_company_domain pattern) — empty when unknown.
+func (s *maService) addCompanyFact(ctx context.Context, companyKey, kind, note, vatCode, taxCode, companyName, subject, email string) (MACompanyFact, error) {
+	if s.store == nil {
+		return MACompanyFact{}, errMAStoreUnavailable
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey == "" {
+		return MACompanyFact{}, fmt.Errorf("%w: companyKey", errMAStrategyInvalid)
+	}
+	if !maCompanyFactKinds[kind] {
+		return MACompanyFact{}, errMACompanyFactKindInvalid
+	}
+	fact := MACompanyFact{
+		ID:               uuid.NewString(),
+		CompanyKey:       companyKey,
+		VATCode:          strings.TrimSpace(vatCode),
+		TaxCode:          strings.TrimSpace(taxCode),
+		CompanyName:      strings.TrimSpace(companyName),
+		Kind:             kind,
+		Note:             cleanText(note, 500),
+		CreatedBySubject: subject,
+		CreatedByEmail:   email,
+	}
+	return s.store.InsertMACompanyFact(ctx, fact)
+}
+
+// revokeCompanyFact revokes an active fact (PRD §6: history preserved, never
+// deleted). Returns sql.ErrNoRows when no active fact with that id exists.
+func (s *maService) revokeCompanyFact(ctx context.Context, id, note, subject, email string) error {
+	if s.store == nil {
+		return errMAStoreUnavailable
+	}
+	revoked, err := s.store.RevokeMACompanyFact(ctx, id, subject, email, cleanText(note, 500))
+	if err != nil {
+		return err
+	}
+	if !revoked {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+// addCompanyNote appends a free-text note to the company registry (PRD §6):
+// registry content, never a log-of-events entry.
+func (s *maService) addCompanyNote(ctx context.Context, companyKey, body, subject, email string) (MACompanyNote, error) {
+	if s.store == nil {
+		return MACompanyNote{}, errMAStoreUnavailable
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey == "" {
+		return MACompanyNote{}, fmt.Errorf("%w: companyKey", errMAStrategyInvalid)
+	}
+	body = cleanText(body, 1000)
+	if body == "" {
+		return MACompanyNote{}, fmt.Errorf("%w: body", errMAStrategyInvalid)
+	}
+	note := MACompanyNote{
+		ID:               uuid.NewString(),
+		CompanyKey:       companyKey,
+		Body:             body,
+		CreatedBySubject: subject,
+		CreatedByEmail:   email,
+	}
+	return s.store.InsertMACompanyNote(ctx, note)
+}
+
+// getCompanyRegistry loads the full registry (facts + notes) for the dossier
+// §6 section.
+func (s *maService) getCompanyRegistry(ctx context.Context, companyKey string) (MACompanyRegistry, error) {
+	if s.store == nil {
+		return MACompanyRegistry{}, errMAStoreUnavailable
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey == "" {
+		return MACompanyRegistry{}, fmt.Errorf("%w: companyKey", errMAStrategyInvalid)
+	}
+	return s.store.GetMACompanyRegistry(ctx, companyKey)
+}
+
 // maPricing holds the business pricing/budget levers, sourced from the
 // ma_parameter table (migration 038) with the compiled constants as fallback.
 type maPricing struct {

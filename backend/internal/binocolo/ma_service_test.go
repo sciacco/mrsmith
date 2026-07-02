@@ -1615,6 +1615,26 @@ func (f *fakeMAWorkspaceStore) ListMARatings(context.Context, string) (map[strin
 	return nil, nil
 }
 
+func (f *fakeMAWorkspaceStore) InsertMACompanyFact(context.Context, MACompanyFact) (MACompanyFact, error) {
+	return MACompanyFact{}, errors.New("not implemented")
+}
+
+func (f *fakeMAWorkspaceStore) RevokeMACompanyFact(context.Context, string, string, string, string) (bool, error) {
+	return false, errors.New("not implemented")
+}
+
+func (f *fakeMAWorkspaceStore) InsertMACompanyNote(context.Context, MACompanyNote) (MACompanyNote, error) {
+	return MACompanyNote{}, errors.New("not implemented")
+}
+
+func (f *fakeMAWorkspaceStore) GetMACompanyRegistry(context.Context, string) (MACompanyRegistry, error) {
+	return MACompanyRegistry{}, nil
+}
+
+func (f *fakeMAWorkspaceStore) ListMACompanyFactsActive(context.Context, []string) (map[string][]string, error) {
+	return nil, nil
+}
+
 type fakeProvinceCache struct {
 	response json.RawMessage
 }

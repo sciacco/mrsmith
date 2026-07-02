@@ -391,6 +391,46 @@ type MAInitiativeCard struct {
 	ClosedAt           *time.Time `json:"closedAt,omitempty"`
 }
 
+// MACompanyFact is one typed, revocable fact of the company registry (mig
+// 090, INIZIATIVE-PRD.md §6): closed vocabulary, one active fact per
+// (company_key, kind), history preserved via revocation instead of deletion.
+type MACompanyFact struct {
+	ID               string     `json:"id"`
+	CompanyKey       string     `json:"companyKey"`
+	VATCode          string     `json:"vatCode,omitempty"`
+	TaxCode          string     `json:"taxCode,omitempty"`
+	CompanyName      string     `json:"companyName,omitempty"`
+	Kind             string     `json:"kind"`
+	Note             string     `json:"note,omitempty"`
+	CreatedBySubject string     `json:"-"`
+	CreatedByEmail   string     `json:"createdByEmail,omitempty"`
+	CreatedAt        time.Time  `json:"createdAt"`
+	RevokedAt        *time.Time `json:"revokedAt,omitempty"`
+	RevokedBySubject string     `json:"-"`
+	RevokedByEmail   string     `json:"revokedByEmail,omitempty"`
+	RevokeNote       string     `json:"revokeNote,omitempty"`
+}
+
+// MACompanyNote is an append-only free-text note of the company registry
+// (mig 090, PRD §6): the expressiveness the closed fact vocabulary does not
+// give. Registry content, not a log-of-events entry.
+type MACompanyNote struct {
+	ID               string    `json:"id"`
+	CompanyKey       string    `json:"companyKey"`
+	Body             string    `json:"body"`
+	CreatedBySubject string    `json:"-"`
+	CreatedByEmail   string    `json:"createdByEmail,omitempty"`
+	CreatedAt        time.Time `json:"createdAt"`
+}
+
+// MACompanyRegistry is the aggregate returned by the registry read endpoint:
+// facts include both active and revoked (the UI shows active, can reveal
+// history), notes are the append-only timeline.
+type MACompanyRegistry struct {
+	Facts []MACompanyFact `json:"facts"`
+	Notes []MACompanyNote `json:"notes"`
+}
+
 type MATargetOutcomeRequest struct {
 	CompanyKey string `json:"companyKey"`
 	Event      string `json:"event"`
