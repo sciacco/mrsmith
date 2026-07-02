@@ -2680,6 +2680,53 @@ func (s *maService) deepDive(ctx context.Context, sessionID string, ack bool, em
 	return s.getSessionShape(ctx, sessionID, lean)
 }
 
+// deepDiveCard avvia l'analisi completa per-azienda della card (B6, PRD §7):
+// variante per-azienda del deep-dive di sessione (deepDive sopra), stesso
+// gate di spesa e stesso worker/cache, con count=1. No-op se già ready o già
+// in coda/running (il bottone in UI resta coerente senza doppia spesa).
+func (s *maService) deepDiveCard(ctx context.Context, initiativeID, companyKey string, ack bool, email string) (MACardDeepDiveResponse, error) {
+	if s.store == nil {
+		return MACardDeepDiveResponse{}, errMAStoreUnavailable
+	}
+	if s.openapiit == nil {
+		return MACardDeepDiveResponse{}, errMAOpenAPIITUnavailable
+	}
+	card, err := s.requireOperationalInitiativeCard(ctx, initiativeID, companyKey)
+	if err != nil {
+		return MACardDeepDiveResponse{}, err
+	}
+	existing, err := s.store.ListMADeepAnalysis(ctx, []string{card.CompanyKey})
+	if err != nil {
+		return MACardDeepDiveResponse{}, err
+	}
+	if record, ok := existing[card.CompanyKey]; ok {
+		switch record.Status {
+		case maDeepStatusReady, maDeepStatusQueued, maDeepStatusRunning:
+			// Già pronto o già in coda: no-op, si riflette lo stato esistente.
+			return MACardDeepDiveResponse{DossierStatus: maCardDossierStatus(record)}, nil
+		}
+	}
+	pricing := s.loadPricing(ctx)
+	projected := pricing.CostFull
+	if projected > pricing.BudgetDefault && !ack {
+		_ = s.traceEvent(ctx, maTraceEventWrite{
+			EventType: "ma_card_deep_dive_over_budget",
+			Status:    maTraceEventInfo,
+			Metadata:  maTraceJSON(map[string]any{"initiative_id": initiativeID, "company_key": card.CompanyKey, "projected_cost": projected, "budget": pricing.BudgetDefault}),
+		})
+		return MACardDeepDiveResponse{}, errMAEstimateOverBudget
+	}
+	if err := s.store.EnqueueMADeepAnalysis(ctx, card.CompanyKey, card.VATCode, card.TaxCode, email); err != nil {
+		return MACardDeepDiveResponse{}, err
+	}
+	_ = s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_card_deep_dive_started",
+		Status:    maTraceEventSucceeded,
+		Metadata:  maTraceJSON(map[string]any{"initiative_id": initiativeID, "company_key": card.CompanyKey, "projected_cost": projected}),
+	})
+	return MACardDeepDiveResponse{DossierStatus: "working"}, nil
+}
+
 func (s *maService) extractIntent(ctx context.Context, prompt, subject, email string) (MAIntent, llm.CallAudit, error) {
 	if s.llmp == nil {
 		return MAIntent{}, llm.CallAudit{}, errMAOpenRouterUnavailable

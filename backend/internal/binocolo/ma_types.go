@@ -524,6 +524,13 @@ type MACardNoteRequest struct {
 	Body string `json:"body"`
 }
 
+// MACardDeepDiveResponse drives POST .../cards/{companyKey}/deep-dive (B6,
+// PRD §7): il bottone a 3 stati sulla card legge solo il DossierStatus
+// risultante, mai cifre di costo.
+type MACardDeepDiveResponse struct {
+	DossierStatus string `json:"dossierStatus"`
+}
+
 // MARescoreRequest — override della tesi da parte dell'analista: ri-scora i
 // target advanced della sessione dai payload già persistiti (gratis, nessuna
 // chiamata vendor) sotto la tesi indicata.

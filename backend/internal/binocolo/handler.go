@@ -127,6 +127,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/remove", h.handleRemoveMACard)
 	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/reopen", h.handleReopenMACard)
 	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/note", h.handleAddMACardNote)
+	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/deep-dive", h.handleDeepDiveMACard)
 	handle("GET /binocolo/v1/ma/companies/{companyKey}/registry", h.handleGetMACompanyRegistry)
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/registry/facts", h.handleCreateMACompanyFact)
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/registry/facts/{factId}/revoke", h.handleRevokeMACompanyFact)
@@ -541,6 +542,29 @@ func (h *Handler) handleAddMACardNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) handleDeepDiveMACard(w http.ResponseWriter, r *http.Request) {
+	id, ok := maInitiativeID(w, r)
+	if !ok {
+		return
+	}
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	var body MADeepDiveRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	_, email := companySearchRefreshActor(r.Context())
+	result, err := h.ma.deepDiveCard(r.Context(), id, companyKey, body.AcknowledgeCost, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_card_deep_dive", err, "initiative_id", id, "company_key", companyKey)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, result)
 }
 
 // maCompanyKeyPath extracts and normalizes the {companyKey} path segment
