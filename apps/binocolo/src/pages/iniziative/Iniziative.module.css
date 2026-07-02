@@ -850,132 +850,208 @@
   pointer-events: none;
 }
 
-.stationBtn:hover .stepLabel,
-.stationBtn.on .stepLabel {
-  opacity: 1;
+.drawerBody {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
-.stepCircle {
-  font-size: 0.75rem;
-  font-weight: 800;
+.drawerScrollArea {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-6) var(--space-8);
 }
 
-.stationBtn.on {
-  border-color: var(--color-accent);
-  background: var(--color-accent-subtle);
-  color: var(--color-accent);
-  box-shadow: 0 0 0 3px var(--color-accent-glow);
-}
-
-.stationBtn.on .stepCircle {
-  background: var(--color-accent);
-  color: white;
-  border-color: var(--color-accent);
-}
-
-.stationBtn:hover:not(.on) {
-  background: var(--color-surface);
-  border-color: var(--color-text-faint);
-}
-
-.provRow {
+.drawerMeta {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
 }
 
-.provSess {
-  color: var(--color-text);
+.drawerActions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.drawerSec {
+  padding: var(--space-5) 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.lab {
+  font-size: 0.72rem;
   font-weight: 600;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-3);
 }
 
-.stars {
-  color: var(--color-warning, #b45309);
-  letter-spacing: 1px;
+.hint {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  font-style: italic;
 }
 
-.starsOff {
-  color: var(--color-text-faint);
+/* Pipeline */
+.pipeline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-bottom: var(--space-8);
 }
 
-.provScore {
+.pipelineStep {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.stationBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  transition: all 0.2s ease;
+  min-width: 80px;
+}
+
+.stepCircle {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
   color: var(--color-text-muted);
 }
 
+.stepLabel {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+
+.stationBtn.on .stepCircle {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: white;
+}
+
+.stationBtn.on .stepLabel {
+  color: var(--color-accent);
+}
+
+.stationBtn:hover:not(.on) .stepCircle {
+  border-color: var(--color-text-muted);
+}
+
+.stepConnector {
+  width: 24px;
+  height: 1.5px;
+  background: var(--color-border);
+}
+
+/* Timeline */
 .timeline {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  margin: var(--space-2) 0;
-  padding: 0;
   list-style: none;
-}
-
-.timelineItem {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  padding: 0;
+  margin: 0;
   position: relative;
-  padding-left: var(--space-6);
 }
 
-.timelineItem::before {
+.timeline::before {
   content: '';
   position: absolute;
   left: 7px;
   top: 8px;
-  bottom: -16px;
+  bottom: 8px;
   width: 2px;
   background: var(--color-border-subtle);
 }
 
-.timelineItem:last-child::before {
-  display: none;
+.timelineItem {
+  position: relative;
+  padding-left: var(--space-8);
+  margin-bottom: var(--space-4);
 }
 
 .timelineDot {
   position: absolute;
   left: 0;
-  top: 4px;
+  top: 6px;
   width: 16px;
   height: 16px;
-  border-radius: var(--radius-full);
+  border-radius: 50%;
   background: var(--color-bg-elevated);
   border: 2px solid var(--color-border);
   z-index: 1;
 }
 
-.timelineNote {
-  background: var(--color-surface);
-  border-radius: var(--radius-lg);
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--color-border-subtle);
-  box-shadow: var(--shadow-sm);
+.timelineEvent {
+  font-size: 0.9375rem;
   color: var(--color-text);
-  font-size: 0.875rem;
+  line-height: 1.4;
 }
 
-.timelineEvent {
-  color: var(--color-text-secondary);
-  font-size: 0.8125rem;
-  font-style: italic;
+.timelineNote {
+  font-size: 0.9375rem;
+  color: var(--color-accent);
+  line-height: 1.4;
+  font-weight: 600;
 }
 
 .timelineWho {
   display: block;
-  margin-top: 4px;
-  color: var(--color-text-faint);
   font-size: 0.75rem;
-  font-weight: 500;
+  color: var(--color-text-muted);
+  margin-top: 2px;
 }
 
+/* Accordion */
+.accordion {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-4);
+  overflow: hidden;
+}
+
+.accordionHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.accordionHead:hover {
+  background: var(--color-surface-hover);
+}
+
+.accordionBody {
+  padding: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+/* Composer */
 .composer {
   display: flex;
   flex-direction: row;
   align-items: flex-end;
   gap: var(--space-3);
-  padding: var(--space-4) var(--space-6);
+  padding: var(--space-4) var(--space-8);
   background: var(--color-bg-elevated);
   border-top: 1px solid var(--color-border);
   box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.03);
@@ -987,14 +1063,14 @@
 .composerInput {
   flex: 1;
   border: 1.5px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: var(--color-surface);
   color: var(--color-text);
   font: inherit;
-  font-size: 0.875rem;
-  min-height: 40px;
+  font-size: 0.9375rem;
+  min-height: 44px;
   max-height: 120px;
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-3);
   outline: none;
   resize: none;
   transition: border-color 0.2s ease;
@@ -1002,40 +1078,8 @@
 
 .composerInput:focus {
   border-color: var(--color-accent);
-}
-
-.accordion {
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  margin-bottom: var(--space-3);
-}
-
-.accordionHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-2) var(--space-3);
-  background: var(--color-surface);
-  cursor: pointer;
-  user-select: none;
-}
-
-.accordionHead:hover {
-  background: var(--color-surface-hover);
-}
-
-.accordionBody {
-  padding: var(--space-3);
   background: var(--color-bg-elevated);
-  border-top: 1px solid var(--color-border-subtle);
-}
-
-.actionsRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
 }
 
 /* ---- Chiusura & rimozione (F3) ---- */
