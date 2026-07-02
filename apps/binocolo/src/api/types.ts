@@ -539,6 +539,38 @@ export interface MACompanyDossier {
   updatedAt?: string;
 }
 
+// Company registry (mig 090, INIZIATIVE-PRD.md §6): closed-vocabulary facts +
+// free-text notes, valid across every initiative. Presentation only.
+export type MACompanyFactKind = 'non_vende' | 'in_trattativa_altrui' | 'da_evitare' | 'gia_cliente' | 'partner';
+
+export interface MACompanyFact {
+  id: string;
+  companyKey: string;
+  vatCode?: string;
+  taxCode?: string;
+  companyName?: string;
+  kind: MACompanyFactKind;
+  note?: string;
+  createdByEmail?: string;
+  createdAt: string;
+  revokedAt?: string;
+  revokedByEmail?: string;
+  revokeNote?: string;
+}
+
+export interface MACompanyNote {
+  id: string;
+  companyKey: string;
+  body: string;
+  createdByEmail?: string;
+  createdAt: string;
+}
+
+export interface MACompanyRegistry {
+  facts: MACompanyFact[];
+  notes: MACompanyNote[];
+}
+
 export type MASessionStatus = 'draft' | 'estimating' | 'estimated' | 'running' | 'completed' | 'failed';
 export type MASessionVisibility = 'active' | 'archived' | 'deleted';
 export type MAStrategyType = 'ateco' | 'expanded';
