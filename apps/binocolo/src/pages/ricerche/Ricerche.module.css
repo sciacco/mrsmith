@@ -248,7 +248,6 @@
 
 .actions,
 .inlineActions,
-.toolbar,
 .tabs,
 .fieldRow,
 .chips,
@@ -352,6 +351,34 @@
 .thesis small {
   color: var(--color-text-secondary);
   font-weight: 600;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+.toolbar .select {
+  width: auto;
+  min-height: 32px;
+  height: 32px;
+  padding: 0 var(--space-2);
+  font-size: 0.8125rem;
+  flex-shrink: 0;
+}
+
+.toolbar button,
+.toolbar .thesis {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .toggleButton,
@@ -604,6 +631,9 @@
 }
 
 .tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   min-height: 48px;
   border: 0;
   border-bottom: 2px solid transparent;
@@ -618,6 +648,24 @@
 .tabActive {
   border-color: var(--color-accent);
   color: var(--color-accent);
+}
+
+.tabBadge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-full);
+  padding: 3px var(--space-2);
+  background: var(--color-warning-subtle);
+  color: var(--color-warning-strong);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.tabBadgeGray {
+  background: var(--color-surface-hover);
+  color: var(--color-text-muted);
 }
 
 .tableWrap {
@@ -658,6 +706,12 @@
 
 .score {
   color: var(--color-text);
+  font-family: var(--font-mono);
+  font-weight: 800;
+}
+
+.scoreAbsent {
+  color: var(--color-text-muted);
   font-family: var(--font-mono);
   font-weight: 800;
 }

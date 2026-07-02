@@ -1,4 +1,4 @@
-import { Button, Icon, Modal, Skeleton, useToast } from '@mrsmith/ui';
+import { Button, Icon, Modal, Skeleton, Tooltip, useToast } from '@mrsmith/ui';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApiClient } from '../../api/client';
@@ -13,7 +13,8 @@ import type {
   MAThesis,
 } from '../../api/types';
 import {
-  bucketLabel,
+  bucketChipDescription,
+  bucketChipLabel,
   dateLabel,
   downloadBlob,
   errorLabel,
@@ -167,6 +168,9 @@ export function RicercaDetailPage() {
       rows
         .filter((target) => !isGateReject(target))
         .sort((a, b) => {
+          // Le soppresse non hanno rango tra le vive: sempre in coda alla lista.
+          const suppressedDelta = Number(a.bucket === 'soppresso') - Number(b.bucket === 'soppresso');
+          if (suppressedDelta !== 0) return suppressedDelta;
           const ratingDelta = (b.rating ?? 0) - (a.rating ?? 0);
           if (ratingDelta !== 0) return ratingDelta;
           if (a.score !== b.score) return b.score - a.score;
@@ -233,24 +237,6 @@ export function RicercaDetailPage() {
     downloadBlob(blob, `ricerca-${safeFilename(detail.session.title)}.csv`);
   }
 
-  async function runDeepDive() {
-    if (!detail?.session.id) return;
-    setBusy('deep');
-    setError(null);
-    try {
-      const data = await api.post<MASessionDetail>(`/binocolo/v1/ma/sessions/${detail.session.id}/deep-dive?targets=none`, {
-        acknowledgeCost: false,
-      });
-      setDetail(data);
-      await loadAll();
-      toast('Approfondimento avviato.', 'success');
-    } catch (err) {
-      setError(errorLabel(err));
-      toast(errorLabel(err), 'error');
-    } finally {
-      setBusy(null);
-    }
-  }
 
   async function rateTarget(target: MATargetRow, rating: number) {
     if (!detail?.session.id) return;
@@ -444,9 +430,6 @@ export function RicercaDetailPage() {
                     Export XLSX
                   </Button>
                   <Button variant="secondary" onClick={exportCSV}>CSV</Button>
-                  <Button onClick={() => void runDeepDive()} loading={busy === 'deep'} leftIcon={<Icon name="sparkles" />}>
-                    Approfondimento
-                  </Button>
                 </div>
               </div>
               <div className={styles.tabs} role="tablist" aria-label="Viste risultati">
@@ -454,10 +437,10 @@ export function RicercaDetailPage() {
                   Risultati
                 </button>
                 <button type="button" role="tab" aria-selected={activeTab === 'queue'} className={`${styles.tab} ${activeTab === 'queue' ? styles.tabActive : ''}`} onClick={() => setActiveTab('queue')}>
-                  Coda di verifica {queue.length}
+                  Coda di verifica <span className={styles.tabBadge}>{numberFormat.format(queue.length)}</span>
                 </button>
                 <button type="button" role="tab" aria-selected={activeTab === 'outside'} className={`${styles.tab} ${activeTab === 'outside' ? styles.tabActive : ''}`} onClick={() => setActiveTab('outside')}>
-                  Fuori tesi {outsideTargets.length}
+                  Fuori tesi <span className={`${styles.tabBadge} ${styles.tabBadgeGray}`}>{numberFormat.format(outsideTargets.length)}</span>
                 </button>
               </div>
               {activeTab === 'results' ? (
@@ -609,10 +592,30 @@ function ProgressPanel({
               <span className={styles.funnelReject} style={{ width: `${(buckets.reject / total) * 100}%` }} />
             </div>
             <div className={styles.buckets}>
-              <BucketLegend className={styles.funnelKeep ?? ''} label="In tesi" count={buckets.keep} />
-              <BucketLegend className={styles.funnelForse ?? ''} label="Da approfondire" count={buckets.forse} />
-              <BucketLegend className={styles.funnelReview ?? ''} label="Da verificare" count={buckets.review || queueCount} />
-              <BucketLegend className={styles.funnelReject ?? ''} label="Fuori tesi" count={buckets.reject} />
+              <BucketLegend
+                className={styles.funnelKeep ?? ''}
+                label="In tesi"
+                count={buckets.keep}
+                hint="Attività giudicata aderente agli ambiti descritti nella richiesta: prosegue nell’analisi completa."
+              />
+              <BucketLegend
+                className={styles.funnelForse ?? ''}
+                label="Da approfondire"
+                count={buckets.forse}
+                hint="Aderenza incerta dalle evidenze web: inclusa comunque nell’analisi completa."
+              />
+              <BucketLegend
+                className={styles.funnelReview ?? ''}
+                label="Da verificare"
+                count={buckets.review || queueCount}
+                hint="Identità o sito web non confermati: richiede un’azione nella coda di verifica."
+              />
+              <BucketLegend
+                className={styles.funnelReject ?? ''}
+                label="Fuori tesi"
+                count={buckets.reject}
+                hint="Attività giudicata fuori dagli ambiti descritti: esclusa dall’analisi completa, consultabile con il motivo dello scarto."
+              />
             </div>
           </>
         )}
@@ -633,12 +636,14 @@ function StageCard({ name, state, tone, value, detail }: { name: string; state: 
   );
 }
 
-function BucketLegend({ className, label, count }: { className: string; label: string; count: number }) {
+function BucketLegend({ className, label, count, hint }: { className: string; label: string; count: number; hint: string }) {
   return (
-    <span className={styles.inlineActions}>
-      <span className={`${styles.bucketDot} ${className}`} />
-      {label} <b>{numberFormat.format(count)}</b>
-    </span>
+    <Tooltip content={hint}>
+      <span className={styles.inlineActions}>
+        <span className={`${styles.bucketDot} ${className}`} />
+        {label} <b>{numberFormat.format(count)}</b>
+      </span>
+    </Tooltip>
   );
 }
 
@@ -681,8 +686,20 @@ function ResultsTable({
                 ) : null}
               </td>
               <td>{target.province ?? '-'}</td>
-              <td><span className={bucketClassName(target.bucket)}>{bucketLabel(target.bucket)}</span></td>
-              <td><span className={styles.score}>{numberFormat.format(target.score)}</span></td>
+              <td>
+                {bucketChipLabel(target.bucket) ? (
+                  <Tooltip content={bucketChipDescription(target.bucket)}>
+                    <span className={bucketClassName(target.bucket)}>{bucketChipLabel(target.bucket)}</span>
+                  </Tooltip>
+                ) : null}
+              </td>
+              <td>
+                {target.bucket === 'soppresso' || !target.matchState ? (
+                  <span className={styles.scoreAbsent}>—</span>
+                ) : (
+                  <span className={styles.score}>{numberFormat.format(target.score)}</span>
+                )}
+              </td>
               <td>
                 <RatingStars
                   rating={target.rating ?? 0}

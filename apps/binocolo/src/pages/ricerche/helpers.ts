@@ -240,6 +240,34 @@ export function bucketLabel(bucket?: string): string {
   }
 }
 
+// Chip Esito in tabella: segnala solo le eccezioni del routing v3.
+// Le righe principale (e i bucket sconosciuti) non portano badge.
+export function bucketChipLabel(bucket?: string): string | null {
+  switch (bucket) {
+    case 'azionabile':
+      return 'Azionabile';
+    case 'da_verificare':
+      return 'Da verificare';
+    case 'soppresso':
+      return 'Soppresso';
+    default:
+      return null;
+  }
+}
+
+export function bucketChipDescription(bucket?: string): string | null {
+  switch (bucket) {
+    case 'azionabile':
+      return 'Esclusa da un criterio formale, ma un’azione la rimette in valutazione: settore da rivedere o dominio da associare.';
+    case 'da_verificare':
+      return 'Valutata su evidenza limitata: il punteggio indica da dove iniziare la verifica, non un rango consolidato.';
+    case 'soppresso':
+      return 'Nessuna azione disponibile: società cessata o dormiente, esclusa dalle regole della ricerca o fuori dagli ambiti descritti.';
+    default:
+      return null;
+  }
+}
+
 export function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
