@@ -415,6 +415,38 @@ type MASessionSummary struct {
 	ArchivedByEmail  string     `json:"archivedByEmail,omitempty"`
 	DeletedAt        *time.Time `json:"deletedAt,omitempty"`
 	DeletedByEmail   string     `json:"deletedByEmail,omitempty"`
+	// InitiativeID/InitiativeTitle are populated by a LEFT JOIN on
+	// ma_initiative (mig 087) when the session is anchored to one. The chip
+	// in the ricerche index (F5) reads InitiativeTitle directly.
+	InitiativeID    string `json:"initiativeId,omitempty"`
+	InitiativeTitle string `json:"initiativeTitle,omitempty"`
+}
+
+// MAInitiative is a light, non-CRM container for M&A workstream sessions
+// (INIZIATIVE-PRD.md §3): title, optional description, author, archivable.
+// No budget/KPI/deadline fields by design.
+type MAInitiative struct {
+	ID                string     `json:"id"`
+	Title             string     `json:"title"`
+	Description       string     `json:"description"`
+	CreatedBySubject  string     `json:"createdBySubject,omitempty"`
+	CreatedByEmail    string     `json:"createdByEmail,omitempty"`
+	CreatedAt         time.Time  `json:"createdAt"`
+	UpdatedAt         time.Time  `json:"updatedAt"`
+	ArchivedAt        *time.Time `json:"archivedAt,omitempty"`
+	ArchivedBySubject string     `json:"archivedBySubject,omitempty"`
+	ArchivedByEmail   string     `json:"archivedByEmail,omitempty"`
+}
+
+// MAInitiativeSummary is the row shown in the /iniziative index (wireframe
+// S1): the initiative plus counts/activity computed from anchored sessions
+// and (from B2 onward) cards. Counts stays empty until B2 wires the
+// per-state join; SessionCount/LastActivityAt are populated here in B1.
+type MAInitiativeSummary struct {
+	MAInitiative
+	Counts         map[string]int `json:"counts"`
+	LastActivityAt *time.Time     `json:"lastActivityAt,omitempty"`
+	SessionCount   int            `json:"sessionCount"`
 }
 
 type MASessionDetail struct {
@@ -475,6 +507,11 @@ type MASession struct {
 	DeletedAt         *time.Time `json:"deletedAt,omitempty"`
 	DeletedBySubject  string     `json:"deletedBySubject,omitempty"`
 	DeletedByEmail    string     `json:"deletedByEmail,omitempty"`
+	// InitiativeID anchors the session to an Iniziativa (mig 087, nullable —
+	// exploratory sessions stay unanchored). Loaded by loadMASession /
+	// GetMASessionState so the rating hook (B2) can read it without an extra
+	// query.
+	InitiativeID string `json:"initiativeId,omitempty"`
 }
 
 type MAStrategyVersion struct {

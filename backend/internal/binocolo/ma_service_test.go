@@ -1575,6 +1575,26 @@ func (f *fakeMAWorkspaceStore) RecordMAExport(context.Context, string, string, i
 	return errors.New("not implemented")
 }
 
+func (f *fakeMAWorkspaceStore) CreateMAInitiative(context.Context, MAInitiative) (MAInitiative, error) {
+	return MAInitiative{}, errors.New("not implemented")
+}
+
+func (f *fakeMAWorkspaceStore) GetMAInitiative(context.Context, string) (MAInitiative, error) {
+	return MAInitiative{}, errors.New("not implemented")
+}
+
+func (f *fakeMAWorkspaceStore) ListMAInitiatives(context.Context, bool) ([]MAInitiativeSummary, error) {
+	return nil, nil
+}
+
+func (f *fakeMAWorkspaceStore) UpdateMAInitiativeLifecycle(context.Context, string, string, string, string) (bool, error) {
+	return false, errors.New("not implemented")
+}
+
+func (f *fakeMAWorkspaceStore) SetMASessionInitiative(context.Context, string, string) error {
+	return errors.New("not implemented")
+}
+
 type fakeProvinceCache struct {
 	response json.RawMessage
 }

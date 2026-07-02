@@ -115,6 +115,11 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("GET /binocolo/v1/ma/ateco/search", h.handleSearchAteco)
 	handle("GET /binocolo/v1/ma/catalog/provinces", h.handleListMAProvinceCatalog)
 	handle("PUT /binocolo/v1/ma/parameters", h.handleUpdateMAParameter)
+	handle("GET /binocolo/v1/ma/initiatives", h.handleListMAInitiatives)
+	handle("POST /binocolo/v1/ma/initiatives", h.handleCreateMAInitiative)
+	handle("POST /binocolo/v1/ma/initiatives/{id}/archive", h.handleArchiveMAInitiative)
+	handle("POST /binocolo/v1/ma/initiatives/{id}/restore", h.handleRestoreMAInitiative)
+	handle("POST /binocolo/v1/ma/sessions/{id}/initiative", h.handleSetMASessionInitiative)
 	handle("GET /binocolo/v1/ma/sessions", h.handleListMASessions)
 	handle("POST /binocolo/v1/ma/sessions", h.handleCreateMASession)
 	handle("GET /binocolo/v1/ma/sessions/{id}", h.handleGetMASession)
@@ -308,6 +313,84 @@ func (h *Handler) handleGetMATarget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httputil.JSON(w, http.StatusOK, target)
+}
+
+func (h *Handler) handleListMAInitiatives(w http.ResponseWriter, r *http.Request) {
+	includeArchived := strings.TrimSpace(r.URL.Query().Get("archived")) == "1"
+	items, err := h.ma.listInitiatives(r.Context(), includeArchived)
+	if err != nil {
+		h.maFailure(w, r, "ma_initiative_list", err)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+type maInitiativeCreateRequest struct {
+	Title       string `json:"title"`
+	Description string `json:"description"`
+}
+
+func (h *Handler) handleCreateMAInitiative(w http.ResponseWriter, r *http.Request) {
+	var body maInitiativeCreateRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	initiative, err := h.ma.createInitiative(r.Context(), body.Title, body.Description, subject, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_initiative_create", err)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, initiative)
+}
+
+func (h *Handler) handleArchiveMAInitiative(w http.ResponseWriter, r *http.Request) {
+	id, ok := maInitiativeID(w, r)
+	if !ok {
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	if err := h.ma.archiveInitiative(r.Context(), id, subject, email); err != nil {
+		h.maFailure(w, r, "ma_initiative_archive", err, "initiative_id", id)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) handleRestoreMAInitiative(w http.ResponseWriter, r *http.Request) {
+	id, ok := maInitiativeID(w, r)
+	if !ok {
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	if err := h.ma.restoreInitiative(r.Context(), id, subject, email); err != nil {
+		h.maFailure(w, r, "ma_initiative_restore", err, "initiative_id", id)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+type maSessionInitiativeRequest struct {
+	InitiativeID string `json:"initiativeId"`
+}
+
+func (h *Handler) handleSetMASessionInitiative(w http.ResponseWriter, r *http.Request) {
+	id, ok := maSessionID(w, r)
+	if !ok {
+		return
+	}
+	var body maSessionInitiativeRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	if err := h.ma.setSessionInitiative(r.Context(), id, body.InitiativeID, subject, email); err != nil {
+		h.maFailure(w, r, "ma_session_set_initiative", err, "session_id", id)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) handleArchiveMASession(w http.ResponseWriter, r *http.Request) {
@@ -990,6 +1073,9 @@ func maHTTPError(err error) (int, string, string) {
 	if errors.Is(err, errMASessionDeleted) {
 		return http.StatusConflict, "ma_session_deleted", "warn"
 	}
+	if errors.Is(err, errMAInitiativeArchived) {
+		return http.StatusConflict, "ma_initiative_archived", "warn"
+	}
 	if errors.Is(err, errAtecoCodeNotFound) {
 		return http.StatusBadRequest, "invalid_ateco_code", "warn"
 	}
@@ -1017,6 +1103,15 @@ func maSessionID(w http.ResponseWriter, r *http.Request) (string, bool) {
 	id := strings.TrimSpace(r.PathValue("id"))
 	if _, err := uuid.Parse(id); err != nil {
 		httputil.Error(w, http.StatusBadRequest, "invalid_ma_session_id")
+		return "", false
+	}
+	return id, true
+}
+
+func maInitiativeID(w http.ResponseWriter, r *http.Request) (string, bool) {
+	id := strings.TrimSpace(r.PathValue("id"))
+	if _, err := uuid.Parse(id); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_ma_initiative_id")
 		return "", false
 	}
 	return id, true

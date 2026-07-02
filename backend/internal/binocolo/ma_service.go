@@ -362,6 +362,98 @@ func ensureMASessionOperational(session MASession) error {
 	return nil
 }
 
+// errMAInitiativeArchived mirrors errMASessionArchived: an archived Iniziativa
+// can still be viewed (index "Archivio") but refuses new anchors.
+var errMAInitiativeArchived = errors.New("ma initiative archived")
+
+func ensureMAInitiativeOperational(initiative MAInitiative) error {
+	if initiative.ArchivedAt != nil {
+		return errMAInitiativeArchived
+	}
+	return nil
+}
+
+// createInitiative validates and persists a new Iniziativa (PRD §3.1): title
+// obbligatorio, description opzionale. Non-CRM by design — no budget/KPI/
+// deadline fields.
+func (s *maService) createInitiative(ctx context.Context, title, description, subject, email string) (MAInitiative, error) {
+	if s.store == nil {
+		return MAInitiative{}, errMAStoreUnavailable
+	}
+	title = cleanText(title, 120)
+	if title == "" {
+		return MAInitiative{}, fmt.Errorf("%w: title", errMAStrategyInvalid)
+	}
+	description = cleanText(description, 500)
+	initiative := MAInitiative{
+		ID:               uuid.NewString(),
+		Title:            title,
+		Description:      description,
+		CreatedBySubject: subject,
+		CreatedByEmail:   email,
+	}
+	return s.store.CreateMAInitiative(ctx, initiative)
+}
+
+// listInitiatives returns the /iniziative index rows, active or archived.
+func (s *maService) listInitiatives(ctx context.Context, includeArchived bool) ([]MAInitiativeSummary, error) {
+	if s.store == nil {
+		return nil, errMAStoreUnavailable
+	}
+	return s.store.ListMAInitiatives(ctx, includeArchived)
+}
+
+func (s *maService) archiveInitiative(ctx context.Context, id, subject, email string) error {
+	return s.updateInitiativeLifecycle(ctx, id, maSessionLifecycleArchive, subject, email)
+}
+
+func (s *maService) restoreInitiative(ctx context.Context, id, subject, email string) error {
+	return s.updateInitiativeLifecycle(ctx, id, maSessionLifecycleRestore, subject, email)
+}
+
+func (s *maService) updateInitiativeLifecycle(ctx context.Context, id, action, subject, email string) error {
+	if s.store == nil {
+		return errMAStoreUnavailable
+	}
+	updated, err := s.store.UpdateMAInitiativeLifecycle(ctx, id, action, subject, email)
+	if err != nil {
+		return err
+	}
+	if !updated {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+// setSessionInitiative anchors or unanchors (initiativeID == "") a session to
+// an Iniziativa (PRD §3.2). The session must be operational; a non-empty
+// target initiative must exist and not be archived. Card backfill for
+// already-rated companies is wired in B2 (ensureInitiativeCard) — B1 only
+// writes the anchor column.
+func (s *maService) setSessionInitiative(ctx context.Context, sessionID, initiativeID, subject, email string) error {
+	if s.store == nil {
+		return errMAStoreUnavailable
+	}
+	session, err := s.store.GetMASessionState(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+	if err := ensureMASessionOperational(session); err != nil {
+		return err
+	}
+	initiativeID = strings.TrimSpace(initiativeID)
+	if initiativeID != "" {
+		initiative, err := s.store.GetMAInitiative(ctx, initiativeID)
+		if err != nil {
+			return err
+		}
+		if err := ensureMAInitiativeOperational(initiative); err != nil {
+			return err
+		}
+	}
+	return s.store.SetMASessionInitiative(ctx, sessionID, initiativeID)
+}
+
 // maPricing holds the business pricing/budget levers, sourced from the
 // ma_parameter table (migration 038) with the compiled constants as fallback.
 type maPricing struct {
