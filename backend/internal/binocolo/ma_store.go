@@ -73,6 +73,7 @@ type maCompanyDomain struct {
 	CompanyName      string
 	Domain           string
 	Method           string // maDomainMethodAutoVerified | maDomainMethodManual
+	GroupSite        bool
 	CreatedBySubject string
 	CreatedByEmail   string
 }
@@ -1608,16 +1609,16 @@ func (s *SQLStore) GetMACompanyDomain(ctx context.Context, companyKey, vatCode, 
 		return nil, nil
 	}
 	row := s.db.QueryRowContext(ctx, `
-SELECT company_key, vat_code, tax_code, company_name, domain, method
+SELECT company_key, vat_code, tax_code, company_name, domain, method, COALESCE(group_site, false)
 FROM binocolo.ma_company_domain
 WHERE ($1 <> '' AND company_key = $1)
    OR ($2 <> '' AND vat_code = $2)
    OR ($3 <> '' AND tax_code = $3)
-ORDER BY (method = 'manual') DESC, (company_key = $1) DESC, verified_at DESC
+ORDER BY (method IN ('manual', 'no_website')) DESC, (company_key = $1) DESC, verified_at DESC
 LIMIT 1
 `, companyKey, vatCode, taxCode)
 	var rec maCompanyDomain
-	if err := row.Scan(&rec.CompanyKey, &rec.VATCode, &rec.TaxCode, &rec.CompanyName, &rec.Domain, &rec.Method); err != nil {
+	if err := row.Scan(&rec.CompanyKey, &rec.VATCode, &rec.TaxCode, &rec.CompanyName, &rec.Domain, &rec.Method, &rec.GroupSite); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -1633,25 +1634,26 @@ func (s *SQLStore) UpsertMACompanyDomain(ctx context.Context, record maCompanyDo
 	if s == nil || s.db == nil {
 		return errors.New("binocolo ma store not configured")
 	}
-	if record.CompanyKey == "" || record.Domain == "" || record.Method == "" {
+	if record.CompanyKey == "" || record.Method == "" || (record.Method != maDomainMethodNoWebsite && record.Domain == "") {
 		return errors.New("ma company domain: missing key, domain or method")
 	}
 	if _, err := s.db.ExecContext(ctx, `
 INSERT INTO binocolo.ma_company_domain (
-    company_key, vat_code, tax_code, company_name, domain, method,
+    company_key, vat_code, tax_code, company_name, domain, method, group_site,
     verified_at, created_by_subject, created_by_email, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, now(), $7, $8, now(), now())
+VALUES ($1, $2, $3, $4, $5, $6, $7, now(), $8, $9, now(), now())
 ON CONFLICT (company_key) DO UPDATE SET
     domain       = EXCLUDED.domain,
     method       = EXCLUDED.method,
+    group_site   = EXCLUDED.group_site,
     vat_code     = CASE WHEN EXCLUDED.vat_code <> '' THEN EXCLUDED.vat_code ELSE binocolo.ma_company_domain.vat_code END,
     tax_code     = CASE WHEN EXCLUDED.tax_code <> '' THEN EXCLUDED.tax_code ELSE binocolo.ma_company_domain.tax_code END,
     company_name = CASE WHEN EXCLUDED.company_name <> '' THEN EXCLUDED.company_name ELSE binocolo.ma_company_domain.company_name END,
     verified_at  = now(),
     updated_at   = now()
-WHERE NOT (binocolo.ma_company_domain.method = 'manual' AND EXCLUDED.method = 'auto_verified')
+WHERE NOT (binocolo.ma_company_domain.method IN ('manual', 'no_website') AND EXCLUDED.method = 'auto_verified')
 `, record.CompanyKey, record.VATCode, record.TaxCode, record.CompanyName, record.Domain, record.Method,
-		record.CreatedBySubject, record.CreatedByEmail); err != nil {
+		record.GroupSite, record.CreatedBySubject, record.CreatedByEmail); err != nil {
 		return fmt.Errorf("upsert ma company domain: %w", err)
 	}
 	return nil

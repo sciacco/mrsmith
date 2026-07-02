@@ -194,6 +194,10 @@ const (
 	// overwrite a manual entry.
 	maDomainMethodAutoVerified = "auto_verified"
 	maDomainMethodManual       = "manual"
+	maDomainMethodNoWebsite    = "no_website"
+
+	maWebValidationStateNoWebsite = "no_website_declared"
+	maFinalActionNoWebsite        = "no_website_structured"
 
 	// Domain-identity certainty of a web validation (mig 083). Recorded as a FACT
 	// at validation time; the "asimmetria identitaria" policy (a reject may
@@ -245,13 +249,15 @@ const (
 )
 
 type MACreateSessionRequest struct {
-	Prompt   string `json:"prompt"`
-	ModelID  string `json:"modelId,omitempty"`
-	PromptID string `json:"promptId,omitempty"`
+	Prompt    string `json:"prompt"`
+	ModelID   string `json:"modelId,omitempty"`
+	PromptID  string `json:"promptId,omitempty"`
+	GatedFlow bool   `json:"gatedFlow,omitempty"`
 }
 
 type MAEstimateSessionRequest struct {
-	Strategy *MAStrategySpec `json:"strategy,omitempty"`
+	Strategy     *MAStrategySpec `json:"strategy,omitempty"`
+	StrategyType string          `json:"strategyType,omitempty"`
 }
 
 type MAExecuteSessionRequest struct {
@@ -322,6 +328,10 @@ type MARescoreRequest struct {
 type MAAssociateDomainRequest struct {
 	CompanyKey string `json:"companyKey"`
 	Domain     string `json:"domain"`
+}
+
+type MACompanyKeyRequest struct {
+	CompanyKey string `json:"companyKey"`
 }
 
 type MAWebValidationUpsertRequest struct {
@@ -491,6 +501,8 @@ type MAStrategySpec struct {
 	MaxShareholders        *int                 `json:"maxShareholders,omitempty"`
 	SearchLimit            int                  `json:"searchLimit"`
 	AtecoCandidates        []MAAtecoCandidate   `json:"atecoCandidates"`
+	SectorConcepts         []MAStrategyConcept  `json:"sectorConcepts,omitempty"`
+	SectorRetrievalMode    string               `json:"sectorRetrievalMode,omitempty"`
 	Keywords               []string             `json:"keywords"`
 	ScoringCriteria        []MAScoringCriterion `json:"scoringCriteria,omitempty"` // deprecated: free-form criteria, no longer generated
 	Rationale              string               `json:"rationale"`
@@ -529,6 +541,79 @@ type MAStrategySpec struct {
 	// iterates these codes instead of dropping the ATECO filter entirely (which
 	// retrieved the whole provincial economy). Empty for sector-less strategies.
 	ExpandedAtecoCandidates []MAAtecoCandidate `json:"-"`
+}
+
+type MAStrategyConcept struct {
+	ID         string   `json:"id"`
+	Name       string   `json:"name"`
+	Fit        string   `json:"fit"`
+	Divisions  []string `json:"divisions,omitempty"`
+	AtecoCodes []string `json:"atecoCodes,omitempty"`
+}
+
+type MAGatedProgressResponse struct {
+	Stage   string                    `json:"stage"`
+	Surface MAGatedProgressSurface    `json:"surface"`
+	Gate    MAGatedProgressGate       `json:"gate"`
+	Enrich  MAGatedProgressEnrich     `json:"enrich"`
+	Run     MAGatedProgressRunSummary `json:"run"`
+}
+
+type MAGatedProgressSurface struct {
+	Expected int `json:"expected"`
+	Fetched  int `json:"fetched"`
+}
+
+type MAGatedProgressGate struct {
+	Processed int                         `json:"processed"`
+	Total     int                         `json:"total"`
+	Buckets   MAGatedProgressBucketCounts `json:"buckets"`
+}
+
+type MAGatedProgressBucketCounts struct {
+	Keep         int `json:"keep"`
+	Forse        int `json:"forse"`
+	Scarta       int `json:"scarta"`
+	ManualReview int `json:"manualReview"`
+}
+
+type MAGatedProgressEnrich struct {
+	Enriched  int `json:"enriched"`
+	Survivors int `json:"survivors"`
+}
+
+type MAGatedProgressRunSummary struct {
+	StartedAt   time.Time  `json:"startedAt"`
+	CompletedAt *time.Time `json:"completedAt"`
+	ErrorCode   string     `json:"errorCode"`
+}
+
+type MAVerificationQueueResponse struct {
+	Items []MAVerificationQueueItem `json:"items"`
+}
+
+type MAVerificationQueueItem struct {
+	TargetID    string                    `json:"targetId"`
+	CompanyKey  string                    `json:"companyKey"`
+	CompanyName string                    `json:"companyName"`
+	Province    string                    `json:"province"`
+	Reason      MAVerificationQueueReason `json:"reason"`
+	Remedies    []string                  `json:"remedies"`
+}
+
+type MAVerificationQueueReason struct {
+	Kind   string `json:"kind"`
+	Detail string `json:"detail"`
+}
+
+type MAProvinceCatalogResponse struct {
+	Items []MAProvinceCatalogItem `json:"items"`
+}
+
+type MAProvinceCatalogItem struct {
+	Code   string `json:"code"`
+	Name   string `json:"name"`
+	Region string `json:"region"`
 }
 
 // MAIntent is the structured, trace-only intermediate contract for the M&A

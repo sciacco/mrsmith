@@ -148,9 +148,9 @@ type kbScored struct {
 // usable (no KB/embedder, drift, API failure) and the caller must fall back to the
 // LLM hierarchy resolver; ok=true means the result is authoritative (even when it
 // is a confident no-match -> empty candidates + a missing-criterion note).
-func (s *maService) retrieveMAIntentAtecoEmbedding(ctx context.Context, intent MAIntent, allowed map[string]AtecoCode, cfg maAtecoRetrievalConfig) (candidates []MAAtecoCandidate, missing []string, ok bool, err error) {
+func (s *maService) retrieveMAIntentAtecoEmbedding(ctx context.Context, intent MAIntent, allowed map[string]AtecoCode, cfg maAtecoRetrievalConfig) (candidates []MAAtecoCandidate, concepts []MAStrategyConcept, missing []string, ok bool, err error) {
 	if s.llmp == nil || s.kb == nil || s.ateco == nil {
-		return nil, nil, false, nil
+		return nil, nil, nil, false, nil
 	}
 	queryText := buildMAEmbeddingQuery(intent)
 	if queryText == "" {
@@ -158,20 +158,20 @@ func (s *maService) retrieveMAIntentAtecoEmbedding(ctx context.Context, intent M
 		if len(intent.Sectors.Exclude) > 0 {
 			missing = append(missing, "Esclusione settoriale senza settore incluso: serve un perimetro positivo")
 		}
-		return nil, missing, true, nil
+		return nil, nil, missing, true, nil
 	}
 
 	instruction, instructionPromptID := s.loadAtecoEmbedInstruction(ctx)
 	scored, embModel, usage, ok, err := s.matchKBConcepts(ctx, instruction, queryText, false)
 	if err != nil || !ok {
-		return nil, nil, false, err
+		return nil, nil, nil, false, err
 	}
 
 	top := scored[0].cosine
 	if top < cfg.Floor {
 		s.recordAtecoRetrievalTrace(ctx, queryText, instruction, instructionPromptID, embModel, cfg, top, nil, nil, usage)
 		missing = append(missing, "Settore non riconosciuto dalla base di conoscenza ATECO")
-		return nil, missing, true, nil
+		return nil, nil, missing, true, nil
 	}
 	relCut := top * cfg.RelThreshold
 	coreCut := top * cfg.CoreRatio
@@ -188,11 +188,12 @@ func (s *maService) retrieveMAIntentAtecoEmbedding(ctx context.Context, intent M
 
 	candidates, resolveMissing, err := s.resolveKBFitToCandidates(ctx, matched, coreCut, allowed)
 	if err != nil {
-		return nil, nil, false, err
+		return nil, nil, nil, false, err
 	}
+	concepts = strategyConceptsFromMatched(matched, coreCut)
 	missing = append(missing, resolveMissing...)
 	s.recordAtecoRetrievalTrace(ctx, queryText, instruction, instructionPromptID, embModel, cfg, top, matched, candidates, usage)
-	return candidates, missing, true, nil
+	return candidates, concepts, missing, true, nil
 }
 
 // matchKBConcepts embeds `text` (wrapped with the query-side instruction, Qwen
@@ -346,6 +347,110 @@ func (s *maService) resolveKBFitToCandidates(ctx context.Context, matched []kbSc
 		})
 	}
 	return candidates, missing, nil
+}
+
+func strategyConceptsFromMatched(matched []kbScored, coreCut float64) []MAStrategyConcept {
+	out := make([]MAStrategyConcept, 0, len(matched))
+	for _, m := range matched {
+		if m.concept == nil {
+			continue
+		}
+		fit := maFitWeak
+		if m.cosine >= coreCut {
+			fit = maFitCore
+		}
+		codes := normalizeMAStrategyConceptAtecoCodes(m.concept.InKB)
+		out = append(out, MAStrategyConcept{
+			ID:         cleanText(m.concept.ID, 80),
+			Name:       cleanText(m.concept.Name, 160),
+			Fit:        fit,
+			Divisions:  conceptDivisions(codes),
+			AtecoCodes: codes,
+		})
+		if len(out) >= 24 {
+			break
+		}
+	}
+	return normalizeMAStrategyConcepts(out)
+}
+
+func conceptsCoveringCodes(concepts []kbConcept, codes []string) []MAStrategyConcept {
+	out := []MAStrategyConcept{}
+	seenConcept := map[string]struct{}{}
+	for _, concept := range concepts {
+		if normalizeKBKind(concept.Kind) == "distractor" {
+			continue
+		}
+		conceptCodes := normalizeMAStrategyConceptAtecoCodes(concept.InKB)
+		if len(conceptCodes) == 0 {
+			continue
+		}
+		covers := false
+		for _, code := range codes {
+			if conceptCoversAtecoCode(conceptCodes, code) {
+				covers = true
+				break
+			}
+		}
+		if !covers {
+			continue
+		}
+		key := strings.ToLower(strings.TrimSpace(concept.ID))
+		if key == "" {
+			continue
+		}
+		if _, exists := seenConcept[key]; exists {
+			continue
+		}
+		seenConcept[key] = struct{}{}
+		out = append(out, MAStrategyConcept{
+			ID:         cleanText(concept.ID, 80),
+			Name:       cleanText(concept.Name, 160),
+			Fit:        maFitCore,
+			Divisions:  conceptDivisions(conceptCodes),
+			AtecoCodes: conceptCodes,
+		})
+		if len(out) >= 24 {
+			break
+		}
+	}
+	return normalizeMAStrategyConcepts(out)
+}
+
+func conceptCoversAtecoCode(conceptCodes []string, code string) bool {
+	searchCode := atecoSearchCode(code)
+	if searchCode == "" {
+		return false
+	}
+	for _, raw := range conceptCodes {
+		conceptSearch := atecoSearchCode(raw)
+		if conceptSearch == "" {
+			continue
+		}
+		if searchCode == conceptSearch || strings.HasPrefix(searchCode, conceptSearch) {
+			return true
+		}
+	}
+	return false
+}
+
+func uncoveredExplicitAtecoCodes(concepts []MAStrategyConcept, codes []string) []string {
+	out := []string{}
+	for _, code := range codes {
+		covered := false
+		for _, concept := range concepts {
+			if conceptCoversAtecoCode(concept.AtecoCodes, code) {
+				covered = true
+				break
+			}
+		}
+		if !covered {
+			if normalized := normalizeAtecoCode(code); normalized != "" {
+				out = append(out, normalized)
+			}
+		}
+	}
+	return out
 }
 
 func (s *maService) recordAtecoRetrievalTrace(ctx context.Context, queryText, instruction, instructionPromptID string, model llm.EmbeddingModel, cfg maAtecoRetrievalConfig, top float64, matched []kbScored, candidates []MAAtecoCandidate, usage llm.Usage) {

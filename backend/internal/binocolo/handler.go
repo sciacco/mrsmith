@@ -113,6 +113,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("GET /binocolo/v1/ma/llm-options", h.handleListMALLMOptions)
 	handle("GET /binocolo/v1/ma/parameters", h.handleListMAParameters)
 	handle("GET /binocolo/v1/ma/ateco/search", h.handleSearchAteco)
+	handle("GET /binocolo/v1/ma/catalog/provinces", h.handleListMAProvinceCatalog)
 	handle("PUT /binocolo/v1/ma/parameters", h.handleUpdateMAParameter)
 	handle("GET /binocolo/v1/ma/sessions", h.handleListMASessions)
 	handle("POST /binocolo/v1/ma/sessions", h.handleCreateMASession)
@@ -125,6 +126,10 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/sessions/{id}/outcome", h.handleAddMATargetOutcome)
 	handle("POST /binocolo/v1/ma/sessions/{id}/rescore", h.handleRescoreMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/associate-domain", h.handleAssociateMATargetDomain)
+	handle("POST /binocolo/v1/ma/sessions/{id}/confirm-group-site", h.handleConfirmMAGroupSite)
+	handle("POST /binocolo/v1/ma/sessions/{id}/no-website", h.handleDeclareMANoWebsite)
+	handle("GET /binocolo/v1/ma/sessions/{id}/gated-progress", h.handleGetMAGatedProgress)
+	handle("GET /binocolo/v1/ma/sessions/{id}/verification-queue", h.handleGetMAVerificationQueue)
 	handle("GET /binocolo/v1/ma/sessions/{id}/sector-eval", h.handleGetSectorEval)
 	handle("PUT /binocolo/v1/ma/sessions/{id}/sector-eval/label", h.handleSetSectorEvalLabel)
 	handle("PUT /binocolo/v1/ma/sessions/{id}/web-validation", h.handleUpsertMAWebValidation)
@@ -401,12 +406,82 @@ func (h *Handler) handleAssociateMATargetDomain(w http.ResponseWriter, r *http.R
 		return
 	}
 	subject, email := companySearchRefreshActor(r.Context())
-	detail, err := h.ma.enqueueAssociateDomain(r.Context(), id, body.CompanyKey, body.Domain, subject, email)
+	detail, err := h.ma.enqueueAssociateDomain(r.Context(), id, body.CompanyKey, body.Domain, "associate", subject, email)
 	if err != nil {
 		h.maFailure(w, r, "ma_target_associate_domain", err, "session_id", id)
 		return
 	}
 	httputil.JSON(w, http.StatusAccepted, detail)
+}
+
+func (h *Handler) handleConfirmMAGroupSite(w http.ResponseWriter, r *http.Request) {
+	id, ok := maSessionID(w, r)
+	if !ok {
+		return
+	}
+	if !h.requireBrave(w) || !h.requireOpenAPIIT(w) {
+		return
+	}
+	var body MACompanyKeyRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	detail, err := h.ma.enqueueAssociateDomain(r.Context(), id, body.CompanyKey, "", "group_site", subject, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_target_confirm_group_site", err, "session_id", id)
+		return
+	}
+	httputil.JSON(w, http.StatusAccepted, detail)
+}
+
+func (h *Handler) handleDeclareMANoWebsite(w http.ResponseWriter, r *http.Request) {
+	id, ok := maSessionID(w, r)
+	if !ok {
+		return
+	}
+	if !h.requireOpenAPIIT(w) {
+		return
+	}
+	var body MACompanyKeyRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	detail, err := h.ma.enqueueAssociateDomain(r.Context(), id, body.CompanyKey, "", "no_website", subject, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_target_no_website", err, "session_id", id)
+		return
+	}
+	httputil.JSON(w, http.StatusAccepted, detail)
+}
+
+func (h *Handler) handleGetMAGatedProgress(w http.ResponseWriter, r *http.Request) {
+	id, ok := maSessionID(w, r)
+	if !ok {
+		return
+	}
+	progress, err := h.ma.gatedProgress(r.Context(), id)
+	if err != nil {
+		h.maFailure(w, r, "ma_gated_progress", err, "session_id", id)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, progress)
+}
+
+func (h *Handler) handleGetMAVerificationQueue(w http.ResponseWriter, r *http.Request) {
+	id, ok := maSessionID(w, r)
+	if !ok {
+		return
+	}
+	queue, err := h.ma.verificationQueue(r.Context(), id)
+	if err != nil {
+		h.maFailure(w, r, "ma_verification_queue", err, "session_id", id)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, queue)
 }
 
 // handleGetSectorEval returns the UC2 sector-eval report for a session: each company

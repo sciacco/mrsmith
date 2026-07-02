@@ -812,10 +812,14 @@ export function TargetPage() {
               <div className={styles.panelHeader}>
                 <div>
                   <h2 id="request-title">Nuova ricerca Target M&amp;A</h2>
-                  <p>Descrivi il target ideale in linguaggio naturale e lascia che Binocolo prepari una strategia.</p>
+                  <p>Le nuove ricerche si creano da <a href="/ricerche/nuova">/ricerche/nuova</a>.</p>
                 </div>
               </div>
-              <form className={styles.requestForm} onSubmit={createSession}>
+              <div className={styles.lifecycleNotice}>
+                <Icon name="route" size={16} />
+                <span>Questa vista resta disponibile per consultare e gestire ricerche esistenti.</span>
+              </div>
+              <form className={styles.requestForm} onSubmit={createSession} hidden aria-hidden="true">
                 <textarea
                   value={prompt}
                   onChange={(event) => setPrompt(event.target.value)}
@@ -2728,6 +2732,8 @@ function finalActionLabel(action: PipelineFinalAction): string {
       return 'Review dominio';
     case 'needs_business_validation':
       return 'Validazione business';
+    case 'no_website_structured':
+      return 'Soli dati strutturati';
   }
 }
 
@@ -2741,6 +2747,8 @@ function webValidationStateLabel(state: PipelineWebValidationState): string {
       return 'Dominio non risolto';
     case 'analysis_unavailable':
       return 'Analyst non disponibile';
+    case 'no_website_declared':
+      return 'Nessun sito dichiarato';
     case 'rejected':
       return 'Respinto';
     case 'unclear':

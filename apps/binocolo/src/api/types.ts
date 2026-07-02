@@ -79,6 +79,11 @@ export interface DomainResolutionResponse {
   count: number;
   candidates: DomainResolutionCandidate[];
   results: WebSearchResult[];
+  groupSiteHint?: {
+    domain: string;
+    identifier?: string;
+    source: string;
+  };
 }
 
 export interface CandidateMatchAnalysisRequest {
@@ -125,6 +130,7 @@ export type PipelineWebValidationState =
   | 'deprioritized'
   | 'domain_unresolved'
   | 'analysis_unavailable'
+  | 'no_website_declared'
   | 'rejected'
   | 'unclear';
 
@@ -133,7 +139,8 @@ export type PipelineFinalAction =
   | 'deprioritize'
   | 'reject'
   | 'needs_domain_review'
-  | 'needs_business_validation';
+  | 'needs_business_validation'
+  | 'no_website_structured';
 
 export interface CandidateMatchFinalDecision {
   initialMatchState: string;
@@ -474,6 +481,8 @@ export interface MAStrategySpec {
   maxShareholders?: number;
   searchLimit: number;
   atecoCandidates: MAAtecoCandidate[];
+  sectorConcepts?: MAStrategyConcept[];
+  sectorRetrievalMode?: 'embedding' | 'fallback_llm' | 'explicit_reverse' | string;
   keywords: string[];
   scoringCriteria?: MAScoringCriterion[];
   rationale: string;
@@ -485,6 +494,14 @@ export interface MAStrategySpec {
   signalWeights?: Record<string, number>;
   maxBudgetEur?: number;
   successionMinOwnerAge?: number;
+}
+
+export interface MAStrategyConcept {
+  id: string;
+  name: string;
+  fit: 'core' | 'weak' | string;
+  divisions?: string[];
+  atecoCodes?: string[];
 }
 
 export type MAAtecoFit = 'core' | 'weak' | 'excluded';
@@ -719,4 +736,59 @@ export interface SectorEvalLabelRequest {
   companyKey: string;
   label: SectorEvalLabel | '';
   note?: string;
+}
+
+export interface MAProvinceCatalogResponse {
+  items: MAProvinceCatalogItem[];
+}
+
+export interface MAProvinceCatalogItem {
+  code: string;
+  name: string;
+  region: string;
+}
+
+export interface MAGatedProgressResponse {
+  stage: 'address' | 'gate' | 'enrich' | 'ready' | 'failed';
+  surface: {
+    expected: number;
+    fetched: number;
+  };
+  gate: {
+    processed: number;
+    total: number;
+    buckets: {
+      keep: number;
+      forse: number;
+      scarta: number;
+      manualReview: number;
+    };
+  };
+  enrich: {
+    enriched: number;
+    survivors: number;
+  };
+  run: {
+    startedAt: string;
+    completedAt?: string | null;
+    errorCode: string;
+  };
+}
+
+export interface MAVerificationQueueResponse {
+  items: MAVerificationQueueItem[];
+}
+
+export type MAVerificationRemedy = 'associate_domain' | 'confirm_group_site' | 'no_website' | 'retry_search';
+
+export interface MAVerificationQueueItem {
+  targetId: string;
+  companyKey: string;
+  companyName: string;
+  province: string;
+  reason: {
+    kind: 'group_site' | 'identity_unconfirmed' | 'no_candidates' | 'enrich_failed' | string;
+    detail: string;
+  };
+  remedies: MAVerificationRemedy[];
 }

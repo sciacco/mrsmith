@@ -575,6 +575,13 @@ func (s *maService) createSession(ctx context.Context, req MACreateSessionReques
 			return MASessionDetail{}, err
 		}
 	}
+	if req.GatedFlow {
+		limit := pricing.SurfaceCap
+		if limit <= 0 {
+			limit = maVendorLimit
+		}
+		strategy.SearchLimit = normalizeMASearchLimit(limit)
+	}
 	title := strategy.Title
 	if title == "" {
 		title = titleFromPrompt(prompt)
@@ -691,6 +698,10 @@ func (s *maService) recordMAStrategyAudits(ctx context.Context, audits []llm.Cal
 	return nil
 }
 
+type maEstimateJobPayload struct {
+	StrategyType string `json:"strategy_type,omitempty"`
+}
+
 // enqueueEstimate is the synchronous half of the estimate flow: validate the
 // request, materialize the strategy version, and queue a background job. The
 // expensive surface probing runs in the estimate worker (runEstimateJob), so the
@@ -728,6 +739,11 @@ func (s *maService) enqueueEstimate(ctx context.Context, sessionID string, req M
 	if strategyVersion == nil {
 		return MASessionDetail{}, fmt.Errorf("%w: strategy", errMAStrategyInvalid)
 	}
+	strategyType := normalizeMAStrategyType(req.StrategyType)
+	payload, err := json.Marshal(maEstimateJobPayload{StrategyType: strategyType})
+	if err != nil {
+		return MASessionDetail{}, fmt.Errorf("marshal ma estimate payload: %w", err)
+	}
 	// One in-flight estimate per session (ma_job_inflight_idx). A re-submit while a
 	// job is queued/running is a no-op here: that job estimates whatever the active
 	// version is at run time and loops if it changes, so the latest strategy is
@@ -738,6 +754,7 @@ func (s *maService) enqueueEstimate(ctx context.Context, sessionID string, req M
 		StrategyVersionID: strategyVersion.ID,
 		Subject:           subject,
 		Email:             email,
+		Payload:           payload,
 		Owner:             s.owner,
 	}); err != nil {
 		return MASessionDetail{}, err
@@ -782,6 +799,13 @@ func (s *maService) runEstimateJob(ctx context.Context, job maJob) (string, erro
 // pathological flip-flop.
 func (s *maService) estimateJobWork(ctx context.Context, job maJob) error {
 	const maxSupersedeLoops = 3
+	var payload maEstimateJobPayload
+	if len(job.Payload) > 0 {
+		if err := json.Unmarshal(job.Payload, &payload); err != nil {
+			return fmt.Errorf("decode ma estimate payload: %w", err)
+		}
+	}
+	requestedStrategyType := normalizeMAStrategyType(payload.StrategyType)
 	for attempt := 0; attempt < maxSupersedeLoops; attempt++ {
 		detail, err := s.store.GetMASession(ctx, job.SessionID)
 		if err != nil {
@@ -817,7 +841,7 @@ func (s *maService) estimateJobWork(ctx context.Context, job maJob) error {
 		if err != nil {
 			return err
 		}
-		estimates, selected, err := s.runEstimates(ctx, job.SessionID, version.ID, strategy, job.CreatedBySubject, job.CreatedByEmail)
+		estimates, selected, err := s.runEstimates(ctx, job.SessionID, version.ID, strategy, requestedStrategyType, job.CreatedBySubject, job.CreatedByEmail)
 		if err != nil {
 			return err
 		}
@@ -2075,7 +2099,7 @@ func (s *maService) resolveIntent(ctx context.Context, promptText string, intent
 	missing = appendMAMissingCriteria(missing, territoryMissing...)
 
 	allowedAteco := map[string]AtecoCode{}
-	atecoCandidates, atecoMissing, atecoAudits, err := s.resolveMAIntentAteco(ctx, promptText, intent, allowedAteco, subject, email)
+	atecoCandidates, sectorConcepts, sectorRetrievalMode, atecoMissing, atecoAudits, err := s.resolveMAIntentAteco(ctx, promptText, intent, allowedAteco, subject, email)
 	audits = append(audits, atecoAudits...)
 	if err != nil {
 		return MAStrategySpec{}, audits, err
@@ -2100,6 +2124,8 @@ func (s *maService) resolveIntent(ctx context.Context, promptText string, intent
 		ActivityStatus:         activityStatus,
 		SearchLimit:            maDefaultSearchLimit,
 		AtecoCandidates:        atecoCandidates,
+		SectorConcepts:         sectorConcepts,
+		SectorRetrievalMode:    sectorRetrievalMode,
 		Keywords:               maIntentKeywords(intent, atecoCandidates),
 		Rationale:              maIntentRationale(intent, provinces, atecoCandidates, legalForms),
 		MissingCriteria:        missing,
@@ -2635,15 +2661,15 @@ func maIntentTerritoryLabel(regions, provinces, excluded, resolved []string) str
 	return cleanText(label, 160)
 }
 
-func (s *maService) resolveMAIntentAteco(ctx context.Context, promptText string, intent MAIntent, allowed map[string]AtecoCode, subject, email string) ([]MAAtecoCandidate, []string, []llm.CallAudit, error) {
+func (s *maService) resolveMAIntentAteco(ctx context.Context, promptText string, intent MAIntent, allowed map[string]AtecoCode, subject, email string) ([]MAAtecoCandidate, []MAStrategyConcept, string, []string, []llm.CallAudit, error) {
 	if len(intent.AtecoExplicit) > 0 {
 		return s.resolveMAIntentExplicitAteco(ctx, intent.AtecoExplicit, intent.Sectors.Exclude, allowed)
 	}
 	if len(intent.Sectors.Include)+len(intent.Sectors.Exclude) == 0 {
-		return nil, nil, nil, nil
+		return nil, nil, "", nil, nil, nil
 	}
 	if s.ateco == nil {
-		return nil, nil, nil, errAtecoStoreUnavailable
+		return nil, nil, "", nil, nil, errAtecoStoreUnavailable
 	}
 
 	// Use case 1: deterministic embedding retrieval over the curated KB replaces the
@@ -2651,9 +2677,9 @@ func (s *maService) resolveMAIntentAteco(ctx context.Context, promptText string,
 	// unavailable) or a retrieval error degrades gracefully to the resolver below.
 	cfg := s.loadAtecoRetrievalConfig(ctx)
 	if cfg.Method == maAtecoRetrievalMethodEmbedding {
-		candidates, missing, ok, embErr := s.retrieveMAIntentAtecoEmbedding(ctx, intent, allowed, cfg)
+		candidates, concepts, missing, ok, embErr := s.retrieveMAIntentAtecoEmbedding(ctx, intent, allowed, cfg)
 		if ok && embErr == nil {
-			return candidates, missing, nil, nil
+			return candidates, concepts, "embedding", missing, nil, nil
 		}
 		fallbackReason := "kb_or_embedder_unavailable"
 		fallbackErr := ""
@@ -2671,7 +2697,7 @@ func (s *maService) resolveMAIntentAteco(ctx context.Context, promptText string,
 
 	divisions, err := s.ateco.AtecoDivisions(ctx)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, "", nil, nil, err
 	}
 	for _, division := range divisions {
 		rememberAllowedAteco(allowed, division)
@@ -2700,7 +2726,7 @@ func (s *maService) resolveMAIntentAteco(ctx context.Context, promptText string,
 			"allowed_ateco_count": len(allowed),
 		}),
 	}); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, "fallback_llm", nil, nil, err
 	}
 
 	output, audit, err := s.rerankMAIntentAteco(ctx, promptText, intent, divisions, allowed, subject, email)
@@ -2709,7 +2735,7 @@ func (s *maService) resolveMAIntentAteco(ctx context.Context, promptText string,
 		if audit.Scope != "" || len(audit.Request) > 0 {
 			audits = append(audits, audit)
 		}
-		return nil, nil, audits, err
+		return nil, nil, "fallback_llm", nil, audits, err
 	}
 	resolved, constrainedMissing := constrainMAAtecoRerank(output, allowed, intent.Sectors.Include, intent.Sectors.Exclude)
 	missing = appendMAMissingCriteria(missing, constrainedMissing...)
@@ -2725,17 +2751,18 @@ func (s *maService) resolveMAIntentAteco(ctx context.Context, promptText string,
 			"excluded_prefix_count": len(output.ExcludedPrefixes),
 		}),
 	}); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, "fallback_llm", nil, nil, err
 	}
-	return resolved, missing, []llm.CallAudit{audit}, nil
+	return resolved, nil, "fallback_llm", missing, []llm.CallAudit{audit}, nil
 }
 
-func (s *maService) resolveMAIntentExplicitAteco(ctx context.Context, constraints []MAIntentAtecoConstraint, excludedSectors []MAIntentTextConstraint, allowed map[string]AtecoCode) ([]MAAtecoCandidate, []string, []llm.CallAudit, error) {
+func (s *maService) resolveMAIntentExplicitAteco(ctx context.Context, constraints []MAIntentAtecoConstraint, excludedSectors []MAIntentTextConstraint, allowed map[string]AtecoCode) ([]MAAtecoCandidate, []MAStrategyConcept, string, []string, []llm.CallAudit, error) {
 	if s.ateco == nil {
-		return nil, nil, nil, errAtecoStoreUnavailable
+		return nil, nil, "", nil, nil, errAtecoStoreUnavailable
 	}
 	candidates := []MAAtecoCandidate{}
 	missing := []string{}
+	resolvedCodes := []string{}
 	seen := map[string]struct{}{}
 	for _, constraint := range constraints {
 		resolved, err := s.ateco.ResolveAtecoCode(ctx, constraint.Code)
@@ -2744,7 +2771,7 @@ func (s *maService) resolveMAIntentExplicitAteco(ctx context.Context, constraint
 			continue
 		}
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, "", nil, nil, err
 		}
 		searchCode := resolved.CodiceSearch
 		if searchCode == "" {
@@ -2755,6 +2782,7 @@ func (s *maService) resolveMAIntentExplicitAteco(ctx context.Context, constraint
 			continue
 		}
 		rememberAllowedAteco(allowed, resolved)
+		resolvedCodes = append(resolvedCodes, resolved.Codice)
 		if _, exists := seen[searchCode]; exists {
 			continue
 		}
@@ -2769,7 +2797,16 @@ func (s *maService) resolveMAIntentExplicitAteco(ctx context.Context, constraint
 	for _, excluded := range excludedSectors {
 		missing = append(missing, "Esclusione settoriale testuale non applicata con ATECO espliciti: "+maIntentSourceLabel(excluded.Text, excluded.SourceText))
 	}
-	return candidates, missing, nil, nil
+	concepts := []MAStrategyConcept{}
+	if s.kb != nil && len(resolvedCodes) > 0 {
+		if kbConcepts, err := s.kb.LoadKBConcepts(ctx); err == nil {
+			concepts = conceptsCoveringCodes(kbConcepts, resolvedCodes)
+		}
+	}
+	for _, code := range uncoveredExplicitAtecoCodes(concepts, resolvedCodes) {
+		missing = append(missing, "Codice ATECO dichiarato fuori dalla base di conoscenza: "+code)
+	}
+	return candidates, concepts, "explicit_reverse", missing, nil, nil
 }
 
 func (s *maService) rerankMAIntentAteco(ctx context.Context, promptText string, intent MAIntent, divisions []AtecoCode, allowed map[string]AtecoCode, subject, email string) (maAtecoRerankOutput, llm.CallAudit, error) {
@@ -4480,8 +4517,20 @@ func (s *maService) expandStrategyExpansion(ctx context.Context, strategy MAStra
 	return strategy, nil
 }
 
-func (s *maService) runEstimates(ctx context.Context, sessionID, strategyVersionID string, strategy MAStrategySpec, subject, email string) ([]MAEstimate, string, error) {
+func (s *maService) runEstimates(ctx context.Context, sessionID, strategyVersionID string, strategy MAStrategySpec, strategyTypeFilter string, subject, email string) ([]MAEstimate, string, error) {
+	if strategyTypeFilter == maStrategyTypeExpanded && len(strategy.SectorDivisions) == 0 {
+		return nil, "", fmt.Errorf("%w: perimetro settoriale mancante", errMAStrategyInvalid)
+	}
 	queries := buildMAEstimateQueries(strategy)
+	if strategyTypeFilter != "" {
+		filtered := queries[:0]
+		for _, query := range queries {
+			if query.strategyType == strategyTypeFilter {
+				filtered = append(filtered, query)
+			}
+		}
+		queries = filtered
+	}
 	estimates := make([]MAEstimate, len(queries))
 	pricing := s.loadPricing(ctx)
 
@@ -4563,6 +4612,9 @@ func (s *maService) runEstimates(ctx context.Context, sessionID, strategyVersion
 	}
 	estimates = aggregateExpandedEstimates(estimates, strategy, pricing.CostAdvanced)
 	selected := chooseSelectedStrategyFromEstimates(estimates, len(strategy.AtecoQueryCandidates) > 0)
+	if strategyTypeFilter != "" {
+		selected = strategyTypeFilter
+	}
 	for index := range estimates {
 		estimates[index].Selected = selected != "" && estimates[index].StrategyType == selected
 	}

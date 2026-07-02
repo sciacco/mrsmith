@@ -389,6 +389,8 @@ function finalActionLabel(action: PipelineFinalAction): string {
       return 'Review dominio';
     case 'needs_business_validation':
       return 'Validazione business';
+    case 'no_website_structured':
+      return 'Soli dati strutturati';
   }
 }
 
@@ -402,6 +404,8 @@ function webValidationStateLabel(state: PipelineWebValidationState): string {
       return 'Dominio non risolto';
     case 'analysis_unavailable':
       return 'Analyst non disponibile';
+    case 'no_website_declared':
+      return 'Nessun sito dichiarato';
     case 'rejected':
       return 'Respinto';
     case 'unclear':

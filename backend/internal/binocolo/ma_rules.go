@@ -102,6 +102,8 @@ func validateMAStrategy(input MAStrategySpec) (MAStrategySpec, error) {
 		})
 	}
 	strategy.AtecoCandidates = candidates
+	strategy.SectorConcepts = normalizeMAStrategyConcepts(strategy.SectorConcepts)
+	strategy.SectorRetrievalMode = normalizeMASectorRetrievalMode(strategy.SectorRetrievalMode)
 
 	strategy.Keywords = cleanStringList(strategy.Keywords, 12, 80)
 	strategy.MissingCriteria = cleanStringList(strategy.MissingCriteria, 12, 120)
@@ -489,6 +491,92 @@ func normalizeMAFit(value string) string {
 		return maFitExcluded
 	default:
 		return maFitCore
+	}
+}
+
+func normalizeMAStrategyConcepts(input []MAStrategyConcept) []MAStrategyConcept {
+	out := make([]MAStrategyConcept, 0, len(input))
+	seen := map[string]struct{}{}
+	for _, raw := range input {
+		id := cleanText(raw.ID, 80)
+		name := cleanText(raw.Name, 160)
+		if id == "" || name == "" {
+			continue
+		}
+		key := strings.ToLower(id)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, MAStrategyConcept{
+			ID:         id,
+			Name:       name,
+			Fit:        normalizeMAConceptFit(raw.Fit),
+			Divisions:  normalizeMAStrategyConceptDivisions(raw.Divisions),
+			AtecoCodes: normalizeMAStrategyConceptAtecoCodes(raw.AtecoCodes),
+		})
+		if len(out) >= 24 {
+			break
+		}
+	}
+	return out
+}
+
+func normalizeMAConceptFit(value string) string {
+	if strings.EqualFold(strings.TrimSpace(value), maFitWeak) {
+		return maFitWeak
+	}
+	return maFitCore
+}
+
+func normalizeMAStrategyConceptDivisions(input []string) []string {
+	out := make([]string, 0, len(input))
+	seen := map[string]struct{}{}
+	for _, raw := range input {
+		value := strings.TrimSpace(raw)
+		if len(value) > 2 {
+			value = value[:2]
+		}
+		if len(value) != 2 || value[0] < '0' || value[0] > '9' || value[1] < '0' || value[1] > '9' {
+			continue
+		}
+		if _, exists := seen[value]; exists {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func normalizeMAStrategyConceptAtecoCodes(input []string) []string {
+	out := make([]string, 0, len(input))
+	seen := map[string]struct{}{}
+	for _, raw := range input {
+		code := normalizeAtecoCode(raw)
+		if code == "" || !atecoCodePattern.MatchString(code) {
+			continue
+		}
+		key := atecoSearchCode(code)
+		if key == "" {
+			continue
+		}
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, code)
+	}
+	return out
+}
+
+func normalizeMASectorRetrievalMode(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "embedding", "fallback_llm", "explicit_reverse":
+		return strings.ToLower(strings.TrimSpace(value))
+	default:
+		return ""
 	}
 }
 

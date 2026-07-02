@@ -332,10 +332,17 @@ func (s *maService) buildMAWebValidation(
 	// verification entirely — zero Brave/scrape spend, and a manual association
 	// done once holds for every future session.
 	if known := s.lookupCompanyDomain(ctx, target); known != nil {
+		if known.Method == maDomainMethodNoWebsite {
+			return s.noWebsiteWebValidation(target, inputHash), nil
+		}
 		reason := "dominio dal registro (verificato in pagina)"
 		identityState := maIdentityStateVerified
 		if known.Method == maDomainMethodManual {
 			reason = "dominio dal registro (associato manualmente)"
+			identityState = maIdentityStateVouched
+		}
+		if known.GroupSite {
+			reason = "dominio dal registro (sito di gruppo confermato)"
 			identityState = maIdentityStateVouched
 		}
 		selectedDomain := &DomainResolutionCandidate{
@@ -482,6 +489,7 @@ func (s *maService) buildMAWebValidationForDomain(
 	inputHash string,
 	payload maWebValidationJobPayload,
 	domain string,
+	reason string,
 	subject string,
 	email string,
 ) (MAWebValidationUpsertRequest, error) {
@@ -496,7 +504,7 @@ func (s *maService) buildMAWebValidationForDomain(
 		Domain:     normalized,
 		Score:      100,
 		Confidence: "alta",
-		Reasons:    []string{"dominio associato manualmente dall'operatore"},
+		Reasons:    []string{defaultString(reason, "dominio associato manualmente dall'operatore")},
 	}
 	scrapedMarkdown, _ := s.scrapeHomepage(ctx, normalized) // best-effort; crawl+evidence tolerate empty
 	domainResponse := DomainResolutionResponse{
@@ -526,7 +534,10 @@ func (s *maService) lookupCompanyDomain(ctx context.Context, target MATarget) *m
 			"company", target.CompanyName, "error", err)
 		return nil
 	}
-	if record == nil || strings.TrimSpace(record.Domain) == "" {
+	if record == nil {
+		return nil
+	}
+	if record.Method != maDomainMethodNoWebsite && strings.TrimSpace(record.Domain) == "" {
 		return nil
 	}
 	return record
@@ -562,6 +573,58 @@ func (s *maService) registerCompanyDomain(ctx context.Context, target MATarget, 
 			"component", "binocolo", "operation", "ma_company_domain_upsert",
 			"company", target.CompanyName, "domain", normalized, "method", method, "error", err)
 	}
+}
+
+func (s *maService) registerCompanyDomainRecord(ctx context.Context, target MATarget, domain, method string, groupSite bool, subject, email string) {
+	if s.store == nil {
+		return
+	}
+	companyKey := normalizeMACompanyKey(target.CompanyKey)
+	if companyKey == "" {
+		companyKey = normalizeMACompanyKey(maTargetDedupeKey(target))
+	}
+	if companyKey == "" {
+		return
+	}
+	normalized := ""
+	if method != maDomainMethodNoWebsite {
+		var ok bool
+		normalized, ok = normalizeDomain(domain)
+		if !ok {
+			return
+		}
+	}
+	err := s.store.UpsertMACompanyDomain(ctx, maCompanyDomain{
+		CompanyKey:       companyKey,
+		VATCode:          strings.ToUpper(strings.TrimSpace(target.VATCode)),
+		TaxCode:          strings.ToUpper(strings.TrimSpace(target.TaxCode)),
+		CompanyName:      strings.TrimSpace(target.CompanyName),
+		Domain:           normalized,
+		Method:           method,
+		GroupSite:        groupSite,
+		CreatedBySubject: subject,
+		CreatedByEmail:   email,
+	})
+	if err != nil {
+		logging.FromContext(ctx).Warn("binocolo domain registry write failed",
+			"component", "binocolo", "operation", "ma_company_domain_upsert",
+			"company", target.CompanyName, "domain", normalized, "method", method, "error", err)
+	}
+}
+
+func (s *maService) noWebsiteWebValidation(target MATarget, inputHash string) MAWebValidationUpsertRequest {
+	decision := &CandidateMatchFinalDecision{
+		InitialMatchState:  target.MatchState,
+		DeterministicScore: target.Score,
+		WebValidationState: maWebValidationStateNoWebsite,
+		FinalAction:        maFinalActionNoWebsite,
+		Confidence:         "alta",
+		Reason:             "Nessun sito ufficiale (dichiarato dall'operatore)",
+		Reasons:            []string{"Nessun sito ufficiale (dichiarato dall'operatore)"},
+	}
+	out := s.assembleWebValidationRequest(target, inputHash, DomainResolutionResponse{Query: "registry:no_website"}, nil, nil, maSectorClassification{}, nil, "", decision)
+	out.IdentityState = maIdentityStateVouched
+	return out
 }
 
 func sectorVerdictNeedsLLM(verdict maSectorVerdict) bool {

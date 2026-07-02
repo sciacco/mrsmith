@@ -403,7 +403,7 @@ func TestMAEstimatesSendDotlessAtecoToOpenAPIIT(t *testing.T) {
 		AtecoQueryCandidates: []MAAtecoCandidate{
 			{Code: "62.10.00", SearchCode: "621000", Description: "Attività di programmazione informatica"},
 		},
-	}, "", "")
+	}, "", "", "")
 	if err != nil {
 		t.Fatalf("runEstimates returned error: %v", err)
 	}
@@ -692,7 +692,7 @@ func TestResolveMAIntentAtecoUsesHierarchyScopeAndToolWhitelist(t *testing.T) {
 		},
 	}
 
-	candidates, missing, audits, err := service.resolveMAIntentAteco(ctx, "target settore it", intent, allowed, "", "")
+	candidates, _, _, missing, audits, err := service.resolveMAIntentAteco(ctx, "target settore it", intent, allowed, "", "")
 
 	if err != nil {
 		t.Fatalf("resolveMAIntentAteco returned error: %v", err)

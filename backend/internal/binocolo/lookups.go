@@ -27,6 +27,33 @@ func (h *Handler) handleListProvinces(w http.ResponseWriter, r *http.Request) {
 	httputil.JSON(w, http.StatusOK, json.RawMessage(raw))
 }
 
+func (h *Handler) handleListMAProvinceCatalog(w http.ResponseWriter, r *http.Request) {
+	if !h.requireOpenAPIIT(w) {
+		return
+	}
+
+	envelope, _, err := listProvincesWithCache(r.Context(), h.provinceCache, h.openapiit, timeNowUTC)
+	if err != nil {
+		if errors.Is(err, errProvinceCacheFailure) {
+			h.binocoloCacheFailure(w, r, err)
+			return
+		}
+		h.openAPIITFailure(w, r, "ma_catalog_provinces", err)
+		return
+	}
+	items := make([]MAProvinceCatalogItem, 0, len(envelope.Data))
+	for _, item := range envelope.Data {
+		code := strings.ToUpper(strings.TrimSpace(item.Sigla))
+		name := strings.TrimSpace(item.Provincia)
+		region := strings.TrimSpace(item.Regione)
+		if code == "" || name == "" || region == "" {
+			continue
+		}
+		items = append(items, MAProvinceCatalogItem{Code: code, Name: name, Region: region})
+	}
+	httputil.JSON(w, http.StatusOK, MAProvinceCatalogResponse{Items: items})
+}
+
 // maAtecoSearchItem is one ATECO typeahead hit for the strategy editor.
 type maAtecoSearchItem struct {
 	Code        string `json:"code"`

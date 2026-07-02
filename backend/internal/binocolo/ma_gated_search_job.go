@@ -24,6 +24,9 @@ type maGatedSearchJobPayload struct {
 type maAssociateDomainJobPayload struct {
 	CompanyKey string `json:"company_key"`
 	Domain     string `json:"domain"`
+	Action     string `json:"action,omitempty"`
+	GroupSite  bool   `json:"group_site,omitempty"`
+	NoWebsite  bool   `json:"no_website,omitempty"`
 }
 
 // maGatedScoreStats records what the enrich_score stage did, for the trace.
@@ -598,22 +601,31 @@ func gatedTargetBucket(target MATarget) string {
 // job pre-leased to this instance's owner — so a foreign worker on the shared queue can't
 // steal the paid re-gate+enrich, and a crash resumes (unlike the dev-only inline mode). The
 // worker runs runAssociateDomainJob; the caller gets the session in 'running' and polls.
-func (s *maService) enqueueAssociateDomain(ctx context.Context, sessionID, companyKey, domain, subject, email string) (MASessionDetail, error) {
+func (s *maService) enqueueAssociateDomain(ctx context.Context, sessionID, companyKey, domain, action, subject, email string) (MASessionDetail, error) {
 	if s.store == nil {
 		return MASessionDetail{}, errMAStoreUnavailable
 	}
 	if s.openapiit == nil {
 		return MASessionDetail{}, errMAOpenAPIITUnavailable
 	}
-	if s.brave == nil {
-		return MASessionDetail{}, errMABraveUnavailable
-	}
 	companyKey = normalizeMACompanyKey(companyKey)
 	if companyKey == "" {
 		return MASessionDetail{}, fmt.Errorf("%w: company key", errMAStrategyInvalid)
 	}
-	if _, ok := normalizeDomain(domain); !ok {
-		return MASessionDetail{}, fmt.Errorf("%w: domain", errMAStrategyInvalid)
+	action = normalizeMAAssociateDomainAction(action)
+	if action == "" {
+		action = "associate"
+	}
+	if action != "no_website" && s.brave == nil {
+		return MASessionDetail{}, errMABraveUnavailable
+	}
+	if action == "associate" {
+		if _, ok := normalizeDomain(domain); !ok {
+			return MASessionDetail{}, fmt.Errorf("%w: domain", errMAStrategyInvalid)
+		}
+	}
+	if action == "no_website" {
+		domain = ""
 	}
 	detail, err := s.store.GetMASession(ctx, sessionID)
 	if err != nil {
@@ -639,7 +651,33 @@ func (s *maService) enqueueAssociateDomain(ctx context.Context, sessionID, compa
 		return MASessionDetail{}, fmt.Errorf("%w: target not found", errMAStrategyInvalid)
 	}
 
-	payload, err := json.Marshal(maAssociateDomainJobPayload{CompanyKey: companyKey, Domain: domain})
+	if action == "group_site" {
+		foundGroupHint := false
+		for _, target := range detail.Targets {
+			if normalizeMACompanyKey(target.CompanyKey) != companyKey || target.WebValidation == nil {
+				continue
+			}
+			if hint := target.WebValidation.DomainResponse.GroupSiteHint; hint != nil {
+				domain = hint.Domain
+				foundGroupHint = true
+				break
+			}
+		}
+		if !foundGroupHint {
+			return MASessionDetail{}, fmt.Errorf("%w: group site hint", errMAStrategyInvalid)
+		}
+		if _, ok := normalizeDomain(domain); !ok {
+			return MASessionDetail{}, fmt.Errorf("%w: domain", errMAStrategyInvalid)
+		}
+	}
+
+	payload, err := json.Marshal(maAssociateDomainJobPayload{
+		CompanyKey: companyKey,
+		Domain:     domain,
+		Action:     action,
+		GroupSite:  action == "group_site",
+		NoWebsite:  action == "no_website",
+	})
 	if err != nil {
 		return MASessionDetail{}, fmt.Errorf("marshal ma associate domain payload: %w", err)
 	}
@@ -661,6 +699,19 @@ func (s *maService) enqueueAssociateDomain(ctx context.Context, sessionID, compa
 		}
 	}
 	return s.getSession(ctx, sessionID)
+}
+
+func normalizeMAAssociateDomainAction(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", "associate":
+		return "associate"
+	case "group_site":
+		return "group_site"
+	case "no_website":
+		return "no_website"
+	default:
+		return ""
+	}
 }
 
 // runAssociateDomainJob executes a queued associate_domain job off the request path, owning
@@ -703,6 +754,17 @@ func (s *maService) associateDomainWork(ctx context.Context, job maJob) error {
 	if companyKey == "" {
 		return fmt.Errorf("%w: company key", errMAStrategyInvalid)
 	}
+	action := normalizeMAAssociateDomainAction(payload.Action)
+	if action == "" {
+		switch {
+		case payload.NoWebsite:
+			action = "no_website"
+		case payload.GroupSite:
+			action = "group_site"
+		default:
+			action = "associate"
+		}
+	}
 	detail, err := s.store.GetMASession(ctx, job.SessionID)
 	if err != nil {
 		return err
@@ -738,9 +800,19 @@ func (s *maService) associateDomainWork(ctx context.Context, job maJob) error {
 	// Re-gate this one company with the forced domain.
 	gatePayload := normalizeMAWebValidationPayload(MAWebValidationEnrichRequest{Limit: 1})
 	inputHash := maWebValidationInputHash(*target, strategy, gatePayload)
-	body, err := s.buildMAWebValidationForDomain(ctx, *target, strategy, inputHash, gatePayload, payload.Domain, job.CreatedBySubject, job.CreatedByEmail)
-	if err != nil {
-		return err
+	var body MAWebValidationUpsertRequest
+	if action == "no_website" {
+		body = s.noWebsiteWebValidation(*target, inputHash)
+	} else {
+		reason := "dominio associato manualmente dall'operatore"
+		if action == "group_site" {
+			reason = "sito di gruppo confermato dall'operatore"
+		}
+		var err error
+		body, err = s.buildMAWebValidationForDomain(ctx, *target, strategy, inputHash, gatePayload, payload.Domain, reason, job.CreatedBySubject, job.CreatedByEmail)
+		if err != nil {
+			return err
+		}
 	}
 	if _, err := s.upsertTargetWebValidation(ctx, job.SessionID, body, job.CreatedBySubject, job.CreatedByEmail); err != nil {
 		return err
@@ -748,11 +820,18 @@ func (s *maService) associateDomainWork(ctx context.Context, job maJob) error {
 	// The operator vouched for this company↔domain identity (independently of the
 	// gate's sector verdict): persist it in the cross-session registry so every
 	// future session resolves it for free instead of re-landing in manual_review.
-	s.registerCompanyDomain(ctx, *target, payload.Domain, maDomainMethodManual, job.CreatedBySubject, job.CreatedByEmail)
+	switch action {
+	case "no_website":
+		s.registerCompanyDomainRecord(ctx, *target, "", maDomainMethodNoWebsite, false, job.CreatedBySubject, job.CreatedByEmail)
+	case "group_site":
+		s.registerCompanyDomainRecord(ctx, *target, payload.Domain, maDomainMethodManual, true, job.CreatedBySubject, job.CreatedByEmail)
+	default:
+		s.registerCompanyDomain(ctx, *target, payload.Domain, maDomainMethodManual, job.CreatedBySubject, job.CreatedByEmail)
+	}
 	_ = s.traceEvent(ctx, maTraceEventWrite{
 		EventType: "ma_target_domain_associated",
 		Status:    maTraceEventSucceeded,
-		Metadata:  maTraceJSON(map[string]any{"session_id": job.SessionID, "company_key": companyKey, "final_action": body.FinalDecision.FinalAction}),
+		Metadata:  maTraceJSON(map[string]any{"session_id": job.SessionID, "company_key": companyKey, "action": action, "final_action": body.FinalDecision.FinalAction}),
 	})
 
 	// Reload so the target carries the fresh verdict, then enrich (this company only) +
