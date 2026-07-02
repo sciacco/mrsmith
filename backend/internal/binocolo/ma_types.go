@@ -572,6 +572,11 @@ type MAIntentAtecoConstraint struct {
 }
 
 type MAIntentSectors struct {
+	// Summary is a synthesis (not a citation, so no sourceText): the positive
+	// business perimeter distilled by the intent prompt. Preferred over the
+	// include fragments for the embedding query and the sector description;
+	// empty with prompts that predate it.
+	Summary string                   `json:"summary,omitempty"`
 	Include []MAIntentTextConstraint `json:"include,omitempty"`
 	Exclude []MAIntentTextConstraint `json:"exclude,omitempty"`
 }

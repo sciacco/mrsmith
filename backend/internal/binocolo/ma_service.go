@@ -2206,6 +2206,9 @@ func maIntentValueConstraintValue(item *MAIntentValueConstraint) *int {
 }
 
 func maIntentSectorDescription(intent MAIntent, candidates []MAAtecoCandidate) string {
+	if summary := cleanText(positiveSectorText(intent.Sectors.Summary), 300); summary != "" {
+		return summary
+	}
 	parts := []string{}
 	for _, sector := range intent.Sectors.Include {
 		if text := cleanText(positiveSectorText(sector.Text), 140); text != "" {

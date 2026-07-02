@@ -119,6 +119,8 @@ func validateMAStrategy(input MAStrategySpec) (MAStrategySpec, error) {
 func validateIntentSpans(intent MAIntent, promptText string) MAIntent {
 	promptNorm := normalizeMAIntentSpanText(promptText)
 
+	// Summary is a synthesis, not an extraction: no sourceText to enforce, only hygiene.
+	intent.Sectors.Summary = cleanText(intent.Sectors.Summary, 600)
 	intent.Sectors.Include = filterMAIntentTextConstraints(intent.Sectors.Include, promptNorm)
 	intent.Sectors.Exclude = filterMAIntentTextConstraints(intent.Sectors.Exclude, promptNorm)
 	intent.AtecoExplicit = filterMAIntentAtecoConstraints(intent.AtecoExplicit, promptNorm)

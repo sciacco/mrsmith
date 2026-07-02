@@ -118,9 +118,15 @@ func (s *maService) loadAtecoEmbedInstruction(ctx context.Context) (string, stri
 }
 
 // buildMAEmbeddingQuery distills the analyst's positive sector intent into the
-// text embedded for retrieval. Exclusions are dropped (positiveSectorText) — they
-// surface later as distractor low-similarity / excluded ATECO, not as needles.
+// text embedded for retrieval. The prompt-distilled summary wins when present
+// (it survives long discursive requests that the include fragments truncate);
+// otherwise the fragments are joined as before. Exclusions are dropped
+// (positiveSectorText) — they surface later as distractor low-similarity /
+// excluded ATECO, not as needles.
 func buildMAEmbeddingQuery(intent MAIntent) string {
+	if summary := cleanText(positiveSectorText(intent.Sectors.Summary), 600); summary != "" {
+		return summary
+	}
 	parts := []string{}
 	for _, sector := range intent.Sectors.Include {
 		if text := cleanText(positiveSectorText(sector.Text), 200); text != "" {
