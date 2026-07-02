@@ -90,6 +90,7 @@ type maWebValidationUpsert struct {
 	LLMModel               string
 	StaleAfter             time.Time
 	ExpiresAt              time.Time
+	IdentityState          string
 	SelectedDomain         string
 	DomainConfidence       string
 	DomainScore            *int
@@ -1773,6 +1774,7 @@ SELECT
   candidate_match_analysis,
   COALESCE(candidate_match_error, ''),
   final_decision,
+  COALESCE(identity_state, ''),
   COALESCE(updated_by_email, ''),
   updated_at
 FROM binocolo.ma_target_web_validation
@@ -1832,6 +1834,7 @@ INSERT INTO binocolo.ma_target_web_validation (
   candidate_match_analysis,
   candidate_match_error,
   final_decision,
+  identity_state,
   created_by_subject,
   created_by_email,
   updated_by_subject,
@@ -1839,7 +1842,7 @@ INSERT INTO binocolo.ma_target_web_validation (
 ) VALUES (
   $1::uuid, $2, NULLIF($3, '')::uuid, NULLIF($4, '')::uuid, $5, $6, $7, $8, $9, $10,
   $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23::jsonb, $24::jsonb,
-  $25::jsonb, $26::jsonb, $27::jsonb, $28::jsonb, $29, $30::jsonb, $31, $32, $31, $32
+  $25::jsonb, $26::jsonb, $27::jsonb, $28::jsonb, $29, $30::jsonb, $33, $31, $32, $31, $32
 )
 ON CONFLICT (session_id, company_key) DO UPDATE
 SET target_id = EXCLUDED.target_id,
@@ -1870,6 +1873,7 @@ SET target_id = EXCLUDED.target_id,
     candidate_match_analysis = EXCLUDED.candidate_match_analysis,
     candidate_match_error = EXCLUDED.candidate_match_error,
     final_decision = EXCLUDED.final_decision,
+    identity_state = EXCLUDED.identity_state,
     updated_by_subject = EXCLUDED.updated_by_subject,
     updated_by_email = EXCLUDED.updated_by_email,
     updated_at = now()
@@ -1904,6 +1908,7 @@ RETURNING
   candidate_match_analysis,
   COALESCE(candidate_match_error, ''),
   final_decision,
+  COALESCE(identity_state, ''),
   COALESCE(updated_by_email, ''),
   updated_at
 `, input.SessionID,
@@ -1938,6 +1943,7 @@ RETURNING
 		[]byte(input.FinalDecision),
 		nullString(input.Subject),
 		nullString(input.Email),
+		nullString(input.IdentityState),
 	)
 	return scanMAWebValidation(row)
 }
@@ -1981,6 +1987,7 @@ func scanMAWebValidation(row maWebValidationScanner) (MAWebValidation, error) {
 		&analysisRaw,
 		&item.CandidateMatchError,
 		&finalDecisionRaw,
+		&item.IdentityState,
 		&item.UpdatedByEmail,
 		&item.UpdatedAt,
 	); err != nil {

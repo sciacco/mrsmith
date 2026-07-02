@@ -1354,6 +1354,14 @@ func (s *maService) upsertTargetWebValidation(ctx context.Context, sessionID str
 		})
 	}
 	staleAfter, expiresAt := maWebValidationFreshnessBounds(time.Now().UTC(), body.FinalDecision.FinalAction, body.CandidateMatchError)
+	// identity_state is a producer-stamped fact (mig 083): tolerate legacy/unknown
+	// callers by recording nothing rather than failing the validation.
+	identityState := strings.TrimSpace(body.IdentityState)
+	switch identityState {
+	case "", maIdentityStateVerified, maIdentityStateVouched, maIdentityStateAssumed:
+	default:
+		identityState = ""
+	}
 
 	summaryRaw, err := json.Marshal(body.Summary)
 	if err != nil {
@@ -1432,6 +1440,7 @@ func (s *maService) upsertTargetWebValidation(ctx context.Context, sessionID str
 		SelectedDomain:         selectedDomain,
 		DomainConfidence:       domainConfidence,
 		DomainScore:            domainScore,
+		IdentityState:          identityState,
 		WebScore:               body.FinalDecision.WebScore,
 		WebConfidence:          body.FinalDecision.Confidence,
 		WebValidationState:     body.FinalDecision.WebValidationState,

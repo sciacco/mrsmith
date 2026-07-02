@@ -50,6 +50,7 @@ type SectorEvalItem struct {
 	// emerge); acceptance_fail = candidati trovati ma tutti scartati dal cancello.
 	DomainOutcome           string `json:"domainOutcome,omitempty"`
 	DomainConfidence        string `json:"domainConfidence,omitempty"`
+	IdentityState           string `json:"identityState,omitempty"` // verified|vouched|assumed, ""=legacy/unresolved (mig 083)
 	DomainScore             int    `json:"domainScore,omitempty"`
 	DomainCandidateCount    int    `json:"domainCandidateCount"`
 	BestCandidateDomain     string `json:"bestCandidateDomain,omitempty"`
@@ -96,6 +97,12 @@ type SectorEvalDomainMetrics struct {
 	RetrievalFail  int     `json:"retrievalFail"`
 	AcceptanceFail int     `json:"acceptanceFail"`
 	ResolutionRate float64 `json:"resolutionRate"`
+
+	// Identity-asymmetry measurement (phase b): how certain was the domain identity
+	// on resolved companies, and — the decision-driving cut — what identity level
+	// backs each REJECT verdict. Keys: verified|vouched|assumed|legacy.
+	IdentityStates   map[string]int `json:"identityStates,omitempty"`
+	RejectByIdentity map[string]int `json:"rejectByIdentity,omitempty"`
 }
 
 // SectorEvalMetrics aggregates the three predictors plus the operational stats that
@@ -197,6 +204,7 @@ func (s *maService) sectorEvalReport(ctx context.Context, sessionID string) (Sec
 
 	metrics := SectorEvalMetrics{
 		Labeled:            len(labels),
+		Domain:             SectorEvalDomainMetrics{IdentityStates: map[string]int{}, RejectByIdentity: map[string]int{}},
 		Deterministic:      SectorEvalPredictorMetrics{Confusion: newSectorConfusion()},
 		LLM:                SectorEvalPredictorMetrics{Confusion: newSectorConfusion()},
 		Final:              SectorEvalPredictorMetrics{Confusion: newSectorConfusion()},
@@ -254,6 +262,22 @@ func (s *maService) sectorEvalReport(ctx context.Context, sessionID string) (Sec
 			item.FinalState = wv.WebValidationState
 			item.FinalAction = wv.FinalAction
 			item.FinalBucket = sectorActionToBucket(wv.FinalAction)
+
+			// Identity-asymmetry cut (phase b): identity level over resolved
+			// companies, and per-REJECT — the number that decides whether "reject
+			// suppresses only from verified/vouched" is affordable. "" = legacy
+			// row (pre-083); unresolved rows carry no domain to have identity on.
+			if wv.SelectedDomain != "" {
+				item.IdentityState = wv.IdentityState
+				identityKey := wv.IdentityState
+				if identityKey == "" {
+					identityKey = "legacy"
+				}
+				metrics.Domain.IdentityStates[identityKey]++
+				if item.FinalBucket == maGatedBucketReject {
+					metrics.Domain.RejectByIdentity[identityKey]++
+				}
+			}
 
 			item.Escalated = sectorVerdictNeedsLLM(maSectorVerdict(wv.Summary.DeterministicVerdict))
 			if item.Escalated {

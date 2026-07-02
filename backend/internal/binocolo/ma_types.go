@@ -195,6 +195,14 @@ const (
 	maDomainMethodAutoVerified = "auto_verified"
 	maDomainMethodManual       = "manual"
 
+	// Domain-identity certainty of a web validation (mig 083). Recorded as a FACT
+	// at validation time; the "asimmetria identitaria" policy (a reject may
+	// suppress only from verified/vouched) is a read-time rule, gated on phase-(b)
+	// measurement. Empty = legacy row or unresolved domain.
+	maIdentityStateVerified = "verified" // target P.IVA/CF confirmed on-page
+	maIdentityStateVouched  = "vouched"  // operator associated the domain
+	maIdentityStateAssumed  = "assumed"  // name-match / brand-trust / score-only
+
 	// Valuation defaults (Fase 4), overridable via ma_parameter (sme_haircut_pct,
 	// ebitda_fallback_threshold). Haircut is a percent applied to sector multiples;
 	// below the EBITDA-margin threshold (or EBITDA<=0) valuation falls back to EV/Sales.
@@ -324,6 +332,7 @@ type MAWebValidationUpsertRequest struct {
 	KeywordSet             CandidateMatchKeywordSet        `json:"keywordSet"`
 	DomainResponse         DomainResolutionResponse        `json:"domainResponse"`
 	SelectedDomain         *DomainResolutionCandidate      `json:"selectedDomain,omitempty"`
+	IdentityState          string                          `json:"identityState,omitempty"`
 	EvidenceRuns           []CandidateMatchEvidenceRun     `json:"evidenceRuns"`
 	Summary                CandidateMatchEvidenceSummary   `json:"summary"`
 	CandidateMatchAnalysis *CandidateMatchAnalysisResponse `json:"candidateMatchAnalysis,omitempty"`
@@ -747,6 +756,7 @@ type MAWebValidation struct {
 	SelectedDomain         string                          `json:"selectedDomain,omitempty"`
 	DomainConfidence       string                          `json:"domainConfidence,omitempty"`
 	DomainScore            *int                            `json:"domainScore,omitempty"`
+	IdentityState          string                          `json:"identityState,omitempty"`
 	WebScore               int                             `json:"webScore"`
 	WebConfidence          string                          `json:"webConfidence,omitempty"`
 	WebValidationState     string                          `json:"webValidationState"`

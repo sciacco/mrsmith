@@ -333,8 +333,10 @@ func (s *maService) buildMAWebValidation(
 	// done once holds for every future session.
 	if known := s.lookupCompanyDomain(ctx, target); known != nil {
 		reason := "dominio dal registro (verificato in pagina)"
+		identityState := maIdentityStateVerified
 		if known.Method == maDomainMethodManual {
 			reason = "dominio dal registro (associato manualmente)"
+			identityState = maIdentityStateVouched
 		}
 		selectedDomain := &DomainResolutionCandidate{
 			Domain:     known.Domain,
@@ -347,7 +349,7 @@ func (s *maService) buildMAWebValidation(
 			Query:      "registry:" + known.Domain,
 			Candidates: []DomainResolutionCandidate{*selectedDomain},
 		}
-		return s.classifyResolvedDomain(ctx, target, strategy, inputHash, payload, domainResponse, selectedDomain, scrapedMarkdown, false, false, subject, email), nil
+		return s.classifyResolvedDomain(ctx, target, strategy, inputHash, payload, domainResponse, selectedDomain, scrapedMarkdown, identityState, false, subject, email), nil
 	}
 
 	domainResponse, err := s.resolveDomainCandidates(ctx, DomainResolutionRequest{
@@ -375,7 +377,11 @@ func (s *maService) buildMAWebValidation(
 		return s.assembleWebValidationRequest(target, inputHash, domainResponse, nil, nil, maSectorClassification{}, nil, "", decision), nil
 	}
 
-	return s.classifyResolvedDomain(ctx, target, strategy, inputHash, payload, domainResponse, selectedDomain, scrapedMarkdown, identityVerified, true, subject, email), nil
+	identityState := maIdentityStateAssumed
+	if identityVerified {
+		identityState = maIdentityStateVerified
+	}
+	return s.classifyResolvedDomain(ctx, target, strategy, inputHash, payload, domainResponse, selectedDomain, scrapedMarkdown, identityState, true, subject, email), nil
 }
 
 // classifyResolvedDomain runs the evidence → classification → decision tail of the gate
@@ -385,10 +391,11 @@ func (s *maService) buildMAWebValidation(
 // ambiguous verdicts to the LLM analyst, producing the web-validation request. A classifier
 // failure (embedder/KB down) is surfaced as analysis_unavailable, never as a hard error.
 //
-// verifiedIdentity carries an on-page P.IVA/CF confirmation already obtained during
-// verification; the crawl below can add its own. registerDomain gates the write to the
-// cross-session domain registry (auto path only — the manual path registers in
-// associateDomainWork with method 'manual', and a registry hit needs no re-write).
+// identityState is the domain-identity certainty established so far (verified /
+// vouched / assumed); the crawl below can upgrade it to verified via an on-page
+// P.IVA. registerDomain gates the write to the cross-session domain registry (auto
+// path only — the manual path registers in associateDomainWork with method
+// 'manual', and a registry hit needs no re-write).
 func (s *maService) classifyResolvedDomain(
 	ctx context.Context,
 	target MATarget,
@@ -398,7 +405,7 @@ func (s *maService) classifyResolvedDomain(
 	domainResponse DomainResolutionResponse,
 	selectedDomain *DomainResolutionCandidate,
 	scrapedMarkdown string,
-	verifiedIdentity bool,
+	identityState string,
 	registerDomain bool,
 	subject string,
 	email string,
@@ -408,11 +415,13 @@ func (s *maService) classifyResolvedDomain(
 	// homepage alone, and an on-page P.IVA on a legal/contact page confirms identity
 	// the homepage often omits. Degrades to homepage-only evidence when disabled/failing.
 	evidencePages, crawlVerified := s.crawlResolvedSite(ctx, selectedDomain.Domain, scrapedMarkdown, target)
-	identityVerified := verifiedIdentity || crawlVerified
-	if identityVerified && selectedDomain.Confidence != "alta" {
+	if crawlVerified {
+		identityState = maIdentityStateVerified
+	}
+	if identityState == maIdentityStateVerified && selectedDomain.Confidence != "alta" {
 		selectedDomain.Confidence = "alta" // on-page P.IVA is the strongest identity signal
 	}
-	if registerDomain && identityVerified {
+	if registerDomain && identityState == maIdentityStateVerified {
 		s.registerCompanyDomain(ctx, target, selectedDomain.Domain, maDomainMethodAutoVerified, subject, email)
 	}
 	evidence, evidenceRuns := s.gatherNeutralEvidence(ctx, selectedDomain.Domain, payload.KeywordCount, subject, email, evidencePages)
@@ -431,7 +440,9 @@ func (s *maService) classifyResolvedDomain(
 			Reason:             "Classificazione settore non disponibile (embedder/KB).",
 			Reasons:            []string{"Classificazione settore non disponibile: " + classError},
 		}
-		return s.assembleWebValidationRequest(target, inputHash, domainResponse, selectedDomain, evidenceRuns, maSectorClassification{}, nil, classError, decision)
+		out := s.assembleWebValidationRequest(target, inputHash, domainResponse, selectedDomain, evidenceRuns, maSectorClassification{}, nil, classError, decision)
+		out.IdentityState = identityState
+		return out
 	}
 
 	var analysis *CandidateMatchAnalysisResponse
@@ -447,7 +458,9 @@ func (s *maService) classifyResolvedDomain(
 
 	decision := sectorFinalDecision(target, classification, analysis, analysisErr)
 	s.recordSectorClassificationTrace(ctx, target, classification, decision, analysis != nil)
-	return s.assembleWebValidationRequest(target, inputHash, domainResponse, selectedDomain, evidenceRuns, classification, analysis, analysisErr, decision)
+	out := s.assembleWebValidationRequest(target, inputHash, domainResponse, selectedDomain, evidenceRuns, classification, analysis, analysisErr, decision)
+	out.IdentityState = identityState
+	return out
 }
 
 // buildMAWebValidationForDomain re-runs the gate for ONE target with a MANUALLY associated
@@ -483,7 +496,7 @@ func (s *maService) buildMAWebValidationForDomain(
 		Query:      "manual:" + normalized,
 		Candidates: []DomainResolutionCandidate{*selectedDomain},
 	}
-	return s.classifyResolvedDomain(ctx, target, strategy, inputHash, payload, domainResponse, selectedDomain, scrapedMarkdown, false, false, subject, email), nil
+	return s.classifyResolvedDomain(ctx, target, strategy, inputHash, payload, domainResponse, selectedDomain, scrapedMarkdown, maIdentityStateVouched, false, subject, email), nil
 }
 
 // lookupCompanyDomain consults the cross-session verified-domain registry for a
