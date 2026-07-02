@@ -333,7 +333,11 @@ func (s *maService) testSectorClassification(ctx context.Context, req SectorClas
 			if err != nil {
 				return SectorClassificationTestResponse{}, err
 			}
-			chosen, homepageMarkdown, _ = s.verifyDomainByScrape(ctx, domainResponse.Candidates, target)
+			var identityOK bool
+			chosen, homepageMarkdown, identityOK = s.verifyDomainByScrape(ctx, domainResponse.Candidates, target)
+			if chosen != nil && identityOK {
+				chosen.Reasons = append(chosen.Reasons, "identità on-page verificata (P.IVA/CF)")
+			}
 		}
 		if chosen == nil {
 			decision := &CandidateMatchFinalDecision{

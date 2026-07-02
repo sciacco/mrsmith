@@ -750,7 +750,16 @@ func (s *maService) verifyDomainByScrape(ctx context.Context, candidates []Domai
 	// reject / score-only path rather than trusting the speculative name-match.
 	chosenRead := chosen != nil && markdownByDomain[chosen.Domain] != ""
 	if nameMatch != nil && chosen != nil && (chosenRead || nameMatch.Domain == chosen.Domain) {
-		return nameMatch, markdownByDomain[nameMatch.Domain], false
+		// Foreign-identifier guard on the name-match path too (it only guarded
+		// brand-trust): same-brand-different-company is exactly what name-match
+		// can't tell apart — greenteam.it carries the name "Green Team" AND
+		// another entity's P.IVA (05313430968 vs the target's 04332290370), and
+		// accepting it classifies the target on someone else's business (false
+		// scarta = recall loss). A name-matched page advertising a different
+		// P.IVA falls through to brand-trust/deep-verify/reject instead.
+		if !pageHasForeignIdentifier(markdownByDomain[nameMatch.Domain]) {
+			return nameMatch, markdownByDomain[nameMatch.Domain], false
+		}
 	}
 	// Recall-safe brand-label trust: when the score-top candidate's domain LABEL
 	// matches the company name (adawen.it for ADAWEN) and it ranked with high
@@ -832,7 +841,7 @@ func (s *maService) deepVerifyIdentity(ctx context.Context, domain, vat, tax str
 		return false
 	}
 	for _, link := range identityPageLinks(links, domain, maDeepVerifyPageCap) {
-		res, err := s.scrape.Scrape(ctx, link)
+		res, err := s.scrape.ScrapeFull(ctx, link) // full page: the P.IVA lives in the footer
 		if err != nil {
 			continue
 		}
@@ -927,7 +936,10 @@ func (s *maService) scrapeHomepage(ctx context.Context, domain string) (string, 
 		return "", false
 	}
 	for _, host := range companyPageHosts(domain) {
-		res, err := s.scrape.Scrape(ctx, "https://"+host)
+		// Full page, not main-content: the homepage markdown feeds the identity
+		// checks (P.IVA short-circuit, foreign-identifier guard, name-match) and
+		// Italian sites put the P.IVA in the footer the main-content mode strips.
+		res, err := s.scrape.ScrapeFull(ctx, "https://"+host)
 		if err != nil {
 			continue
 		}

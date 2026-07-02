@@ -169,6 +169,7 @@ type maService struct {
 	// score-only domain pick and Brave-snippet evidence (today's behavior).
 	scrape interface {
 		Scrape(context.Context, string) (scrape.Result, error)
+		ScrapeFull(context.Context, string) (scrape.Result, error)
 		Search(context.Context, string, int) ([]scrape.SearchResult, error)
 		Crawl(context.Context, string, int, int) ([]scrape.CrawlPage, error)
 		Map(context.Context, string, int) ([]string, error)

@@ -83,14 +83,31 @@ type Result struct {
 	StatusCode int // HTTP status the scraper observed fetching the target page
 }
 
-// Scrape fetches target and returns its content as markdown. The request format
-// is fixed to ["markdown"]. Returns an error on transport failure, a non-2xx
-// scraper response, or success:false.
+// Scrape fetches target's MAIN content as markdown (the service strips
+// headers/footers/navs) — right for self-description evidence. Returns an error
+// on transport failure, a non-2xx scraper response, or success:false.
 func (c *Client) Scrape(ctx context.Context, target string) (Result, error) {
-	payload, err := json.Marshal(map[string]any{
+	return c.scrapePage(ctx, target, false)
+}
+
+// ScrapeFull fetches the WHOLE rendered page (onlyMainContent:false). Identity
+// verification MUST use this: Italian sites publish the P.IVA in the footer,
+// which the main-content extraction silently strips — proven on greenteam.it
+// (2026-07-02: default scrape had no identifier at all, the full page carried a
+// foreign P.IVA that correctly disqualifies the domain).
+func (c *Client) ScrapeFull(ctx context.Context, target string) (Result, error) {
+	return c.scrapePage(ctx, target, true)
+}
+
+func (c *Client) scrapePage(ctx context.Context, target string, fullPage bool) (Result, error) {
+	reqBody := map[string]any{
 		"url":     target,
 		"formats": []string{"markdown"},
-	})
+	}
+	if fullPage {
+		reqBody["onlyMainContent"] = false
+	}
+	payload, err := json.Marshal(reqBody)
 	if err != nil {
 		return Result{}, fmt.Errorf("scrape: encode request: %w", err)
 	}
@@ -292,7 +309,12 @@ type CrawlPage struct {
 // on legal/contact pages the homepage omits. Bound the scope with maxDepth /
 // maxPages. Requires an API key.
 func (c *Client) Crawl(ctx context.Context, target string, maxDepth, maxPages int) ([]CrawlPage, error) {
-	reqBody := map[string]any{"url": target, "formats": []string{"markdown"}, "onlyMainContent": true}
+	// onlyMainContent:false — the crawl doubles as identity confirmation
+	// (crawlResolvedSite checks the P.IVA on /contatti and /note-legali), and the
+	// P.IVA lives in footers the main-content extraction strips. The evidence
+	// side tolerates the extra chrome: markdownToEvidenceSnippets drops short
+	// nav lines and the distiller summarizes past boilerplate.
+	reqBody := map[string]any{"url": target, "formats": []string{"markdown"}, "onlyMainContent": false}
 	if maxDepth > 0 {
 		reqBody["maxDepth"] = maxDepth
 	}
