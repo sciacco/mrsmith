@@ -340,6 +340,79 @@ export interface MAInitiativeListResponse {
   items: MAInitiativeSummary[];
 }
 
+export interface MAInitiativeCard {
+  initiativeId: string;
+  companyKey: string;
+  companyName: string;
+  vatCode?: string;
+  taxCode?: string;
+  province?: string;
+  state: string;
+  esito?: string;
+  createdFromSession?: string;
+  createdAt: string;
+  updatedAt: string;
+  closedAt?: string;
+}
+
+export interface MACardMarker {
+  initiativeId: string;
+  initiativeTitle: string;
+}
+
+export interface MACardProvenance {
+  sessionId: string;
+  sessionTitle: string;
+  rating: number;
+  scoreAtRating?: number;
+  ratedAt: string;
+}
+
+export interface MAInitiativeCardView extends MAInitiativeCard {
+  dossierStatus: string;
+  collisions?: MACardMarker[];
+  registryFacts?: string[];
+  provenances?: MACardProvenance[];
+}
+
+export interface MAInitiativeBoard {
+  initiative: MAInitiative;
+  sessions: MASessionSummary[];
+  cards: MAInitiativeCardView[];
+}
+
+export interface MACardEvent {
+  id: string;
+  sessionId?: string;
+  initiativeId?: string;
+  companyKey: string;
+  event: string;
+  note?: string;
+  payload?: unknown;
+  createdByEmail?: string;
+  createdAt: string;
+}
+
+export interface MACardEventListResponse {
+  items: MACardEvent[];
+}
+
+export interface MACardCloseResponse {
+  card: MAInitiativeCard;
+  registeredFacts?: string[];
+  skippedFacts?: string[];
+}
+
+export interface MACardRemoveResponse {
+  card: MAInitiativeCard;
+  ratingCorrected: boolean;
+  ratingCorrectionSkipped?: boolean;
+}
+
+export interface MACardDeepDiveResponse {
+  dossierStatus: string;
+}
+
 export interface MASessionDetail {
   session: MASession;
   strategy?: MAStrategyVersion;

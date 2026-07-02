@@ -254,3 +254,445 @@
   justify-content: flex-end;
   margin-top: var(--space-4);
 }
+
+/* ---- Board (F2) ---- */
+
+.boardPage {
+  display: flex;
+  min-height: calc(100vh - 140px);
+  flex-direction: column;
+  gap: var(--space-4);
+  animation: pageEnter 0.35s var(--ease-out) both;
+}
+
+.backLink {
+  align-self: flex-start;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.backLink:hover {
+  color: var(--color-accent);
+}
+
+.boardHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.titleRow h1 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.viewToggle {
+  display: inline-flex;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.viewToggleBtn {
+  border: 0;
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  padding: var(--space-2) var(--space-4);
+}
+
+.viewToggleBtn.on {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.sessChips {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.sessChip {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: var(--space-1) var(--space-3);
+}
+
+/* Kanban */
+
+.kanban {
+  display: flex;
+  gap: var(--space-3);
+  overflow-x: auto;
+  padding-bottom: var(--space-3);
+}
+
+.kcol {
+  display: flex;
+  width: 240px;
+  min-width: 240px;
+  flex-direction: column;
+  gap: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  padding: var(--space-3);
+}
+
+.kcolCollapsed {
+  display: flex;
+  width: 40px;
+  min-width: 40px;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  cursor: pointer;
+  padding: var(--space-3) var(--space-2);
+}
+
+.kcolCollapsedLabel {
+  writing-mode: vertical-rl;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.kcolHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--color-text);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.kcolHeadBtn {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+}
+
+.kcolCount {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.kcolBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 40px;
+}
+
+.kcard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  padding: var(--space-3);
+}
+
+.kcard[draggable='true'] {
+  cursor: grab;
+}
+
+.kcardName {
+  color: var(--color-text);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.kcardMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-full);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  padding: 2px var(--space-2);
+}
+
+.badgeInfo {
+  background: var(--color-info-subtle, rgba(59, 130, 246, 0.12));
+  color: var(--color-info, #2563eb);
+}
+
+.badgeWarn {
+  background: var(--color-warning-subtle, rgba(217, 119, 6, 0.14));
+  color: var(--color-warning, #b45309);
+}
+
+.badgeLav {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.badgeEsito {
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+
+.kcardCompact {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+}
+
+.dossierBtn {
+  align-self: flex-start;
+}
+
+.pulse {
+  animation: pulseOpacity 1.4s ease-in-out infinite;
+}
+
+@keyframes pulseOpacity {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* Table view */
+
+.tableView {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.filters {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.select {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.8125rem;
+  padding: var(--space-2) var(--space-3);
+}
+
+.searchInput {
+  min-width: 220px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.table th,
+.table td {
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+}
+
+.table th {
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tableRow {
+  cursor: pointer;
+}
+
+.tableRow:hover {
+  background: var(--color-surface);
+}
+
+.linkBtn {
+  border: 0;
+  background: transparent;
+  color: var(--color-accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  padding: 0;
+}
+
+/* Drawer content */
+
+.drawerSub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.drawerSec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.drawerSec:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.lab {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.stationSel {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+
+.stationBtn {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: var(--space-1) var(--space-3);
+}
+
+.stationBtn.on {
+  border-color: var(--color-accent);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.provRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.8125rem;
+}
+
+.provSess {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.stars {
+  color: var(--color-warning, #b45309);
+  letter-spacing: 1px;
+}
+
+.starsOff {
+  color: var(--color-text-faint);
+}
+
+.provScore {
+  color: var(--color-text-muted);
+}
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.timelineItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-left: 2px solid var(--color-border);
+  padding-left: var(--space-3);
+  font-size: 0.8125rem;
+}
+
+.timelineWho {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+.composer {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.composerInput {
+  flex: 1;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  font: inherit;
+  padding: var(--space-2) var(--space-3);
+}
+
+.actionsRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
