@@ -409,6 +409,18 @@ export interface MACardRemoveResponse {
   ratingCorrectionSkipped?: boolean;
 }
 
+export interface MACardCloseResponse {
+  card: MAInitiativeCard;
+  registeredFacts?: string[];
+  skippedFacts?: string[];
+}
+
+export interface MACardRemoveResponse {
+  card: MAInitiativeCard;
+  ratingCorrected: boolean;
+  ratingCorrectionSkipped?: boolean;
+}
+
 export interface MACardDeepDiveResponse {
   dossierStatus: string;
 }

@@ -3,8 +3,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApiClient } from '../../api/client';
 import type {
+  MACardCloseResponse,
   MACardEvent,
   MACardEventListResponse,
+  MACardRemoveResponse,
   MAInitiativeBoard,
   MAInitiativeCardView,
   MASessionListResponse,
@@ -29,6 +31,24 @@ const ESITO_LABELS: Record<string, string> = {
   sfumata: 'Sfumata',
   rimandata: 'Rimandata',
 };
+
+const ESITI: Array<{ key: string; label: string; description: string; bridge: boolean }> = [
+  { key: 'conclusa', label: 'Conclusa', description: "l'operazione è andata in porto", bridge: false },
+  { key: 'no_go', label: 'No-go', description: 'idonea, ma si sceglie di non procedere', bridge: true },
+  {
+    key: 'non_idonea',
+    label: 'Non idonea',
+    description: 'alla prova dei fatti non è in profilo per questa iniziativa',
+    bridge: false,
+  },
+  { key: 'sfumata', label: 'Sfumata', description: 'decisione della controparte o di terzi', bridge: false },
+  { key: 'rimandata', label: 'Rimandata', description: 'condizioni non mature, da riprendere', bridge: true },
+];
+
+const BRIDGE_KINDS: Array<{ key: string; label: string; hint: string }> = [
+  { key: 'non_vende', label: 'Non vende', hint: 'il titolare non intende vendere' },
+  { key: 'in_trattativa_altrui', label: 'In trattativa con altri', hint: '' },
+];
 
 const REGISTRY_LABELS: Record<string, { label: string; kind: 'info' | 'warn' }> = {
   non_vende: { label: 'Non vende', kind: 'warn' },
@@ -84,6 +104,8 @@ export function IniziativaBoardPage() {
   const [attaching, setAttaching] = useState<string | null>(null);
 
   const [selectedCard, setSelectedCard] = useState<MAInitiativeCardView | null>(null);
+  const [closeModalCard, setCloseModalCard] = useState<MAInitiativeCardView | null>(null);
+  const [removeModalCard, setRemoveModalCard] = useState<MAInitiativeCardView | null>(null);
 
   const [tableStateFilter, setTableStateFilter] = useState('');
   const [tableEsitoFilter, setTableEsitoFilter] = useState('');
@@ -169,6 +191,37 @@ export function IniziativaBoardPage() {
     try {
       await api.post(`/binocolo/v1/ma/initiatives/${id}/cards/${encodeURIComponent(companyKey)}/state`, { state });
       await load();
+    } catch (err) {
+      toast(errorLabel(err), 'error');
+    }
+  };
+
+  const closeCard = async (companyKey: string, esito: string, note: string, registerFacts: string[]) => {
+    if (!id) return;
+    const data = await api.post<MACardCloseResponse>(
+      `/binocolo/v1/ma/initiatives/${id}/cards/${encodeURIComponent(companyKey)}/close`,
+      { esito, note: note || undefined, registerFacts: registerFacts.length > 0 ? registerFacts : undefined },
+    );
+    await load();
+    return data;
+  };
+
+  const removeCard = async (companyKey: string, correctRating: boolean, reason: string) => {
+    if (!id) return;
+    const data = await api.post<MACardRemoveResponse>(
+      `/binocolo/v1/ma/initiatives/${id}/cards/${encodeURIComponent(companyKey)}/remove`,
+      { correctRating, reason: reason || undefined },
+    );
+    await load();
+    return data;
+  };
+
+  const reopenCard = async (companyKey: string) => {
+    if (!id) return;
+    try {
+      await api.post(`/binocolo/v1/ma/initiatives/${id}/cards/${encodeURIComponent(companyKey)}/reopen`, {});
+      await load();
+      toast('Card riaperta.', 'success');
     } catch (err) {
       toast(errorLabel(err), 'error');
     }
@@ -302,7 +355,13 @@ export function IniziativaBoardPage() {
                 onDrop={(e) => {
                   e.preventDefault();
                   const companyKey = e.dataTransfer.getData('text/plain');
-                  if (companyKey && state.key !== 'chiusa') void setCardState(companyKey, state.key);
+                  if (!companyKey) return;
+                  if (state.key === 'chiusa') {
+                    const dropped = (board?.cards ?? []).find((c) => c.companyKey === companyKey);
+                    if (dropped) setCloseModalCard(dropped);
+                    return;
+                  }
+                  void setCardState(companyKey, state.key);
                 }}
               >
                 <div className={styles.kcolHead}>
@@ -471,6 +530,43 @@ export function IniziativaBoardPage() {
           onSetState={setCardState}
           onDeepDive={startDeepDive}
           onOpenDossier={openDossier}
+          onOpenCloseModal={(card) => setCloseModalCard(card)}
+          onOpenRemoveModal={(card) => setRemoveModalCard(card)}
+          onReopen={reopenCard}
+        />
+      ) : null}
+
+      {closeModalCard ? (
+        <CloseCardModal
+          card={closeModalCard}
+          onClose={() => setCloseModalCard(null)}
+          onSubmit={closeCard}
+          onDone={(result) => {
+            setCloseModalCard(null);
+            if (selectedCard?.companyKey === closeModalCard.companyKey) setSelectedCard(null);
+            if (result?.skippedFacts && result.skippedFacts.length > 0) {
+              toast('Card chiusa. Alcuni fatti erano già registrati.', 'success');
+            } else {
+              toast('Card chiusa.', 'success');
+            }
+          }}
+        />
+      ) : null}
+
+      {removeModalCard ? (
+        <RemoveCardModal
+          card={removeModalCard}
+          onClose={() => setRemoveModalCard(null)}
+          onSubmit={removeCard}
+          onDone={(result) => {
+            setRemoveModalCard(null);
+            if (selectedCard?.companyKey === removeModalCard.companyKey) setSelectedCard(null);
+            if (result?.ratingCorrectionSkipped) {
+              toast('Card rimossa. La ricerca di provenienza non è più operativa: correzione stella saltata.', 'warning');
+            } else {
+              toast('Card rimossa.', 'success');
+            }
+          }}
         />
       ) : null}
     </main>
@@ -551,6 +647,9 @@ function CardDrawer({
   onSetState,
   onDeepDive,
   onOpenDossier,
+  onOpenCloseModal,
+  onOpenRemoveModal,
+  onReopen,
 }: {
   initiativeId: string;
   card: MAInitiativeCardView;
@@ -559,6 +658,9 @@ function CardDrawer({
   onSetState: (companyKey: string, state: string) => Promise<void>;
   onDeepDive: (companyKey: string) => Promise<void>;
   onOpenDossier: (card: MAInitiativeCardView) => void;
+  onOpenCloseModal: (card: MAInitiativeCardView) => void;
+  onOpenRemoveModal: (card: MAInitiativeCardView) => void;
+  onReopen: (companyKey: string) => Promise<void>;
 }) {
   const api = useApiClient();
   const { toast } = useToast();
@@ -630,26 +732,38 @@ function CardDrawer({
 
       <div className={styles.drawerSec}>
         <p className={styles.lab}>Stato</p>
-        <div className={styles.stationSel}>
-          {activeStates.map((state) => (
-            <button
-              key={state.key}
-              type="button"
-              className={`${styles.stationBtn} ${card.state === state.key ? styles.on : ''}`}
-              onClick={() => void onSetState(card.companyKey, state.key)}
-            >
-              {state.label}
+        {card.state === 'chiusa' || card.state === 'rimossa' ? (
+          <div className={styles.actionsRow}>
+            {card.state === 'chiusa' && card.esito ? (
+              <span className={`${styles.badge} ${styles.badgeEsito}`}>{ESITO_LABELS[card.esito] ?? card.esito}</span>
+            ) : null}
+            {card.state === 'rimossa' ? <span className={styles.hint}>Rimossa dalla lavorazione.</span> : null}
+            <Button variant="secondary" size="sm" onClick={() => void onReopen(card.companyKey)}>
+              Riapri
+            </Button>
+          </div>
+        ) : (
+          <div className={styles.stationSel}>
+            {activeStates.map((state) => (
+              <button
+                key={state.key}
+                type="button"
+                className={`${styles.stationBtn} ${card.state === state.key ? styles.on : ''}`}
+                onClick={() => void onSetState(card.companyKey, state.key)}
+              >
+                {state.label}
+              </button>
+            ))}
+            <button type="button" className={styles.stationBtn} onClick={() => onOpenCloseModal(card)}>
+              Chiusa…
             </button>
-          ))}
-          <button
-            type="button"
-            className={`${styles.stationBtn} ${card.state === 'chiusa' ? styles.on : ''}`}
-            disabled
-            title="La chiusura si gestisce dal flusso esiti."
-          >
-            Chiusa…
+          </div>
+        )}
+        {card.state !== 'chiusa' && card.state !== 'rimossa' ? (
+          <button type="button" className={styles.linkBtn} onClick={() => onOpenRemoveModal(card)}>
+            Rimuovi dalla lavorazione
           </button>
-        </div>
+        ) : null}
       </div>
 
       {(card.provenances ?? []).length > 0 ? (
@@ -756,6 +870,163 @@ function CardDrawer({
         </div>
       </div>
     </Drawer>
+  );
+}
+
+function CloseCardModal({
+  card,
+  onClose,
+  onSubmit,
+  onDone,
+}: {
+  card: MAInitiativeCardView;
+  onClose: () => void;
+  onSubmit: (companyKey: string, esito: string, note: string, registerFacts: string[]) => Promise<MACardCloseResponse | undefined>;
+  onDone: (result: MACardCloseResponse | undefined) => void;
+}) {
+  const { toast } = useToast();
+  const [esito, setEsito] = useState('');
+  const [note, setNote] = useState('');
+  const [facts, setFacts] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
+
+  const selected = ESITI.find((e) => e.key === esito);
+  const showBridge = selected?.bridge ?? false;
+
+  const toggleFact = (kind: string) => {
+    setFacts((prev) => {
+      const next = new Set(prev);
+      if (next.has(kind)) next.delete(kind);
+      else next.add(kind);
+      return next;
+    });
+  };
+
+  const submit = async () => {
+    if (!esito) return;
+    setSaving(true);
+    try {
+      const result = await onSubmit(card.companyKey, esito, note.trim(), showBridge ? [...facts] : []);
+      onDone(result);
+    } catch (err) {
+      toast(errorLabel(err), 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal open onClose={onClose} title={`Chiudi lavorazione — ${card.companyName}`}>
+      <p className={styles.modalSub}>L&apos;esito resta nel diario e alimenta la calibrazione del punteggio.</p>
+      <div className={styles.radios}>
+        {ESITI.map((e) => (
+          <label key={e.key} className={`${styles.radioRow} ${esito === e.key ? styles.on : ''}`}>
+            <input type="radio" name="esito" value={e.key} checked={esito === e.key} onChange={() => setEsito(e.key)} />
+            <span className={styles.radioText}>
+              <b>{e.label}</b>
+              <span className={styles.radioSmall}>{e.description}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+      {showBridge ? (
+        <div className={styles.bridge}>
+          <p className={styles.lab}>
+            Registra anche nel registro azienda <span className={styles.hint}>(vale per tutte le iniziative)</span>
+          </p>
+          {BRIDGE_KINDS.map((k) => (
+            <label key={k.key} className={styles.checkrow}>
+              <input type="checkbox" checked={facts.has(k.key)} onChange={() => toggleFact(k.key)} />
+              <span>
+                <b>{k.label}</b>
+                {k.hint ? ` — ${k.hint}` : ''}
+              </span>
+            </label>
+          ))}
+        </div>
+      ) : null}
+      <div className={styles.field}>
+        <label>Nota</label>
+        <input
+          className={styles.input}
+          placeholder="Motivo in una riga…"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          maxLength={500}
+        />
+      </div>
+      <div className={styles.modalActions}>
+        <Button variant="secondary" onClick={onClose}>
+          Annulla
+        </Button>
+        <Button variant="primary" onClick={() => void submit()} loading={saving} disabled={!esito}>
+          Chiudi card
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
+function RemoveCardModal({
+  card,
+  onClose,
+  onSubmit,
+  onDone,
+}: {
+  card: MAInitiativeCardView;
+  onClose: () => void;
+  onSubmit: (companyKey: string, correctRating: boolean, reason: string) => Promise<MACardRemoveResponse | undefined>;
+  onDone: (result: MACardRemoveResponse | undefined) => void;
+}) {
+  const { toast } = useToast();
+  const [correctRating, setCorrectRating] = useState(false);
+  const [reason, setReason] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const submit = async () => {
+    setSaving(true);
+    try {
+      const result = await onSubmit(card.companyKey, correctRating, reason.trim());
+      onDone(result);
+    } catch (err) {
+      toast(errorLabel(err), 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal open onClose={onClose} title={`Rimuovi dalla lavorazione — ${card.companyName}`}>
+      <p className={styles.modalSub}>
+        La rimozione è per le card create per errore: <b>nessun verdetto</b> viene registrato.
+      </p>
+      <div className={styles.bridge}>
+        <label className={styles.checkrow}>
+          <input type="checkbox" checked={correctRating} onChange={(e) => setCorrectRating(e.target.checked)} />
+          <span>
+            Correggi anche la valutazione nella ricerca di provenienza: <b>escludi (−1)</b>
+          </span>
+        </label>
+      </div>
+      <div className={styles.field}>
+        <label>Motivo dell&apos;esclusione</label>
+        <input
+          className={styles.input}
+          placeholder="Es. non è un MSP, rivende solo licenze…"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          maxLength={500}
+        />
+      </div>
+      <div className={styles.modalActions}>
+        <Button variant="secondary" onClick={onClose}>
+          Annulla
+        </Button>
+        <Button variant="danger" onClick={() => void submit()} loading={saving}>
+          Rimuovi
+        </Button>
+      </div>
+    </Modal>
   );
 }
 
