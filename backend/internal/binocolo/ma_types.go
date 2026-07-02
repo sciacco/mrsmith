@@ -246,7 +246,64 @@ const (
 	maOutcomeContattato = "contattato"
 	maOutcomeBuonLead   = "buon_lead"
 	maOutcomeNoGo       = "no_go"
+
+	// Eventi di card aggiunti dall'evoluzione a log unico (migrazione 089,
+	// INIZIATIVE-PRD.md §5): ma_target_outcome diventa il diario di
+	// lavorazione, ancorato a initiative_id oltre che a session_id.
+	maEventCardCreata   = "card_creata"
+	maEventCardRimossa  = "card_rimossa"
+	maEventCardRiaperta = "card_riaperta"
+	maEventStato        = "stato"
+	maEventNota         = "nota"
+	maEventChiusura     = "chiusura"
+
+	// Stati della card di lavorazione (ma_initiative_card, migrazione 088,
+	// INIZIATIVE-PRD.md §4.4). "rimossa" non è mai una colonna del board.
+	maCardStateDaContattare    = "da_contattare"
+	maCardStateContattata      = "contattata"
+	maCardStateInDialogo       = "in_dialogo"
+	maCardStateApprofondimento = "approfondimento"
+	maCardStateOfferta         = "offerta"
+	maCardStateChiusa          = "chiusa"
+	maCardStateRimossa         = "rimossa"
+
+	// Esiti di chiusura della card (PRD §4.4): attributo della chiusura, non
+	// colonne separate.
+	maCardEsitoConclusa  = "conclusa"
+	maCardEsitoNoGo      = "no_go"
+	maCardEsitoNonIdonea = "non_idonea"
+	maCardEsitoSfumata   = "sfumata"
+	maCardEsitoRimandata = "rimandata"
 )
+
+// maCardActiveStates elenca gli stati non terminali di una card: usati per il
+// filtro "attiva" delle collisioni cross-iniziativa (PRD §6.1) e dei badge
+// nelle proiezioni (B5).
+var maCardActiveStates = []string{
+	maCardStateDaContattare,
+	maCardStateContattata,
+	maCardStateInDialogo,
+	maCardStateApprofondimento,
+	maCardStateOfferta,
+}
+
+func validMACardState(state string) bool {
+	switch state {
+	case maCardStateDaContattare, maCardStateContattata, maCardStateInDialogo, maCardStateApprofondimento, maCardStateOfferta, maCardStateChiusa, maCardStateRimossa:
+		return true
+	default:
+		return false
+	}
+}
+
+func validMACardEsito(esito string) bool {
+	switch esito {
+	case maCardEsitoConclusa, maCardEsitoNoGo, maCardEsitoNonIdonea, maCardEsitoSfumata, maCardEsitoRimandata:
+		return true
+	default:
+		return false
+	}
+}
 
 type MACreateSessionRequest struct {
 	Prompt    string `json:"prompt"`
@@ -299,14 +356,39 @@ type MATargetRatingRequest struct {
 // dello screening (migrazione 080): l'unica ground truth che permetterà di
 // validare lo score. Agganciato a company_key come il rating.
 type MATargetOutcome struct {
-	ID               string    `json:"id"`
-	SessionID        string    `json:"sessionId,omitempty"`
-	CompanyKey       string    `json:"companyKey"`
-	Event            string    `json:"event"`
-	Note             string    `json:"note,omitempty"`
-	CreatedBySubject string    `json:"-"`
-	CreatedByEmail   string    `json:"createdByEmail,omitempty"`
-	CreatedAt        time.Time `json:"createdAt"`
+	ID        string `json:"id"`
+	SessionID string `json:"sessionId,omitempty"`
+	// InitiativeID ancora l'evento all'Iniziativa (migrazione 089): nuovo
+	// ancoraggio primario per gli eventi di card; i tre eventi storici restano
+	// ancorati alla sola sessione.
+	InitiativeID string `json:"initiativeId,omitempty"`
+	CompanyKey   string `json:"companyKey"`
+	Event        string `json:"event"`
+	Note         string `json:"note,omitempty"`
+	// Payload porta i dettagli tipizzati dell'evento (from/to di stato, esito,
+	// sessione/rating di provenienza): migrazione 089.
+	Payload          json.RawMessage `json:"payload,omitempty"`
+	CreatedBySubject string          `json:"-"`
+	CreatedByEmail   string          `json:"createdByEmail,omitempty"`
+	CreatedAt        time.Time       `json:"createdAt"`
+}
+
+// MAInitiativeCard è la card di lavorazione (iniziativa, azienda) —
+// migrazione 088, INIZIATIVE-PRD.md §4. Chiave primaria unica: la riapertura
+// riusa la stessa card, mai una seconda (§4.3).
+type MAInitiativeCard struct {
+	InitiativeID       string     `json:"initiativeId"`
+	CompanyKey         string     `json:"companyKey"`
+	CompanyName        string     `json:"companyName"`
+	VATCode            string     `json:"vatCode,omitempty"`
+	TaxCode            string     `json:"taxCode,omitempty"`
+	Province           string     `json:"province,omitempty"`
+	State              string     `json:"state"`
+	Esito              string     `json:"esito,omitempty"`
+	CreatedFromSession string     `json:"createdFromSession,omitempty"`
+	CreatedAt          time.Time  `json:"createdAt"`
+	UpdatedAt          time.Time  `json:"updatedAt"`
+	ClosedAt           *time.Time `json:"closedAt,omitempty"`
 }
 
 type MATargetOutcomeRequest struct {

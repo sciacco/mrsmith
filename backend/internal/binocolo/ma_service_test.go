@@ -1595,6 +1595,26 @@ func (f *fakeMAWorkspaceStore) SetMASessionInitiative(context.Context, string, s
 	return errors.New("not implemented")
 }
 
+func (f *fakeMAWorkspaceStore) GetMAInitiativeCard(context.Context, string, string) (*MAInitiativeCard, error) {
+	return nil, nil
+}
+
+func (f *fakeMAWorkspaceStore) UpsertMAInitiativeCard(context.Context, MAInitiativeCard) error {
+	return nil
+}
+
+func (f *fakeMAWorkspaceStore) ListMAInitiativeCards(context.Context, string) ([]MAInitiativeCard, error) {
+	return nil, nil
+}
+
+func (f *fakeMAWorkspaceStore) ListMAActiveCardsByCompany(context.Context, []string) (map[string][]MAInitiativeCard, error) {
+	return nil, nil
+}
+
+func (f *fakeMAWorkspaceStore) ListMARatings(context.Context, string) (map[string]int, error) {
+	return nil, nil
+}
+
 type fakeProvinceCache struct {
 	response json.RawMessage
 }

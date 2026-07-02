@@ -451,7 +451,28 @@ func (s *maService) setSessionInitiative(ctx context.Context, sessionID, initiat
 			return err
 		}
 	}
-	return s.store.SetMASessionInitiative(ctx, sessionID, initiativeID)
+	if err := s.store.SetMASessionInitiative(ctx, sessionID, initiativeID); err != nil {
+		return err
+	}
+	// Backfill (PRD §3.2): agganciare una sessione che ha già >=1★ crea le
+	// card mancanti, stessa regola d'ingresso di §4.1 applicata
+	// retroattivamente. Sgancio (initiativeID == "") non tocca le card
+	// esistenti: sono già autonome (§4.2).
+	if initiativeID != "" {
+		ratings, err := s.store.ListMARatings(ctx, sessionID)
+		if err != nil {
+			return err
+		}
+		for companyKey, rating := range ratings {
+			if rating < 1 {
+				continue
+			}
+			if err := s.ensureInitiativeCard(ctx, initiativeID, sessionID, companyKey, rating, subject, email); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // maPricing holds the business pricing/budget levers, sourced from the
@@ -1390,11 +1411,82 @@ func (s *maService) setTargetRating(ctx context.Context, sessionID string, input
 	if err := s.store.UpsertMATargetRating(ctx, sessionID, input, subject, email); err != nil {
 		return err
 	}
+	// La prima >=1 stella su una sessione agganciata crea (o riapre) la card di
+	// lavorazione (PRD §4.1, §4.3). Errore dell'hook: propagato — il rating non
+	// deve riuscire con la card rotta.
+	if input.Rating >= 1 && session.InitiativeID != "" {
+		if err := s.ensureInitiativeCard(ctx, session.InitiativeID, sessionID, input.CompanyKey, input.Rating, subject, email); err != nil {
+			return err
+		}
+	}
 	_ = s.traceEvent(ctx, maTraceEventWrite{
 		EventType: "ma_target_rated",
 		Status:    maTraceEventSucceeded,
 		Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "company_key": input.CompanyKey, "rating": input.Rating, "reason": input.Reason}),
 	})
+	return nil
+}
+
+// ensureInitiativeCard applies the PRD §4.1/§4.3 entry rule: create the card
+// (state da_contattare) if it does not exist yet, reopen it if it exists
+// closed/removed (evento card_riaperta), or do nothing if it exists active
+// (autonomy, §4.2 — the star no longer governs an active card). Used both by
+// the setTargetRating hook and by the retro-anchor backfill.
+func (s *maService) ensureInitiativeCard(ctx context.Context, initiativeID, sessionID, companyKey string, rating int, subject, email string) error {
+	if s.store == nil {
+		return errMAStoreUnavailable
+	}
+	existing, err := s.store.GetMAInitiativeCard(ctx, initiativeID, companyKey)
+	if err != nil {
+		return err
+	}
+	if existing != nil && existing.State != maCardStateChiusa && existing.State != maCardStateRimossa {
+		return nil
+	}
+
+	card := MAInitiativeCard{
+		InitiativeID:       initiativeID,
+		CompanyKey:         companyKey,
+		State:              maCardStateDaContattare,
+		CreatedFromSession: sessionID,
+	}
+	if existing != nil {
+		// Riapertura: preserva lo snapshot già registrato, resetta solo stato/esito.
+		card.CompanyName = existing.CompanyName
+		card.VATCode = existing.VATCode
+		card.TaxCode = existing.TaxCode
+		card.Province = existing.Province
+		card.CreatedFromSession = existing.CreatedFromSession
+	} else if rows, err := s.store.ListMATargetRows(ctx, sessionID); err == nil {
+		for _, row := range rows {
+			if row.CompanyKey == companyKey {
+				card.CompanyName = row.CompanyName
+				card.VATCode = row.VATCode
+				card.Province = row.Province
+				break
+			}
+		}
+	}
+
+	if err := s.store.UpsertMAInitiativeCard(ctx, card); err != nil {
+		return err
+	}
+
+	event := maEventCardCreata
+	if existing != nil {
+		event = maEventCardRiaperta
+	}
+	if err := s.store.InsertMATargetOutcome(ctx, MATargetOutcome{
+		SessionID:        sessionID,
+		InitiativeID:     initiativeID,
+		CompanyKey:       companyKey,
+		Event:            event,
+		Payload:          maTraceJSON(map[string]any{"sessionId": sessionID, "rating": rating}),
+		CreatedBySubject: subject,
+		CreatedByEmail:   email,
+	}); err != nil {
+		return err
+	}
 	return nil
 }
 

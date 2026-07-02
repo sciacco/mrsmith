@@ -63,6 +63,11 @@ type maWorkspaceStore interface {
 	ListMAInitiatives(ctx context.Context, includeArchived bool) ([]MAInitiativeSummary, error)
 	UpdateMAInitiativeLifecycle(ctx context.Context, id, action, subject, email string) (bool, error)
 	SetMASessionInitiative(ctx context.Context, sessionID, initiativeID string) error
+	GetMAInitiativeCard(ctx context.Context, initiativeID, companyKey string) (*MAInitiativeCard, error)
+	UpsertMAInitiativeCard(ctx context.Context, card MAInitiativeCard) error
+	ListMAInitiativeCards(ctx context.Context, initiativeID string) ([]MAInitiativeCard, error)
+	ListMAActiveCardsByCompany(ctx context.Context, companyKeys []string) (map[string][]MAInitiativeCard, error)
+	ListMARatings(ctx context.Context, sessionID string) (map[string]int, error)
 }
 
 type maCompanyLegalForm struct {
@@ -1990,6 +1995,13 @@ func maRatingValue(rating *int) int {
 	return *rating
 }
 
+// ListMARatings exposes loadMARatings on the store interface (backfill on
+// retro-anchor, PRD §3.2): every rated company of a session, keyed by
+// company_key.
+func (s *SQLStore) ListMARatings(ctx context.Context, sessionID string) (map[string]int, error) {
+	return s.loadMARatings(ctx, sessionID)
+}
+
 func (s *SQLStore) loadMARatings(ctx context.Context, sessionID string) (map[string]int, error) {
 	rows, err := s.db.QueryContext(ctx, `
 SELECT company_key, rating
@@ -2080,10 +2092,22 @@ func (s *SQLStore) InsertMATargetOutcome(ctx context.Context, outcome MATargetOu
 	if s == nil || s.db == nil {
 		return errors.New("binocolo ma store not configured")
 	}
+	var sessionID any
+	if outcome.SessionID != "" {
+		sessionID = outcome.SessionID
+	}
+	var initiativeID any
+	if outcome.InitiativeID != "" {
+		initiativeID = outcome.InitiativeID
+	}
+	payload := outcome.Payload
+	if len(payload) == 0 {
+		payload = json.RawMessage(`{}`)
+	}
 	if _, err := s.db.ExecContext(ctx, `
-INSERT INTO binocolo.ma_target_outcome (id, session_id, company_key, event, note, created_by_subject, created_by_email, created_at)
-VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, now())
-`, uuid.NewString(), outcome.SessionID, outcome.CompanyKey, outcome.Event, nullString(outcome.Note), nullString(outcome.CreatedBySubject), nullString(outcome.CreatedByEmail)); err != nil {
+INSERT INTO binocolo.ma_target_outcome (id, session_id, initiative_id, company_key, event, note, payload, created_by_subject, created_by_email, created_at)
+VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7::jsonb, $8, $9, now())
+`, uuid.NewString(), sessionID, initiativeID, outcome.CompanyKey, outcome.Event, nullString(outcome.Note), string(payload), nullString(outcome.CreatedBySubject), nullString(outcome.CreatedByEmail)); err != nil {
 		return fmt.Errorf("insert ma target outcome: %w", err)
 	}
 	return nil
@@ -2200,6 +2224,153 @@ ORDER BY created_at
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate ma outcomes for company: %w", err)
+	}
+	return out, nil
+}
+
+// GetMAInitiativeCard loads a single card by its (initiative, company) key. A
+// miss is (nil, nil) — only real DB failures return an error, mirroring
+// GetMACompanyDomain.
+func (s *SQLStore) GetMAInitiativeCard(ctx context.Context, initiativeID, companyKey string) (*MAInitiativeCard, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	row := s.db.QueryRowContext(ctx, `
+SELECT initiative_id::text, company_key, company_name, vat_code, tax_code, province,
+       state, COALESCE(esito, ''), COALESCE(created_from_session::text, ''),
+       created_at, updated_at, closed_at
+FROM binocolo.ma_initiative_card
+WHERE initiative_id = $1::uuid AND company_key = $2
+`, initiativeID, companyKey)
+	var card MAInitiativeCard
+	var closedAt sql.NullTime
+	if err := row.Scan(&card.InitiativeID, &card.CompanyKey, &card.CompanyName, &card.VATCode, &card.TaxCode,
+		&card.Province, &card.State, &card.Esito, &card.CreatedFromSession, &card.CreatedAt, &card.UpdatedAt, &closedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get ma initiative card: %w", err)
+	}
+	if closedAt.Valid {
+		card.ClosedAt = &closedAt.Time
+	}
+	return &card, nil
+}
+
+// UpsertMAInitiativeCard inserts or updates a card. Callers own the state
+// machine (ensureInitiativeCard, B4 transitions) — this is a plain write.
+func (s *SQLStore) UpsertMAInitiativeCard(ctx context.Context, card MAInitiativeCard) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	if card.InitiativeID == "" || card.CompanyKey == "" {
+		return errors.New("ma initiative card: missing initiative or company key")
+	}
+	var createdFromSession any
+	if card.CreatedFromSession != "" {
+		createdFromSession = card.CreatedFromSession
+	}
+	if _, err := s.db.ExecContext(ctx, `
+INSERT INTO binocolo.ma_initiative_card (
+    initiative_id, company_key, company_name, vat_code, tax_code, province,
+    state, esito, created_from_session, created_at, updated_at, closed_at)
+VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, NULLIF($8, ''), $9::uuid, now(), now(), $10)
+ON CONFLICT (initiative_id, company_key) DO UPDATE SET
+    company_name = CASE WHEN EXCLUDED.company_name <> '' THEN EXCLUDED.company_name ELSE binocolo.ma_initiative_card.company_name END,
+    vat_code     = CASE WHEN EXCLUDED.vat_code <> '' THEN EXCLUDED.vat_code ELSE binocolo.ma_initiative_card.vat_code END,
+    tax_code     = CASE WHEN EXCLUDED.tax_code <> '' THEN EXCLUDED.tax_code ELSE binocolo.ma_initiative_card.tax_code END,
+    province     = CASE WHEN EXCLUDED.province <> '' THEN EXCLUDED.province ELSE binocolo.ma_initiative_card.province END,
+    state        = EXCLUDED.state,
+    esito        = EXCLUDED.esito,
+    updated_at   = now(),
+    closed_at    = EXCLUDED.closed_at
+`, card.InitiativeID, card.CompanyKey, card.CompanyName, card.VATCode, card.TaxCode, card.Province,
+		card.State, card.Esito, createdFromSession, card.ClosedAt); err != nil {
+		return fmt.Errorf("upsert ma initiative card: %w", err)
+	}
+	return nil
+}
+
+// ListMAInitiativeCards loads every card of an Iniziativa (board rows, B4).
+func (s *SQLStore) ListMAInitiativeCards(ctx context.Context, initiativeID string) ([]MAInitiativeCard, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT initiative_id::text, company_key, company_name, vat_code, tax_code, province,
+       state, COALESCE(esito, ''), COALESCE(created_from_session::text, ''),
+       created_at, updated_at, closed_at
+FROM binocolo.ma_initiative_card
+WHERE initiative_id = $1::uuid
+ORDER BY updated_at DESC
+`, initiativeID)
+	if err != nil {
+		return nil, fmt.Errorf("list ma initiative cards: %w", err)
+	}
+	defer rows.Close()
+	out := []MAInitiativeCard{}
+	for rows.Next() {
+		var card MAInitiativeCard
+		var closedAt sql.NullTime
+		if err := rows.Scan(&card.InitiativeID, &card.CompanyKey, &card.CompanyName, &card.VATCode, &card.TaxCode,
+			&card.Province, &card.State, &card.Esito, &card.CreatedFromSession, &card.CreatedAt, &card.UpdatedAt, &closedAt); err != nil {
+			return nil, fmt.Errorf("scan ma initiative card: %w", err)
+		}
+		if closedAt.Valid {
+			card.ClosedAt = &closedAt.Time
+		}
+		out = append(out, card)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma initiative cards: %w", err)
+	}
+	return out, nil
+}
+
+// ListMAActiveCardsByCompany batches the collision/badge lookup (PRD §6.1,
+// B5): for each company key, every ACTIVE card (state NOT IN chiusa/rimossa)
+// across all initiatives.
+func (s *SQLStore) ListMAActiveCardsByCompany(ctx context.Context, companyKeys []string) (map[string][]MAInitiativeCard, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	out := map[string][]MAInitiativeCard{}
+	if len(companyKeys) == 0 {
+		return out, nil
+	}
+	placeholders := make([]string, len(companyKeys))
+	args := make([]any, len(companyKeys))
+	for i, key := range companyKeys {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		args[i] = key
+	}
+	query := fmt.Sprintf(`
+SELECT initiative_id::text, company_key, company_name, vat_code, tax_code, province,
+       state, COALESCE(esito, ''), COALESCE(created_from_session::text, ''),
+       created_at, updated_at, closed_at
+FROM binocolo.ma_initiative_card
+WHERE company_key IN (%s)
+  AND state NOT IN ('chiusa', 'rimossa')
+`, strings.Join(placeholders, ", "))
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list ma active cards by company: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var card MAInitiativeCard
+		var closedAt sql.NullTime
+		if err := rows.Scan(&card.InitiativeID, &card.CompanyKey, &card.CompanyName, &card.VATCode, &card.TaxCode,
+			&card.Province, &card.State, &card.Esito, &card.CreatedFromSession, &card.CreatedAt, &card.UpdatedAt, &closedAt); err != nil {
+			return nil, fmt.Errorf("scan ma active card: %w", err)
+		}
+		if closedAt.Valid {
+			card.ClosedAt = &closedAt.Time
+		}
+		out[card.CompanyKey] = append(out[card.CompanyKey], card)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma active cards by company: %w", err)
 	}
 	return out, nil
 }
