@@ -454,32 +454,215 @@ function FinancialsTab({ target }: { target: MATarget }) {
     return <EmptyState icon="file-text" title="Dati finanziari non disponibili" text="Nessun dato di bilancio storico presente per questo target." />;
   }
 
+  const latestTurnoverSheet = [...sheets].reverse().find((s: any) => s.turnover != null);
+  const latestNetWorthSheet = [...sheets].reverse().find((s: any) => s.netWorth != null);
+  const latestTotalAssetsSheet = [...sheets].reverse().find((s: any) => s.totalAssets != null);
+  const latestEmployeesSheet = [...sheets].reverse().find((s: any) => s.employees != null);
+
+  const getTrend = (key: 'turnover' | 'netWorth' | 'employees' | 'totalAssets') => {
+    const validSheets = sheets.filter((s: any) => s[key] != null);
+    if (validSheets.length < 2) return null;
+    const lastIndex = validSheets.length - 1;
+    const lastVal = (validSheets[lastIndex] as any)[key];
+    const prevVal = (validSheets[lastIndex - 1] as any)[key];
+    if (lastVal != null && prevVal != null && prevVal > 0) {
+      return ((lastVal - prevVal) / prevVal) * 100;
+    }
+    return null;
+  };
+
+  const formatTrend = (pct: number | null) => {
+    if (pct === null) return null;
+    const sign = pct >= 0 ? '+' : '';
+    const className = pct >= 0 ? styles.finTrendPositive : styles.finTrendNegative;
+    return (
+      <small className={className}>
+        {sign}
+        {pct.toFixed(1)}% YoY
+      </small>
+    );
+  };
+
+  const turnoverSheets = sheets.filter((s: any) => s.turnover != null);
+  const maxTurnover = Math.max(...turnoverSheets.map((s: any) => s.turnover ?? 0), 1);
+
+  const renderBarChart = () => {
+    if (turnoverSheets.length === 0) return null;
+
+    const width = 600;
+    const height = 200;
+    const paddingLeft = 65;
+    const paddingRight = 20;
+    const paddingTop = 25;
+    const paddingBottom = 35;
+
+    const chartWidth = width - paddingLeft - paddingRight;
+    const chartHeight = height - paddingTop - paddingBottom;
+
+    const barSpacing = chartWidth / turnoverSheets.length;
+    const barWidth = Math.min(barSpacing * 0.5, 45);
+
+    return (
+      <div className={styles.chartContainer}>
+        <div className={styles.chartTitle}>Andamento Fatturato (€)</div>
+        <svg viewBox={`0 0 ${width} ${height}`} className={styles.chartSvg}>
+          <defs>
+            <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--color-accent)" />
+              <stop offset="100%" stopColor="#7c6cff" />
+            </linearGradient>
+          </defs>
+
+          {/* Grid lines (0%, 50%, 100%) */}
+          <line
+            x1={paddingLeft}
+            y1={paddingTop}
+            x2={width - paddingRight}
+            y2={paddingTop}
+            stroke="var(--color-border-subtle)"
+            strokeDasharray="4 4"
+          />
+          <text
+            x={paddingLeft - 10}
+            y={paddingTop + 4}
+            textAnchor="end"
+            style={{ fontSize: '10px', fill: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}
+          >
+            {moneyFormat.format(maxTurnover)}
+          </text>
+
+          <line
+            x1={paddingLeft}
+            y1={paddingTop + chartHeight / 2}
+            x2={width - paddingRight}
+            y2={paddingTop + chartHeight / 2}
+            stroke="var(--color-border-subtle)"
+            strokeDasharray="4 4"
+          />
+          <text
+            x={paddingLeft - 10}
+            y={paddingTop + chartHeight / 2 + 4}
+            textAnchor="end"
+            style={{ fontSize: '10px', fill: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}
+          >
+            {moneyFormat.format(maxTurnover / 2)}
+          </text>
+
+          <line
+            x1={paddingLeft}
+            y1={paddingTop + chartHeight}
+            x2={width - paddingRight}
+            y2={paddingTop + chartHeight}
+            stroke="var(--color-border)"
+          />
+          <text
+            x={paddingLeft - 10}
+            y={paddingTop + chartHeight + 4}
+            textAnchor="end"
+            style={{ fontSize: '10px', fill: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}
+          >
+            0 €
+          </text>
+
+          {/* Bars and Labels */}
+          {turnoverSheets.map((sheet: any, idx: number) => {
+            const val = sheet.turnover ?? 0;
+            const barHeight = (val / maxTurnover) * chartHeight;
+            const x = paddingLeft + idx * barSpacing + (barSpacing - barWidth) / 2;
+            const y = paddingTop + chartHeight - barHeight;
+
+            return (
+              <g key={sheet.year}>
+                <rect
+                  x={x}
+                  y={y}
+                  width={barWidth}
+                  height={Math.max(barHeight, 2)}
+                  rx={4}
+                  ry={4}
+                  fill="url(#barGradient)"
+                />
+                <text
+                  x={x + barWidth / 2}
+                  y={y - 6}
+                  textAnchor="middle"
+                  style={{ fontSize: '11px', fill: 'var(--color-text)', fontWeight: 700, fontFamily: 'var(--font-mono)' }}
+                >
+                  {val >= 1000000 ? `${(val / 1000000).toFixed(2)}M` : `${Math.round(val / 1000).toLocaleString('it-IT')}k`}
+                </text>
+                <text
+                  x={x + barWidth / 2}
+                  y={paddingTop + chartHeight + 18}
+                  textAnchor="middle"
+                  style={{ fontSize: '11px', fill: 'var(--color-text-secondary)', fontWeight: 600 }}
+                >
+                  {sheet.year}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    );
+  };
+
   return (
     <div>
-      <table className={styles.mono}>
-        <thead>
-          <tr>
-            <th>Anno</th>
-            <th>Fatturato</th>
-            <th>Patrimonio Netto</th>
-            <th>Attivo Totale</th>
-            <th>Dipendenti</th>
-          </tr>
-        </thead>
-        <tbody>
-          {[...sheets].reverse().map((sheet: any) => (
-            <tr key={sheet.year}>
-              <td>
-                <strong>{sheet.year}</strong>
-              </td>
-              <td>{sheet.turnover != null ? moneyFormat.format(sheet.turnover) : '-'}</td>
-              <td>{sheet.netWorth != null ? moneyFormat.format(sheet.netWorth) : '-'}</td>
-              <td>{sheet.totalAssets != null ? moneyFormat.format(sheet.totalAssets) : '-'}</td>
-              <td>{sheet.employees != null ? numberFormat.format(sheet.employees) : '-'}</td>
+      <div className={styles.finCardsGrid}>
+        <div className={styles.finCard}>
+          <span>Fatturato {latestTurnoverSheet ? `(${(latestTurnoverSheet as any).year})` : ''}</span>
+          <strong>{(latestTurnoverSheet as any)?.turnover != null ? moneyFormat.format((latestTurnoverSheet as any).turnover) : '-'}</strong>
+          {formatTrend(getTrend('turnover'))}
+        </div>
+        <div className={styles.finCard}>
+          <span>Patrimonio Netto {latestNetWorthSheet ? `(${(latestNetWorthSheet as any).year})` : ''}</span>
+          <strong>{(latestNetWorthSheet as any)?.netWorth != null ? moneyFormat.format((latestNetWorthSheet as any).netWorth) : '-'}</strong>
+          {formatTrend(getTrend('netWorth'))}
+        </div>
+        <div className={styles.finCard}>
+          <span>Attivo Totale {latestTotalAssetsSheet ? `(${(latestTotalAssetsSheet as any).year})` : ''}</span>
+          <strong>
+            {(latestTotalAssetsSheet as any)?.totalAssets != null ? moneyFormat.format((latestTotalAssetsSheet as any).totalAssets) : '-'}
+          </strong>
+          {formatTrend(getTrend('totalAssets'))}
+        </div>
+        <div className={styles.finCard}>
+          <span>Dipendenti {latestEmployeesSheet ? `(${(latestEmployeesSheet as any).year})` : ''}</span>
+          <strong>
+            {(latestEmployeesSheet as any)?.employees != null ? numberFormat.format((latestEmployeesSheet as any).employees) : '-'}
+          </strong>
+          {formatTrend(getTrend('employees'))}
+        </div>
+      </div>
+
+      {renderBarChart()}
+
+      <div className={styles.tableContainer}>
+        <table className={styles.finTable}>
+          <thead>
+            <tr>
+              <th>Anno</th>
+              <th>Fatturato</th>
+              <th>Patrimonio Netto</th>
+              <th>Attivo Totale</th>
+              <th>Dipendenti</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {[...sheets].reverse().map((sheet: any) => (
+              <tr key={sheet.year}>
+                <td>
+                  <strong>{sheet.year}</strong>
+                </td>
+                <td>{sheet.turnover != null ? moneyFormat.format(sheet.turnover) : '-'}</td>
+                <td>{sheet.netWorth != null ? moneyFormat.format(sheet.netWorth) : '-'}</td>
+                <td>{sheet.totalAssets != null ? moneyFormat.format(sheet.totalAssets) : '-'}</td>
+                <td>{sheet.employees != null ? numberFormat.format(sheet.employees) : '-'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -524,18 +707,23 @@ function ShareholdersTab({ target }: { target: MATarget }) {
   }
 
   return (
-    <div>
+    <div className={styles.shGrid}>
       {shareholders.map((sh: any, index: number) => {
         const displayName = [sh.name, sh.surname].filter(Boolean).join(' ') || sh.companyName || 'Socio Sconosciuto';
         const percent = sh.percentShare ?? 0;
         return (
-          <div key={index}>
-            <div>{displayName}</div>
-            {sh.taxCode && <div className={styles.mono}>{sh.taxCode}</div>}
-            <div>
+          <div key={index} className={styles.shCard}>
+            <div className={styles.shName}>{displayName}</div>
+            {sh.taxCode && <div className={styles.shTaxCode}>{sh.taxCode}</div>}
+            <div className={styles.shShare}>
               <span>Quota societaria:</span>
               <strong>{percent > 0 ? `${percent}%` : 'n.d.'}</strong>
             </div>
+            {percent > 0 && (
+              <div className={styles.shProgressBarBg}>
+                <div className={styles.shProgressBar} style={{ width: `${percent}%` }} />
+              </div>
+            )}
           </div>
         );
       })}
