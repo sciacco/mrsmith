@@ -1074,6 +1074,12 @@ type MATargetRow struct {
 	EnrichmentLevel string          `json:"enrichmentLevel,omitempty"`
 	WebValidation   *MATargetRowWeb `json:"webValidation,omitempty"`
 
+	// RegistryFacts/InLavorazione sono decorazioni di sola presentazione
+	// (PRD §6.1, R-D3-7): badge registro azienda + marker di card attive in
+	// altre iniziative. Zero effetti su bucket/score/routing.
+	RegistryFacts []string       `json:"registryFacts,omitempty"`
+	InLavorazione []MACardMarker `json:"inLavorazione,omitempty"`
+
 	SortTurnover         *int `json:"-"`
 	HasOutsidePostFilter bool `json:"-"`
 }

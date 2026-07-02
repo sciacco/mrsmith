@@ -281,7 +281,62 @@ func (s *maService) sessionTargetRows(ctx context.Context, sessionID string) ([]
 	for index := range rows {
 		rows[index].Bucket = maRouteTarget(rowAsTarget(rows[index]), thesis)
 	}
+	if err := s.decorateTargetRowsWithRegistryAndCards(ctx, rows); err != nil {
+		return nil, err
+	}
 	return rows, nil
+}
+
+// decorateTargetRowsWithRegistryAndCards arricchisce le righe con i badge del
+// registro azienda e il marker di card attive in altre iniziative (PRD §6.1,
+// R-D3-7). Decorazione di sola presentazione: NON tocca bucket/score/routing.
+func (s *maService) decorateTargetRowsWithRegistryAndCards(ctx context.Context, rows []MATargetRow) error {
+	if s.store == nil {
+		return errMAStoreUnavailable
+	}
+	companyKeys := make([]string, 0, len(rows))
+	seen := map[string]bool{}
+	for _, row := range rows {
+		key := normalizeMACompanyKey(row.CompanyKey)
+		if key == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		companyKeys = append(companyKeys, key)
+	}
+	if len(companyKeys) == 0 {
+		return nil
+	}
+	registryFacts, err := s.store.ListMACompanyFactsActive(ctx, companyKeys)
+	if err != nil {
+		return err
+	}
+	activeCards, err := s.store.ListMAActiveCardsByCompany(ctx, companyKeys)
+	if err != nil {
+		return err
+	}
+	titles := map[string]string{}
+	for index := range rows {
+		key := normalizeMACompanyKey(rows[index].CompanyKey)
+		if key == "" {
+			continue
+		}
+		rows[index].RegistryFacts = registryFacts[key]
+		for _, card := range activeCards[key] {
+			title, ok := titles[card.InitiativeID]
+			if !ok {
+				if initiative, err := s.store.GetMAInitiative(ctx, card.InitiativeID); err == nil {
+					title = initiative.Title
+				}
+				titles[card.InitiativeID] = title
+			}
+			rows[index].InLavorazione = append(rows[index].InLavorazione, MACardMarker{
+				InitiativeID:    card.InitiativeID,
+				InitiativeTitle: title,
+			})
+		}
+	}
+	return nil
 }
 
 func (s *maService) sessionTargetDetail(ctx context.Context, sessionID, targetID string) (MATarget, error) {
