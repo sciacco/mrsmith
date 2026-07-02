@@ -1404,6 +1404,22 @@ func (f *fakeMAWorkspaceStore) GetMASession(context.Context, string) (MASessionD
 	return MASessionDetail{}, errors.New("not implemented")
 }
 
+func (f *fakeMAWorkspaceStore) GetMASessionLean(context.Context, string) (MASessionDetail, error) {
+	return MASessionDetail{}, errors.New("not implemented")
+}
+
+func (f *fakeMAWorkspaceStore) ListMARuns(context.Context, string) ([]MAExecutionRun, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (f *fakeMAWorkspaceStore) ListMATargetRows(context.Context, string) ([]MATargetRow, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (f *fakeMAWorkspaceStore) GetMATargetByID(context.Context, string, string) (MATarget, error) {
+	return MATarget{}, errors.New("not implemented")
+}
+
 func (f *fakeMAWorkspaceStore) UpdateMASessionLifecycle(context.Context, string, string, string, string) (bool, error) {
 	return false, errors.New("not implemented")
 }

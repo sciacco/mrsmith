@@ -44,7 +44,7 @@ type maGatedScoreStats struct {
 // hard governor, because the gate pays ~€0.02/company across the whole surface. The
 // heavy multi-stage work runs in the worker (runGatedSearchJob), so the request never
 // times out. Coexists with execute as a distinct mode (one in-flight job per type).
-func (s *maService) enqueueGatedSearch(ctx context.Context, sessionID string, req MAExecuteSessionRequest, subject, email string, inline bool) (MASessionDetail, error) {
+func (s *maService) enqueueGatedSearch(ctx context.Context, sessionID string, req MAExecuteSessionRequest, subject, email string, inline bool, lean bool) (MASessionDetail, error) {
 	if s.store == nil {
 		return MASessionDetail{}, errMAStoreUnavailable
 	}
@@ -54,7 +54,13 @@ func (s *maService) enqueueGatedSearch(ctx context.Context, sessionID string, re
 	if s.brave == nil {
 		return MASessionDetail{}, errMABraveUnavailable
 	}
-	detail, err := s.store.GetMASession(ctx, sessionID)
+	var detail MASessionDetail
+	var err error
+	if lean {
+		detail, err = s.store.GetMASessionLean(ctx, sessionID)
+	} else {
+		detail, err = s.store.GetMASession(ctx, sessionID)
+	}
 	if err != nil {
 		return MASessionDetail{}, err
 	}
@@ -75,7 +81,11 @@ func (s *maService) enqueueGatedSearch(ctx context.Context, sessionID string, re
 		if err != nil {
 			return MASessionDetail{}, err
 		}
-		detail, err = s.store.GetMASession(ctx, sessionID)
+		if lean {
+			detail, err = s.store.GetMASessionLean(ctx, sessionID)
+		} else {
+			detail, err = s.store.GetMASession(ctx, sessionID)
+		}
 		if err != nil {
 			return MASessionDetail{}, err
 		}
@@ -167,7 +177,7 @@ func (s *maService) enqueueGatedSearch(ctx context.Context, sessionID string, re
 					"session_id", sessionID, "error", err)
 			}
 		}()
-		return s.getSession(ctx, sessionID)
+		return s.getSessionShape(ctx, sessionID, lean)
 	}
 
 	_, created, err := s.store.EnqueueMAJob(ctx, maJobEnqueue{
@@ -187,7 +197,7 @@ func (s *maService) enqueueGatedSearch(ctx context.Context, sessionID string, re
 			return MASessionDetail{}, err
 		}
 	}
-	return s.getSession(ctx, sessionID)
+	return s.getSessionShape(ctx, sessionID, lean)
 }
 
 // runGatedSearchJob executes a queued gated-search job off the request path, owning
@@ -601,7 +611,7 @@ func gatedTargetBucket(target MATarget) string {
 // job pre-leased to this instance's owner — so a foreign worker on the shared queue can't
 // steal the paid re-gate+enrich, and a crash resumes (unlike the dev-only inline mode). The
 // worker runs runAssociateDomainJob; the caller gets the session in 'running' and polls.
-func (s *maService) enqueueAssociateDomain(ctx context.Context, sessionID, companyKey, domain, action, subject, email string) (MASessionDetail, error) {
+func (s *maService) enqueueAssociateDomain(ctx context.Context, sessionID, companyKey, domain, action, subject, email string, lean bool) (MASessionDetail, error) {
 	if s.store == nil {
 		return MASessionDetail{}, errMAStoreUnavailable
 	}
@@ -698,7 +708,7 @@ func (s *maService) enqueueAssociateDomain(ctx context.Context, sessionID, compa
 			return MASessionDetail{}, err
 		}
 	}
-	return s.getSession(ctx, sessionID)
+	return s.getSessionShape(ctx, sessionID, lean)
 }
 
 func normalizeMAAssociateDomainAction(value string) string {

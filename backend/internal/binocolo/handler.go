@@ -118,6 +118,8 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("GET /binocolo/v1/ma/sessions", h.handleListMASessions)
 	handle("POST /binocolo/v1/ma/sessions", h.handleCreateMASession)
 	handle("GET /binocolo/v1/ma/sessions/{id}", h.handleGetMASession)
+	handle("GET /binocolo/v1/ma/sessions/{id}/targets", h.handleListMATargetRows)
+	handle("GET /binocolo/v1/ma/sessions/{id}/targets/{targetId}", h.handleGetMATarget)
 	handle("POST /binocolo/v1/ma/sessions/{id}/archive", h.handleArchiveMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/restore", h.handleRestoreMASession)
 	handle("DELETE /binocolo/v1/ma/sessions/{id}", h.handleDeleteMASession)
@@ -270,12 +272,42 @@ func (h *Handler) handleGetMASession(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	detail, err := h.ma.getSession(r.Context(), id)
+	detail, err := h.ma.getSessionShape(r.Context(), id, wantsMATargetsNone(r))
 	if err != nil {
 		h.maFailure(w, r, "ma_session_get", err, "session_id", id)
 		return
 	}
 	httputil.JSON(w, http.StatusOK, detail)
+}
+
+func (h *Handler) handleListMATargetRows(w http.ResponseWriter, r *http.Request) {
+	id, ok := maSessionID(w, r)
+	if !ok {
+		return
+	}
+	rows, err := h.ma.sessionTargetRows(r.Context(), id)
+	if err != nil {
+		h.maFailure(w, r, "ma_target_rows", err, "session_id", id)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, MATargetListResponse{Items: rows})
+}
+
+func (h *Handler) handleGetMATarget(w http.ResponseWriter, r *http.Request) {
+	id, ok := maSessionID(w, r)
+	if !ok {
+		return
+	}
+	targetID, ok := maTargetID(w, r)
+	if !ok {
+		return
+	}
+	target, err := h.ma.sessionTargetDetail(r.Context(), id, targetID)
+	if err != nil {
+		h.maFailure(w, r, "ma_target_get", err, "session_id", id, "target_id", targetID)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, target)
 }
 
 func (h *Handler) handleArchiveMASession(w http.ResponseWriter, r *http.Request) {
@@ -380,7 +412,7 @@ func (h *Handler) handleRescoreMASession(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	subject, email := companySearchRefreshActor(r.Context())
-	detail, err := h.ma.rescoreSession(r.Context(), id, body.Thesis, subject, email)
+	detail, err := h.ma.rescoreSession(r.Context(), id, body.Thesis, subject, email, wantsMATargetsNone(r))
 	if err != nil {
 		h.maFailure(w, r, "ma_session_rescore", err, "session_id", id)
 		return
@@ -406,7 +438,7 @@ func (h *Handler) handleAssociateMATargetDomain(w http.ResponseWriter, r *http.R
 		return
 	}
 	subject, email := companySearchRefreshActor(r.Context())
-	detail, err := h.ma.enqueueAssociateDomain(r.Context(), id, body.CompanyKey, body.Domain, "associate", subject, email)
+	detail, err := h.ma.enqueueAssociateDomain(r.Context(), id, body.CompanyKey, body.Domain, "associate", subject, email, wantsMATargetsNone(r))
 	if err != nil {
 		h.maFailure(w, r, "ma_target_associate_domain", err, "session_id", id)
 		return
@@ -428,7 +460,7 @@ func (h *Handler) handleConfirmMAGroupSite(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	subject, email := companySearchRefreshActor(r.Context())
-	detail, err := h.ma.enqueueAssociateDomain(r.Context(), id, body.CompanyKey, "", "group_site", subject, email)
+	detail, err := h.ma.enqueueAssociateDomain(r.Context(), id, body.CompanyKey, "", "group_site", subject, email, wantsMATargetsNone(r))
 	if err != nil {
 		h.maFailure(w, r, "ma_target_confirm_group_site", err, "session_id", id)
 		return
@@ -450,7 +482,7 @@ func (h *Handler) handleDeclareMANoWebsite(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	subject, email := companySearchRefreshActor(r.Context())
-	detail, err := h.ma.enqueueAssociateDomain(r.Context(), id, body.CompanyKey, "", "no_website", subject, email)
+	detail, err := h.ma.enqueueAssociateDomain(r.Context(), id, body.CompanyKey, "", "no_website", subject, email, wantsMATargetsNone(r))
 	if err != nil {
 		h.maFailure(w, r, "ma_target_no_website", err, "session_id", id)
 		return
@@ -604,7 +636,7 @@ func (h *Handler) handleDeepDiveMASession(w http.ResponseWriter, r *http.Request
 	if !traceOK {
 		return
 	}
-	detail, err := h.ma.deepDive(r.Context(), id, body.AcknowledgeCost, email)
+	detail, err := h.ma.deepDive(r.Context(), id, body.AcknowledgeCost, email, wantsMATargetsNone(r))
 	if err != nil {
 		h.maFailure(w, r, "ma_session_deep_dive", err, "session_id", id)
 		return
@@ -743,7 +775,7 @@ func (h *Handler) handleEstimateMASession(w http.ResponseWriter, r *http.Request
 	// probing happens — nor can a client disconnect cancel the work. The UI polls
 	// GET .../sessions/{id} until status leaves 'estimating'. The operation trace is
 	// owned by the worker, not this request.
-	detail, err := h.ma.enqueueEstimate(r.Context(), id, body, subject, email)
+	detail, err := h.ma.enqueueEstimate(r.Context(), id, body, subject, email, wantsMATargetsNone(r))
 	if err != nil {
 		h.maFailure(w, r, "ma_session_estimate", err, "session_id", id)
 		return
@@ -767,7 +799,7 @@ func (h *Handler) handleExecuteMASession(w http.ResponseWriter, r *http.Request)
 	// and cannot time out during the paid company fetch. The UI polls
 	// GET .../sessions/{id} until status leaves 'running'. The operation trace is
 	// owned by the worker, not this request.
-	detail, err := h.ma.enqueueExecute(r.Context(), id, body, subject, email)
+	detail, err := h.ma.enqueueExecute(r.Context(), id, body, subject, email, wantsMATargetsNone(r))
 	if err != nil {
 		h.maFailure(w, r, "ma_session_execute", err, "session_id", id)
 		return
@@ -791,7 +823,7 @@ func (h *Handler) handleGatedSearchMASession(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	subject, email := companySearchRefreshActor(r.Context())
-	detail, err := h.ma.enqueueGatedSearch(r.Context(), id, body, subject, email, false)
+	detail, err := h.ma.enqueueGatedSearch(r.Context(), id, body, subject, email, false, wantsMATargetsNone(r))
 	if err != nil {
 		h.maFailure(w, r, "ma_session_gated_search", err, "session_id", id)
 		return
@@ -817,7 +849,7 @@ func (h *Handler) handleTestGatedSearch(w http.ResponseWriter, r *http.Request) 
 	}
 	subject, email := companySearchRefreshActor(r.Context())
 	req := MAExecuteSessionRequest{StrategyType: body.StrategyType, Limit: body.Limit}
-	detail, err := h.ma.enqueueGatedSearch(r.Context(), sessionID, req, subject, email, true)
+	detail, err := h.ma.enqueueGatedSearch(r.Context(), sessionID, req, subject, email, true, false)
 	if err != nil {
 		h.maFailure(w, r, "ma_session_gated_search", err, "session_id", sessionID)
 		return
@@ -988,6 +1020,19 @@ func maSessionID(w http.ResponseWriter, r *http.Request) (string, bool) {
 		return "", false
 	}
 	return id, true
+}
+
+func maTargetID(w http.ResponseWriter, r *http.Request) (string, bool) {
+	id := strings.TrimSpace(r.PathValue("targetId"))
+	if _, err := uuid.Parse(id); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_ma_target_id")
+		return "", false
+	}
+	return id, true
+}
+
+func wantsMATargetsNone(r *http.Request) bool {
+	return strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("targets")), "none")
 }
 
 func decodeMABody(r *http.Request, dst any) error {

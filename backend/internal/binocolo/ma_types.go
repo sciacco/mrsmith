@@ -807,6 +807,51 @@ type MATarget struct {
 	CreatedAt       time.Time            `json:"createdAt"`
 }
 
+// MATargetRow è la proiezione leggera di un target per liste e derivazioni:
+// niente vendor_payload, niente blob di validation, niente evidence.
+type MATargetRow struct {
+	ID              string          `json:"id"`
+	RunID           string          `json:"runId"`
+	CompanyKey      string          `json:"companyKey,omitempty"`
+	CompanyName     string          `json:"companyName"`
+	VATCode         string          `json:"vatCode,omitempty"`
+	Province        string          `json:"province,omitempty"`
+	Town            string          `json:"town,omitempty"`
+	AtecoCode       string          `json:"atecoCode,omitempty"`
+	Score           int             `json:"score"`
+	ScoreVersion    *int            `json:"scoreVersion,omitempty"`
+	MatchState      string          `json:"matchState"`
+	Confidence      string          `json:"confidence,omitempty"`
+	Bucket          string          `json:"bucket,omitempty"`
+	Rating          *int            `json:"rating,omitempty"`
+	Flags           []MATargetFlag  `json:"flags,omitempty"`
+	EnrichmentLevel string          `json:"enrichmentLevel,omitempty"`
+	WebValidation   *MATargetRowWeb `json:"webValidation,omitempty"`
+
+	SortTurnover         *int `json:"-"`
+	HasOutsidePostFilter bool `json:"-"`
+}
+
+// MATargetRowWeb replica i soli percorsi JSON consumati dalle liste.
+type MATargetRowWeb struct {
+	WebValidationState string                   `json:"webValidationState"`
+	FinalAction        string                   `json:"finalAction"`
+	SelectedDomain     string                   `json:"selectedDomain,omitempty"`
+	FinalDecision      MATargetRowFinalDecision `json:"finalDecision"`
+
+	GroupSiteDomain     string `json:"-"`
+	GroupSiteIdentifier string `json:"-"`
+	CandidateCount      int    `json:"-"`
+}
+
+type MATargetRowFinalDecision struct {
+	Reason string `json:"reason,omitempty"`
+}
+
+type MATargetListResponse struct {
+	Items []MATargetRow `json:"items"`
+}
+
 type MATargetEvidence struct {
 	Criterion string  `json:"criterion"`
 	Status    string  `json:"status"`

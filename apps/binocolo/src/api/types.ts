@@ -609,6 +609,41 @@ export interface MATarget {
   vendorPayload?: any;
 }
 
+export interface MATargetRowFinalDecision {
+  reason?: string;
+}
+
+export interface MATargetRowWeb {
+  webValidationState: PipelineWebValidationState | string;
+  finalAction: PipelineFinalAction | string;
+  selectedDomain?: string;
+  finalDecision: MATargetRowFinalDecision;
+}
+
+export interface MATargetRow {
+  id: string;
+  runId: string;
+  companyKey?: string;
+  companyName: string;
+  vatCode?: string;
+  province?: string;
+  town?: string;
+  atecoCode?: string;
+  score: number;
+  scoreVersion?: number;
+  matchState: MAMatchState | string;
+  confidence?: MAConfidence | string;
+  bucket?: MATargetBucket;
+  rating?: number;
+  flags?: MATargetFlag[];
+  enrichmentLevel?: string;
+  webValidation?: MATargetRowWeb;
+}
+
+export interface MATargetListResponse {
+  items: MATargetRow[];
+}
+
 export interface MATargetFlag {
   code: string;
   label: string;

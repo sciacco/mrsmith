@@ -17,7 +17,11 @@ type maWorkspaceStore interface {
 	ListMASessions(ctx context.Context, visibility string) ([]MASessionSummary, error)
 	CreateMASession(ctx context.Context, input maSessionCreate) (MASessionDetail, error)
 	GetMASession(ctx context.Context, id string) (MASessionDetail, error)
+	GetMASessionLean(ctx context.Context, id string) (MASessionDetail, error)
 	GetMASessionState(ctx context.Context, id string) (MASession, error)
+	ListMARuns(ctx context.Context, sessionID string) ([]MAExecutionRun, error)
+	ListMATargetRows(ctx context.Context, sessionID string) ([]MATargetRow, error)
+	GetMATargetByID(ctx context.Context, sessionID, targetID string) (MATarget, error)
 	UpdateMASessionLifecycle(ctx context.Context, sessionID, action, subject, email string) (bool, error)
 	AddMAStrategyVersion(ctx context.Context, sessionID string, strategy MAStrategySpec, createdByEmail string) (*MAStrategyVersion, error)
 	AddMARescoreStrategyVersion(ctx context.Context, sessionID string, strategy MAStrategySpec, createdByEmail string) (*MAStrategyVersion, error)
@@ -358,6 +362,33 @@ func (s *SQLStore) GetMASession(ctx context.Context, id string) (MASessionDetail
 	return detail, nil
 }
 
+func (s *SQLStore) GetMASessionLean(ctx context.Context, id string) (MASessionDetail, error) {
+	if s == nil || s.db == nil {
+		return MASessionDetail{}, errors.New("binocolo ma store not configured")
+	}
+	session, err := s.loadMASession(ctx, s.db, id)
+	if err != nil {
+		return MASessionDetail{}, err
+	}
+	strategy, err := s.loadActiveMAStrategy(ctx, id)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return MASessionDetail{}, err
+	}
+	estimates, err := s.loadMAEstimates(ctx, id)
+	if err != nil {
+		return MASessionDetail{}, err
+	}
+	runs, err := s.loadMARuns(ctx, id)
+	if err != nil {
+		return MASessionDetail{}, err
+	}
+	detail := MASessionDetail{Session: session, Estimates: estimates, Runs: runs, Targets: []MATarget{}}
+	if strategy.ID != "" {
+		detail.Strategy = &strategy
+	}
+	return detail, nil
+}
+
 // GetMASessionState loads only the session row (no strategy/estimates/runs/targets),
 // for cheap lifecycle checks such as the rating endpoint.
 func (s *SQLStore) GetMASessionState(ctx context.Context, id string) (MASession, error) {
@@ -365,6 +396,13 @@ func (s *SQLStore) GetMASessionState(ctx context.Context, id string) (MASession,
 		return MASession{}, errors.New("binocolo ma store not configured")
 	}
 	return s.loadMASession(ctx, s.db, id)
+}
+
+func (s *SQLStore) ListMARuns(ctx context.Context, sessionID string) ([]MAExecutionRun, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	return s.loadMARuns(ctx, sessionID)
 }
 
 func (s *SQLStore) UpdateMASessionLifecycle(ctx context.Context, sessionID, action, subject, email string) (bool, error) {
@@ -1338,6 +1376,78 @@ ORDER BY started_at DESC
 	return out, nil
 }
 
+type maTargetScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanMATargetBase(row maTargetScanner) (MATarget, error) {
+	var item MATarget
+	var turnover sql.NullInt64
+	var turnoverYear sql.NullInt64
+	var employees sql.NullInt64
+	var score sql.NullInt64
+	var scoreVersion sql.NullInt64
+	var missingRaw []byte
+	var flagsRaw []byte
+	if err := row.Scan(
+		&item.ID,
+		&item.SessionID,
+		&item.RunID,
+		&item.VendorID,
+		&item.CompanyName,
+		&item.VATCode,
+		&item.TaxCode,
+		&item.Province,
+		&item.Town,
+		&item.ActivityStatus,
+		&turnover,
+		&turnoverYear,
+		&employees,
+		&item.AtecoCode,
+		&item.AtecoDescription,
+		&score,
+		&item.MatchState,
+		&item.Confidence,
+		&flagsRaw,
+		&item.Rationale,
+		&missingRaw,
+		&item.VendorPayload,
+		&item.EnrichmentLevel,
+		&scoreVersion,
+		&item.CreatedAt,
+	); err != nil {
+		return MATarget{}, fmt.Errorf("scan ma target: %w", err)
+	}
+	// Address-stage rows are unscored (score NULL); leave item.Score at 0.
+	if score.Valid {
+		item.Score = int(score.Int64)
+	}
+	if scoreVersion.Valid {
+		value := int(scoreVersion.Int64)
+		item.ScoreVersion = &value
+	}
+	if len(flagsRaw) > 0 {
+		_ = json.Unmarshal(flagsRaw, &item.Flags)
+	}
+	if turnover.Valid {
+		value := int(turnover.Int64)
+		item.Turnover = &value
+	}
+	if turnoverYear.Valid {
+		value := int(turnoverYear.Int64)
+		item.TurnoverYear = &value
+	}
+	if employees.Valid {
+		value := int(employees.Int64)
+		item.Employees = &value
+	}
+	if len(missingRaw) > 0 {
+		_ = json.Unmarshal(missingRaw, &item.MissingCriteria)
+	}
+	item.CompanyKey = maTargetDedupeKey(item)
+	return item, nil
+}
+
 func (s *SQLStore) loadMATargets(ctx context.Context, sessionID string) ([]MATarget, error) {
 	rows, err := s.db.QueryContext(ctx, `
 SELECT id::text, session_id::text, run_id::text, COALESCE(vendor_id, ''), company_name,
@@ -1355,70 +1465,10 @@ ORDER BY score DESC NULLS LAST, company_name
 	defer rows.Close()
 	targets := []MATarget{}
 	for rows.Next() {
-		var item MATarget
-		var turnover sql.NullInt64
-		var turnoverYear sql.NullInt64
-		var employees sql.NullInt64
-		var score sql.NullInt64
-		var scoreVersion sql.NullInt64
-		var missingRaw []byte
-		var flagsRaw []byte
-		if err := rows.Scan(
-			&item.ID,
-			&item.SessionID,
-			&item.RunID,
-			&item.VendorID,
-			&item.CompanyName,
-			&item.VATCode,
-			&item.TaxCode,
-			&item.Province,
-			&item.Town,
-			&item.ActivityStatus,
-			&turnover,
-			&turnoverYear,
-			&employees,
-			&item.AtecoCode,
-			&item.AtecoDescription,
-			&score,
-			&item.MatchState,
-			&item.Confidence,
-			&flagsRaw,
-			&item.Rationale,
-			&missingRaw,
-			&item.VendorPayload,
-			&item.EnrichmentLevel,
-			&scoreVersion,
-			&item.CreatedAt,
-		); err != nil {
-			return nil, fmt.Errorf("scan ma target: %w", err)
+		item, err := scanMATargetBase(rows)
+		if err != nil {
+			return nil, err
 		}
-		// Address-stage rows are unscored (score NULL); leave item.Score at 0.
-		if score.Valid {
-			item.Score = int(score.Int64)
-		}
-		if scoreVersion.Valid {
-			value := int(scoreVersion.Int64)
-			item.ScoreVersion = &value
-		}
-		if len(flagsRaw) > 0 {
-			_ = json.Unmarshal(flagsRaw, &item.Flags)
-		}
-		if turnover.Valid {
-			value := int(turnover.Int64)
-			item.Turnover = &value
-		}
-		if turnoverYear.Valid {
-			value := int(turnoverYear.Int64)
-			item.TurnoverYear = &value
-		}
-		if employees.Valid {
-			value := int(employees.Int64)
-			item.Employees = &value
-		}
-		if len(missingRaw) > 0 {
-			_ = json.Unmarshal(missingRaw, &item.MissingCriteria)
-		}
-		item.CompanyKey = maTargetDedupeKey(item)
 		targets = append(targets, item)
 	}
 	if err := rows.Err(); err != nil {
@@ -1473,6 +1523,199 @@ ORDER BY score DESC NULLS LAST, company_name
 	return targets, nil
 }
 
+func (s *SQLStore) ListMATargetRows(ctx context.Context, sessionID string) ([]MATargetRow, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	rows, err := s.db.QueryContext(ctx, `
+WITH target_rows AS (
+  SELECT
+    t.*,
+    COALESCE(
+      NULLIF(upper(btrim(t.vendor_id)), ''),
+      NULLIF(upper(btrim(t.vat_code)), ''),
+      NULLIF(upper(btrim(t.tax_code)), ''),
+      upper(btrim(t.company_name))
+    ) AS company_key
+  FROM binocolo.ma_target t
+  WHERE t.session_id = $1::uuid
+)
+SELECT
+  t.id::text,
+  t.run_id::text,
+  COALESCE(t.company_key, ''),
+  t.company_name,
+  COALESCE(t.vat_code, ''),
+  COALESCE(t.province, ''),
+  COALESCE(t.town, ''),
+  COALESCE(t.ateco_code, ''),
+  t.score,
+  t.score_version,
+  COALESCE(t.match_state, ''),
+  COALESCE(t.confidence, ''),
+  t.flags,
+  COALESCE(t.enrichment_level, 'advanced'),
+  t.turnover,
+  r.rating,
+  wv.company_key IS NOT NULL AS has_validation,
+  COALESCE(wv.web_validation_state, ''),
+  COALESCE(wv.final_action, ''),
+  COALESCE(wv.selected_domain, ''),
+  COALESCE(wv.final_decision->>'reason', ''),
+  COALESCE(wv.domain_response->'groupSiteHint'->>'domain', ''),
+  COALESCE(wv.domain_response->'groupSiteHint'->>'identifier', ''),
+  COALESCE(jsonb_array_length(
+    CASE
+      WHEN jsonb_typeof(wv.domain_response->'candidates') = 'array' THEN wv.domain_response->'candidates'
+      ELSE '[]'::jsonb
+    END
+  ), 0),
+  EXISTS (
+    SELECT 1
+    FROM binocolo.ma_evidence evidence
+    WHERE evidence.target_id = t.id
+      AND evidence.status = $2
+      AND evidence.criterion IN ($3, $4)
+  ) AS has_outside_post_filter
+FROM target_rows t
+LEFT JOIN binocolo.ma_target_web_validation wv
+  ON wv.session_id = t.session_id AND wv.company_key = t.company_key
+LEFT JOIN binocolo.ma_target_rating r
+  ON r.session_id = t.session_id AND r.company_key = t.company_key
+ORDER BY t.score DESC NULLS LAST, t.company_name
+`, sessionID, maEvidenceOutside, maPostFilterRevenuePerEmployeeMin, maPostFilterMaxShareholders)
+	if err != nil {
+		return nil, fmt.Errorf("list ma target rows: %w", err)
+	}
+	defer rows.Close()
+
+	out := []MATargetRow{}
+	for rows.Next() {
+		var item MATargetRow
+		var score sql.NullInt64
+		var scoreVersion sql.NullInt64
+		var turnover sql.NullInt64
+		var rating sql.NullInt64
+		var flagsRaw []byte
+		var hasValidation bool
+		var webState, finalAction, selectedDomain, reason string
+		var groupDomain, groupIdentifier string
+		var candidateCount int
+		if err := rows.Scan(
+			&item.ID,
+			&item.RunID,
+			&item.CompanyKey,
+			&item.CompanyName,
+			&item.VATCode,
+			&item.Province,
+			&item.Town,
+			&item.AtecoCode,
+			&score,
+			&scoreVersion,
+			&item.MatchState,
+			&item.Confidence,
+			&flagsRaw,
+			&item.EnrichmentLevel,
+			&turnover,
+			&rating,
+			&hasValidation,
+			&webState,
+			&finalAction,
+			&selectedDomain,
+			&reason,
+			&groupDomain,
+			&groupIdentifier,
+			&candidateCount,
+			&item.HasOutsidePostFilter,
+		); err != nil {
+			return nil, fmt.Errorf("scan ma target row: %w", err)
+		}
+		if score.Valid {
+			item.Score = int(score.Int64)
+		}
+		if scoreVersion.Valid {
+			value := int(scoreVersion.Int64)
+			item.ScoreVersion = &value
+		}
+		if turnover.Valid {
+			value := int(turnover.Int64)
+			item.SortTurnover = &value
+		}
+		if rating.Valid {
+			value := int(rating.Int64)
+			item.Rating = &value
+		}
+		if len(flagsRaw) > 0 {
+			_ = json.Unmarshal(flagsRaw, &item.Flags)
+		}
+		if hasValidation {
+			item.WebValidation = &MATargetRowWeb{
+				WebValidationState:  webState,
+				FinalAction:         finalAction,
+				SelectedDomain:      selectedDomain,
+				FinalDecision:       MATargetRowFinalDecision{Reason: reason},
+				GroupSiteDomain:     groupDomain,
+				GroupSiteIdentifier: groupIdentifier,
+				CandidateCount:      candidateCount,
+			}
+		}
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma target rows: %w", err)
+	}
+	sortMATargetRowsByRating(out)
+	return out, nil
+}
+
+func (s *SQLStore) GetMATargetByID(ctx context.Context, sessionID, targetID string) (MATarget, error) {
+	if s == nil || s.db == nil {
+		return MATarget{}, errors.New("binocolo ma store not configured")
+	}
+	row := s.db.QueryRowContext(ctx, `
+SELECT id::text, session_id::text, run_id::text, COALESCE(vendor_id, ''), company_name,
+       COALESCE(vat_code, ''), COALESCE(tax_code, ''), COALESCE(province, ''), COALESCE(town, ''),
+       COALESCE(activity_status, ''), turnover, turnover_year, employees, COALESCE(ateco_code, ''),
+       COALESCE(ateco_description, ''), score, COALESCE(match_state, ''), COALESCE(confidence, ''), flags,
+       rationale, missing_criteria, vendor_payload, COALESCE(enrichment_level, 'advanced'), score_version, created_at
+FROM binocolo.ma_target
+WHERE session_id = $1::uuid AND id = $2::uuid
+`, sessionID, targetID)
+	target, err := scanMATargetBase(row)
+	if err != nil {
+		return MATarget{}, err
+	}
+	target.Evidence, err = s.loadMAEvidenceForTarget(ctx, sessionID, target.ID)
+	if err != nil {
+		return MATarget{}, err
+	}
+	rating, err := s.loadMARating(ctx, sessionID, target.CompanyKey)
+	if err != nil {
+		return MATarget{}, err
+	}
+	target.Rating = rating
+	target.Outcomes, err = s.loadMAOutcomesForCompany(ctx, sessionID, target.CompanyKey)
+	if err != nil {
+		return MATarget{}, err
+	}
+	validation, err := s.loadMAWebValidationForCompany(ctx, sessionID, target.CompanyKey)
+	if err != nil {
+		return MATarget{}, err
+	}
+	if validation != nil {
+		target.WebValidation = validation
+	}
+	deep, err := s.ListMADeepAnalysis(ctx, []string{target.CompanyKey})
+	if err != nil {
+		return MATarget{}, err
+	}
+	if analysis, ok := deep[target.CompanyKey]; ok {
+		record := analysis
+		target.Deep = &record
+	}
+	return target, nil
+}
+
 // sortMATargetsByRating ordina i target con la classifica utente in testa
 // (rating DESC), poi per punteggio dello scoring, poi — a parità di punteggio —
 // per sostanza invece che per alfabeto: confidence (documentato batte rado),
@@ -1494,6 +1737,25 @@ func sortMATargetsByRating(targets []MATarget) {
 			return ti > tj
 		}
 		return targets[i].CompanyName < targets[j].CompanyName
+	})
+}
+
+func sortMATargetRowsByRating(rows []MATargetRow) {
+	sort.SliceStable(rows, func(i, j int) bool {
+		ri, rj := maRatingValue(rows[i].Rating), maRatingValue(rows[j].Rating)
+		if ri != rj {
+			return ri > rj
+		}
+		if rows[i].Score != rows[j].Score {
+			return rows[i].Score > rows[j].Score
+		}
+		if ci, cj := maConfidenceRank(rows[i].Confidence), maConfidenceRank(rows[j].Confidence); ci != cj {
+			return ci > cj
+		}
+		if ti, tj := intValue(rows[i].SortTurnover), intValue(rows[j].SortTurnover); ti != tj {
+			return ti > tj
+		}
+		return rows[i].CompanyName < rows[j].CompanyName
 	})
 }
 
@@ -1540,6 +1802,25 @@ WHERE session_id = $1::uuid
 		return nil, fmt.Errorf("iterate ma ratings: %w", err)
 	}
 	return out, nil
+}
+
+func (s *SQLStore) loadMARating(ctx context.Context, sessionID, companyKey string) (*int, error) {
+	if companyKey == "" {
+		return nil, nil
+	}
+	var rating int
+	err := s.db.QueryRowContext(ctx, `
+SELECT rating
+FROM binocolo.ma_target_rating
+WHERE session_id = $1::uuid AND company_key = $2
+`, sessionID, companyKey).Scan(&rating)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("load ma rating: %w", err)
+	}
+	return &rating, nil
 }
 
 // UpsertMATargetRating salva (o azzera) il voto su un'azienda nella sessione.
@@ -1684,6 +1965,34 @@ ORDER BY created_at
 	return out, nil
 }
 
+func (s *SQLStore) loadMAOutcomesForCompany(ctx context.Context, sessionID, companyKey string) ([]MATargetOutcome, error) {
+	if companyKey == "" {
+		return nil, nil
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT id, company_key, event, COALESCE(note, ''), COALESCE(created_by_email, ''), created_at
+FROM binocolo.ma_target_outcome
+WHERE session_id = $1::uuid AND company_key = $2
+ORDER BY created_at
+`, sessionID, companyKey)
+	if err != nil {
+		return nil, fmt.Errorf("load ma outcomes for company: %w", err)
+	}
+	defer rows.Close()
+	out := []MATargetOutcome{}
+	for rows.Next() {
+		var item MATargetOutcome
+		if err := rows.Scan(&item.ID, &item.CompanyKey, &item.Event, &item.Note, &item.CreatedByEmail, &item.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan ma outcome: %w", err)
+		}
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma outcomes for company: %w", err)
+	}
+	return out, nil
+}
+
 // ListMASectorEvalLabels loads the human ground-truth sector labels for a session,
 // keyed by company_key. Used by the sector-eval harness to compare against predictions.
 func (s *SQLStore) ListMASectorEvalLabels(ctx context.Context, sessionID string) (map[string]MASectorEvalLabel, error) {
@@ -1798,6 +2107,58 @@ WHERE session_id = $1::uuid
 		return nil, fmt.Errorf("iterate ma web validations: %w", err)
 	}
 	return out, nil
+}
+
+func (s *SQLStore) loadMAWebValidationForCompany(ctx context.Context, sessionID, companyKey string) (*MAWebValidation, error) {
+	if companyKey == "" {
+		return nil, nil
+	}
+	row := s.db.QueryRowContext(ctx, `
+SELECT
+  session_id::text,
+  company_key,
+  COALESCE(target_id::text, ''),
+  COALESCE(run_id::text, ''),
+  COALESCE(selected_domain, ''),
+  COALESCE(domain_confidence, ''),
+  domain_score,
+  web_score,
+  COALESCE(web_confidence, ''),
+  web_validation_state,
+  final_action,
+  COALESCE(analyst_verdict, ''),
+  COALESCE(analyst_action, ''),
+  COALESCE(analyst_confidence, ''),
+  pipeline_version,
+  input_hash,
+  keyword_set_hash,
+  COALESCE(llm_model_id, ''),
+  COALESCE(llm_prompt_id, ''),
+  COALESCE(llm_model, ''),
+  stale_after,
+  expires_at,
+  summary,
+  keyword_set,
+  selected_domain_payload,
+  domain_response,
+  evidence_runs,
+  candidate_match_analysis,
+  COALESCE(candidate_match_error, ''),
+  final_decision,
+  COALESCE(identity_state, ''),
+  COALESCE(updated_by_email, ''),
+  updated_at
+FROM binocolo.ma_target_web_validation
+WHERE session_id = $1::uuid AND company_key = $2
+`, sessionID, companyKey)
+	item, err := scanMAWebValidation(row)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &item, nil
 }
 
 func (s *SQLStore) UpsertMAWebValidation(ctx context.Context, input maWebValidationUpsert) (MAWebValidation, error) {
@@ -2046,6 +2407,36 @@ ORDER BY evidence.created_at, evidence.id
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate ma evidence: %w", err)
+	}
+	return out, nil
+}
+
+func (s *SQLStore) loadMAEvidenceForTarget(ctx context.Context, sessionID, targetID string) ([]MATargetEvidence, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT evidence.criterion, evidence.status,
+       COALESCE(evidence.family, ''), evidence.label, COALESCE(evidence.value, ''),
+       COALESCE(evidence.points, 0)::float8, COALESCE(evidence.weight, 0)::float8,
+       COALESCE(evidence.source_path, '')
+FROM binocolo.ma_evidence evidence
+JOIN binocolo.ma_target target ON target.id = evidence.target_id
+WHERE target.session_id = $1::uuid
+  AND evidence.target_id = $2::uuid
+ORDER BY evidence.created_at, evidence.id
+`, sessionID, targetID)
+	if err != nil {
+		return nil, fmt.Errorf("load ma evidence for target: %w", err)
+	}
+	defer rows.Close()
+	out := []MATargetEvidence{}
+	for rows.Next() {
+		var item MATargetEvidence
+		if err := rows.Scan(&item.Criterion, &item.Status, &item.Family, &item.Label, &item.Value, &item.Points, &item.Weight, &item.SourcePath); err != nil {
+			return nil, fmt.Errorf("scan ma evidence: %w", err)
+		}
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma evidence for target: %w", err)
 	}
 	return out, nil
 }

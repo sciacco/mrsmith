@@ -75,7 +75,7 @@ export function NuovaRicercaPage() {
     if (!sessionId || detail?.session.status !== 'estimating') return;
     const handle = setInterval(() => {
       api
-        .get<MASessionDetail>(`/binocolo/v1/ma/sessions/${sessionId}`)
+        .get<MASessionDetail>(`/binocolo/v1/ma/sessions/${sessionId}?targets=none`)
         .then((data) => {
           setDetail(data);
           if (data.strategy?.strategy) setStrategy(data.strategy.strategy);
@@ -110,7 +110,7 @@ export function NuovaRicercaPage() {
     setBusy('create');
     setError(null);
     try {
-      const data = await api.post<MASessionDetail>('/binocolo/v1/ma/sessions', {
+      const data = await api.post<MASessionDetail>('/binocolo/v1/ma/sessions?targets=none', {
         prompt: normalized,
         gatedFlow: true,
       });
@@ -133,7 +133,7 @@ export function NuovaRicercaPage() {
     setBusy('estimate');
     setError(null);
     try {
-      const data = await api.post<MASessionDetail>(`/binocolo/v1/ma/sessions/${detail.session.id}/estimate`, {
+      const data = await api.post<MASessionDetail>(`/binocolo/v1/ma/sessions/${detail.session.id}/estimate?targets=none`, {
         strategy,
         strategyType: 'expanded',
       });
@@ -153,7 +153,7 @@ export function NuovaRicercaPage() {
     setBusy('execute');
     setError(null);
     try {
-      await api.post<MASessionDetail>(`/binocolo/v1/ma/sessions/${detail.session.id}/gated-search`, {
+      await api.post<MASessionDetail>(`/binocolo/v1/ma/sessions/${detail.session.id}/gated-search?targets=none`, {
         strategyType: 'expanded',
         limit: normalizeSearchLimit(strategy.searchLimit),
       });

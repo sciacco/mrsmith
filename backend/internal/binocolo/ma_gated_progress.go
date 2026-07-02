@@ -9,13 +9,21 @@ func (s *maService) gatedProgress(ctx context.Context, sessionID string) (MAGate
 	if s.store == nil {
 		return MAGatedProgressResponse{}, errMAStoreUnavailable
 	}
-	detail, err := s.store.GetMASession(ctx, sessionID)
+	session, err := s.store.GetMASessionState(ctx, sessionID)
+	if err != nil {
+		return MAGatedProgressResponse{}, err
+	}
+	runs, err := s.store.ListMARuns(ctx, sessionID)
+	if err != nil {
+		return MAGatedProgressResponse{}, err
+	}
+	rows, err := s.store.ListMATargetRows(ctx, sessionID)
 	if err != nil {
 		return MAGatedProgressResponse{}, err
 	}
 
-	run := latestMAGatedRun(detail.Runs)
-	targets := targetsForRun(detail.Targets, run.ID)
+	run := latestMAGatedRun(runs)
+	targets := targetRowsForRun(rows, run.ID)
 	out := MAGatedProgressResponse{
 		Stage:   "ready",
 		Surface: MAGatedProgressSurface{Expected: run.EstimatedCount, Fetched: len(targets)},
@@ -27,7 +35,8 @@ func (s *maService) gatedProgress(ctx context.Context, sessionID string) (MAGate
 		},
 	}
 
-	for _, target := range targets {
+	for _, row := range targets {
+		target := rowAsTarget(row)
 		if target.WebValidation == nil {
 			continue
 		}
@@ -47,22 +56,22 @@ func (s *maService) gatedProgress(ctx context.Context, sessionID string) (MAGate
 			out.Gate.Buckets.ManualReview++
 		}
 	}
-	for _, target := range targets {
-		if target.EnrichmentLevel == maEnrichmentAdvanced {
+	for _, row := range targets {
+		if row.EnrichmentLevel == maEnrichmentAdvanced {
 			out.Enrich.Enriched++
 		}
 	}
 
 	switch {
-	case run.Status == maRunStatusFailed || detail.Session.Status == maSessionStatusFailed:
+	case run.Status == maRunStatusFailed || session.Status == maSessionStatusFailed:
 		out.Stage = "failed"
-	case run.Status == maRunStatusCompleted || detail.Session.Status == maSessionStatusCompleted:
+	case run.Status == maRunStatusCompleted || session.Status == maSessionStatusCompleted:
 		out.Stage = "ready"
-	case detail.Session.Status == maSessionStatusRunning && len(targets) == 0:
+	case session.Status == maSessionStatusRunning && len(targets) == 0:
 		out.Stage = "address"
-	case detail.Session.Status == maSessionStatusRunning && out.Gate.Processed < out.Gate.Total:
+	case session.Status == maSessionStatusRunning && out.Gate.Processed < out.Gate.Total:
 		out.Stage = "gate"
-	case detail.Session.Status == maSessionStatusRunning:
+	case session.Status == maSessionStatusRunning:
 		out.Stage = "enrich"
 	}
 	return out, nil
@@ -72,15 +81,24 @@ func (s *maService) verificationQueue(ctx context.Context, sessionID string) (MA
 	if s.store == nil {
 		return MAVerificationQueueResponse{}, errMAStoreUnavailable
 	}
-	detail, err := s.store.GetMASession(ctx, sessionID)
+	session, err := s.store.GetMASessionState(ctx, sessionID)
 	if err != nil {
 		return MAVerificationQueueResponse{}, err
 	}
-	run := latestMAGatedRun(detail.Runs)
-	targets := targetsForRun(detail.Targets, run.ID)
-	running := detail.Session.Status == maSessionStatusRunning
+	runs, err := s.store.ListMARuns(ctx, sessionID)
+	if err != nil {
+		return MAVerificationQueueResponse{}, err
+	}
+	rows, err := s.store.ListMATargetRows(ctx, sessionID)
+	if err != nil {
+		return MAVerificationQueueResponse{}, err
+	}
+	run := latestMAGatedRun(runs)
+	targets := targetRowsForRun(rows, run.ID)
+	running := session.Status == maSessionStatusRunning
 	out := MAVerificationQueueResponse{Items: []MAVerificationQueueItem{}}
-	for _, target := range targets {
+	for _, row := range targets {
+		target := rowAsTarget(row)
 		bucket := gatedTargetBucket(target)
 		identityOnlySurvivor := target.MatchState == "" && (bucket == maGatedBucketKeep || bucket == maGatedBucketForse)
 		if bucket != maGatedBucketManualReview && (running || !identityOnlySurvivor) {
@@ -97,6 +115,53 @@ func (s *maService) verificationQueue(ctx context.Context, sessionID string) (MA
 		})
 	}
 	return out, nil
+}
+
+func rowAsTarget(row MATargetRow) MATarget {
+	target := MATarget{
+		ID:              row.ID,
+		RunID:           row.RunID,
+		CompanyKey:      row.CompanyKey,
+		CompanyName:     row.CompanyName,
+		VATCode:         row.VATCode,
+		Province:        row.Province,
+		Town:            row.Town,
+		AtecoCode:       row.AtecoCode,
+		Score:           row.Score,
+		ScoreVersion:    row.ScoreVersion,
+		MatchState:      row.MatchState,
+		Confidence:      row.Confidence,
+		Rating:          row.Rating,
+		Flags:           row.Flags,
+		EnrichmentLevel: row.EnrichmentLevel,
+	}
+	if row.HasOutsidePostFilter {
+		target.Evidence = []MATargetEvidence{{
+			Criterion: maPostFilterRevenuePerEmployeeMin,
+			Status:    maEvidenceOutside,
+		}}
+	}
+	if row.WebValidation != nil {
+		validation := MAWebValidation{
+			WebValidationState: row.WebValidation.WebValidationState,
+			FinalAction:        row.WebValidation.FinalAction,
+			SelectedDomain:     row.WebValidation.SelectedDomain,
+			FinalDecision: CandidateMatchFinalDecision{
+				Reason: row.WebValidation.FinalDecision.Reason,
+			},
+		}
+		if row.WebValidation.GroupSiteDomain != "" {
+			validation.DomainResponse.GroupSiteHint = &MAGroupSiteHint{
+				Domain:     row.WebValidation.GroupSiteDomain,
+				Identifier: row.WebValidation.GroupSiteIdentifier,
+			}
+		}
+		if row.WebValidation.CandidateCount > 0 {
+			validation.DomainResponse.Candidates = make([]DomainResolutionCandidate, row.WebValidation.CandidateCount)
+		}
+		target.WebValidation = &validation
+	}
+	return target
 }
 
 func verificationQueueReason(target MATarget, bucket string, identityOnlySurvivor bool) (string, string, []string) {
@@ -130,6 +195,19 @@ func targetsForRun(targets []MATarget, runID string) []MATarget {
 	for _, target := range targets {
 		if target.RunID == runID {
 			out = append(out, target)
+		}
+	}
+	return out
+}
+
+func targetRowsForRun(rows []MATargetRow, runID string) []MATargetRow {
+	if runID == "" {
+		return rows
+	}
+	out := make([]MATargetRow, 0, len(rows))
+	for _, row := range rows {
+		if row.RunID == runID {
+			out = append(out, row)
 		}
 	}
 	return out

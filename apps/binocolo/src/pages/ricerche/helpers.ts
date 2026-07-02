@@ -7,6 +7,7 @@ import type {
   MAStrategySpec,
   MAStrategyType,
   MATarget,
+  MATargetRow,
 } from '../../api/types';
 
 export const numberFormat = new Intl.NumberFormat('it-IT');
@@ -206,15 +207,20 @@ export function gatedBucketCounts(progress: MAGatedProgressResponse | null): { k
   return { keep, forse, review, reject, total: keep + forse + review + reject };
 }
 
-export function targetKey(target: MATarget): string {
-  return target.companyKey || target.vatCode || target.taxCode || target.id;
+export type MATargetListItem = MATarget | MATargetRow;
+
+export function targetKey(target: MATargetListItem): string {
+  const taxCode = 'taxCode' in target ? target.taxCode : undefined;
+  return target.companyKey || target.vatCode || taxCode || target.id;
 }
 
-export function isGateReject(target: MATarget): boolean {
+export function isGateReject(target: MATargetListItem): boolean {
   const validation = target.webValidation;
+  const finalDecisionAction =
+    validation?.finalDecision && 'finalAction' in validation.finalDecision ? validation.finalDecision.finalAction : undefined;
   return (
     validation?.finalAction === 'reject' ||
-    validation?.finalDecision?.finalAction === 'reject' ||
+    finalDecisionAction === 'reject' ||
     validation?.webValidationState === 'rejected'
   );
 }
@@ -243,20 +249,24 @@ export function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-export function targetsToCSV(targets: MATarget[]): string {
+export function targetsToCSV(targets: MATargetListItem[]): string {
   const rows = [
     ['Azienda', 'Partita IVA', 'Codice fiscale', 'Provincia', 'Comune', 'Punteggio', 'Esito', 'Dominio', 'Motivo'],
-    ...targets.map((target) => [
-      target.companyName,
-      target.vatCode ?? '',
-      target.taxCode ?? '',
-      target.province ?? '',
-      target.town ?? '',
-      String(target.score ?? ''),
-      bucketLabel(target.bucket),
-      target.webValidation?.selectedDomain ?? '',
-      target.webValidation?.finalDecision?.reason ?? target.rationale ?? '',
-    ]),
+    ...targets.map((target) => {
+      const taxCode = 'taxCode' in target ? target.taxCode : undefined;
+      const rationale = 'rationale' in target ? target.rationale : undefined;
+      return [
+        target.companyName,
+        target.vatCode ?? '',
+        taxCode ?? '',
+        target.province ?? '',
+        target.town ?? '',
+        String(target.score ?? ''),
+        bucketLabel(target.bucket),
+        target.webValidation?.selectedDomain ?? '',
+        target.webValidation?.finalDecision?.reason ?? rationale ?? '',
+      ];
+    }),
   ];
   return rows.map((row) => row.map(csvCell).join(',')).join('\n');
 }

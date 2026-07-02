@@ -1,11 +1,13 @@
 import { Button, Icon, Modal, Skeleton, useToast } from '@mrsmith/ui';
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApiClient } from '../../api/client';
 import type {
   MAGatedProgressResponse,
   MASessionDetail,
   MATarget,
+  MATargetListResponse,
+  MATargetRow,
   MAVerificationQueueItem,
   MAVerificationQueueResponse,
   MAThesis,
@@ -42,41 +44,67 @@ export function RicercaDetailPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [detail, setDetail] = useState<MASessionDetail | null>(null);
+  const [rows, setRows] = useState<MATargetRow[]>([]);
   const [progress, setProgress] = useState<MAGatedProgressResponse | null>(null);
   const [queue, setQueue] = useState<MAVerificationQueueItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [rowsLoading, setRowsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>('results');
-  const [selectedTarget, setSelectedTarget] = useState<MATarget | null>(null);
+  const [selectedRow, setSelectedRow] = useState<MATargetRow | null>(null);
+  const [targetCache, setTargetCache] = useState<Record<string, MATarget>>({});
+  const [targetLoading, setTargetLoading] = useState(false);
+  const [targetError, setTargetError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [thesis, setThesis] = useState<MAThesis>('generico');
   const [associateFor, setAssociateFor] = useState<string | null>(null);
   const [associateDomain, setAssociateDomain] = useState('');
   const [noWebsiteItem, setNoWebsiteItem] = useState<MAVerificationQueueItem | null>(null);
   const [reprocessingKeys, setReprocessingKeys] = useState<Set<string>>(() => new Set());
+  const rowsTerminalKey = useRef('');
 
-  const loadAll = useCallback(async () => {
+  const loadStatus = useCallback(async () => {
     if (!id) return;
-    setError(null);
-    try {
-      const [detailData, progressData, queueData] = await Promise.all([
-        api.get<MASessionDetail>(`/binocolo/v1/ma/sessions/${id}`),
-        api.get<MAGatedProgressResponse>(`/binocolo/v1/ma/sessions/${id}/gated-progress`),
-        api.get<MAVerificationQueueResponse>(`/binocolo/v1/ma/sessions/${id}/verification-queue`),
-      ]);
-      setDetail(detailData);
-      setProgress(progressData);
-      setQueue(queueData.items);
-      setThesis(detailData.strategy?.strategy.thesis ?? 'generico');
-      if (detailData.session.status !== 'running') {
-        setReprocessingKeys(new Set());
-      }
-    } catch (err) {
-      setError(errorLabel(err));
-    } finally {
-      setLoading(false);
+    const [detailData, progressData, queueData] = await Promise.all([
+      api.get<MASessionDetail>(`/binocolo/v1/ma/sessions/${id}?targets=none`),
+      api.get<MAGatedProgressResponse>(`/binocolo/v1/ma/sessions/${id}/gated-progress`),
+      api.get<MAVerificationQueueResponse>(`/binocolo/v1/ma/sessions/${id}/verification-queue`),
+    ]);
+    setDetail(detailData);
+    setProgress(progressData);
+    setQueue(queueData.items);
+    setThesis(detailData.strategy?.strategy.thesis ?? 'generico');
+    if (detailData.session.status !== 'running') {
+      setReprocessingKeys(new Set());
     }
   }, [api, id]);
+
+  const loadRows = useCallback(async () => {
+    if (!id) return;
+    setRowsLoading(true);
+    try {
+      const data = await api.get<MATargetListResponse>(`/binocolo/v1/ma/sessions/${id}/targets`);
+      setRows(data.items);
+      setTargetCache({});
+    } finally {
+      setRowsLoading(false);
+    }
+  }, [api, id]);
+
+  const loadAll = useCallback(
+    async (includeRows = true) => {
+      if (!id) return;
+      setError(null);
+      try {
+        await Promise.all([loadStatus(), includeRows ? loadRows() : Promise.resolve()]);
+      } catch (err) {
+        setError(errorLabel(err));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [id, loadRows, loadStatus],
+  );
 
   useEffect(() => {
     void loadAll();
@@ -91,16 +119,52 @@ export function RicercaDetailPage() {
       progress.stage === 'enrich';
     if (!shouldPoll) return;
     const handle = setInterval(() => {
-      void loadAll();
+      void loadAll(false);
     }, 4000);
     return () => clearInterval(handle);
   }, [detail, loadAll, progress]);
 
-  const targets = detail?.targets ?? [];
-  const outsideTargets = useMemo(() => targets.filter(isGateReject), [targets]);
+  useEffect(() => {
+    if (!progress) return;
+    const terminal = progress.stage === 'ready' || progress.stage === 'failed';
+    if (!terminal) {
+      rowsTerminalKey.current = '';
+      return;
+    }
+    const key = `${progress.stage}:${progress.run.completedAt ?? ''}:${progress.run.errorCode ?? ''}`;
+    if (rowsTerminalKey.current === key) return;
+    rowsTerminalKey.current = key;
+    void loadRows().catch((err) => setError(errorLabel(err)));
+  }, [loadRows, progress]);
+
+  const selectedTarget = selectedRow ? targetCache[selectedRow.id] ?? null : null;
+
+  useEffect(() => {
+    if (!id || !selectedRow || targetCache[selectedRow.id]) return;
+    let active = true;
+    setTargetLoading(true);
+    setTargetError(null);
+    api
+      .get<MATarget>(`/binocolo/v1/ma/sessions/${id}/targets/${selectedRow.id}`)
+      .then((target) => {
+        if (!active) return;
+        setTargetCache((current) => ({ ...current, [selectedRow.id]: target }));
+      })
+      .catch((err) => {
+        if (active) setTargetError(errorLabel(err));
+      })
+      .finally(() => {
+        if (active) setTargetLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [api, id, selectedRow, targetCache]);
+
+  const outsideTargets = useMemo(() => rows.filter(isGateReject), [rows]);
   const resultTargets = useMemo(
     () =>
-      targets
+      rows
         .filter((target) => !isGateReject(target))
         .sort((a, b) => {
           const ratingDelta = (b.rating ?? 0) - (a.rating ?? 0);
@@ -108,7 +172,7 @@ export function RicercaDetailPage() {
           if (a.score !== b.score) return b.score - a.score;
           return a.companyName.localeCompare(b.companyName);
         }),
-    [targets],
+    [rows],
   );
   const buckets = gatedBucketCounts(progress);
   const isRunning = detail?.session.status === 'running' || progress?.stage === 'address' || progress?.stage === 'gate' || progress?.stage === 'enrich';
@@ -119,7 +183,7 @@ export function RicercaDetailPage() {
     setBusy('resume');
     setError(null);
     try {
-      await api.post<MASessionDetail>(`/binocolo/v1/ma/sessions/${detail.session.id}/gated-search`, {
+      await api.post<MASessionDetail>(`/binocolo/v1/ma/sessions/${detail.session.id}/gated-search?targets=none`, {
         strategyType: 'expanded',
         limit: normalizeSearchLimit(detail.strategy?.strategy.searchLimit),
       });
@@ -137,8 +201,9 @@ export function RicercaDetailPage() {
     setBusy('rescore');
     setError(null);
     try {
-      const data = await api.post<MASessionDetail>(`/binocolo/v1/ma/sessions/${detail.session.id}/rescore`, { thesis });
+      const data = await api.post<MASessionDetail>(`/binocolo/v1/ma/sessions/${detail.session.id}/rescore?targets=none`, { thesis });
       setDetail(data);
+      await loadAll();
       toast('Shortlist ricalcolata sotto la nuova tesi.', 'success');
     } catch (err) {
       setError(errorLabel(err));
@@ -173,10 +238,11 @@ export function RicercaDetailPage() {
     setBusy('deep');
     setError(null);
     try {
-      const data = await api.post<MASessionDetail>(`/binocolo/v1/ma/sessions/${detail.session.id}/deep-dive`, {
+      const data = await api.post<MASessionDetail>(`/binocolo/v1/ma/sessions/${detail.session.id}/deep-dive?targets=none`, {
         acknowledgeCost: false,
       });
       setDetail(data);
+      await loadAll();
       toast('Approfondimento avviato.', 'success');
     } catch (err) {
       setError(errorLabel(err));
@@ -186,20 +252,19 @@ export function RicercaDetailPage() {
     }
   }
 
-  async function rateTarget(target: MATarget, rating: number) {
+  async function rateTarget(target: MATargetRow, rating: number) {
     if (!detail?.session.id) return;
     const nextRating = target.rating === rating ? 0 : rating;
     const sessionId = detail.session.id;
-    setDetail((current) =>
-      current
-        ? {
-            ...current,
-            targets: current.targets.map((item) =>
-              targetKey(item) === targetKey(target) ? { ...item, rating: nextRating === 0 ? undefined : nextRating } : item,
-            ),
-          }
-        : current,
+    const previousRows = rows;
+    setRows((current) =>
+      current.map((item) => (targetKey(item) === targetKey(target) ? { ...item, rating: nextRating === 0 ? undefined : nextRating } : item)),
     );
+    setTargetCache((current) => {
+      const cached = current[target.id];
+      if (!cached) return current;
+      return { ...current, [target.id]: { ...cached, rating: nextRating === 0 ? undefined : nextRating } };
+    });
     try {
       await api.post<void>(`/binocolo/v1/ma/sessions/${sessionId}/rating`, {
         companyKey: targetKey(target),
@@ -208,6 +273,7 @@ export function RicercaDetailPage() {
       });
     } catch (err) {
       toast(errorLabel(err), 'error');
+      setRows(previousRows);
       await loadAll();
     }
   }
@@ -216,7 +282,7 @@ export function RicercaDetailPage() {
     if (!detail?.session.id || !associateDomain.trim()) return;
     setBusy(`associate:${companyKey}`);
     try {
-      await api.post<void>(`/binocolo/v1/ma/sessions/${detail.session.id}/associate-domain`, {
+      await api.post<void>(`/binocolo/v1/ma/sessions/${detail.session.id}/associate-domain?targets=none`, {
         companyKey,
         domain: associateDomain.trim(),
       });
@@ -236,7 +302,7 @@ export function RicercaDetailPage() {
     if (!detail?.session.id) return;
     setBusy(`group:${item.companyKey}`);
     try {
-      await api.post<void>(`/binocolo/v1/ma/sessions/${detail.session.id}/confirm-group-site`, {
+      await api.post<void>(`/binocolo/v1/ma/sessions/${detail.session.id}/confirm-group-site?targets=none`, {
         companyKey: item.companyKey,
       });
       setReprocessingKeys((current) => new Set(current).add(item.companyKey));
@@ -254,7 +320,7 @@ export function RicercaDetailPage() {
     const item = noWebsiteItem;
     setBusy(`no-website:${item.companyKey}`);
     try {
-      await api.post<void>(`/binocolo/v1/ma/sessions/${detail.session.id}/no-website`, {
+      await api.post<void>(`/binocolo/v1/ma/sessions/${detail.session.id}/no-website?targets=none`, {
         companyKey: item.companyKey,
       });
       setReprocessingKeys((current) => new Set(current).add(item.companyKey));
@@ -352,7 +418,7 @@ export function RicercaDetailPage() {
               </div>
               <div className={styles.panelBody}>
                 <div className={styles.summaryStrip}>
-                  <span>Superficie <b>{numberFormat.format(progress?.surface.fetched || progress?.surface.expected || targets.length)}</b></span>
+                  <span>Superficie <b>{numberFormat.format(progress?.surface.fetched || progress?.surface.expected || rows.length)}</b></span>
                   <span>→</span>
                   <span>oltre il gate <b>{numberFormat.format(progress?.enrich.survivors ?? buckets.keep + buckets.forse + buckets.review)}</b></span>
                   <span>→</span>
@@ -395,7 +461,7 @@ export function RicercaDetailPage() {
                 </button>
               </div>
               {activeTab === 'results' ? (
-                <ResultsTable rows={resultTargets} onOpen={setSelectedTarget} onRate={(target, rating) => void rateTarget(target, rating)} />
+                <ResultsTable rows={resultTargets} loading={rowsLoading} onOpen={setSelectedRow} onRate={(target, rating) => void rateTarget(target, rating)} />
               ) : null}
               {activeTab === 'queue' ? (
                 <QueueTab
@@ -434,7 +500,16 @@ export function RicercaDetailPage() {
         </>
       ) : null}
 
-      <TargetDetailModal target={selectedTarget} onClose={() => setSelectedTarget(null)} />
+      <TargetDetailModal
+        row={selectedRow}
+        target={selectedTarget}
+        loading={targetLoading}
+        error={targetError}
+        onClose={() => {
+          setSelectedRow(null);
+          setTargetError(null);
+        }}
+      />
 
       <Modal
         open={noWebsiteItem !== null}
@@ -567,7 +642,20 @@ function BucketLegend({ className, label, count }: { className: string; label: s
   );
 }
 
-function ResultsTable({ rows, onOpen, onRate }: { rows: MATarget[]; onOpen: (target: MATarget) => void; onRate: (target: MATarget, rating: number) => void }) {
+function ResultsTable({
+  rows,
+  loading,
+  onOpen,
+  onRate,
+}: {
+  rows: MATargetRow[];
+  loading: boolean;
+  onOpen: (target: MATargetRow) => void;
+  onRate: (target: MATargetRow, rating: number) => void;
+}) {
+  if (loading && rows.length === 0) {
+    return <div className={styles.panelBody}><Skeleton rows={8} /></div>;
+  }
   if (rows.length === 0) {
     return <div className={styles.emptyState}><span className={styles.emptyIcon}><Icon name="file-text" size={28} /></span><strong>Nessun risultato</strong></div>;
   }
@@ -709,9 +797,9 @@ function OutsideTab({
   onAssociateFor,
   onAssociateDomain,
   onAssociate,
-}: {
-  rows: MATarget[];
-  busy: string | null;
+	}: {
+	  rows: MATargetRow[];
+	  busy: string | null;
   associateFor: string | null;
   associateDomain: string;
   onAssociateFor: (companyKey: string) => void;
@@ -788,10 +876,33 @@ function AssociateForm({
   );
 }
 
-function TargetDetailModal({ target, onClose }: { target: MATarget | null; onClose: () => void }) {
+function TargetDetailModal({
+  row,
+  target,
+  loading,
+  error,
+  onClose,
+}: {
+  row: MATargetRow | null;
+  target: MATarget | null;
+  loading: boolean;
+  error: string | null;
+  onClose: () => void;
+}) {
   return (
-    <Modal open={target !== null} onClose={onClose} title={target?.companyName ?? 'Dettaglio'} size="wide">
-      {target ? (
+    <Modal open={row !== null} onClose={onClose} title={target?.companyName ?? row?.companyName ?? 'Dettaglio'} size="wide">
+      {loading ? (
+        <div className={styles.detailModalBody}>
+          <Skeleton rows={8} />
+        </div>
+      ) : error ? (
+        <div className={styles.detailModalBody}>
+          <div className={styles.danger} role="alert">
+            <Icon name="triangle-alert" size={18} />
+            <span>{error}</span>
+          </div>
+        </div>
+      ) : target ? (
         <div className={styles.detailModalBody}>
           <dl className={styles.facts}>
             <Fact label="Partita IVA" value={target.vatCode || '-'} />

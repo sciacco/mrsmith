@@ -234,6 +234,79 @@ func (s *maService) getSession(ctx context.Context, id string) (MASessionDetail,
 	return decorateMACost(detail, s.loadPricing(ctx)), nil
 }
 
+func (s *maService) getSessionLean(ctx context.Context, id string) (MASessionDetail, error) {
+	if s.store == nil {
+		return MASessionDetail{}, errMAStoreUnavailable
+	}
+	detail, err := s.store.GetMASessionLean(ctx, id)
+	if err != nil {
+		return MASessionDetail{}, err
+	}
+	if detail.Session.DeletedAt != nil {
+		return MASessionDetail{}, errMASessionDeleted
+	}
+	if detail.Strategy != nil {
+		plan := buildMAScoringPlan(detail.Strategy.Strategy)
+		detail.ScoringPlan = &plan
+	}
+	return decorateMACost(detail, s.loadPricing(ctx)), nil
+}
+
+func (s *maService) getSessionShape(ctx context.Context, id string, lean bool) (MASessionDetail, error) {
+	if lean {
+		return s.getSessionLean(ctx, id)
+	}
+	return s.getSession(ctx, id)
+}
+
+func (s *maService) sessionTargetRows(ctx context.Context, sessionID string) ([]MATargetRow, error) {
+	if s.store == nil {
+		return nil, errMAStoreUnavailable
+	}
+	detail, err := s.store.GetMASessionLean(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	if detail.Session.DeletedAt != nil {
+		return nil, errMASessionDeleted
+	}
+	thesis := ""
+	if detail.Strategy != nil {
+		thesis = detail.Strategy.Strategy.Thesis
+	}
+	rows, err := s.store.ListMATargetRows(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	for index := range rows {
+		rows[index].Bucket = maRouteTarget(rowAsTarget(rows[index]), thesis)
+	}
+	return rows, nil
+}
+
+func (s *maService) sessionTargetDetail(ctx context.Context, sessionID, targetID string) (MATarget, error) {
+	if s.store == nil {
+		return MATarget{}, errMAStoreUnavailable
+	}
+	detail, err := s.store.GetMASessionLean(ctx, sessionID)
+	if err != nil {
+		return MATarget{}, err
+	}
+	if detail.Session.DeletedAt != nil {
+		return MATarget{}, errMASessionDeleted
+	}
+	thesis := ""
+	if detail.Strategy != nil {
+		thesis = detail.Strategy.Strategy.Thesis
+	}
+	target, err := s.store.GetMATargetByID(ctx, sessionID, targetID)
+	if err != nil {
+		return MATarget{}, err
+	}
+	target.Bucket = maRouteTarget(target, thesis)
+	return target, nil
+}
+
 func (s *maService) archiveSession(ctx context.Context, id, subject, email string) error {
 	return s.updateSessionLifecycle(ctx, id, maSessionLifecycleArchive, subject, email)
 }
@@ -707,14 +780,20 @@ type maEstimateJobPayload struct {
 // expensive surface probing runs in the estimate worker (runEstimateJob), so the
 // HTTP request returns immediately — it cannot time out while the backend works,
 // and a client disconnect can no longer cancel the work mid-flight.
-func (s *maService) enqueueEstimate(ctx context.Context, sessionID string, req MAEstimateSessionRequest, subject, email string) (MASessionDetail, error) {
+func (s *maService) enqueueEstimate(ctx context.Context, sessionID string, req MAEstimateSessionRequest, subject, email string, lean bool) (MASessionDetail, error) {
 	if s.store == nil {
 		return MASessionDetail{}, errMAStoreUnavailable
 	}
 	if s.openapiit == nil {
 		return MASessionDetail{}, errMAOpenAPIITUnavailable
 	}
-	detail, err := s.store.GetMASession(ctx, sessionID)
+	var detail MASessionDetail
+	var err error
+	if lean {
+		detail, err = s.store.GetMASessionLean(ctx, sessionID)
+	} else {
+		detail, err = s.store.GetMASession(ctx, sessionID)
+	}
 	if err != nil {
 		return MASessionDetail{}, err
 	}
@@ -764,7 +843,7 @@ func (s *maService) enqueueEstimate(ctx context.Context, sessionID string, req M
 	if err := s.store.SetMASessionEstimateStatus(ctx, sessionID, strategyVersion.ID, maSessionStatusEstimating); err != nil {
 		return MASessionDetail{}, err
 	}
-	return s.getSession(ctx, sessionID)
+	return s.getSessionShape(ctx, sessionID, lean)
 }
 
 // runEstimateJob executes a queued estimate job off the request path. It owns the
@@ -885,14 +964,20 @@ type maExecuteJobPayload struct {
 // background job. The heavy network work — subtree expansion and the paid company
 // fetch — runs in the worker (runExecuteJob), so the request cannot time out and a
 // client disconnect cannot cancel the run.
-func (s *maService) enqueueExecute(ctx context.Context, sessionID string, req MAExecuteSessionRequest, subject, email string) (MASessionDetail, error) {
+func (s *maService) enqueueExecute(ctx context.Context, sessionID string, req MAExecuteSessionRequest, subject, email string, lean bool) (MASessionDetail, error) {
 	if s.store == nil {
 		return MASessionDetail{}, errMAStoreUnavailable
 	}
 	if s.openapiit == nil {
 		return MASessionDetail{}, errMAOpenAPIITUnavailable
 	}
-	detail, err := s.store.GetMASession(ctx, sessionID)
+	var detail MASessionDetail
+	var err error
+	if lean {
+		detail, err = s.store.GetMASessionLean(ctx, sessionID)
+	} else {
+		detail, err = s.store.GetMASession(ctx, sessionID)
+	}
 	if err != nil {
 		return MASessionDetail{}, err
 	}
@@ -913,7 +998,11 @@ func (s *maService) enqueueExecute(ctx context.Context, sessionID string, req MA
 		if err != nil {
 			return MASessionDetail{}, err
 		}
-		detail, err = s.store.GetMASession(ctx, sessionID)
+		if lean {
+			detail, err = s.store.GetMASessionLean(ctx, sessionID)
+		} else {
+			detail, err = s.store.GetMASession(ctx, sessionID)
+		}
 		if err != nil {
 			return MASessionDetail{}, err
 		}
@@ -980,7 +1069,7 @@ func (s *maService) enqueueExecute(ctx context.Context, sessionID string, req MA
 			return MASessionDetail{}, err
 		}
 	}
-	return s.getSession(ctx, sessionID)
+	return s.getSessionShape(ctx, sessionID, lean)
 }
 
 // runExecuteJob executes a queued execute job off the request path. It owns the
@@ -1266,7 +1355,7 @@ func (s *maService) addTargetOutcome(ctx context.Context, sessionID string, inpu
 // passa dalla coda condivisa), registrando la tesi come nuova versione di
 // strategia per l'audit trail. Le righe identity-only restano intatte; rating,
 // web-validation e deep sopravvivono perché agganciati a company_key.
-func (s *maService) rescoreSession(ctx context.Context, sessionID, thesisRaw, subject, email string) (MASessionDetail, error) {
+func (s *maService) rescoreSession(ctx context.Context, sessionID, thesisRaw, subject, email string, lean bool) (MASessionDetail, error) {
 	if s.store == nil {
 		return MASessionDetail{}, errMAStoreUnavailable
 	}
@@ -1326,7 +1415,7 @@ func (s *maService) rescoreSession(ctx context.Context, sessionID, thesisRaw, su
 		Status:    maTraceEventSucceeded,
 		Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "thesis": thesis, "strategy_version_id": version.ID, "rescored": len(scored), "requested_by": subject}),
 	})
-	return s.getSession(ctx, sessionID)
+	return s.getSessionShape(ctx, sessionID, lean)
 }
 
 func (s *maService) upsertTargetWebValidation(ctx context.Context, sessionID string, body MAWebValidationUpsertRequest, subject, email string) (MAWebValidation, error) {
@@ -1814,7 +1903,7 @@ func mapMACompanyDossier(vat string, rec *maDeepVATRecord) MACompanyDossier {
 	return dossier
 }
 
-func (s *maService) deepDive(ctx context.Context, sessionID string, ack bool, email string) (MASessionDetail, error) {
+func (s *maService) deepDive(ctx context.Context, sessionID string, ack bool, email string, lean bool) (MASessionDetail, error) {
 	if s.store == nil {
 		return MASessionDetail{}, errMAStoreUnavailable
 	}
@@ -1882,7 +1971,7 @@ func (s *maService) deepDive(ctx context.Context, sessionID string, ack bool, em
 		Status:    maTraceEventSucceeded,
 		Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "candidates": len(candidates), "enqueued": enqueued, "projected_cost": projected}),
 	})
-	return s.getSession(ctx, sessionID)
+	return s.getSessionShape(ctx, sessionID, lean)
 }
 
 func (s *maService) extractIntent(ctx context.Context, prompt, subject, email string) (MAIntent, llm.CallAudit, error) {
