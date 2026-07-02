@@ -31,6 +31,7 @@ func TestComputeViability(t *testing.T) {
 		ctx          maSignalContext
 		wantFactor   float64
 		wantKnockout bool
+		wantReason   string
 	}{
 		{
 			// attiva, bilancio 2024 (gap 2 fisiologico), PN positivo e stabile
@@ -60,27 +61,41 @@ func TestComputeViability(t *testing.T) {
 			wantKnockout: false,
 		},
 		{
-			// MARCUZZO: bilancio 2018 (gap 8) + PN eroso -> knockout
+			// MARCUZZO: bilancio 2018 (gap 8) + PN eroso -> knockout per distress
 			name:         "marcuzzo: bilancio datato + PN eroso",
 			ctx:          ctx("ATTIVA", false, 2018, ip(0), ip(10_000), ip(100_000)),
 			wantFactor:   0.15, // 1.0 * 0.25 * 0.6
 			wantKnockout: true,
+			wantReason:   maViabilityReasonDistress,
 		},
 		{
 			name:         "cessata fiscalmente: knockout immediato",
 			ctx:          ctx("ATTIVA", true, 2024, ip(900_000), ip(200_000), nil),
 			wantFactor:   0.0,
 			wantKnockout: true,
+			wantReason:   maViabilityReasonCeased,
 		},
 		{
 			name:         "non attiva: sotto soglia -> knockout",
 			ctx:          ctx("INATTIVA", false, 2024, ip(900_000), ip(200_000), nil),
 			wantFactor:   0.2,
 			wantKnockout: true,
+			wantReason:   maViabilityReasonInactive,
 		},
 		{
-			name:         "bilancio assente (turnover nil)",
+			// ASSENTE ≠ DISTRESSED: il non-deposito è fisiologico (micro-imprese,
+			// archetipo successione) — nessuna penalità; il caveat lo porta la
+			// coverage (confidence + routing da_verificare), non la viability.
+			name:         "bilancio assente (turnover nil): neutro",
 			ctx:          ctx("ATTIVA", false, 0, nil, nil, nil),
+			wantFactor:   1.0,
+			wantKnockout: false,
+		},
+		{
+			// PN negativo resta distress anche senza fatturato depositato:
+			// l'assenza è neutra, l'evidenza negativa no.
+			name:         "PN negativo senza fatturato",
+			ctx:          ctx("ATTIVA", false, 0, nil, ip(-10_000), nil),
 			wantFactor:   0.3,
 			wantKnockout: false,
 		},
@@ -88,12 +103,15 @@ func TestComputeViability(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			factor, knockout := computeViability(tc.ctx)
+			factor, knockout, reason := computeViability(tc.ctx)
 			if math.Abs(factor-tc.wantFactor) > 1e-9 {
 				t.Errorf("factor = %.4f, want %.4f", factor, tc.wantFactor)
 			}
 			if knockout != tc.wantKnockout {
 				t.Errorf("knockout = %v, want %v", knockout, tc.wantKnockout)
+			}
+			if reason != tc.wantReason {
+				t.Errorf("reason = %q, want %q", reason, tc.wantReason)
 			}
 		})
 	}

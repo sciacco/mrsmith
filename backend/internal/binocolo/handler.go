@@ -122,6 +122,8 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("DELETE /binocolo/v1/ma/sessions/{id}", h.handleDeleteMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/purge", h.handlePurgeMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/rating", h.handleRateMATarget)
+	handle("POST /binocolo/v1/ma/sessions/{id}/outcome", h.handleAddMATargetOutcome)
+	handle("POST /binocolo/v1/ma/sessions/{id}/rescore", h.handleRescoreMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/associate-domain", h.handleAssociateMATargetDomain)
 	handle("GET /binocolo/v1/ma/sessions/{id}/sector-eval", h.handleGetSectorEval)
 	handle("PUT /binocolo/v1/ma/sessions/{id}/sector-eval/label", h.handleSetSectorEvalLabel)
@@ -334,11 +336,51 @@ func (h *Handler) handleRateMATarget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	subject, email := companySearchRefreshActor(r.Context())
-	if err := h.ma.setTargetRating(r.Context(), id, body.CompanyKey, body.Rating, subject, email); err != nil {
+	if err := h.ma.setTargetRating(r.Context(), id, body, subject, email); err != nil {
 		h.maFailure(w, r, "ma_target_rate", err, "session_id", id)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) handleAddMATargetOutcome(w http.ResponseWriter, r *http.Request) {
+	id, ok := maSessionID(w, r)
+	if !ok {
+		return
+	}
+	var body MATargetOutcomeRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	if err := h.ma.addTargetOutcome(r.Context(), id, body, subject, email); err != nil {
+		h.maFailure(w, r, "ma_target_outcome", err, "session_id", id)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleRescoreMASession is the analyst's thesis override: re-scores the
+// session's advanced targets from the persisted payloads under the requested
+// thesis (free — no vendor calls, synchronous) and returns the updated detail.
+func (h *Handler) handleRescoreMASession(w http.ResponseWriter, r *http.Request) {
+	id, ok := maSessionID(w, r)
+	if !ok {
+		return
+	}
+	var body MARescoreRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	detail, err := h.ma.rescoreSession(r.Context(), id, body.Thesis, subject, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_session_rescore", err, "session_id", id)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, detail)
 }
 
 // handleAssociateMATargetDomain is the manual-review remedy: the operator supplies an

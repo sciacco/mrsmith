@@ -18,10 +18,13 @@ import type {
   MADeepAnalysis,
   MADeepMetric,
   MADeepValuation,
+  MAScoringPlan,
   MATarget,
   MATargetAdjustment,
+  MATargetBucket,
   MATargetEvidence,
   MATargetFlag,
+  MATargetOutcome,
   MAThesis,
   MAWebValidation,
   MAWebValidationEnrichRequest,
@@ -128,6 +131,9 @@ export function TargetPage() {
   const [purgeCandidate, setPurgeCandidate] = useState<MASessionSummary | null>(null);
   const [lastSessionId, setLastSessionId] = useState<string | null>(null);
   const [webEnrichPolling, setWebEnrichPolling] = useState(false);
+  const [excludeCandidate, setExcludeCandidate] = useState<MATarget | null>(null);
+  const [excludeReason, setExcludeReason] = useState('');
+  const [rescoreBusy, setRescoreBusy] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem('mrsmith_binocolo_sidebar_collapsed');
@@ -246,15 +252,36 @@ export function TargetPage() {
     }
   }, [detail, lastSessionId, sortedTargets]);
 
-  // Sector gate, viability knockout and hard post-filters land off-perimeter targets in
-  // fuori_criterio; they are hidden by default, revealable via a toggle so the
-  // filtering is never silent. Selection and the shortlist track the visible set.
+  // Routing scarti (bucket derivato dal backend a lettura): principale è la
+  // lista di lavoro; da_verificare è la coda alto-potenziale/dati-sottili;
+  // azionabile ha un'azione di recupero a un click; soppresso è solo un
+  // conteggio (cessate o regole dure dell'analista), rivelabile col toggle così
+  // il filtro non è mai silenzioso. Fallback per righe legacy senza bucket:
+  // fuori_criterio → soppresso, il resto → principale.
+  const buckets = useMemo(() => {
+    const groups: Record<MATargetBucket, MATarget[]> = {
+      principale: [],
+      da_verificare: [],
+      azionabile: [],
+      soppresso: [],
+    };
+    for (const target of sortedTargets) {
+      const bucket: MATargetBucket =
+        target.bucket && target.bucket in groups
+          ? target.bucket
+          : target.matchState === 'fuori_criterio'
+            ? 'soppresso'
+            : 'principale';
+      groups[bucket].push(target);
+    }
+    return groups;
+  }, [sortedTargets]);
   const visibleTargets = useMemo(
-    () => sortedTargets.filter((target) => target.matchState !== 'fuori_criterio'),
-    [sortedTargets],
+    () => [...buckets.principale, ...buckets.da_verificare, ...buckets.azionabile],
+    [buckets],
   );
-  const hiddenCount = (detail?.targets.length ?? 0) - visibleTargets.length;
-  const shortlistRows = showOutside ? sortedTargets : visibleTargets;
+  const hiddenCount = buckets.soppresso.length;
+  const shortlistRows = showOutside ? sortedTargets : buckets.principale;
 
   const selectedTarget = useMemo(() => {
     if (!detail?.targets.length) return null;
@@ -473,26 +500,79 @@ export function TargetPage() {
 
   async function rateTarget(companyKey: string, rating: number) {
     if (!detail || !companyKey) return;
+    if (rating === -1) {
+      // L'esclusione chiede il motivo (ground truth per la calibrazione futura):
+      // la chiamata parte dal modal di conferma.
+      setExcludeReason('');
+      setExcludeCandidate(detail.targets.find((target) => target.companyKey === companyKey) ?? null);
+      return;
+    }
+    await submitRating(companyKey, rating, '');
+  }
+
+  async function submitRating(companyKey: string, rating: number, reason: string) {
+    if (!detail || !companyKey) return;
     const sessionId = detail.session.id;
-    const previousRating = detail.targets.find((target) => target.companyKey === companyKey)?.rating;
+    const target = detail.targets.find((item) => item.companyKey === companyKey);
+    const previousRating = target?.rating;
     // Functional updater so concurrent ratings on different rows don't clobber.
     const apply = (value: number | undefined) =>
       setDetail((current) =>
         current
           ? {
               ...current,
-              targets: current.targets.map((target) =>
-                target.companyKey === companyKey ? { ...target, rating: value } : target,
+              targets: current.targets.map((item) =>
+                item.companyKey === companyKey ? { ...item, rating: value } : item,
               ),
             }
           : current,
       );
     apply(rating === 0 ? undefined : rating);
     try {
-      await api.post<void>(`/binocolo/v1/ma/sessions/${sessionId}/rating`, { companyKey, rating });
+      await api.post<void>(`/binocolo/v1/ma/sessions/${sessionId}/rating`, {
+        companyKey,
+        rating,
+        ...(reason ? { reason } : {}),
+        // Snapshot di ciò che la UI mostra al momento del giudizio: quando lo
+        // scoring cambierà, il voto resterà interpretabile.
+        ...(rating !== 0 && target
+          ? { scoreAtRating: target.score, confidenceAtRating: target.confidence }
+          : {}),
+      });
     } catch (err) {
       apply(previousRating);
       toast(errorLabel(err), 'error');
+    }
+  }
+
+  async function addOutcome(companyKey: string, event: MATargetOutcome['event'], note: string) {
+    if (!detail?.session.id || !companyKey) return;
+    try {
+      await api.post<void>(`/binocolo/v1/ma/sessions/${detail.session.id}/outcome`, {
+        companyKey,
+        event,
+        ...(note ? { note } : {}),
+      });
+      const data = await api.get<MASessionDetail>(`/binocolo/v1/ma/sessions/${detail.session.id}`);
+      setDetail(data);
+      toast('Esito registrato.', 'success');
+    } catch (err) {
+      toast(errorLabel(err), 'error');
+    }
+  }
+
+  async function rescoreWithThesis(thesis: MAThesis) {
+    if (!detail?.session.id) return;
+    setRescoreBusy(true);
+    setError(null);
+    try {
+      const data = await api.post<MASessionDetail>(`/binocolo/v1/ma/sessions/${detail.session.id}/rescore`, { thesis });
+      setDetail(data);
+      toast('Shortlist ricalcolata sotto la nuova tesi.', 'success');
+    } catch (err) {
+      toast(errorLabel(err), 'error');
+    } finally {
+      setRescoreBusy(false);
     }
   }
 
@@ -857,25 +937,62 @@ export function TargetPage() {
                       </Button>
                     </div>
                   </div>
-                  {hasTargets && detail.strategy?.strategy ? <AppliedPerimeter strategy={detail.strategy.strategy} /> : null}
-                  {hasTargets && hiddenCount > 0 ? (
-                    <button type="button" className={styles.outsideToggle} onClick={() => setShowOutside((prev) => !prev)}>
-                      <Icon name={showOutside ? 'x-circle' : 'eye'} size={13} />
-                      {showOutside ? `Nascondi ${hiddenCount} fuori perimetro` : `Mostra ${hiddenCount} fuori perimetro`}
-                    </button>
+                  {hasTargets ? (
+                    <ScoringRegister
+                      plan={detail.scoringPlan}
+                      strategy={detail.strategy?.strategy}
+                      canOverrideThesis={canOperateOnSession && !executing}
+                      thesisBusy={rescoreBusy}
+                      onThesisChange={(thesis) => void rescoreWithThesis(thesis)}
+                    />
                   ) : null}
-                  {busy === 'execute' || executing ? (
+                  {busy === 'execute' || executing || rescoreBusy ? (
                     <div className={styles.skeletonBlock}>
                       <Skeleton rows={8} />
                     </div>
-                  ) : shortlistRows.length > 0 ? (
-                    <TargetShortlist rows={shortlistRows} selectedId={selectedTarget?.id} onSelect={setSelectedTargetId} onRate={rateTarget} />
                   ) : hasTargets ? (
-                    <EmptyState
-                      icon="eye"
-                      title="Tutti fuori perimetro"
-                      text={`${hiddenCount} target risultano fuori dal perimetro settoriale. Usa "Mostra fuori perimetro" per ispezionarli.`}
-                    />
+                    <>
+                      {!showOutside ? (
+                        <TierBlock
+                          tone="verify"
+                          title="Da verificare"
+                          hint="Punteggio costruito su dati sottili: una visura o il sito bastano a promuoverli o scartarli."
+                          rows={buckets.da_verificare}
+                          defaultOpen
+                          selectedId={selectedTarget?.id}
+                          onSelect={setSelectedTargetId}
+                          onRate={rateTarget}
+                        />
+                      ) : null}
+                      {shortlistRows.length > 0 ? (
+                        <TargetShortlist rows={shortlistRows} selectedId={selectedTarget?.id} onSelect={setSelectedTargetId} onRate={rateTarget} />
+                      ) : buckets.da_verificare.length === 0 && buckets.azionabile.length === 0 ? (
+                        <EmptyState
+                          icon="eye"
+                          title="Nessun target in lista"
+                          text={`${hiddenCount} soppresse senza azione possibile (cessate o fuori dalle tue regole). Usa il toggle sotto per ispezionarle.`}
+                        />
+                      ) : null}
+                      {!showOutside ? (
+                        <TierBlock
+                          tone="action"
+                          title="Azionabili"
+                          hint="Un'azione li rimette in gioco: ATECO da rivedere, dominio da associare, distress da valutare."
+                          rows={buckets.azionabile}
+                          selectedId={selectedTarget?.id}
+                          onSelect={setSelectedTargetId}
+                          onRate={rateTarget}
+                        />
+                      ) : null}
+                      {hiddenCount > 0 ? (
+                        <button type="button" className={styles.outsideToggle} onClick={() => setShowOutside((prev) => !prev)}>
+                          <Icon name={showOutside ? 'x-circle' : 'eye'} size={13} />
+                          {showOutside
+                            ? 'Torna alla vista per destinazione'
+                            : `${hiddenCount} escluse senza azione (cessate o regole tue) — ispeziona tutto`}
+                        </button>
+                      ) : null}
+                    </>
                   ) : (
                     <EmptyState icon="clipboard-check" title="In attesa di conferma" text="Completa la stima e avvia la ricerca dei target." />
                   )}
@@ -902,7 +1019,12 @@ export function TargetPage() {
                     )}
                   </div>
                   {selectedTarget ? (
-                    <TargetDetail target={selectedTarget} />
+                    <TargetDetail
+                      key={selectedTarget.id}
+                      target={selectedTarget}
+                      ignoredCriteria={detail.scoringPlan?.ignored}
+                      onOutcome={(companyKey, event, note) => void addOutcome(companyKey, event, note)}
+                    />
                   ) : (
                     <EmptyState icon="eye" title="Nessun target selezionato" text="Apri una riga della shortlist per visualizzare i dettagli." />
                   )}
@@ -1088,6 +1210,56 @@ export function TargetPage() {
               </div>
             </>
           )}
+        </div>
+      </Modal>
+
+      <Modal
+        open={excludeCandidate !== null}
+        onClose={() => setExcludeCandidate(null)}
+        title="Escludi target"
+        size="sm"
+      >
+        <div className={styles.confirmBody}>
+          <p>
+            &ldquo;{excludeCandidate?.companyName ?? ''}&rdquo; esce dalla shortlist. Il motivo alimenta la
+            calibrazione futura del punteggio.
+          </p>
+          <div className={styles.excludeReasons}>
+            {['Fuori settore', 'Troppo piccola', 'Distress', 'Non in vendita'].map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                className={`${styles.flagFilterChip} ${excludeReason === preset ? styles.flagFilterActive : ''}`}
+                onClick={() => setExcludeReason(preset)}
+              >
+                {preset}
+              </button>
+            ))}
+          </div>
+          <input
+            type="text"
+            className={styles.excludeReasonInput}
+            placeholder="Motivo libero (opzionale)"
+            value={excludeReason}
+            onChange={(event) => setExcludeReason(event.target.value)}
+            maxLength={300}
+          />
+          <div className={styles.confirmActions}>
+            <Button variant="secondary" onClick={() => setExcludeCandidate(null)}>
+              Annulla
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                const companyKey = excludeCandidate?.companyKey ?? '';
+                setExcludeCandidate(null);
+                void submitRating(companyKey, -1, excludeReason.trim());
+              }}
+              leftIcon={<Icon name="x-circle" size={16} />}
+            >
+              Escludi
+            </Button>
+          </div>
         </div>
       </Modal>
 
@@ -2004,6 +2176,139 @@ function AppliedPerimeter({ strategy }: { strategy: MAStrategySpec }) {
   );
 }
 
+// I MissingCriteria arrivano dal backend con prefissi tecnici ("Vincolo deep
+// non applicato: …") ridondanti sotto l'etichetta "NON considera": via.
+function cleanIgnoredLabel(value: string): string {
+  return value.replace(/^vincolo\s+\S+\s+non applicato:\s*/i, '').trim() || value;
+}
+
+// ScoringRegister è il registro "valutato / filtrato / ignorato": dichiara il
+// confine di ciò che il punteggio significa, con la tesi come override di prima
+// classe (muove ~metà del budget pesi; il ricalcolo è gratuito, sui payload già
+// pagati). I vincoli non considerati restano sempre visibili, mai solo
+// nell'oggetto strategia.
+function ScoringRegister({
+  plan,
+  strategy,
+  canOverrideThesis,
+  thesisBusy,
+  onThesisChange,
+}: {
+  plan?: MAScoringPlan;
+  strategy?: MAStrategySpec;
+  canOverrideThesis: boolean;
+  thesisBusy: boolean;
+  onThesisChange: (thesis: MAThesis) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  if (!plan && !strategy) return null;
+  const ignored = plan?.ignored ?? strategy?.missingCriteria ?? [];
+  const thesis = (plan?.thesis ?? strategy?.thesis ?? 'generico') as MAThesis;
+  return (
+    <div className={styles.registerBox}>
+      <div className={styles.registerHead}>
+        <label className={styles.thesisSelectWrap} title={thesisDescriptions[thesis]}>
+          <span>Tesi</span>
+          <select
+            value={thesis}
+            disabled={!canOverrideThesis || thesisBusy}
+            onChange={(event) => onThesisChange(event.target.value as MAThesis)}
+          >
+            {thesisOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="button" className={styles.registerToggle} onClick={() => setOpen((value) => !value)}>
+          Valutati {plan?.evaluated.length ?? 0} segnali · Filtri {plan?.filtered.length ?? 0} · Non considerati{' '}
+          {ignored.length}
+          <span aria-hidden="true">{open ? ' ▾' : ' ▸'}</span>
+        </button>
+      </div>
+      {ignored.length > 0 ? (
+        <div className={styles.registerIgnored}>
+          <span className={styles.registerIgnoredLabel}>Il punteggio NON considera:</span>
+          {ignored.map((item) => (
+            <span key={item} className={styles.ignoredChip} title={item}>
+              {cleanIgnoredLabel(item)}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {open ? (
+        <div className={styles.registerDetail}>
+          {plan && plan.evaluated.length > 0 ? (
+            <div className={styles.registerGroup}>
+              <span className={styles.registerGroupHead}>Valutato dal punteggio (peso su 100)</span>
+              <div className={styles.registerChips}>
+                {plan.evaluated.map((signal) => (
+                  <span key={signal.id} className={styles.perimeterChip} title={signal.family}>
+                    {signal.label} · {Math.round(signal.weight)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {plan && plan.filtered.length > 0 ? (
+            <div className={styles.registerGroup}>
+              <span className={styles.registerGroupHead}>Filtri applicati a monte (ogni riga li rispetta già)</span>
+              <div className={styles.registerChips}>
+                {plan.filtered.map((item) => (
+                  <span key={item} className={styles.perimeterChip}>
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : strategy ? (
+            <AppliedPerimeter strategy={strategy} />
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// TierBlock rende una destinazione del routing scarti come coda di lavoro
+// accanto alla lista principale — mai appendice in fondo: per la tesi
+// successione il cassetto "da verificare" è dove atterra l'archetipo giusto.
+function TierBlock({
+  tone,
+  title,
+  hint,
+  rows,
+  defaultOpen,
+  selectedId,
+  onSelect,
+  onRate,
+}: {
+  tone: 'verify' | 'action';
+  title: string;
+  hint: string;
+  rows: MATarget[];
+  defaultOpen?: boolean;
+  selectedId?: string;
+  onSelect: (id: string) => void;
+  onRate: (companyKey: string, rating: number) => void;
+}) {
+  const [open, setOpen] = useState(Boolean(defaultOpen));
+  if (rows.length === 0) return null;
+  return (
+    <section className={`${styles.tierBlock} ${tone === 'verify' ? styles.tierVerify : styles.tierAction}`}>
+      <button type="button" className={styles.tierHead} onClick={() => setOpen((value) => !value)}>
+        <span className={styles.tierTitle}>
+          {title} <strong>{rows.length}</strong>
+        </span>
+        <span className={styles.tierHint}>{hint}</span>
+        <span aria-hidden="true">{open ? '▾' : '▸'}</span>
+      </button>
+      {open ? <TargetTable rows={rows} selectedId={selectedId} onSelect={onSelect} onRate={onRate} /> : null}
+    </section>
+  );
+}
+
 function TargetShortlist({
   rows,
   selectedId,
@@ -2198,7 +2503,15 @@ function RatingStars({ value, onRate }: { value?: number; onRate: (rating: numbe
   );
 }
 
-function TargetDetail({ target }: { target: MATarget }) {
+function TargetDetail({
+  target,
+  ignoredCriteria,
+  onOutcome,
+}: {
+  target: MATarget;
+  ignoredCriteria?: string[];
+  onOutcome?: (companyKey: string, event: MATargetOutcome['event'], note: string) => void;
+}) {
   return (
     <div className={styles.targetDetail}>
       <div className={styles.detailTitleBlock}>
@@ -2206,6 +2519,12 @@ function TargetDetail({ target }: { target: MATarget }) {
         <ConfidenceCaveat confidence={target.confidence} missing={target.missingCriteria} />
       </div>
       <FlagChips flags={target.flags} />
+      {ignoredCriteria && ignoredCriteria.length > 0 ? (
+        <div className={styles.manualCheckBox} title={ignoredCriteria.join(' · ')}>
+          <span>Verifica a mano ({ignoredCriteria.length})</span>
+          <p>{ignoredCriteria.map(cleanIgnoredLabel).join(' · ')}</p>
+        </div>
+      ) : null}
       <WebValidationBlock validation={target.webValidation} />
       <p className={styles.detailRationale}>{target.rationale || 'Motivazione non disponibile.'}</p>
       <dl className={styles.detailFacts}>
@@ -2248,6 +2567,63 @@ function TargetDetail({ target }: { target: MATarget }) {
           ))}
       </div>
       <ScoreAdjustments adjustments={target.adjustments} />
+      <OutcomeBlock target={target} onOutcome={onOutcome} />
+    </div>
+  );
+}
+
+// OutcomeBlock registra gli esiti reali (contattato / buon lead / no-go): la
+// ground truth che renderà validabile il punteggio. Append-only.
+function OutcomeBlock({
+  target,
+  onOutcome,
+}: {
+  target: MATarget;
+  onOutcome?: (companyKey: string, event: MATargetOutcome['event'], note: string) => void;
+}) {
+  const [note, setNote] = useState('');
+  if (!onOutcome || !target.companyKey) return null;
+  const labels: Record<MATargetOutcome['event'], string> = {
+    contattato: 'Contattato',
+    buon_lead: 'Buon lead',
+    no_go: 'No-go',
+  };
+  const outcomes = target.outcomes ?? [];
+  return (
+    <div className={styles.outcomeBox}>
+      <span className={styles.outcomeHead}>Esiti</span>
+      {outcomes.length > 0 ? (
+        <div className={styles.outcomeList}>
+          {outcomes.map((outcome) => (
+            <span key={outcome.id} className={styles.outcomeChip} title={outcome.note || undefined}>
+              {labels[outcome.event]} · {dateFormat.format(new Date(outcome.createdAt))}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      <div className={styles.outcomeActions}>
+        <input
+          type="text"
+          className={styles.outcomeNote}
+          placeholder="Nota (opzionale)"
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          maxLength={500}
+        />
+        {(Object.keys(labels) as MATargetOutcome['event'][]).map((event) => (
+          <button
+            key={event}
+            type="button"
+            className={styles.flagFilterChip}
+            onClick={() => {
+              onOutcome(target.companyKey ?? '', event, note.trim());
+              setNote('');
+            }}
+          >
+            {labels[event]}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

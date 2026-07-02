@@ -218,6 +218,17 @@ func (s *maService) getSession(ctx context.Context, id string) (MASessionDetail,
 	if detail.Session.DeletedAt != nil {
 		return MASessionDetail{}, errMASessionDeleted
 	}
+	// Vista di lettura (mai persistita): registro valutato/filtrato/ignorato e
+	// destinazione di presentazione per ogni target (routing scarti).
+	thesis := ""
+	if detail.Strategy != nil {
+		thesis = detail.Strategy.Strategy.Thesis
+		plan := buildMAScoringPlan(detail.Strategy.Strategy)
+		detail.ScoringPlan = &plan
+	}
+	for i := range detail.Targets {
+		detail.Targets[i].Bucket = maRouteTarget(detail.Targets[i], thesis)
+	}
 	return decorateMACost(detail, s.loadPricing(ctx)), nil
 }
 
@@ -296,6 +307,26 @@ type maPricing struct {
 	// SurfaceCap is the max surface a gated search may admit (the one hard cost
 	// governor under automatic spend); overridable via ma_parameter.
 	SurfaceCap int
+	// Ancore delle rampe assolute dei segnali economici (migrazione 081).
+	// TrendCagrDeclineFloorPct è il MODULO del declino (10 = -10%/anno) perché
+	// paramFloat rifiuta i negativi.
+	TrendCagrDeclineFloorPct float64
+	TrendCagrTopPct          float64
+	ProductivityFloorEUR     float64
+	ProductivityTopEUR       float64
+}
+
+// maScoringParamsFromPricing converte le leve ma_parameter nei parametri dello
+// scoring puro (unico punto di conversione: i 3 callsite di scoreMATargetsV2
+// devono restare coerenti tra loro).
+func maScoringParamsFromPricing(pricing maPricing) maScoringParams {
+	return maScoringParams{
+		ThesisFitHoldingFactor: 1 - pricing.ThesisFitHoldingHaircutPct/100,
+		TrendCagrFloor:         -pricing.TrendCagrDeclineFloorPct / 100,
+		TrendCagrTop:           pricing.TrendCagrTopPct / 100,
+		ProductivityFloorEUR:   pricing.ProductivityFloorEUR,
+		ProductivityTopEUR:     pricing.ProductivityTopEUR,
+	}
 }
 
 // loadPricing reads the configurable pricing levers; missing/unreadable values
@@ -325,6 +356,10 @@ func maPricingFromParameters(params []MAParameter) maPricing {
 		CostSearch:                 maCostPerSearchEUR,
 		SurvivorRate:               maSurvivorRateDefault,
 		SurfaceCap:                 maGatedSurfaceCapDefault,
+		TrendCagrDeclineFloorPct:   -maTrendCagrFloorDefault * 100,
+		TrendCagrTopPct:            maTrendCagrTopDefault * 100,
+		ProductivityFloorEUR:       maProductivityFloorEURDefault,
+		ProductivityTopEUR:         maProductivityTopEURDefault,
 	}
 	values := make(map[string]string, len(params))
 	for _, param := range params {
@@ -365,6 +400,22 @@ func maPricingFromParameters(params []MAParameter) maPricing {
 	}
 	if v, ok := paramInt(values, "gated_surface_cap"); ok && v > 0 {
 		pricing.SurfaceCap = v
+	}
+	if v, ok := paramFloat(values, "trend_cagr_decline_floor_pct"); ok && v > 0 {
+		pricing.TrendCagrDeclineFloorPct = v
+	}
+	if v, ok := paramFloat(values, "trend_cagr_top_pct"); ok && v > 0 {
+		pricing.TrendCagrTopPct = v
+	}
+	if v, ok := paramFloat(values, "productivity_floor_eur"); ok && v > 0 {
+		pricing.ProductivityFloorEUR = v
+	}
+	if v, ok := paramFloat(values, "productivity_top_eur"); ok && v > 0 {
+		pricing.ProductivityTopEUR = v
+	}
+	if pricing.ProductivityTopEUR <= pricing.ProductivityFloorEUR {
+		pricing.ProductivityFloorEUR = maProductivityFloorEURDefault
+		pricing.ProductivityTopEUR = maProductivityTopEURDefault
 	}
 	return pricing
 }
@@ -1019,7 +1070,7 @@ func (s *maService) executeJobWork(ctx context.Context, job maJob) error {
 		targets[index].RunID = run.ID
 	}
 	pricing := s.loadPricing(ctx)
-	scoringParams := maScoringParams{ThesisFitHoldingFactor: 1 - pricing.ThesisFitHoldingHaircutPct/100}
+	scoringParams := maScoringParamsFromPricing(pricing)
 	targets = scoreMATargetsV2(targets, strategy, scoringParams, s.now())
 	missingFinancials := 0
 	for _, target := range targets {
@@ -1100,16 +1151,27 @@ func (s *maService) exportSession(ctx context.Context, sessionID string, format 
 // setTargetRating salva il voto preferiti dell'analista su un'azienda della
 // sessione (memoria della preferenza + selezione per il deep-dive). Il voto è
 // agganciato a company_key, quindi sopravvive al re-execute della sessione.
-func (s *maService) setTargetRating(ctx context.Context, sessionID, companyKey string, rating int, subject, email string) error {
+// Con il voto persiste la ground truth (migrazione 080): motivo dell'esclusione
+// e snapshot di ciò che la UI mostrava al momento del giudizio.
+func (s *maService) setTargetRating(ctx context.Context, sessionID string, input MATargetRatingRequest, subject, email string) error {
 	if s.store == nil {
 		return errMAStoreUnavailable
 	}
-	companyKey = normalizeMACompanyKey(companyKey)
-	if companyKey == "" {
+	input.CompanyKey = normalizeMACompanyKey(input.CompanyKey)
+	if input.CompanyKey == "" {
 		return fmt.Errorf("%w: company key", errMAStrategyInvalid)
 	}
-	if !validMARating(rating) {
+	if !validMARating(input.Rating) {
 		return fmt.Errorf("%w: rating", errMAStrategyInvalid)
+	}
+	input.Reason = cleanText(input.Reason, 300)
+	switch input.ConfidenceAtRating {
+	case "", "alta", "media", "bassa":
+	default:
+		input.ConfidenceAtRating = ""
+	}
+	if input.ScoreAtRating != nil && (*input.ScoreAtRating < 0 || *input.ScoreAtRating > 100) {
+		input.ScoreAtRating = nil
 	}
 	session, err := s.store.GetMASessionState(ctx, sessionID)
 	if err != nil {
@@ -1118,15 +1180,127 @@ func (s *maService) setTargetRating(ctx context.Context, sessionID, companyKey s
 	if err := ensureMASessionOperational(session); err != nil {
 		return err
 	}
-	if err := s.store.UpsertMATargetRating(ctx, sessionID, companyKey, rating, subject, email); err != nil {
+	if err := s.store.UpsertMATargetRating(ctx, sessionID, input, subject, email); err != nil {
 		return err
 	}
 	_ = s.traceEvent(ctx, maTraceEventWrite{
 		EventType: "ma_target_rated",
 		Status:    maTraceEventSucceeded,
-		Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "company_key": companyKey, "rating": rating}),
+		Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "company_key": input.CompanyKey, "rating": input.Rating, "reason": input.Reason}),
 	})
 	return nil
+}
+
+// addTargetOutcome appende un esito reale (contattato / buon lead / no go) al
+// log append-only: la ground truth che renderà validabile lo score. Agganciato
+// a company_key come il rating.
+func (s *maService) addTargetOutcome(ctx context.Context, sessionID string, input MATargetOutcomeRequest, subject, email string) error {
+	if s.store == nil {
+		return errMAStoreUnavailable
+	}
+	companyKey := normalizeMACompanyKey(input.CompanyKey)
+	if companyKey == "" {
+		return fmt.Errorf("%w: company key", errMAStrategyInvalid)
+	}
+	event := strings.ToLower(strings.TrimSpace(input.Event))
+	switch event {
+	case maOutcomeContattato, maOutcomeBuonLead, maOutcomeNoGo:
+	default:
+		return fmt.Errorf("%w: outcome event", errMAStrategyInvalid)
+	}
+	session, err := s.store.GetMASessionState(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+	if err := ensureMASessionOperational(session); err != nil {
+		return err
+	}
+	if err := s.store.InsertMATargetOutcome(ctx, MATargetOutcome{
+		SessionID:        sessionID,
+		CompanyKey:       companyKey,
+		Event:            event,
+		Note:             cleanText(input.Note, 500),
+		CreatedBySubject: subject,
+		CreatedByEmail:   email,
+	}); err != nil {
+		return err
+	}
+	_ = s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_target_outcome",
+		Status:    maTraceEventSucceeded,
+		Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "company_key": companyKey, "event": event}),
+	})
+	return nil
+}
+
+// rescoreSession è l'override di tesi dell'analista: la tesi muove ~metà del
+// budget pesi e gata interi segnali, e l'inferenza LLM può sbagliarla — deve
+// essere correggibile a un click. Ri-scora i target advanced della sessione dai
+// payload GIÀ persistiti (nessuna chiamata vendor, nessun costo, sincrono: non
+// passa dalla coda condivisa), registrando la tesi come nuova versione di
+// strategia per l'audit trail. Le righe identity-only restano intatte; rating,
+// web-validation e deep sopravvivono perché agganciati a company_key.
+func (s *maService) rescoreSession(ctx context.Context, sessionID, thesisRaw, subject, email string) (MASessionDetail, error) {
+	if s.store == nil {
+		return MASessionDetail{}, errMAStoreUnavailable
+	}
+	thesis := normalizeMAThesis(thesisRaw)
+	detail, err := s.store.GetMASession(ctx, sessionID)
+	if err != nil {
+		return MASessionDetail{}, err
+	}
+	if err := ensureMASessionOperational(detail.Session); err != nil {
+		return MASessionDetail{}, err
+	}
+	if detail.Session.Status == maSessionStatusRunning || detail.Session.Status == maSessionStatusEstimating {
+		return MASessionDetail{}, fmt.Errorf("%w: session busy", errMAStrategyInvalid)
+	}
+	if detail.Strategy == nil {
+		return MASessionDetail{}, fmt.Errorf("%w: no strategy to rescore", errMAStrategyInvalid)
+	}
+
+	strategy := detail.Strategy.Strategy
+	strategy.Thesis = thesis
+	version, err := s.store.AddMARescoreStrategyVersion(ctx, sessionID, strategy, email)
+	if err != nil {
+		return MASessionDetail{}, err
+	}
+	// SectorDivisions è transiente (json:"-"): va ricomputato come nei percorsi
+	// estimate/execute, altrimenti il gate settore non gaterebbe nulla.
+	strategy, err = s.canonicalizeMAStrategyAteco(ctx, strategy, nil, false)
+	if err != nil {
+		return MASessionDetail{}, err
+	}
+
+	var toScore, carried []MATarget
+	runID := ""
+	for _, target := range detail.Targets {
+		if target.EnrichmentLevel == maEnrichmentAdvanced && len(target.VendorPayload) > 0 {
+			toScore = append(toScore, target)
+			if runID == "" {
+				runID = target.RunID
+			}
+		} else {
+			carried = append(carried, target)
+		}
+	}
+	if len(toScore) == 0 {
+		return MASessionDetail{}, fmt.Errorf("%w: no scored targets to rescore", errMAStrategyInvalid)
+	}
+
+	scored := scoreMATargetsV2(toScore, strategy, maScoringParamsFromPricing(s.loadPricing(ctx)), s.now())
+	merged := make([]MATarget, 0, len(scored)+len(carried))
+	merged = append(merged, scored...)
+	merged = append(merged, carried...)
+	if err := s.store.ReplaceMATargets(ctx, sessionID, runID, merged); err != nil {
+		return MASessionDetail{}, err
+	}
+	_ = s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_session_rescored",
+		Status:    maTraceEventSucceeded,
+		Metadata:  maTraceJSON(map[string]any{"session_id": sessionID, "thesis": thesis, "strategy_version_id": version.ID, "rescored": len(scored), "requested_by": subject}),
+	})
+	return s.getSession(ctx, sessionID)
 }
 
 func (s *maService) upsertTargetWebValidation(ctx context.Context, sessionID string, body MAWebValidationUpsertRequest, subject, email string) (MAWebValidation, error) {

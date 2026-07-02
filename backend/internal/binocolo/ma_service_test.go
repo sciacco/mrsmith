@@ -1456,7 +1456,15 @@ func (f *fakeMAWorkspaceStore) MarkMATargetAdvancedEnriched(context.Context, str
 	return nil
 }
 
-func (f *fakeMAWorkspaceStore) UpsertMATargetRating(context.Context, string, string, int, string, string) error {
+func (f *fakeMAWorkspaceStore) InsertMATargetOutcome(context.Context, MATargetOutcome) error {
+	return nil
+}
+
+func (f *fakeMAWorkspaceStore) AddMARescoreStrategyVersion(ctx context.Context, sessionID string, strategy MAStrategySpec, createdByEmail string) (*MAStrategyVersion, error) {
+	return f.AddMAStrategyVersion(ctx, sessionID, strategy, createdByEmail)
+}
+
+func (f *fakeMAWorkspaceStore) UpsertMATargetRating(context.Context, string, MATargetRatingRequest, string, string) error {
 	return nil
 }
 

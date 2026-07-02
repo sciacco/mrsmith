@@ -18,37 +18,55 @@ type maSignalContext struct {
 	strategy MAStrategySpec
 	now      time.Time
 	thesis   string
+	params   maScoringParams
 }
 
 // maScoringParams carries the configurable (ma_parameter) levers that influence
 // scoring. Kept separate from the additive signal catalog so scoreMATargetsV2
 // stays a pure, deterministic function of its inputs: the call site reads the
-// values from the parameter store, tests pass them explicitly.
+// values from the parameter store (maScoringParamsFromPricing), tests pass them
+// explicitly. Zero values fall back to the compiled defaults inside the measure
+// functions, so a zero-valued params is safe.
 type maScoringParams struct {
 	// ThesisFitHoldingFactor in (0,1]: the multiplier applied to a
 	// holding-controlled company under the succession thesis. 1.0 disables it.
 	ThesisFitHoldingFactor float64
+	// Ancore delle rampe ASSOLUTE dei segnali economici (sostituiscono i
+	// percentili pool-relativi, migrazione 081). TrendCagrFloor < 0 (es. -0.10):
+	// a quel declino il sotto-score trend tocca 0.1; a crescita 0 vale 0.5; a
+	// TrendCagrTop (> 0) vale 1.0, lineare nei tratti intermedi.
+	TrendCagrFloor float64
+	TrendCagrTop   float64
+	// Produttività (€/dipendente): floor → 0.1, top → 1.0, lineare in mezzo.
+	ProductivityFloorEUR float64
+	ProductivityTopEUR   float64
 }
 
 // scoreMATargetsV2 scores and ranks a run's targets with the catalog/thesis model.
-// Two passes are required because percentile signals (trend, productivity) rank
-// each target against the whole population. Weights are re-normalized per target
-// over the signals that actually have data (missing data lowers confidence, never
-// penalizes the score). The blended fit is then scaled by two multiplicative
+// Every signal is ABSOLUTE (the former percentile signals now score on anchored
+// ramps), so each target scores independently of the pool: same input → same
+// score, across runs and sessions (score_version 3). Weights are re-normalized
+// per target over the signals that actually have data (missing data lowers
+// confidence, never penalizes the score — the coverage tier, not the number,
+// carries the caveat). The blended fit is then scaled by two multiplicative
 // factors that live OUTSIDE the re-normalization — viability (distress) and
 // thesisFit (structural contradiction of the thesis) — each surfaced as an
 // Adjustment so the displayed score reconstructs from the breakdown. Returns the
-// targets sorted by score desc, company name.
+// targets sorted by score desc, then coverage desc, viability desc, turnover
+// desc, company name (the graded sub-scores make exact ties common; alphabetical
+// alone would be an arbitrary rank).
 func scoreMATargetsV2(targets []MATarget, strategy MAStrategySpec, params maScoringParams, now time.Time) []MATarget {
 	catalog := maSignalCatalog()
 	nominal := maSignalNominalWeights(strategy)
 	thesis := normalizeMAThesis(strategy.Thesis)
 
-	contexts := make([]maSignalContext, len(targets))
-	samples := make([]map[string]maSignalSample, len(targets))
-	percentileRaws := map[string][]float64{}
+	type rankKey struct {
+		coverage  float64
+		viability float64
+		turnover  int
+	}
+	keys := make([]rankKey, len(targets))
 
-	// Pass 1: decode payloads, evaluate every intended signal, gather percentile raws.
 	for i := range targets {
 		object, err := decodeVendorObject(targets[i].VendorPayload)
 		if err != nil {
@@ -60,31 +78,13 @@ func scoreMATargetsV2(targets []MATarget, strategy MAStrategySpec, params maScor
 			strategy: strategy,
 			now:      now,
 			thesis:   thesis,
+			params:   params,
 		}
 		if object != nil {
 			ctx.fin = extractFinancials(object)
 			ctx.holders = extractShareholders(object)
 		}
-		contexts[i] = ctx
-		row := make(map[string]maSignalSample, len(catalog))
-		for _, signal := range catalog {
-			if _, ok := nominal[signal.ID]; !ok {
-				continue
-			}
-			sample := signal.Measure(ctx)
-			row[signal.ID] = sample
-			if signal.Percentile && sample.Applicable {
-				percentileRaws[signal.ID] = append(percentileRaws[signal.ID], sample.Raw)
-			}
-		}
-		samples[i] = row
-	}
-	for id := range percentileRaws {
-		sort.Float64s(percentileRaws[id])
-	}
 
-	// Pass 2: convert to graded sub-scores, re-normalize, blend, derive confidence.
-	for i := range targets {
 		type contribution struct {
 			signal maScoringSignal
 			weight float64
@@ -94,22 +94,21 @@ func scoreMATargetsV2(targets []MATarget, strategy MAStrategySpec, params maScor
 		}
 		contributions := make([]contribution, 0, len(catalog))
 		var activeWeight, intendedWeight float64
+		econActive := false
 		for _, signal := range catalog {
 			weight, ok := nominal[signal.ID]
 			if !ok {
 				continue
 			}
 			intendedWeight += weight
-			sample := samples[i][signal.ID]
-			contrib := contribution{signal: signal, weight: weight, label: sample.Label}
+			sample := signal.Measure(ctx)
+			contrib := contribution{signal: signal, weight: weight, label: sample.Label, score: sample.Score}
 			if sample.Applicable {
 				contrib.active = true
-				if signal.Percentile {
-					contrib.score = percentileRank(percentileRaws[signal.ID], sample.Raw)
-				} else {
-					contrib.score = sample.Score
-				}
 				activeWeight += weight
+				if signal.Family == maFamilyEconomic {
+					econActive = true
+				}
 			}
 			contributions = append(contributions, contrib)
 		}
@@ -150,7 +149,7 @@ func scoreMATargetsV2(targets []MATarget, strategy MAStrategySpec, params maScor
 				Weight:    math.Round(weight*10) / 10,
 			})
 		}
-		postFilterEvidence, postFilterMissing, postFilterOut := maPostFilterEvidence(contexts[i])
+		postFilterEvidence, postFilterMissing, postFilterOut := maPostFilterEvidence(ctx)
 		evidence = append(evidence, postFilterEvidence...)
 		missing = append(missing, postFilterMissing...)
 
@@ -159,15 +158,44 @@ func scoreMATargetsV2(targets []MATarget, strategy MAStrategySpec, params maScor
 			coverage = activeWeight / intendedWeight
 		}
 		confidence := maConfidenceLabel(coverage)
-		flags := computeMAFlags(contexts[i])
-		viability, knockout := computeViability(contexts[i])
-		thesisFit := computeThesisFit(contexts[i], params.ThesisFitHoldingFactor)
+		// Zero evidenza economica ≠ alta confidenza: sotto le tesi che pesano poco
+		// l'economico (successione: 20/100) un'azienda senza alcun bilancio può
+		// comunque superare l'80% di coverage. Il numero resta (assente non
+		// penalizza), ma l'etichetta non può dichiarare "alta" senza nemmeno un
+		// segnale finanziario attivo: cap a media (resta in lista principale, con
+		// lo stile "unsure" e il flag bilancio_assente a spiegare perché).
+		if confidence == "alta" && !econActive {
+			confidence = "media"
+		}
+		flags := computeMAFlags(ctx)
+		viability, knockout, knockoutReason := computeViability(ctx)
+		thesisFit := computeThesisFit(ctx, params.ThesisFitHoldingFactor)
+
+		// Sector gate, with the semantic-gate rescue: an ATECO outside the declared
+		// divisions is often just a mis-coded company. If the (paid, semantic) UC2
+		// gate already confirmed the company as a keep/forse survivor, hiding it on
+		// the cruder 2-digit code would re-reject a semantically confirmed target —
+		// the dominant false-negative risk. It stays VISIBLE, flagged, and the read
+		// path routes it to the actionable drawer. An explicitly excluded subtree is
+		// the analyst's own rule and is never rescued.
 		sectorOut := !inSectorPerimeter(strategy, targets[i].AtecoCode)
+		if sectorOut && resolveAtecoFit(strategy, targets[i].AtecoCode) != maFitExcluded && maGateSurvivor(targets[i]) {
+			sectorOut = false
+			flags = append(flags, MATargetFlag{Code: maFlagAtecoFuoriPerimetro, Label: "ATECO fuori perimetro (settore confermato dal gate)", Severity: maFlagWarning})
+		}
+		if sectorOut {
+			flags = append(flags, MATargetFlag{Code: maFlagFuoriSettore, Label: "Fuori perimetro ATECO", Severity: maFlagWarning})
+		}
+		if knockout {
+			flags = append(flags, maKnockoutFlag(knockoutReason))
+		}
 
 		targets[i].Score = int(math.Round(blended * viability * thesisFit * 100))
 		if targets[i].Score > 100 {
 			targets[i].Score = 100
 		}
+		version := maScoreVersion
+		targets[i].ScoreVersion = &version
 		targets[i].Confidence = confidence
 		// Sector gate and viability knockout both land the target in fuori_criterio
 		// (hidden by default in the UI). The gate is sector-only; it does not touch
@@ -182,34 +210,68 @@ func scoreMATargetsV2(targets []MATarget, strategy MAStrategySpec, params maScor
 		targets[i].Flags = flags
 		targets[i].MissingCriteria = cleanStringList(missing, 20, 80)
 		targets[i].Rationale = maRationaleV2(thesis, evidence, flags)
+		keys[i] = rankKey{coverage: coverage, viability: viability, turnover: intValue(ctx.fin.Turnover)}
 	}
 
-	sort.SliceStable(targets, func(i, j int) bool {
-		if targets[i].Score == targets[j].Score {
-			return targets[i].CompanyName < targets[j].CompanyName
+	// Rank: score, then tie-break on substance — coverage (documented beats
+	// sparse), viability, turnover — before the alphabetical last resort.
+	order := make([]int, len(targets))
+	for i := range order {
+		order[i] = i
+	}
+	sort.SliceStable(order, func(a, b int) bool {
+		i, j := order[a], order[b]
+		if targets[i].Score != targets[j].Score {
+			return targets[i].Score > targets[j].Score
 		}
-		return targets[i].Score > targets[j].Score
+		if keys[i].coverage != keys[j].coverage {
+			return keys[i].coverage > keys[j].coverage
+		}
+		if keys[i].viability != keys[j].viability {
+			return keys[i].viability > keys[j].viability
+		}
+		if keys[i].turnover != keys[j].turnover {
+			return keys[i].turnover > keys[j].turnover
+		}
+		return targets[i].CompanyName < targets[j].CompanyName
 	})
-	return targets
+	ranked := make([]MATarget, len(targets))
+	for pos, idx := range order {
+		ranked[pos] = targets[idx]
+	}
+	return ranked
 }
 
-// percentileRank returns the fraction of the population at or below v (ties shared).
-func percentileRank(sorted []float64, v float64) float64 {
-	n := len(sorted)
-	if n <= 1 {
-		return 0.5
+// maGateSurvivor reports whether the semantic gate POSITIVELY confirmed the
+// target as a keep/forse survivor. A missing web-validation is not a
+// confirmation (the non-gated execute path has none): the rescue must never
+// fire on absence of evidence.
+func maGateSurvivor(target MATarget) bool {
+	if target.WebValidation == nil {
+		return false
 	}
-	less := 0
-	equal := 0
-	for _, x := range sorted {
-		switch {
-		case x < v:
-			less++
-		case x == v:
-			equal++
-		}
+	switch gatedTargetBucket(target) {
+	case maGatedBucketKeep, maGatedBucketForse:
+		return true
+	default:
+		return false
 	}
-	return (float64(less) + 0.5*float64(equal)) / float64(n)
+}
+
+// maKnockoutFlag makes the viability knockout reason machine-readable on the
+// persisted row, so the read-time routing (maRouteTarget) can send the target
+// to the right destination without re-deriving financials.
+func maKnockoutFlag(reason string) MATargetFlag {
+	label := "Fuori criterio: vitalità"
+	switch reason {
+	case maViabilityReasonCeased:
+		label = "Fuori criterio: cessata"
+	case maViabilityReasonInactive:
+		label = "Fuori criterio: non attiva"
+	case maViabilityReasonDistress:
+		label = "Fuori criterio: distress finanziario"
+	}
+	return MATargetFlag{Code: maFlagKnockoutVitalita + "_" + reason, Label: label, Severity: maFlagWarning}
 }
 
 func maConfidenceLabel(coverage float64) string {
@@ -413,32 +475,48 @@ const (
 	maBalancePhysiologicalGap = 2 // years; a filing lag up to here is normal, no penalty
 )
 
+// Viability knockout reasons — appended to the knockout flag code so the
+// read-time routing can tell a dead/dormant shell (suppress with a count) from
+// financial distress (an actionable candidate under a consolidation thesis).
+const (
+	maViabilityReasonCeased   = "cessata"
+	maViabilityReasonInactive = "non_attiva"
+	maViabilityReasonDistress = "distress"
+)
+
+// Flag codes the scoring layer persists for the read-time routing (maRouteTarget).
+const (
+	maFlagAtecoFuoriPerimetro = "ateco_fuori_perimetro"
+	maFlagFuoriSettore        = "fuori_settore"
+	maFlagKnockoutVitalita    = "knockout_vitalita"
+)
+
 // computeViability collapses the fit blend toward zero for distressed / dormant
 // companies and reports whether the target should be knocked out to
-// fuori_criterio. Unlike the fit signals it lives OUTSIDE the coverage
-// re-normalization: missing or zero financial health is a penalty here, not a
-// neutral drop — so a company that lacks the data to compute solidity (e.g. no
-// revenue) can no longer have that weight quietly redistributed onto the signals
-// it scores well on. Confidence stays a pure coverage measure; viability drives
-// the score. Reads the same payload signals as computeMAFlags, whose warning
-// flags are the human-readable "why" behind a low score.
-func computeViability(c maSignalContext) (factor float64, knockout bool) {
+// fuori_criterio, with the dominant reason. Unlike the fit signals it lives
+// OUTSIDE the coverage re-normalization — but it punishes only EVIDENCE of
+// distress (ceased, dormant, stale filings, negative equity), never the ABSENCE
+// of data: an unfiled turnover is physiological for Italian micro filings and
+// characteristic of the succession archetype — absence is the coverage tier's
+// job (confidence + da_verificare routing), not a distress penalty. Reads the
+// same payload signals as computeMAFlags, whose warning flags are the
+// human-readable "why" behind a low score.
+func computeViability(c maSignalContext) (factor float64, knockout bool, reason string) {
 	// Activity status — ceased is a hard knockout.
 	if vendorBool(c.object, "taxCodeCeased") {
-		return 0, true
+		return 0, true, maViabilityReasonCeased
 	}
 	statusFactor := 1.0
 	if status := strings.ToUpper(strings.TrimSpace(c.target.ActivityStatus)); status != "" && status != "ATTIVA" {
 		statusFactor = 0.2
 	}
 
-	// Balance freshness/presence — a filing lag up to maBalancePhysiologicalGap
-	// years is physiological (in 2026 a 2024 balance is normal) and not penalized;
-	// the bilancio_datato flag still surfaces it as information.
+	// Balance freshness — a filing lag up to maBalancePhysiologicalGap years is
+	// physiological (in 2026 a 2024 balance is normal) and not penalized; the
+	// bilancio_datato flag still surfaces it as information. A FILED-but-old
+	// balance is a real dormancy signal and degrades; a missing turnover is not.
 	balanceFactor := 1.0
-	if c.fin.Turnover == nil {
-		balanceFactor = 0.3
-	} else if c.fin.LastYear > 0 {
+	if c.fin.Turnover != nil && c.fin.LastYear > 0 {
 		switch gap := c.now.Year() - c.fin.LastYear; {
 		case gap <= maBalancePhysiologicalGap:
 			balanceFactor = 1.0
@@ -464,7 +542,15 @@ func computeViability(c maSignalContext) (factor float64, knockout bool) {
 	}
 
 	factor = statusFactor * balanceFactor * equityFactor
-	return factor, factor < maViabilityKnockoutFloor
+	knockout = factor < maViabilityKnockoutFloor
+	if knockout {
+		if statusFactor < 1 {
+			reason = maViabilityReasonInactive
+		} else {
+			reason = maViabilityReasonDistress
+		}
+	}
+	return factor, knockout, reason
 }
 
 // computeThesisFit returns a multiplicative demotion factor in (0,1] for a target
@@ -740,35 +826,94 @@ func measureLegalForm(c maSignalContext) maSignalSample {
 	return maSignalSample{Applicable: true, Score: score, Label: label}
 }
 
+// measureTurnoverTrend scores the revenue trajectory on an ABSOLUTE anchored
+// ramp (no pool percentile): the growth metric is the MEDIAN of the annualized
+// year-over-year rates across the whole filed series, so a single mis-filed
+// year skews an endpoints-CAGR but not this. Same series → same sub-score, in
+// any pool.
 func measureTurnoverTrend(c maSignalContext) maSignalSample {
-	series := c.fin.Series
-	if len(series) < 2 {
+	growth, ok := medianAnnualGrowth(c.fin.Series)
+	if !ok {
 		return maSignalSample{}
 	}
-	start := len(series) - 3
-	if start < 0 {
-		start = 0
-	}
-	first := series[start]
-	last := series[len(series)-1]
-	if first.Turnover == nil || last.Turnover == nil || *first.Turnover <= 0 {
-		return maSignalSample{}
-	}
-	years := last.Year - first.Year
-	if years <= 0 {
-		years = 1
-	}
-	ratio := float64(*last.Turnover) / float64(*first.Turnover)
-	cagr := math.Pow(ratio, 1.0/float64(years)) - 1.0
-	return maSignalSample{Applicable: true, Raw: cagr, Label: fmt.Sprintf("%+.0f%%/anno", cagr*100)}
+	return maSignalSample{Applicable: true, Score: maTrendScore(growth, c.params), Raw: growth, Label: fmt.Sprintf("%+.0f%%/anno", growth*100)}
 }
 
+// medianAnnualGrowth returns the median annualized YoY growth over consecutive
+// filed years (a >1-year filing gap is annualized geometrically). False when
+// fewer than two comparable years exist.
+func medianAnnualGrowth(series []maBalanceSheet) (float64, bool) {
+	growths := make([]float64, 0, len(series))
+	for k := 1; k < len(series); k++ {
+		prev, curr := series[k-1], series[k]
+		if prev.Turnover == nil || curr.Turnover == nil || *prev.Turnover <= 0 || *curr.Turnover < 0 {
+			continue
+		}
+		gap := curr.Year - prev.Year
+		if gap <= 0 {
+			gap = 1
+		}
+		ratio := float64(*curr.Turnover) / float64(*prev.Turnover)
+		growths = append(growths, math.Pow(ratio, 1.0/float64(gap))-1.0)
+	}
+	if len(growths) == 0 {
+		return 0, false
+	}
+	sort.Float64s(growths)
+	mid := len(growths) / 2
+	if len(growths)%2 == 1 {
+		return growths[mid], true
+	}
+	return (growths[mid-1] + growths[mid]) / 2, true
+}
+
+// maTrendScore maps an annual growth rate onto the anchored ramp: floor (a
+// decline, e.g. -10%) → 0.1, zero growth → 0.5, top (e.g. +15%) → 1.0, linear
+// in between, clamped outside. A declining business can never ride a weak pool
+// to the top ("best decliner" is dead).
+func maTrendScore(growth float64, params maScoringParams) float64 {
+	floor, top := params.TrendCagrFloor, params.TrendCagrTop
+	if math.IsNaN(floor) || floor >= 0 {
+		floor = maTrendCagrFloorDefault
+	}
+	if math.IsNaN(top) || top <= 0 {
+		top = maTrendCagrTopDefault
+	}
+	switch {
+	case growth <= floor:
+		return 0.1
+	case growth < 0:
+		return 0.1 + (growth-floor)/(-floor)*0.4
+	case growth >= top:
+		return 1.0
+	default:
+		return 0.5 + growth/top*0.5
+	}
+}
+
+// measureProductivity scores €/employee on an absolute anchored ramp (floor →
+// 0.1, top → 1.0, linear in between) instead of a pool percentile.
 func measureProductivity(c maSignalContext) maSignalSample {
 	if c.fin.Turnover == nil || c.fin.Employees == nil || *c.fin.Employees <= 0 {
 		return maSignalSample{}
 	}
 	ratio := float64(*c.fin.Turnover) / float64(*c.fin.Employees)
-	return maSignalSample{Applicable: true, Raw: ratio, Label: fmt.Sprintf("%.0fk/dip", ratio/1000)}
+	return maSignalSample{Applicable: true, Score: maProductivityScore(ratio, c.params), Raw: ratio, Label: fmt.Sprintf("%.0fk/dip", ratio/1000)}
+}
+
+func maProductivityScore(ratio float64, params maScoringParams) float64 {
+	floor, top := params.ProductivityFloorEUR, params.ProductivityTopEUR
+	if floor <= 0 || top <= floor {
+		floor, top = maProductivityFloorEURDefault, maProductivityTopEURDefault
+	}
+	switch {
+	case ratio <= floor:
+		return 0.1
+	case ratio >= top:
+		return 1.0
+	default:
+		return 0.1 + (ratio-floor)/(top-floor)*0.9
+	}
 }
 
 func measureEquitySolidity(c maSignalContext) maSignalSample {

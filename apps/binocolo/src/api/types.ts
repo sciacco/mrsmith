@@ -317,6 +317,37 @@ export interface MASessionDetail {
   budgetEur: number;
   costPerCompanyEur: number;
   costFullEur: number;
+  scoringPlan?: MAScoringPlan;
+}
+
+// Registro "valutato / filtrato / ignorato": il confine esplicito di cosa il
+// punteggio significa (computed dal backend, mai persistito).
+export interface MAScoringPlan {
+  thesis: MAThesis;
+  scoreVersion: number;
+  evaluated: MAScoringPlanSignal[];
+  filtered: string[];
+  ignored: string[];
+}
+
+export interface MAScoringPlanSignal {
+  id: string;
+  label: string;
+  family: string;
+  weight: number;
+}
+
+// Destinazione di presentazione derivata dal backend (routing scarti).
+export type MATargetBucket = 'principale' | 'da_verificare' | 'azionabile' | 'soppresso';
+
+// Evento del log esiti (ground truth reale, append-only).
+export interface MATargetOutcome {
+  id: string;
+  companyKey: string;
+  event: 'contattato' | 'buon_lead' | 'no_go';
+  note?: string;
+  createdByEmail?: string;
+  createdAt: string;
 }
 
 export interface MADeepAnalysis {
@@ -544,9 +575,12 @@ export interface MATarget {
   atecoCode?: string;
   atecoDescription?: string;
   score: number;
+  scoreVersion?: number;
   matchState: MAMatchState;
   confidence?: MAConfidence;
+  bucket?: MATargetBucket;
   rating?: number;
+  outcomes?: MATargetOutcome[];
   flags?: MATargetFlag[];
   rationale: string;
   missingCriteria: string[];

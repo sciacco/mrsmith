@@ -20,6 +20,7 @@ type maWorkspaceStore interface {
 	GetMASessionState(ctx context.Context, id string) (MASession, error)
 	UpdateMASessionLifecycle(ctx context.Context, sessionID, action, subject, email string) (bool, error)
 	AddMAStrategyVersion(ctx context.Context, sessionID string, strategy MAStrategySpec, createdByEmail string) (*MAStrategyVersion, error)
+	AddMARescoreStrategyVersion(ctx context.Context, sessionID string, strategy MAStrategySpec, createdByEmail string) (*MAStrategyVersion, error)
 	GetMAStrategyVersion(ctx context.Context, sessionID, versionID string) (MAStrategyVersion, error)
 	ReplaceMAEstimates(ctx context.Context, sessionID, strategyVersionID, selectedStrategy string, estimates []MAEstimate) error
 	EnqueueMAJob(ctx context.Context, input maJobEnqueue) (jobID string, created bool, err error)
@@ -31,7 +32,8 @@ type maWorkspaceStore interface {
 	CompleteMAExecutionRun(ctx context.Context, runID, status string, resultCount int, errorCode string) error
 	ReplaceMATargets(ctx context.Context, sessionID, runID string, targets []MATarget) error
 	MarkMATargetAdvancedEnriched(ctx context.Context, targetID string, vendorPayload json.RawMessage) error
-	UpsertMATargetRating(ctx context.Context, sessionID, companyKey string, rating int, subject, email string) error
+	UpsertMATargetRating(ctx context.Context, sessionID string, input MATargetRatingRequest, subject, email string) error
+	InsertMATargetOutcome(ctx context.Context, outcome MATargetOutcome) error
 	UpsertMAWebValidation(ctx context.Context, input maWebValidationUpsert) (MAWebValidation, error)
 	UpsertMASectorEvalLabel(ctx context.Context, sessionID, companyKey, label, note, subject, email string) error
 	ListMASectorEvalLabels(ctx context.Context, sessionID string) (map[string]MASectorEvalLabel, error)
@@ -475,6 +477,53 @@ WHERE id = $1::uuid
 	return &strategy, nil
 }
 
+// AddMARescoreStrategyVersion registra una nuova versione di strategia per un
+// RESCORE (override di tesi) e la attiva, PRESERVANDO stato sessione, stime e
+// strategia selezionata: la tesi muove solo i pesi dello scoring, non la
+// superficie di ricerca — azzerare le stime e tornare a draft (come fa
+// AddMAStrategyVersion per estimate/execute) butterebbe via stato ancora valido
+// e nasconderebbe i risultati appena ri-scorati.
+func (s *SQLStore) AddMARescoreStrategyVersion(ctx context.Context, sessionID string, strategySpec MAStrategySpec, createdByEmail string) (*MAStrategyVersion, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("begin ma rescore strategy version: %w", err)
+	}
+	defer tx.Rollback()
+
+	var version int
+	if err := tx.QueryRowContext(ctx, `
+SELECT COALESCE(MAX(version), 0) + 1
+FROM binocolo.ma_strategy_version
+WHERE session_id = $1::uuid
+`, sessionID).Scan(&version); err != nil {
+		return nil, fmt.Errorf("next ma strategy version: %w", err)
+	}
+	strategyID := uuid.NewString()
+	rawStrategy, err := strategyToRaw(strategySpec)
+	if err != nil {
+		return nil, fmt.Errorf("marshal ma strategy: %w", err)
+	}
+	strategy, err := insertMAStrategyVersion(ctx, tx, sessionID, strategyID, version, rawStrategy, createdByEmail)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `
+UPDATE binocolo.ma_session
+SET active_strategy_id = $2::uuid,
+    updated_at = now()
+WHERE id = $1::uuid
+`, sessionID, strategyID); err != nil {
+		return nil, fmt.Errorf("activate ma rescore strategy version: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit ma rescore strategy version: %w", err)
+	}
+	return &strategy, nil
+}
+
 func (s *SQLStore) ReplaceMAEstimates(ctx context.Context, sessionID, strategyVersionID, selectedStrategy string, estimates []MAEstimate) error {
 	if s == nil || s.db == nil {
 		return errors.New("binocolo ma store not configured")
@@ -714,9 +763,14 @@ WHERE target_id IN (SELECT id FROM binocolo.ma_target WHERE session_id = $1::uui
 		}
 		var scoreVal any = target.Score
 		var matchVal any = target.MatchState
+		var scoreVersionVal any
+		if target.ScoreVersion != nil {
+			scoreVersionVal = *target.ScoreVersion
+		}
 		if level == maEnrichmentAddress {
 			scoreVal = nil
 			matchVal = nil
+			scoreVersionVal = nil
 		}
 		if _, err := tx.ExecContext(ctx, `
 INSERT INTO binocolo.ma_target (
@@ -742,11 +796,12 @@ INSERT INTO binocolo.ma_target (
   rationale,
   missing_criteria,
   vendor_payload,
-  enrichment_level
+  enrichment_level,
+  score_version
 ) VALUES (
   $1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9, $10,
   $11, $12, $13, $14, $15, $16, $17, $18, $19::jsonb, $20,
-  $21::jsonb, $22::jsonb, $23
+  $21::jsonb, $22::jsonb, $23, $24
 )
 `, targetID,
 			sessionID,
@@ -771,6 +826,7 @@ INSERT INTO binocolo.ma_target (
 			missingRaw,
 			[]byte(payload),
 			level,
+			scoreVersionVal,
 		); err != nil {
 			return fmt.Errorf("insert ma target: %w", err)
 		}
@@ -1269,7 +1325,7 @@ SELECT id::text, session_id::text, run_id::text, COALESCE(vendor_id, ''), compan
        COALESCE(vat_code, ''), COALESCE(tax_code, ''), COALESCE(province, ''), COALESCE(town, ''),
        COALESCE(activity_status, ''), turnover, turnover_year, employees, COALESCE(ateco_code, ''),
        COALESCE(ateco_description, ''), score, COALESCE(match_state, ''), COALESCE(confidence, ''), flags,
-       rationale, missing_criteria, vendor_payload, COALESCE(enrichment_level, 'advanced'), created_at
+       rationale, missing_criteria, vendor_payload, COALESCE(enrichment_level, 'advanced'), score_version, created_at
 FROM binocolo.ma_target
 WHERE session_id = $1::uuid
 ORDER BY score DESC NULLS LAST, company_name
@@ -1285,6 +1341,7 @@ ORDER BY score DESC NULLS LAST, company_name
 		var turnoverYear sql.NullInt64
 		var employees sql.NullInt64
 		var score sql.NullInt64
+		var scoreVersion sql.NullInt64
 		var missingRaw []byte
 		var flagsRaw []byte
 		if err := rows.Scan(
@@ -1311,6 +1368,7 @@ ORDER BY score DESC NULLS LAST, company_name
 			&missingRaw,
 			&item.VendorPayload,
 			&item.EnrichmentLevel,
+			&scoreVersion,
 			&item.CreatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan ma target: %w", err)
@@ -1318,6 +1376,10 @@ ORDER BY score DESC NULLS LAST, company_name
 		// Address-stage rows are unscored (score NULL); leave item.Score at 0.
 		if score.Valid {
 			item.Score = int(score.Int64)
+		}
+		if scoreVersion.Valid {
+			value := int(scoreVersion.Int64)
+			item.ScoreVersion = &value
 		}
 		if len(flagsRaw) > 0 {
 			_ = json.Unmarshal(flagsRaw, &item.Flags)
@@ -1354,6 +1416,10 @@ ORDER BY score DESC NULLS LAST, company_name
 	if err != nil {
 		return nil, err
 	}
+	outcomes, err := s.loadMAOutcomes(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
 	webValidations, err := s.loadMAWebValidations(ctx, sessionID)
 	if err != nil {
 		return nil, err
@@ -1372,6 +1438,9 @@ ORDER BY score DESC NULLS LAST, company_name
 			value := rating
 			targets[index].Rating = &value
 		}
+		if events, ok := outcomes[targets[index].CompanyKey]; ok {
+			targets[index].Outcomes = events
+		}
 		if validation, ok := webValidations[targets[index].CompanyKey]; ok {
 			record := validation
 			targets[index].WebValidation = &record
@@ -1386,8 +1455,10 @@ ORDER BY score DESC NULLS LAST, company_name
 }
 
 // sortMATargetsByRating ordina i target con la classifica utente in testa
-// (rating DESC), poi per punteggio dello scoring (campo secondario), poi per
-// nome. I non valutati (rating nil -> 0) stanno tra le stelle e gli esclusi (-1).
+// (rating DESC), poi per punteggio dello scoring, poi — a parità di punteggio —
+// per sostanza invece che per alfabeto: confidence (documentato batte rado),
+// fatturato, e solo alla fine il nome. I non valutati (rating nil -> 0) stanno
+// tra le stelle e gli esclusi (-1).
 func sortMATargetsByRating(targets []MATarget) {
 	sort.SliceStable(targets, func(i, j int) bool {
 		ri, rj := maRatingValue(targets[i].Rating), maRatingValue(targets[j].Rating)
@@ -1397,8 +1468,27 @@ func sortMATargetsByRating(targets []MATarget) {
 		if targets[i].Score != targets[j].Score {
 			return targets[i].Score > targets[j].Score
 		}
+		if ci, cj := maConfidenceRank(targets[i].Confidence), maConfidenceRank(targets[j].Confidence); ci != cj {
+			return ci > cj
+		}
+		if ti, tj := intValue(targets[i].Turnover), intValue(targets[j].Turnover); ti != tj {
+			return ti > tj
+		}
 		return targets[i].CompanyName < targets[j].CompanyName
 	})
+}
+
+func maConfidenceRank(confidence string) int {
+	switch confidence {
+	case "alta":
+		return 3
+	case "media":
+		return 2
+	case "bassa":
+		return 1
+	default:
+		return 0
+	}
 }
 
 func maRatingValue(rating *int) int {
@@ -1435,31 +1525,82 @@ WHERE session_id = $1::uuid
 
 // UpsertMATargetRating salva (o azzera) il voto su un'azienda nella sessione.
 // rating == 0 cancella la riga (torna "non valutato"); -1/1..3 fanno upsert.
-func (s *SQLStore) UpsertMATargetRating(ctx context.Context, sessionID, companyKey string, rating int, subject, email string) error {
+// Con il voto persiste la ground truth (migrazione 080): il motivo (compilato
+// sull'esclusione) e lo snapshot di score/confidence che la UI mostrava al
+// momento del giudizio.
+func (s *SQLStore) UpsertMATargetRating(ctx context.Context, sessionID string, input MATargetRatingRequest, subject, email string) error {
 	if s == nil || s.db == nil {
 		return errors.New("binocolo ma store not configured")
 	}
-	if rating == 0 {
+	if input.Rating == 0 {
 		if _, err := s.db.ExecContext(ctx, `
 DELETE FROM binocolo.ma_target_rating
 WHERE session_id = $1::uuid AND company_key = $2
-`, sessionID, companyKey); err != nil {
+`, sessionID, input.CompanyKey); err != nil {
 			return fmt.Errorf("clear ma target rating: %w", err)
 		}
 		return nil
 	}
+	var scoreAt any
+	if input.ScoreAtRating != nil {
+		scoreAt = *input.ScoreAtRating
+	}
 	if _, err := s.db.ExecContext(ctx, `
-INSERT INTO binocolo.ma_target_rating (session_id, company_key, rating, rated_by_subject, rated_by_email, rated_at)
-VALUES ($1::uuid, $2, $3, $4, $5, now())
+INSERT INTO binocolo.ma_target_rating (session_id, company_key, rating, reason, score_at_rating, confidence_at_rating, rated_by_subject, rated_by_email, rated_at)
+VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, now())
 ON CONFLICT (session_id, company_key) DO UPDATE
 SET rating = EXCLUDED.rating,
+    reason = EXCLUDED.reason,
+    score_at_rating = EXCLUDED.score_at_rating,
+    confidence_at_rating = EXCLUDED.confidence_at_rating,
     rated_by_subject = EXCLUDED.rated_by_subject,
     rated_by_email = EXCLUDED.rated_by_email,
     rated_at = now()
-`, sessionID, companyKey, rating, nullString(subject), nullString(email)); err != nil {
+`, sessionID, input.CompanyKey, input.Rating, nullString(input.Reason), scoreAt, nullString(input.ConfidenceAtRating), nullString(subject), nullString(email)); err != nil {
 		return fmt.Errorf("upsert ma target rating: %w", err)
 	}
 	return nil
+}
+
+// InsertMATargetOutcome appende un evento al log esiti (append-only): la
+// ground truth reale — contattato / buon lead / no go — che renderà validabile
+// lo score. Mai aggiornato né cancellato da codice.
+func (s *SQLStore) InsertMATargetOutcome(ctx context.Context, outcome MATargetOutcome) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	if _, err := s.db.ExecContext(ctx, `
+INSERT INTO binocolo.ma_target_outcome (id, session_id, company_key, event, note, created_by_subject, created_by_email, created_at)
+VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, now())
+`, uuid.NewString(), outcome.SessionID, outcome.CompanyKey, outcome.Event, nullString(outcome.Note), nullString(outcome.CreatedBySubject), nullString(outcome.CreatedByEmail)); err != nil {
+		return fmt.Errorf("insert ma target outcome: %w", err)
+	}
+	return nil
+}
+
+func (s *SQLStore) loadMAOutcomes(ctx context.Context, sessionID string) (map[string][]MATargetOutcome, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT id, company_key, event, COALESCE(note, ''), COALESCE(created_by_email, ''), created_at
+FROM binocolo.ma_target_outcome
+WHERE session_id = $1::uuid
+ORDER BY created_at
+`, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("load ma outcomes: %w", err)
+	}
+	defer rows.Close()
+	out := map[string][]MATargetOutcome{}
+	for rows.Next() {
+		var item MATargetOutcome
+		if err := rows.Scan(&item.ID, &item.CompanyKey, &item.Event, &item.Note, &item.CreatedByEmail, &item.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan ma outcome: %w", err)
+		}
+		out[item.CompanyKey] = append(out[item.CompanyKey], item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma outcomes: %w", err)
+	}
+	return out, nil
 }
 
 // ListMASectorEvalLabels loads the human ground-truth sector labels for a session,

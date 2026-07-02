@@ -208,6 +208,25 @@ const (
 	// maSuccessionDefaultMinAge is the owner-age threshold used by the succession
 	// signal/flag when the strategy does not specify SuccessionMinOwnerAge.
 	maSuccessionDefaultMinAge = 60
+
+	// Ancore delle rampe ASSOLUTE dei segnali economici (migrazione 081,
+	// overridable via ma_parameter). I punteggi ai capi sono fissi in codice:
+	// trend floor→0.1, crescita zero→0.5, top→1.0; produttività floor→0.1,
+	// top→1.0, lineare in mezzo. Default provvisori (PMI ICT), da calibrare.
+	maTrendCagrFloorDefault       = -0.10
+	maTrendCagrTopDefault         = 0.15
+	maProductivityFloorEURDefault = 50000.0
+	maProductivityTopEURDefault   = 200000.0
+
+	// maScoreVersion etichetta i punteggi prodotti da questa revisione dello
+	// scoring (persistita in ma_target.score_version): 3 = catalogo v2 + bande
+	// assolute + viability assente≠distressed. NULL in DB = versioni precedenti.
+	maScoreVersion = 3
+
+	// Eventi del log esiti (ma_target_outcome, migrazione 080).
+	maOutcomeContattato = "contattato"
+	maOutcomeBuonLead   = "buon_lead"
+	maOutcomeNoGo       = "no_go"
 )
 
 type MACreateSessionRequest struct {
@@ -242,9 +261,44 @@ type MAExportRequest struct {
 	Format string `json:"format,omitempty"`
 }
 
+// MATargetRatingRequest — oltre al voto, cattura la ground truth per la
+// calibrazione futura (migrazione 080): il motivo dell'esclusione e lo snapshot
+// di ciò che la UI mostrava al momento del giudizio (score/confidence arrivano
+// dal client perché sono letteralmente ciò che l'analista stava guardando,
+// anche se il backend ha ri-scorato nel frattempo).
 type MATargetRatingRequest struct {
+	CompanyKey         string `json:"companyKey"`
+	Rating             int    `json:"rating"`
+	Reason             string `json:"reason,omitempty"`
+	ScoreAtRating      *int   `json:"scoreAtRating,omitempty"`
+	ConfidenceAtRating string `json:"confidenceAtRating,omitempty"`
+}
+
+// MATargetOutcome è un evento del log append-only degli esiti reali a valle
+// dello screening (migrazione 080): l'unica ground truth che permetterà di
+// validare lo score. Agganciato a company_key come il rating.
+type MATargetOutcome struct {
+	ID               string    `json:"id"`
+	SessionID        string    `json:"sessionId,omitempty"`
+	CompanyKey       string    `json:"companyKey"`
+	Event            string    `json:"event"`
+	Note             string    `json:"note,omitempty"`
+	CreatedBySubject string    `json:"-"`
+	CreatedByEmail   string    `json:"createdByEmail,omitempty"`
+	CreatedAt        time.Time `json:"createdAt"`
+}
+
+type MATargetOutcomeRequest struct {
 	CompanyKey string `json:"companyKey"`
-	Rating     int    `json:"rating"`
+	Event      string `json:"event"`
+	Note       string `json:"note,omitempty"`
+}
+
+// MARescoreRequest — override della tesi da parte dell'analista: ri-scora i
+// target advanced della sessione dai payload già persistiti (gratis, nessuna
+// chiamata vendor) sotto la tesi indicata.
+type MARescoreRequest struct {
+	Thesis string `json:"thesis"`
 }
 
 // MAAssociateDomainRequest is the manual-review remedy input: the operator supplies an
@@ -349,6 +403,31 @@ type MASessionDetail struct {
 	BudgetEUR         float64 `json:"budgetEur"`
 	CostPerCompanyEUR float64 `json:"costPerCompanyEur"`
 	CostFullEUR       float64 `json:"costFullEur"`
+	// ScoringPlan è il registro "valutato / filtrato / ignorato" (computed, not
+	// persisted): il confine esplicito di cosa il numero significa. Vedi
+	// buildMAScoringPlan.
+	ScoringPlan *MAScoringPlan `json:"scoringPlan,omitempty"`
+}
+
+// MAScoringPlan dichiara all'analista cosa lo score ha graduato, cosa è stato
+// applicato come filtro duro a monte (quindi non ri-valutato), e cosa è stato
+// lasciato cadere (vincoli free-form non supportati). La fiducia viene dal
+// vedere il confine, non dal numero.
+type MAScoringPlan struct {
+	Thesis       string                `json:"thesis"`
+	ScoreVersion int                   `json:"scoreVersion"`
+	Evaluated    []MAScoringPlanSignal `json:"evaluated"`
+	Filtered     []string              `json:"filtered"`
+	Ignored      []string              `json:"ignored"`
+}
+
+// MAScoringPlanSignal è un segnale graduato dallo score con il suo peso
+// nominale (su 100) sotto la tesi corrente.
+type MAScoringPlanSignal struct {
+	ID     string  `json:"id"`
+	Label  string  `json:"label"`
+	Family string  `json:"family"`
+	Weight float64 `json:"weight"`
 }
 
 type MASession struct {
@@ -598,9 +677,18 @@ type MATarget struct {
 	AtecoCode        string               `json:"atecoCode,omitempty"`
 	AtecoDescription string               `json:"atecoDescription,omitempty"`
 	Score            int                  `json:"score"`
-	MatchState       string               `json:"matchState"`
-	Confidence       string               `json:"confidence,omitempty"`
-	Rating           *int                 `json:"rating,omitempty"`
+	// ScoreVersion etichetta la revisione dello scoring che ha prodotto Score
+	// (migrazione 081): nil = riga address (mai scorata) o punteggio legacy.
+	// Punteggi con versione diversa non sono confrontabili.
+	ScoreVersion *int   `json:"scoreVersion,omitempty"`
+	MatchState   string `json:"matchState"`
+	Confidence   string `json:"confidence,omitempty"`
+	// Bucket è la destinazione di presentazione derivata A LETTURA dai campi
+	// persistiti (mai salvata): principale / da_verificare / azionabile /
+	// soppresso. Vedi maRouteTarget.
+	Bucket   string            `json:"bucket,omitempty"`
+	Rating   *int              `json:"rating,omitempty"`
+	Outcomes []MATargetOutcome `json:"outcomes,omitempty"`
 	Flags            []MATargetFlag       `json:"flags,omitempty"`
 	Rationale        string               `json:"rationale"`
 	MissingCriteria  []string             `json:"missingCriteria"`

@@ -406,7 +406,7 @@ func (s *maService) gatedSearchJobWork(ctx context.Context, job maJob) error {
 // salta + un-enriched forse identity-only), the scored count, and stats.
 func (s *maService) enrichAndScoreSurvivors(ctx context.Context, targets []MATarget, strategy MAStrategySpec, sessionID, runID string) ([]MATarget, int, maGatedScoreStats, error) {
 	pricing := s.loadPricing(ctx)
-	scoringParams := maScoringParams{ThesisFitHoldingFactor: 1 - pricing.ThesisFitHoldingHaircutPct/100}
+	scoringParams := maScoringParamsFromPricing(pricing)
 
 	plan := planGatedEnrichment(targets)
 	var toScore []MATarget // advanced survivors, ready to score
@@ -567,6 +567,10 @@ func (s *maService) enrichTargetAdvanced(ctx context.Context, target MATarget) (
 	enriched.TaxCode = target.TaxCode
 	enriched.CompanyName = target.CompanyName
 	enriched.EnrichmentLevel = maEnrichmentAdvanced
+	// Carry the gate verdict onto the enriched row: scoring reads it for the
+	// sector-mismatch rescue (a gate-confirmed survivor with an off-division
+	// ATECO must not be re-hidden by the cruder 2-digit gate).
+	enriched.WebValidation = target.WebValidation
 	return enriched, nil
 }
 
@@ -820,7 +824,7 @@ func planDomainAssociationEnrich(targets []MATarget, companyKey string) domainAs
 // survivor set together (set-relative), carry the rest identity-only, and complete the run.
 func (s *maService) enrichAssociatedAndRescore(ctx context.Context, targets []MATarget, strategy MAStrategySpec, sessionID, runID, companyKey string) error {
 	pricing := s.loadPricing(ctx)
-	scoringParams := maScoringParams{ThesisFitHoldingFactor: 1 - pricing.ThesisFitHoldingHaircutPct/100}
+	scoringParams := maScoringParamsFromPricing(pricing)
 	plan := planDomainAssociationEnrich(targets, companyKey)
 
 	var toScore, carried []MATarget

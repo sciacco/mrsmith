@@ -43,16 +43,16 @@ const (
 
 // maScoringSignal is one catalog entry. Base is the signal's share within its
 // family (the family weight from the thesis is split proportionally across the
-// intended signals of that family). Percentile signals are ranked across the
-// run population in a second pass; absolute signals score themselves in [0,1].
+// intended signals of that family). Every signal scores itself ABSOLUTELY in
+// [0,1] — no pool-relative ranking (score_version 3): the same input yields the
+// same sub-score in any run.
 type maScoringSignal struct {
-	ID         string
-	Family     string
-	Label      string
-	Base       int
-	Percentile bool
-	Measure    func(c maSignalContext) maSignalSample
-	intended   func(strategy MAStrategySpec) bool
+	ID       string
+	Family   string
+	Label    string
+	Base     int
+	Measure  func(c maSignalContext) maSignalSample
+	intended func(strategy MAStrategySpec) bool
 }
 
 // Intended reports whether the signal makes sense for the given strategy
@@ -66,8 +66,8 @@ func (s maScoringSignal) Intended(strategy MAStrategySpec) bool {
 
 type maSignalSample struct {
 	Applicable bool
-	Score      float64 // [0,1] for absolute signals
-	Raw        float64 // metric ranked across the population for percentile signals
+	Score      float64 // [0,1]
+	Raw        float64 // underlying metric (growth rate, €/employee) — informational
 	Label      string
 }
 
@@ -80,8 +80,8 @@ func maSignalCatalog() []maScoringSignal {
 		{ID: maSignalCompanyAge, Family: maFamilyDeal, Label: "Anzianità", Base: 10, Measure: measureCompanyAge},
 		{ID: maSignalLegalForm, Family: maFamilyDeal, Label: "Forma giuridica", Base: 8, Measure: measureLegalForm, intended: func(s MAStrategySpec) bool { return len(s.LegalForms) == 0 }},
 		{ID: maSignalSuccessionOwner, Family: maFamilyDeal, Label: "Ricambio generazionale", Base: 12, Measure: measureSuccessionOwner, intended: func(s MAStrategySpec) bool { return normalizeMAThesis(s.Thesis) == maThesisSuccession }},
-		{ID: maSignalTurnoverTrend, Family: maFamilyEconomic, Label: "Trend fatturato", Base: 12, Percentile: true, Measure: measureTurnoverTrend},
-		{ID: maSignalProductivity, Family: maFamilyEconomic, Label: "Produttività", Base: 8, Percentile: true, Measure: measureProductivity},
+		{ID: maSignalTurnoverTrend, Family: maFamilyEconomic, Label: "Trend fatturato", Base: 12, Measure: measureTurnoverTrend},
+		{ID: maSignalProductivity, Family: maFamilyEconomic, Label: "Produttività", Base: 8, Measure: measureProductivity},
 		{ID: maSignalEquitySolidity, Family: maFamilyEconomic, Label: "Solidità patrimoniale", Base: 10, Measure: measureEquitySolidity},
 	}
 }
