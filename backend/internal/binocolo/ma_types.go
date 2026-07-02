@@ -437,6 +437,93 @@ type MATargetOutcomeRequest struct {
 	Note       string `json:"note,omitempty"`
 }
 
+// MACardMarker names one Iniziativa where the company has an ACTIVE card
+// (PRD §6.1: collision marker, derived from the cards, no new data).
+type MACardMarker struct {
+	InitiativeID    string `json:"initiativeId"`
+	InitiativeTitle string `json:"initiativeTitle"`
+}
+
+// MACardProvenance is one ≥1★ origin of a card: the sessione, the stella and
+// the score fotografato al momento del giudizio (PRD §4.1/§4.2). A card can
+// carry multiple provenances (ripescaggi da sessioni diverse della stessa
+// iniziativa); nessuna aggregazione delle stelle.
+type MACardProvenance struct {
+	SessionID     string    `json:"sessionId"`
+	SessionTitle  string    `json:"sessionTitle"`
+	Rating        int       `json:"rating"`
+	ScoreAtRating *int      `json:"scoreAtRating,omitempty"`
+	RatedAt       time.Time `json:"ratedAt"`
+}
+
+// MAInitiativeCardView is one row of the board (B4): the card plus everything
+// presentational the drawer/kanban need, computed in a handful of batch
+// queries (never N+1).
+type MAInitiativeCardView struct {
+	MAInitiativeCard
+	DossierStatus string             `json:"dossierStatus"`
+	Collisions    []MACardMarker     `json:"collisions,omitempty"`
+	RegistryFacts []string           `json:"registryFacts,omitempty"`
+	Provenances   []MACardProvenance `json:"provenances,omitempty"`
+}
+
+// MAInitiativeBoard is the response of GET .../initiatives/{id}: the
+// Iniziativa, its anchored sessions (chips) and its cards (board rows).
+type MAInitiativeBoard struct {
+	Initiative MAInitiative           `json:"initiative"`
+	Sessions   []MASessionSummary     `json:"sessions"`
+	Cards      []MAInitiativeCardView `json:"cards"`
+}
+
+// MACardStateRequest drives POST .../cards/{companyKey}/state (B4 passo 3):
+// free transitions among the 5 active states (chiusa/rimossa go through
+// their dedicated endpoints).
+type MACardStateRequest struct {
+	State string `json:"state"`
+}
+
+// MACardCloseRequest drives POST .../cards/{companyKey}/close (B4 passo 4):
+// the esito is the attribute of the closure (PRD §4.4); RegisterFacts is the
+// typed bridge to the company registry (§6), allowed only for esito
+// no_go/rimandata and only for non_vende/in_trattativa_altrui.
+type MACardCloseRequest struct {
+	Esito         string   `json:"esito"`
+	Note          string   `json:"note,omitempty"`
+	RegisterFacts []string `json:"registerFacts,omitempty"`
+}
+
+// MACardCloseResponse reports the card plus which registerFacts actually got
+// written (idempotent skip on already-active fact does not fail the close).
+type MACardCloseResponse struct {
+	Card            MAInitiativeCard `json:"card"`
+	RegisteredFacts []string         `json:"registeredFacts,omitempty"`
+	SkippedFacts    []string         `json:"skippedFacts,omitempty"`
+}
+
+// MACardRemoveRequest drives POST .../cards/{companyKey}/remove (B4 passo 5):
+// removal is for triage error, never a verdict (PRD §4.3). CorrectRating
+// reuses setTargetRating on the most recent ≥1★ provenance.
+type MACardRemoveRequest struct {
+	CorrectRating bool   `json:"correctRating,omitempty"`
+	Reason        string `json:"reason,omitempty"`
+}
+
+// MACardRemoveResponse signals when the star correction was skipped (the
+// provenance session is no longer operational) so the caller can toast it
+// without failing the removal itself.
+type MACardRemoveResponse struct {
+	Card                    MAInitiativeCard `json:"card"`
+	RatingCorrected         bool             `json:"ratingCorrected"`
+	RatingCorrectionSkipped bool             `json:"ratingCorrectionSkipped,omitempty"`
+}
+
+// MACardNoteRequest drives POST .../cards/{companyKey}/note (B4 passo 7): the
+// diario composer note (log event only, never the company registry — PRD
+// §2).
+type MACardNoteRequest struct {
+	Body string `json:"body"`
+}
+
 // MARescoreRequest — override della tesi da parte dell'analista: ri-scora i
 // target advanced della sessione dai payload già persistiti (gratis, nessuna
 // chiamata vendor) sotto la tesi indicata.

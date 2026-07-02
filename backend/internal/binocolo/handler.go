@@ -120,6 +120,13 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/initiatives/{id}/archive", h.handleArchiveMAInitiative)
 	handle("POST /binocolo/v1/ma/initiatives/{id}/restore", h.handleRestoreMAInitiative)
 	handle("POST /binocolo/v1/ma/sessions/{id}/initiative", h.handleSetMASessionInitiative)
+	handle("GET /binocolo/v1/ma/initiatives/{id}", h.handleGetMAInitiativeBoard)
+	handle("GET /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/events", h.handleGetMAInitiativeCardEvents)
+	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/state", h.handleSetMACardState)
+	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/close", h.handleCloseMACard)
+	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/remove", h.handleRemoveMACard)
+	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/reopen", h.handleReopenMACard)
+	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/note", h.handleAddMACardNote)
 	handle("GET /binocolo/v1/ma/companies/{companyKey}/registry", h.handleGetMACompanyRegistry)
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/registry/facts", h.handleCreateMACompanyFact)
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/registry/facts/{factId}/revoke", h.handleRevokeMACompanyFact)
@@ -392,6 +399,145 @@ func (h *Handler) handleSetMASessionInitiative(w http.ResponseWriter, r *http.Re
 	subject, email := companySearchRefreshActor(r.Context())
 	if err := h.ma.setSessionInitiative(r.Context(), id, body.InitiativeID, subject, email); err != nil {
 		h.maFailure(w, r, "ma_session_set_initiative", err, "session_id", id)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) handleGetMAInitiativeBoard(w http.ResponseWriter, r *http.Request) {
+	id, ok := maInitiativeID(w, r)
+	if !ok {
+		return
+	}
+	board, err := h.ma.getInitiativeBoard(r.Context(), id)
+	if err != nil {
+		h.maFailure(w, r, "ma_initiative_board_get", err, "initiative_id", id)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, board)
+}
+
+func (h *Handler) handleGetMAInitiativeCardEvents(w http.ResponseWriter, r *http.Request) {
+	id, ok := maInitiativeID(w, r)
+	if !ok {
+		return
+	}
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	events, err := h.ma.getInitiativeCardEvents(r.Context(), id, companyKey)
+	if err != nil {
+		h.maFailure(w, r, "ma_initiative_card_events_get", err, "initiative_id", id, "company_key", companyKey)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, map[string]any{"items": events})
+}
+
+func (h *Handler) handleSetMACardState(w http.ResponseWriter, r *http.Request) {
+	id, ok := maInitiativeID(w, r)
+	if !ok {
+		return
+	}
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	var body MACardStateRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	card, err := h.ma.setCardState(r.Context(), id, companyKey, body.State, subject, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_card_state_set", err, "initiative_id", id, "company_key", companyKey)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, card)
+}
+
+func (h *Handler) handleCloseMACard(w http.ResponseWriter, r *http.Request) {
+	id, ok := maInitiativeID(w, r)
+	if !ok {
+		return
+	}
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	var body MACardCloseRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	result, err := h.ma.closeCard(r.Context(), id, companyKey, body, subject, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_card_close", err, "initiative_id", id, "company_key", companyKey)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, result)
+}
+
+func (h *Handler) handleRemoveMACard(w http.ResponseWriter, r *http.Request) {
+	id, ok := maInitiativeID(w, r)
+	if !ok {
+		return
+	}
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	var body MACardRemoveRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	result, err := h.ma.removeCard(r.Context(), id, companyKey, body, subject, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_card_remove", err, "initiative_id", id, "company_key", companyKey)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, result)
+}
+
+func (h *Handler) handleReopenMACard(w http.ResponseWriter, r *http.Request) {
+	id, ok := maInitiativeID(w, r)
+	if !ok {
+		return
+	}
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	card, err := h.ma.reopenCard(r.Context(), id, companyKey, subject, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_card_reopen", err, "initiative_id", id, "company_key", companyKey)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, card)
+}
+
+func (h *Handler) handleAddMACardNote(w http.ResponseWriter, r *http.Request) {
+	id, ok := maInitiativeID(w, r)
+	if !ok {
+		return
+	}
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	var body MACardNoteRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	if err := h.ma.addCardNote(r.Context(), id, companyKey, body.Body, subject, email); err != nil {
+		h.maFailure(w, r, "ma_card_note_add", err, "initiative_id", id, "company_key", companyKey)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

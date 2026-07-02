@@ -1635,6 +1635,18 @@ func (f *fakeMAWorkspaceStore) ListMACompanyFactsActive(context.Context, []strin
 	return nil, nil
 }
 
+func (f *fakeMAWorkspaceStore) ListMASessionsByInitiative(context.Context, string) ([]MASessionSummary, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (f *fakeMAWorkspaceStore) ListMACardProvenances(context.Context, string, []string) (map[string][]MACardProvenance, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (f *fakeMAWorkspaceStore) ListMAInitiativeCardEvents(context.Context, string, []string, string) ([]MATargetOutcome, error) {
+	return nil, errors.New("not implemented")
+}
+
 type fakeProvinceCache struct {
 	response json.RawMessage
 }

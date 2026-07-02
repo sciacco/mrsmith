@@ -1585,6 +1585,378 @@ func (s *maService) ensureInitiativeCard(ctx context.Context, initiativeID, sess
 	return nil
 }
 
+// errMACardNotFound signals a missing card at the (initiative, companyKey)
+// key: mapped to 404 like sql.ErrNoRows.
+var errMACardNotFound = sql.ErrNoRows
+
+// getInitiativeBoard assembles the board (B4 passo 1): l'Iniziativa, le
+// sessioni agganciate (chips) e le card decorate con stato dossier,
+// collisioni, badge registro e provenienze — tutto in query batch, mai N+1.
+func (s *maService) getInitiativeBoard(ctx context.Context, initiativeID string) (MAInitiativeBoard, error) {
+	if s.store == nil {
+		return MAInitiativeBoard{}, errMAStoreUnavailable
+	}
+	initiative, err := s.store.GetMAInitiative(ctx, initiativeID)
+	if err != nil {
+		return MAInitiativeBoard{}, err
+	}
+	sessions, err := s.store.ListMASessionsByInitiative(ctx, initiativeID)
+	if err != nil {
+		return MAInitiativeBoard{}, err
+	}
+	cards, err := s.store.ListMAInitiativeCards(ctx, initiativeID)
+	if err != nil {
+		return MAInitiativeBoard{}, err
+	}
+	companyKeys := make([]string, 0, len(cards))
+	for _, card := range cards {
+		companyKeys = append(companyKeys, card.CompanyKey)
+	}
+	deep, err := s.store.ListMADeepAnalysis(ctx, companyKeys)
+	if err != nil {
+		return MAInitiativeBoard{}, err
+	}
+	activeCards, err := s.store.ListMAActiveCardsByCompany(ctx, companyKeys)
+	if err != nil {
+		return MAInitiativeBoard{}, err
+	}
+	registryFacts, err := s.store.ListMACompanyFactsActive(ctx, companyKeys)
+	if err != nil {
+		return MAInitiativeBoard{}, err
+	}
+	provenances, err := s.store.ListMACardProvenances(ctx, initiativeID, companyKeys)
+	if err != nil {
+		return MAInitiativeBoard{}, err
+	}
+
+	views := make([]MAInitiativeCardView, 0, len(cards))
+	for _, card := range cards {
+		view := MAInitiativeCardView{
+			MAInitiativeCard: card,
+			DossierStatus:    maCardDossierStatus(deep[card.CompanyKey]),
+			RegistryFacts:    registryFacts[card.CompanyKey],
+			Provenances:      provenances[card.CompanyKey],
+		}
+		for _, other := range activeCards[card.CompanyKey] {
+			if other.InitiativeID == initiativeID {
+				continue
+			}
+			view.Collisions = append(view.Collisions, MACardMarker{InitiativeID: other.InitiativeID})
+		}
+		views = append(views, view)
+	}
+	// Titoli delle collisioni: un'unica passata sulle iniziative referenziate
+	// (di solito poche), evitando N chiamate a GetMAInitiative.
+	if titles, err := s.collisionInitiativeTitles(ctx, views); err == nil {
+		for i := range views {
+			for j := range views[i].Collisions {
+				views[i].Collisions[j].InitiativeTitle = titles[views[i].Collisions[j].InitiativeID]
+			}
+		}
+	}
+
+	return MAInitiativeBoard{Initiative: initiative, Sessions: sessions, Cards: views}, nil
+}
+
+// collisionInitiativeTitles risolve i titoli delle iniziative citate come
+// collisione, deduplicando le chiamate a GetMAInitiative.
+func (s *maService) collisionInitiativeTitles(ctx context.Context, views []MAInitiativeCardView) (map[string]string, error) {
+	titles := map[string]string{}
+	for _, view := range views {
+		for _, collision := range view.Collisions {
+			if _, ok := titles[collision.InitiativeID]; ok {
+				continue
+			}
+			other, err := s.store.GetMAInitiative(ctx, collision.InitiativeID)
+			if err != nil {
+				continue
+			}
+			titles[collision.InitiativeID] = other.Title
+		}
+	}
+	return titles, nil
+}
+
+// maCardDossierStatus proietta lo stato del deep-dive (PRD §7) sul ciclo di
+// vita del bottone: assente/failed → none, queued/running → working, ready →
+// ready.
+func maCardDossierStatus(deep MADeepAnalysis) string {
+	switch deep.Status {
+	case maDeepStatusQueued, maDeepStatusRunning:
+		return "working"
+	case maDeepStatusReady:
+		return "ready"
+	default:
+		return "none"
+	}
+}
+
+// getInitiativeCardEvents carica il diario di una card (B4 passo 2): eventi
+// ancorati all'iniziativa OR alle sessioni agganciate, così gli esiti storici
+// di D2 (contattato/buon_lead/no_go) restano visibili.
+func (s *maService) getInitiativeCardEvents(ctx context.Context, initiativeID, companyKey string) ([]MATargetOutcome, error) {
+	if s.store == nil {
+		return nil, errMAStoreUnavailable
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey == "" {
+		return nil, fmt.Errorf("%w: companyKey", errMAStrategyInvalid)
+	}
+	if _, err := s.store.GetMAInitiative(ctx, initiativeID); err != nil {
+		return nil, err
+	}
+	sessions, err := s.store.ListMASessionsByInitiative(ctx, initiativeID)
+	if err != nil {
+		return nil, err
+	}
+	sessionIDs := make([]string, 0, len(sessions))
+	for _, session := range sessions {
+		sessionIDs = append(sessionIDs, session.ID)
+	}
+	return s.store.ListMAInitiativeCardEvents(ctx, initiativeID, sessionIDs, companyKey)
+}
+
+// requireOperationalInitiativeCard is the common guard for every card write
+// (B4 passo 8): l'iniziativa deve esistere e non essere archiviata, la card
+// deve esistere.
+func (s *maService) requireOperationalInitiativeCard(ctx context.Context, initiativeID, companyKey string) (MAInitiativeCard, error) {
+	if s.store == nil {
+		return MAInitiativeCard{}, errMAStoreUnavailable
+	}
+	initiative, err := s.store.GetMAInitiative(ctx, initiativeID)
+	if err != nil {
+		return MAInitiativeCard{}, err
+	}
+	if err := ensureMAInitiativeOperational(initiative); err != nil {
+		return MAInitiativeCard{}, err
+	}
+	card, err := s.store.GetMAInitiativeCard(ctx, initiativeID, companyKey)
+	if err != nil {
+		return MAInitiativeCard{}, err
+	}
+	if card == nil {
+		return MAInitiativeCard{}, errMACardNotFound
+	}
+	return *card, nil
+}
+
+// setCardState applica una transizione libera fra i 5 stati attivi (PRD
+// §4.4: nessun vincolo di sequenza). Chiusura e rimozione hanno endpoint
+// dedicati perché portano side-effect (esito, correzione stella).
+func (s *maService) setCardState(ctx context.Context, initiativeID, companyKey, state string, subject, email string) (MAInitiativeCard, error) {
+	companyKey = normalizeMACompanyKey(companyKey)
+	if !validMACardState(state) || state == maCardStateChiusa || state == maCardStateRimossa {
+		return MAInitiativeCard{}, fmt.Errorf("%w: state", errMAStrategyInvalid)
+	}
+	card, err := s.requireOperationalInitiativeCard(ctx, initiativeID, companyKey)
+	if err != nil {
+		return MAInitiativeCard{}, err
+	}
+	from := card.State
+	card.State = state
+	if err := s.store.UpsertMAInitiativeCard(ctx, card); err != nil {
+		return MAInitiativeCard{}, err
+	}
+	if err := s.store.InsertMATargetOutcome(ctx, MATargetOutcome{
+		InitiativeID:     initiativeID,
+		CompanyKey:       companyKey,
+		Event:            maEventStato,
+		Payload:          maTraceJSON(map[string]any{"from": from, "to": state}),
+		CreatedBySubject: subject,
+		CreatedByEmail:   email,
+	}); err != nil {
+		return MAInitiativeCard{}, err
+	}
+	return card, nil
+}
+
+// maCardCloseRegisterableKinds is the closed set of fatti tipizzati che la
+// chiusura può proporre (PRD §4.4/§6): mai per non_idonea, mai un fatto fuori
+// da questi due.
+var maCardCloseRegisterableKinds = map[string]bool{
+	"non_vende":            true,
+	"in_trattativa_altrui": true,
+}
+
+// closeCard chiude la card con un esito (PRD §4.4: attributo della chiusura,
+// non colonne separate) e opzionalmente propone il ponte tipizzato verso il
+// registro azienda per no_go/rimandata (§6). Un fatto già attivo non fa
+// fallire la chiusura (idempotenza, B4 passo 4).
+func (s *maService) closeCard(ctx context.Context, initiativeID, companyKey string, input MACardCloseRequest, subject, email string) (MACardCloseResponse, error) {
+	companyKey = normalizeMACompanyKey(companyKey)
+	if !validMACardEsito(input.Esito) {
+		return MACardCloseResponse{}, fmt.Errorf("%w: esito", errMAStrategyInvalid)
+	}
+	note := cleanText(input.Note, 500)
+	var registerKinds []string
+	if len(input.RegisterFacts) > 0 {
+		if input.Esito != maCardEsitoNoGo && input.Esito != maCardEsitoRimandata {
+			return MACardCloseResponse{}, fmt.Errorf("%w: registerFacts non ammesso per questo esito", errMAStrategyInvalid)
+		}
+		for _, kind := range input.RegisterFacts {
+			if !maCardCloseRegisterableKinds[kind] {
+				return MACardCloseResponse{}, fmt.Errorf("%w: registerFacts kind", errMAStrategyInvalid)
+			}
+			registerKinds = append(registerKinds, kind)
+		}
+	}
+	card, err := s.requireOperationalInitiativeCard(ctx, initiativeID, companyKey)
+	if err != nil {
+		return MACardCloseResponse{}, err
+	}
+	card.State = maCardStateChiusa
+	card.Esito = input.Esito
+	now := time.Now()
+	card.ClosedAt = &now
+	if err := s.store.UpsertMAInitiativeCard(ctx, card); err != nil {
+		return MACardCloseResponse{}, err
+	}
+	if err := s.store.InsertMATargetOutcome(ctx, MATargetOutcome{
+		InitiativeID:     initiativeID,
+		CompanyKey:       companyKey,
+		Event:            maEventChiusura,
+		Note:             note,
+		Payload:          maTraceJSON(map[string]any{"esito": input.Esito}),
+		CreatedBySubject: subject,
+		CreatedByEmail:   email,
+	}); err != nil {
+		return MACardCloseResponse{}, err
+	}
+
+	response := MACardCloseResponse{Card: card}
+	for _, kind := range registerKinds {
+		_, err := s.store.InsertMACompanyFact(ctx, MACompanyFact{
+			ID:               uuid.NewString(),
+			CompanyKey:       companyKey,
+			VATCode:          card.VATCode,
+			TaxCode:          card.TaxCode,
+			CompanyName:      card.CompanyName,
+			Kind:             kind,
+			Note:             note,
+			CreatedBySubject: subject,
+			CreatedByEmail:   email,
+		})
+		if err != nil {
+			if errors.Is(err, errMACompanyFactActive) {
+				response.SkippedFacts = append(response.SkippedFacts, kind)
+				continue
+			}
+			return MACardCloseResponse{}, err
+		}
+		response.RegisteredFacts = append(response.RegisteredFacts, kind)
+	}
+	return response, nil
+}
+
+// removeCard è l'uscita per errore di triage (PRD §4.3): mai un verdetto.
+// CorrectRating riusa setTargetRating sulla provenienza ≥1★ più recente; se
+// quella sessione non è più operativa, la correzione viene saltata e
+// segnalata nella risposta, la rimozione non fallisce.
+func (s *maService) removeCard(ctx context.Context, initiativeID, companyKey string, input MACardRemoveRequest, subject, email string) (MACardRemoveResponse, error) {
+	companyKey = normalizeMACompanyKey(companyKey)
+	reason := cleanText(input.Reason, 300)
+	card, err := s.requireOperationalInitiativeCard(ctx, initiativeID, companyKey)
+	if err != nil {
+		return MACardRemoveResponse{}, err
+	}
+	card.State = maCardStateRimossa
+	if err := s.store.UpsertMAInitiativeCard(ctx, card); err != nil {
+		return MACardRemoveResponse{}, err
+	}
+	if err := s.store.InsertMATargetOutcome(ctx, MATargetOutcome{
+		InitiativeID:     initiativeID,
+		CompanyKey:       companyKey,
+		Event:            maEventCardRimossa,
+		Note:             reason,
+		CreatedBySubject: subject,
+		CreatedByEmail:   email,
+	}); err != nil {
+		return MACardRemoveResponse{}, err
+	}
+
+	response := MACardRemoveResponse{Card: card}
+	if input.CorrectRating {
+		provenances, err := s.store.ListMACardProvenances(ctx, initiativeID, []string{companyKey})
+		if err != nil {
+			return MACardRemoveResponse{}, err
+		}
+		rows := provenances[companyKey]
+		if len(rows) == 0 {
+			response.RatingCorrectionSkipped = true
+		} else {
+			latest := rows[0]
+			session, err := s.store.GetMASessionState(ctx, latest.SessionID)
+			if err != nil {
+				return MACardRemoveResponse{}, err
+			}
+			if err := ensureMASessionOperational(session); err != nil {
+				response.RatingCorrectionSkipped = true
+			} else {
+				if err := s.setTargetRating(ctx, latest.SessionID, MATargetRatingRequest{
+					CompanyKey: companyKey,
+					Rating:     -1,
+					Reason:     reason,
+				}, subject, email); err != nil {
+					return MACardRemoveResponse{}, err
+				}
+				response.RatingCorrected = true
+			}
+		}
+	}
+	return response, nil
+}
+
+// reopenCard riporta a "da contattare" una card chiusa o rimossa (B4 passo
+// 6): riapertura manuale, diario continuo (PRD §4.3).
+func (s *maService) reopenCard(ctx context.Context, initiativeID, companyKey, subject, email string) (MAInitiativeCard, error) {
+	companyKey = normalizeMACompanyKey(companyKey)
+	card, err := s.requireOperationalInitiativeCard(ctx, initiativeID, companyKey)
+	if err != nil {
+		return MAInitiativeCard{}, err
+	}
+	if card.State != maCardStateChiusa && card.State != maCardStateRimossa {
+		return MAInitiativeCard{}, fmt.Errorf("%w: card non chiusa né rimossa", errMAStrategyInvalid)
+	}
+	card.State = maCardStateDaContattare
+	card.Esito = ""
+	card.ClosedAt = nil
+	if err := s.store.UpsertMAInitiativeCard(ctx, card); err != nil {
+		return MAInitiativeCard{}, err
+	}
+	if err := s.store.InsertMATargetOutcome(ctx, MATargetOutcome{
+		InitiativeID:     initiativeID,
+		CompanyKey:       companyKey,
+		Event:            maEventCardRiaperta,
+		Payload:          maTraceJSON(map[string]any{"manual": true}),
+		CreatedBySubject: subject,
+		CreatedByEmail:   email,
+	}); err != nil {
+		return MAInitiativeCard{}, err
+	}
+	return card, nil
+}
+
+// addCardNote appende la nota di diario del composer S4 (B4 passo 7): solo
+// il log eventi, mai il registro azienda (PRD §2: generi diversi).
+func (s *maService) addCardNote(ctx context.Context, initiativeID, companyKey, body, subject, email string) error {
+	companyKey = normalizeMACompanyKey(companyKey)
+	body = cleanText(body, 1000)
+	if body == "" {
+		return fmt.Errorf("%w: body", errMAStrategyInvalid)
+	}
+	if _, err := s.requireOperationalInitiativeCard(ctx, initiativeID, companyKey); err != nil {
+		return err
+	}
+	return s.store.InsertMATargetOutcome(ctx, MATargetOutcome{
+		InitiativeID:     initiativeID,
+		CompanyKey:       companyKey,
+		Event:            maEventNota,
+		Note:             body,
+		CreatedBySubject: subject,
+		CreatedByEmail:   email,
+	})
+}
+
 // addTargetOutcome appende un esito reale (contattato / buon lead / no go) al
 // log append-only: la ground truth che renderà validabile lo score. Agganciato
 // a company_key come il rating.

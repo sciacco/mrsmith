@@ -73,6 +73,9 @@ type maWorkspaceStore interface {
 	InsertMACompanyNote(ctx context.Context, note MACompanyNote) (MACompanyNote, error)
 	GetMACompanyRegistry(ctx context.Context, companyKey string) (MACompanyRegistry, error)
 	ListMACompanyFactsActive(ctx context.Context, companyKeys []string) (map[string][]string, error)
+	ListMASessionsByInitiative(ctx context.Context, initiativeID string) ([]MASessionSummary, error)
+	ListMACardProvenances(ctx context.Context, initiativeID string, companyKeys []string) (map[string][]MACardProvenance, error)
+	ListMAInitiativeCardEvents(ctx context.Context, initiativeID string, sessionIDs []string, companyKey string) ([]MATargetOutcome, error)
 }
 
 type maCompanyLegalForm struct {
@@ -2550,6 +2553,186 @@ WHERE company_key IN (%s)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate ma company facts active: %w", err)
+	}
+	return out, nil
+}
+
+// ListMASessionsByInitiative loads the summaries of every session anchored to
+// an Iniziativa (B4 board header: chips). Reuses the same shape as
+// ListMASessions so the client renders both with one component.
+func (s *SQLStore) ListMASessionsByInitiative(ctx context.Context, initiativeID string) ([]MASessionSummary, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT
+  session.id::text,
+  session.title,
+  session.prompt,
+  session.status,
+  session.selected_strategy,
+  COALESCE((SELECT SUM(estimated_count) FROM binocolo.ma_dry_run_estimate estimate WHERE estimate.session_id = session.id AND estimate.selected), 0) AS estimated_count,
+  COALESCE((SELECT SUM(estimated_cost) FROM binocolo.ma_dry_run_estimate estimate WHERE estimate.session_id = session.id AND estimate.selected), 0) AS estimated_cost,
+  COALESCE((SELECT COUNT(*) FROM binocolo.ma_target target WHERE target.session_id = session.id), 0) AS result_count,
+  session.created_at,
+  session.updated_at,
+  session.last_executed_at,
+  session.archived_at,
+  session.archived_by_email,
+  session.deleted_at,
+  session.deleted_by_email,
+  session.initiative_id::text,
+  initiative.title
+FROM binocolo.ma_session session
+LEFT JOIN binocolo.ma_initiative initiative ON initiative.id = session.initiative_id
+WHERE session.initiative_id = $1::uuid AND session.deleted_at IS NULL
+ORDER BY session.updated_at DESC, session.created_at DESC
+`, initiativeID)
+	if err != nil {
+		return nil, fmt.Errorf("list ma sessions by initiative: %w", err)
+	}
+	defer rows.Close()
+
+	out := []MASessionSummary{}
+	for rows.Next() {
+		var item MASessionSummary
+		var selected sql.NullString
+		var lastRun sql.NullTime
+		var archivedAt sql.NullTime
+		var archivedByEmail sql.NullString
+		var deletedAt sql.NullTime
+		var deletedByEmail sql.NullString
+		var initID sql.NullString
+		var initTitle sql.NullString
+		if err := rows.Scan(
+			&item.ID, &item.Title, &item.Prompt, &item.Status, &selected,
+			&item.EstimatedCount, &item.EstimatedCost, &item.ResultCount,
+			&item.CreatedAt, &item.UpdatedAt, &lastRun,
+			&archivedAt, &archivedByEmail, &deletedAt, &deletedByEmail,
+			&initID, &initTitle,
+		); err != nil {
+			return nil, fmt.Errorf("scan ma session by initiative: %w", err)
+		}
+		item.SelectedStrategy = selected.String
+		item.InitiativeID = initID.String
+		item.InitiativeTitle = initTitle.String
+		if lastRun.Valid {
+			item.LastRunAt = &lastRun.Time
+		}
+		if archivedAt.Valid {
+			item.ArchivedAt = &archivedAt.Time
+		}
+		item.ArchivedByEmail = archivedByEmail.String
+		if deletedAt.Valid {
+			item.DeletedAt = &deletedAt.Time
+		}
+		item.DeletedByEmail = deletedByEmail.String
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma sessions by initiative: %w", err)
+	}
+	return out, nil
+}
+
+// ListMACardProvenances batches the provenance lookup for the board (B4
+// passo 1): every ≥1★ rating on the sessions of this Iniziativa, for the
+// given company keys, in ONE query — not N. Ordered newest-first so callers
+// that want "most recent" just take index 0.
+func (s *SQLStore) ListMACardProvenances(ctx context.Context, initiativeID string, companyKeys []string) (map[string][]MACardProvenance, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	out := map[string][]MACardProvenance{}
+	if len(companyKeys) == 0 {
+		return out, nil
+	}
+	placeholders := make([]string, len(companyKeys))
+	args := make([]any, 0, len(companyKeys)+1)
+	args = append(args, initiativeID)
+	for i, key := range companyKeys {
+		placeholders[i] = fmt.Sprintf("$%d", i+2)
+		args = append(args, key)
+	}
+	query := fmt.Sprintf(`
+SELECT r.session_id::text, COALESCE(session.title, ''), r.company_key, r.rating, r.score_at_rating, r.rated_at
+FROM binocolo.ma_target_rating r
+JOIN binocolo.ma_session session ON session.id = r.session_id
+WHERE session.initiative_id = $1::uuid
+  AND r.company_key IN (%s)
+  AND r.rating >= 1
+ORDER BY r.rated_at DESC
+`, strings.Join(placeholders, ", "))
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list ma card provenances: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var item MACardProvenance
+		var companyKey string
+		var scoreAt sql.NullInt64
+		if err := rows.Scan(&item.SessionID, &item.SessionTitle, &companyKey, &item.Rating, &scoreAt, &item.RatedAt); err != nil {
+			return nil, fmt.Errorf("scan ma card provenance: %w", err)
+		}
+		if scoreAt.Valid {
+			v := int(scoreAt.Int64)
+			item.ScoreAtRating = &v
+		}
+		out[companyKey] = append(out[companyKey], item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma card provenances: %w", err)
+	}
+	return out, nil
+}
+
+// ListMAInitiativeCardEvents loads the diario of one card (B4 passo 2):
+// events anchored directly to the Iniziativa (new-style, initiative_id =
+// initiativeID) OR to one of the Iniziativa's sessions (legacy contattato/
+// buon_lead/no_go emitted by D2) — so the historical outcomes surface in the
+// same timeline. Newest first.
+func (s *SQLStore) ListMAInitiativeCardEvents(ctx context.Context, initiativeID string, sessionIDs []string, companyKey string) ([]MATargetOutcome, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	out := []MATargetOutcome{}
+	args := []any{initiativeID, companyKey}
+	sessionClause := "FALSE"
+	if len(sessionIDs) > 0 {
+		placeholders := make([]string, len(sessionIDs))
+		for i, id := range sessionIDs {
+			placeholders[i] = fmt.Sprintf("$%d", i+3)
+			args = append(args, id)
+		}
+		sessionClause = fmt.Sprintf("o.session_id IN (%s)", strings.Join(placeholders, ", "))
+	}
+	query := fmt.Sprintf(`
+SELECT o.id::text, COALESCE(o.session_id::text, ''), COALESCE(o.initiative_id::text, ''), o.company_key,
+       o.event, COALESCE(o.note, ''), COALESCE(o.payload::text, '{}'),
+       COALESCE(o.created_by_email, ''), o.created_at
+FROM binocolo.ma_target_outcome o
+WHERE o.company_key = $2
+  AND (o.initiative_id = $1::uuid OR %s)
+ORDER BY o.created_at DESC
+`, sessionClause)
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list ma initiative card events: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var item MATargetOutcome
+		var payload string
+		if err := rows.Scan(&item.ID, &item.SessionID, &item.InitiativeID, &item.CompanyKey,
+			&item.Event, &item.Note, &payload, &item.CreatedByEmail, &item.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan ma initiative card event: %w", err)
+		}
+		item.Payload = json.RawMessage(payload)
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma initiative card events: %w", err)
 	}
 	return out, nil
 }
