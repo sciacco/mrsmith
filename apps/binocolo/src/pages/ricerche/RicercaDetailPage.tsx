@@ -29,6 +29,14 @@ import {
 } from './helpers';
 import styles from './Ricerche.module.css';
 
+const registryFactLabels: Record<string, { label: string; tone: 'warn' | 'info' }> = {
+  non_vende: { label: 'Non vende', tone: 'warn' },
+  in_trattativa_altrui: { label: 'In trattativa con altri', tone: 'warn' },
+  da_evitare: { label: 'Da evitare', tone: 'warn' },
+  gia_cliente: { label: 'Già cliente', tone: 'info' },
+  partner: { label: 'Partner', tone: 'info' },
+};
+
 const thesisOptions: { value: MAThesis; label: string }[] = [
   { value: 'generico', label: 'Generico' },
   { value: 'successione', label: 'Successione' },
@@ -680,10 +688,29 @@ function ResultsTable({
           {rows.map((target) => (
             <tr key={target.id} className={styles.clickRow} onClick={() => onOpen(target)}>
               <td>
-                <b>{target.companyName}</b>
-                {target.webValidation?.webValidationState === 'no_website_declared' ? (
-                  <span className={styles.badge}>nessuna evidenza web</span>
-                ) : null}
+                <span className={styles.cellStack}>
+                  <b>{target.companyName}</b>
+                  {target.webValidation?.webValidationState === 'no_website_declared' ? (
+                    <span className={styles.badge}>nessuna evidenza web</span>
+                  ) : null}
+                  {(target.registryFacts?.length || target.inLavorazione?.length) ? (
+                    <span className={styles.cellBadges}>
+                      {(target.registryFacts ?? []).map((kind) => {
+                        const meta = registryFactLabels[kind];
+                        if (!meta) return null;
+                        const toneClass = meta.tone === 'warn' ? styles.badgeWarn : styles.badgeInfo;
+                        return (
+                          <span key={kind} className={`${styles.badge} ${toneClass}`}>{meta.label}</span>
+                        );
+                      })}
+                      {(target.inLavorazione ?? []).map((marker) => (
+                        <span key={marker.initiativeId} className={`${styles.badge} ${styles.badgeLav}`}>
+                          In lavorazione · {marker.initiativeTitle}
+                        </span>
+                      ))}
+                    </span>
+                  ) : null}
+                </span>
               </td>
               <td>{target.province ?? '-'}</td>
               <td>

@@ -5,6 +5,9 @@ import { useApiClient } from '../../api/client';
 import type {
   MAAtecoCandidate,
   MAEstimate,
+  MAInitiative,
+  MAInitiativeListResponse,
+  MAInitiativeSummary,
   MAProvinceCatalogItem,
   MAProvinceCatalogResponse,
   MASessionDetail,
@@ -54,6 +57,21 @@ export function NuovaRicercaPage() {
   const [atecoOpen, setAtecoOpen] = useState(false);
   const [busy, setBusy] = useState<BusyState>(null);
   const [error, setError] = useState<string | null>(null);
+  const [initiatives, setInitiatives] = useState<MAInitiativeSummary[]>([]);
+  const [initiativeId, setInitiativeId] = useState('');
+  const [newInitiativeOpen, setNewInitiativeOpen] = useState(false);
+  const [newInitiativeTitle, setNewInitiativeTitle] = useState('');
+  const [newInitiativeDescription, setNewInitiativeDescription] = useState('');
+  const [initiativeBusy, setInitiativeBusy] = useState(false);
+
+  const loadInitiatives = useCallback(async () => {
+    try {
+      const data = await api.get<MAInitiativeListResponse>('/binocolo/v1/ma/initiatives');
+      setInitiatives(data.items);
+    } catch (err) {
+      setError(errorLabel(err));
+    }
+  }, [api]);
 
   useEffect(() => {
     let active = true;
@@ -69,6 +87,32 @@ export function NuovaRicercaPage() {
       active = false;
     };
   }, [api]);
+
+  useEffect(() => {
+    void loadInitiatives();
+  }, [loadInitiatives]);
+
+  async function createInitiativeInline() {
+    const title = newInitiativeTitle.trim();
+    if (!title) return;
+    setInitiativeBusy(true);
+    setError(null);
+    try {
+      const created = await api.post<MAInitiative>('/binocolo/v1/ma/initiatives', {
+        title,
+        description: newInitiativeDescription.trim(),
+      });
+      await loadInitiatives();
+      setInitiativeId(created.id);
+      setNewInitiativeOpen(false);
+      setNewInitiativeTitle('');
+      setNewInitiativeDescription('');
+    } catch (err) {
+      setError(errorLabel(err));
+    } finally {
+      setInitiativeBusy(false);
+    }
+  }
 
   useEffect(() => {
     const sessionId = detail?.session.id;
@@ -116,6 +160,10 @@ export function NuovaRicercaPage() {
       });
       if (!data.strategy?.strategy) {
         throw new Error('Perimetro non restituito dal server.');
+      }
+      if (initiativeId) {
+        await api.post<void>(`/binocolo/v1/ma/sessions/${data.session.id}/initiative`, { initiativeId });
+        data.session.initiativeId = initiativeId;
       }
       setDetail(data);
       setStrategy(data.strategy.strategy);
@@ -216,6 +264,27 @@ export function NuovaRicercaPage() {
               <span>
                 Esempio: «Aziende che sviluppano software gestionale per la logistica e l'automazione di magazzino, anche system integrator specializzati; escluse le web agency. Province di Milano e Monza, fatturato tra 1 e 5 milioni, titolare vicino alla pensione.»
               </span>
+            </div>
+            <div className={styles.field}>
+              <span className={styles.label}>Iniziativa <small className={styles.hint}>(opzionale)</small></span>
+              <div className={styles.actions} style={{ justifyContent: 'flex-start', marginTop: 0 }}>
+                <select
+                  className={styles.select}
+                  value={initiativeId}
+                  onChange={(event) => setInitiativeId(event.target.value)}
+                >
+                  <option value="">Nessuna iniziativa</option>
+                  {initiatives.map((item) => (
+                    <option key={item.id} value={item.id}>{item.title}</option>
+                  ))}
+                </select>
+                <button type="button" className={styles.linkButton} onClick={() => setNewInitiativeOpen(true)}>
+                  + Nuova iniziativa
+                </button>
+              </div>
+              <p className={styles.hint} style={{ marginTop: 8 }}>
+                Le aziende con almeno una stella entreranno nella lavorazione dell'iniziativa.
+              </p>
             </div>
             <div className={styles.actions}>
               <Button
@@ -402,6 +471,44 @@ export function NuovaRicercaPage() {
           }}
         />
       ) : null}
+
+      <Modal
+        open={newInitiativeOpen}
+        onClose={() => setNewInitiativeOpen(false)}
+        title="Nuova iniziativa"
+        size="sm"
+        dismissible={!initiativeBusy}
+      >
+        <div className={styles.stack}>
+          <label className={styles.field}>
+            <span>Titolo</span>
+            <input
+              className={styles.input}
+              value={newInitiativeTitle}
+              onChange={(event) => setNewInitiativeTitle(event.target.value)}
+              placeholder="es. Acquisizione MSP 2026"
+              maxLength={120}
+            />
+          </label>
+          <label className={styles.field}>
+            <span>Descrizione <small className={styles.hint}>(opzionale)</small></span>
+            <input
+              className={styles.input}
+              value={newInitiativeDescription}
+              onChange={(event) => setNewInitiativeDescription(event.target.value)}
+              maxLength={500}
+            />
+          </label>
+          <div className={styles.modalActions}>
+            <Button onClick={() => void createInitiativeInline()} loading={initiativeBusy} disabled={!newInitiativeTitle.trim()}>
+              Crea
+            </Button>
+            <Button variant="secondary" onClick={() => setNewInitiativeOpen(false)} disabled={initiativeBusy}>
+              Annulla
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </main>
   );
 }

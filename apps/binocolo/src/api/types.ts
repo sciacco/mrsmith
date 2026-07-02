@@ -781,6 +781,8 @@ export interface MATargetRow {
   flags?: MATargetFlag[];
   enrichmentLevel?: string;
   webValidation?: MATargetRowWeb;
+  registryFacts?: string[];
+  inLavorazione?: MACardMarker[];
 }
 
 export interface MATargetListResponse {

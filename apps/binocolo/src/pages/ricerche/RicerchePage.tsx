@@ -1,8 +1,8 @@
-import { Button, Icon, Skeleton } from '@mrsmith/ui';
+import { Button, Icon, Modal, Skeleton, useToast } from '@mrsmith/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApiClient } from '../../api/client';
-import type { MASessionListResponse, MASessionSummary } from '../../api/types';
+import type { MAInitiativeListResponse, MAInitiativeSummary, MASessionListResponse, MASessionSummary } from '../../api/types';
 import {
   dateLabel,
   errorLabel,
@@ -14,9 +14,14 @@ import styles from './Ricerche.module.css';
 export function RicerchePage() {
   const api = useApiClient();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [sessions, setSessions] = useState<MASessionSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [initiatives, setInitiatives] = useState<MAInitiativeSummary[]>([]);
+  const [attachFor, setAttachFor] = useState<MASessionSummary | null>(null);
+  const [attachInitiativeId, setAttachInitiativeId] = useState('');
+  const [attachBusy, setAttachBusy] = useState(false);
 
   const loadSessions = useCallback(async () => {
     setLoading(true);
@@ -31,9 +36,35 @@ export function RicerchePage() {
     }
   }, [api]);
 
+  const loadInitiatives = useCallback(async () => {
+    try {
+      const data = await api.get<MAInitiativeListResponse>('/binocolo/v1/ma/initiatives');
+      setInitiatives(data.items);
+    } catch (err) {
+      setError(errorLabel(err));
+    }
+  }, [api]);
+
   useEffect(() => {
     void loadSessions();
-  }, [loadSessions]);
+    void loadInitiatives();
+  }, [loadSessions, loadInitiatives]);
+
+  async function attachInitiative() {
+    if (!attachFor || !attachInitiativeId) return;
+    setAttachBusy(true);
+    try {
+      await api.post<void>(`/binocolo/v1/ma/sessions/${attachFor.id}/initiative`, { initiativeId: attachInitiativeId });
+      setAttachFor(null);
+      setAttachInitiativeId('');
+      await loadSessions();
+      toast('Ricerca agganciata all’iniziativa.', 'success');
+    } catch (err) {
+      toast(errorLabel(err), 'error');
+    } finally {
+      setAttachBusy(false);
+    }
+  }
 
   return (
     <main className={styles.page}>
@@ -79,14 +110,26 @@ export function RicerchePage() {
           ) : (
             <div className={styles.indexList}>
               {sessions.map((session) => (
-                <button
-                  key={session.id}
-                  type="button"
-                  className={styles.rowCard}
-                  onClick={() => navigate(`/ricerche/${session.id}`)}
-                >
+                <div key={session.id} className={styles.rowCard} role="button" tabIndex={0} onClick={() => navigate(`/ricerche/${session.id}`)}>
                   <span>
-                    <span className={styles.rowTitle}>{session.title || 'Ricerca senza titolo'}</span>
+                    <span className={styles.inlineActions}>
+                      <span className={styles.rowTitle}>{session.title || 'Ricerca senza titolo'}</span>
+                      {session.initiativeTitle ? (
+                        <span className={`${styles.badge} ${styles.badgeLav}`}>{session.initiativeTitle}</span>
+                      ) : (
+                        <button
+                          type="button"
+                          className={styles.linkButton}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setAttachFor(session);
+                            setAttachInitiativeId('');
+                          }}
+                        >
+                          Aggancia a iniziativa…
+                        </button>
+                      )}
+                    </span>
                     <span className={styles.rowMeta}>
                       {sessionStatusLabel(session.status)}
                       {session.resultCount > 0 ? ` · ${numberFormat.format(session.resultCount)} risultati` : ''}
@@ -98,12 +141,44 @@ export function RicerchePage() {
                     {session.status === 'running' || session.status === 'estimating' ? <span className={styles.pulse} /> : null}
                     {sessionStatusLabel(session.status)}
                   </span>
-                </button>
+                </div>
               ))}
             </div>
           )}
         </div>
       </section>
+
+      <Modal
+        open={attachFor !== null}
+        onClose={() => setAttachFor(null)}
+        title="Aggancia a iniziativa"
+        size="sm"
+        dismissible={!attachBusy}
+      >
+        <div className={styles.stack}>
+          <p className={styles.hint}>
+            Le aziende con almeno una stella in «{attachFor?.title || 'questa ricerca'}» entreranno nella lavorazione dell'iniziativa scelta.
+          </p>
+          <select
+            className={styles.select}
+            value={attachInitiativeId}
+            onChange={(event) => setAttachInitiativeId(event.target.value)}
+          >
+            <option value="">Seleziona iniziativa</option>
+            {initiatives.map((item) => (
+              <option key={item.id} value={item.id}>{item.title}</option>
+            ))}
+          </select>
+          <div className={styles.modalActions}>
+            <Button onClick={() => void attachInitiative()} loading={attachBusy} disabled={!attachInitiativeId}>
+              Aggancia
+            </Button>
+            <Button variant="secondary" onClick={() => setAttachFor(null)} disabled={attachBusy}>
+              Annulla
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </main>
   );
 }
