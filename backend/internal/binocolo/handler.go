@@ -162,6 +162,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/deep/recompute", h.handleRecomputeMADeep)
 	handle("POST /binocolo/v1/ma/deep/regenerate-briefs", h.handleRegenerateMADeepBriefs)
 	handle("GET /binocolo/v1/ma/deep/inspect", h.handleInspectMADeep)
+	handle("PUT /binocolo/v1/ma/companies/{companyKey}/bm-family", h.handleRatifyBMFamily)
 	handle("GET /binocolo/v1/companies/{vat}/dossier", h.handleGetCompanyDossier)
 	handle("POST /binocolo/v1/companies/{vat}/dossier", h.handleCreateCompanyDossier)
 	handle("POST /binocolo/v1/test/gated-search", h.handleTestGatedSearch)
@@ -1091,6 +1092,31 @@ func (h *Handler) handleInspectMADeep(w http.ResponseWriter, r *http.Request) {
 	}
 	h.completeMATraceSuccess(r, http.StatusOK)
 	httputil.JSON(w, http.StatusOK, report)
+}
+
+// handleRatifyBMFamily registra la ratifica/override dell'analista sulla famiglia
+// di business model (Fase 3): body {"family": "..."}; vuota = revoca. La famiglia
+// alimenta soglie RAG e riga Damodaran al prossimo ricalcolo dell'azienda.
+func (h *Handler) handleRatifyBMFamily(w http.ResponseWriter, r *http.Request) {
+	companyKey := strings.TrimSpace(r.PathValue("companyKey"))
+	subject, email := companySearchRefreshActor(r.Context())
+	var body MABMFamilyRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "body non valido")
+		return
+	}
+	var ok bool
+	r, ok = h.startMATrace(w, r, "ma_bm_family_ratify", companyKey, body, subject, email)
+	if !ok {
+		return
+	}
+	family, err := h.ma.ratifyBMFamily(r.Context(), companyKey, strings.TrimSpace(body.Family), subject, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_bm_family_ratify", err, "company_key", companyKey)
+		return
+	}
+	h.completeMATraceSuccess(r, http.StatusOK)
+	httputil.JSON(w, http.StatusOK, family)
 }
 
 // handleGetCompanyDossier returns the cached dossier state for a P.IVA (poll target);

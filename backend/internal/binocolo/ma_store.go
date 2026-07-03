@@ -58,7 +58,10 @@ type maWorkspaceStore interface {
 	CountMADeepVintage(ctx context.Context) (int, int, error)
 	UpdateMADeepScorecard(ctx context.Context, companyKey string, scorecard *MADeepScorecard) error
 	UpdateMADeepValuation(ctx context.Context, companyKey string, valuation *MADeepValuation) error
-	ResolveSectorMultiple(ctx context.Context, ateco string) (*sectorMultiple, error)
+	ResolveSectorMultipleKeys(ctx context.Context, keys []string) (*sectorMultiple, error)
+	UpsertMABMFamilySuggestion(ctx context.Context, companyKey, vatCode, taxCode, companyName string, suggestion maBMFamilySuggestion) error
+	GetMABMFamily(ctx context.Context, companyKey string) (*MABMFamily, error)
+	RatifyMABMFamily(ctx context.Context, companyKey, family, subject, email string) error
 	GetMADeepByVAT(ctx context.Context, vat string) (*maDeepVATRecord, error)
 	ListMADeepReadyForBrief(ctx context.Context) ([]maDeepBriefRow, error)
 	UpdateMADeepBrief(ctx context.Context, companyKey string, brief *MADeepBrief, modelID, promptID string) error
@@ -3602,6 +3605,8 @@ SELECT count(*), count(DISTINCT company_key) FROM binocolo.ma_deep_payload_vinta
 
 type maDeepPayloadRow struct {
 	CompanyKey string
+	VATCode    string
+	TaxCode    string
 	Payload    json.RawMessage
 }
 
@@ -3612,7 +3617,7 @@ func (s *SQLStore) ListMADeepReadyPayloads(ctx context.Context) ([]maDeepPayload
 		return nil, errors.New("binocolo ma store not configured")
 	}
 	rows, err := s.db.QueryContext(ctx, `
-SELECT company_key, itfull_payload
+SELECT company_key, COALESCE(vat_code, ''), COALESCE(tax_code, ''), itfull_payload
 FROM binocolo.ma_deep_analysis
 WHERE status = 'ready' AND itfull_payload IS NOT NULL AND itfull_payload <> 'null'::jsonb
 ORDER BY updated_at
@@ -3625,7 +3630,7 @@ ORDER BY updated_at
 	for rows.Next() {
 		var row maDeepPayloadRow
 		var payload []byte
-		if err := rows.Scan(&row.CompanyKey, &payload); err != nil {
+		if err := rows.Scan(&row.CompanyKey, &row.VATCode, &row.TaxCode, &payload); err != nil {
 			return nil, fmt.Errorf("scan ma deep ready payload: %w", err)
 		}
 		row.Payload = json.RawMessage(payload)
@@ -3825,22 +3830,15 @@ type sectorMultiple struct {
 	SourceDate string
 }
 
-// ResolveSectorMultiple finds the Damodaran sector multiple for an ATECO code by
-// longest-prefix match (4 -> 3 -> 2 digits), falling back to the TOTAL market row.
-func (s *SQLStore) ResolveSectorMultiple(ctx context.Context, ateco string) (*sectorMultiple, error) {
+// ResolveSectorMultipleKeys tries the lookup keys in order (dal redesign Fase 3:
+// famiglia di business model → prefissi ATECO 4→3→2 → riga TOTAL; l'ordine è
+// costruito da sectorMultipleLookupKeys). Nil when nothing matches.
+func (s *SQLStore) ResolveSectorMultipleKeys(ctx context.Context, keys []string) (*sectorMultiple, error) {
 	if s == nil || s.db == nil {
 		return nil, errors.New("binocolo ma store not configured")
 	}
-	code := strings.ReplaceAll(normalizeAtecoCode(ateco), ".", "")
-	prefixes := make([]string, 0, 4)
-	for _, n := range []int{4, 3, 2} {
-		if len(code) >= n {
-			prefixes = append(prefixes, code[:n])
-		}
-	}
-	prefixes = append(prefixes, "TOTAL")
-	for _, prefix := range prefixes {
-		multiple, err := s.loadSectorMultiple(ctx, prefix)
+	for _, key := range keys {
+		multiple, err := s.loadSectorMultiple(ctx, key)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				continue
@@ -3850,6 +3848,106 @@ func (s *SQLStore) ResolveSectorMultiple(ctx context.Context, ateco string) (*se
 		return multiple, nil
 	}
 	return nil, nil
+}
+
+// UpsertMABMFamilySuggestion salva il suggerimento deterministico di famiglia
+// (mig 093) senza MAI toccare la ratifica dell'analista; gli snapshot anagrafici
+// si aggiornano solo se valorizzati.
+func (s *SQLStore) UpsertMABMFamilySuggestion(ctx context.Context, companyKey, vatCode, taxCode, companyName string, suggestion maBMFamilySuggestion) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	if strings.TrimSpace(companyKey) == "" || !maBMFamilies[suggestion.Family] {
+		return errors.New("ma bm family suggestion: invalid input")
+	}
+	_, err := s.db.ExecContext(ctx, `
+INSERT INTO binocolo.ma_company_bm_family
+  (company_key, vat_code, tax_code, company_name, suggested_family, suggested_source, suggested_evidence)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+ON CONFLICT (company_key) DO UPDATE SET
+  vat_code = CASE WHEN EXCLUDED.vat_code <> '' THEN EXCLUDED.vat_code ELSE ma_company_bm_family.vat_code END,
+  tax_code = CASE WHEN EXCLUDED.tax_code <> '' THEN EXCLUDED.tax_code ELSE ma_company_bm_family.tax_code END,
+  company_name = CASE WHEN EXCLUDED.company_name <> '' THEN EXCLUDED.company_name ELSE ma_company_bm_family.company_name END,
+  suggested_family = EXCLUDED.suggested_family,
+  suggested_source = EXCLUDED.suggested_source,
+  suggested_evidence = EXCLUDED.suggested_evidence,
+  updated_at = now()
+`, companyKey, vatCode, taxCode, companyName, suggestion.Family, suggestion.Source, suggestion.Evidence)
+	if err != nil {
+		return fmt.Errorf("upsert ma bm family suggestion: %w", err)
+	}
+	return nil
+}
+
+// GetMABMFamily ritorna la classificazione di famiglia (nil se mai suggerita né
+// ratificata).
+func (s *SQLStore) GetMABMFamily(ctx context.Context, companyKey string) (*MABMFamily, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	var out MABMFamily
+	var suggestedFamily, suggestedSource, suggestedEvidence, family, ratifiedEmail sql.NullString
+	var ratifiedAt sql.NullTime
+	err := s.db.QueryRowContext(ctx, `
+SELECT company_key, suggested_family, suggested_source, suggested_evidence, family, ratified_by_email, ratified_at
+FROM binocolo.ma_company_bm_family
+WHERE company_key = $1
+`, companyKey).Scan(&out.CompanyKey, &suggestedFamily, &suggestedSource, &suggestedEvidence, &family, &ratifiedEmail, &ratifiedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get ma bm family: %w", err)
+	}
+	out.SuggestedFamily = suggestedFamily.String
+	out.SuggestedSource = suggestedSource.String
+	out.SuggestedEvidence = suggestedEvidence.String
+	out.Family = family.String
+	out.RatifiedByEmail = ratifiedEmail.String
+	if ratifiedAt.Valid {
+		ts := ratifiedAt.Time
+		out.RatifiedAt = &ts
+	}
+	return &out, nil
+}
+
+// RatifyMABMFamily registra la ratifica/override dell'analista; family vuota =
+// revoca (si torna al solo suggerimento, con caveat in valuation).
+func (s *SQLStore) RatifyMABMFamily(ctx context.Context, companyKey, family, subject, email string) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	if strings.TrimSpace(companyKey) == "" {
+		return errors.New("ma bm family ratify: missing company key")
+	}
+	if family == "" {
+		_, err := s.db.ExecContext(ctx, `
+UPDATE binocolo.ma_company_bm_family
+SET family = NULL, ratified_by_subject = NULL, ratified_by_email = NULL, ratified_at = NULL, updated_at = now()
+WHERE company_key = $1
+`, companyKey)
+		if err != nil {
+			return fmt.Errorf("revoke ma bm family: %w", err)
+		}
+		return nil
+	}
+	if !maBMFamilies[family] {
+		return errors.New("ma bm family ratify: unknown family")
+	}
+	_, err := s.db.ExecContext(ctx, `
+INSERT INTO binocolo.ma_company_bm_family (company_key, family, ratified_by_subject, ratified_by_email, ratified_at)
+VALUES ($1, $2, $3, $4, now())
+ON CONFLICT (company_key) DO UPDATE SET
+  family = EXCLUDED.family,
+  ratified_by_subject = EXCLUDED.ratified_by_subject,
+  ratified_by_email = EXCLUDED.ratified_by_email,
+  ratified_at = now(),
+  updated_at = now()
+`, companyKey, family, nullString(subject), nullString(email))
+	if err != nil {
+		return fmt.Errorf("ratify ma bm family: %w", err)
+	}
+	return nil
 }
 
 func (s *SQLStore) loadSectorMultiple(ctx context.Context, prefix string) (*sectorMultiple, error) {

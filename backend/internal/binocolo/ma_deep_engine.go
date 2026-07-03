@@ -28,11 +28,39 @@ const (
 	maRAGAmber = "amber"
 	maRAGRed   = "red"
 	maRAGNone  = "na"
+
+	// maMetricTierContorno (Fase 3, lente compratore): metriche sulla struttura
+	// del capitale del venditore — visibili ma escluse dall'overall RAG.
+	maMetricTierContorno = "contorno"
 )
+
+// maDeepThresholds sono le soglie RAG strutturalmente dipendenti dal business
+// model (Fase 3): solo margine EBITDA, ROS e ciclo finanziario — leva e liquidità
+// restano uniformi (e di contorno). Override per famiglia in ma_parameter (mig 095).
+type maDeepThresholds struct {
+	MarginOK, MarginGood float64
+	ROSOK, ROSGood       float64
+	CicloGood, CicloOK   float64
+}
+
+// defaultMADeepThresholds: le soglie storiche, usate senza famiglia.
+func defaultMADeepThresholds() maDeepThresholds {
+	return maDeepThresholds{MarginOK: 8, MarginGood: 15, ROSOK: 5, ROSGood: 10, CicloGood: 60, CicloOK: 120}
+}
+
+// maFamilyThresholdDefaults: tabella DEEP-DIVE-DECISIONS.md §5.3 (valori da
+// prassi; la mig 095 li replica in ma_parameter per la taratura da UI).
+var maFamilyThresholdDefaults = map[string]maDeepThresholds{
+	maBMFamilyServiziRicorrenti:    {MarginOK: 10, MarginGood: 18, ROSOK: 6, ROSGood: 12, CicloGood: 30, CicloOK: 75},
+	maBMFamilyProgettoIntegrazione: {MarginOK: 6, MarginGood: 12, ROSOK: 4, ROSGood: 8, CicloGood: 90, CicloOK: 150},
+	maBMFamilyRivenditaVAR:         {MarginOK: 3, MarginGood: 7, ROSOK: 2, ROSGood: 5, CicloGood: 45, CicloOK: 90},
+	maBMFamilySoftwareProdotto:     {MarginOK: 15, MarginGood: 25, ROSOK: 10, ROSGood: 18, CicloGood: 15, CicloOK: 60},
+}
 
 // buildMADeepScorecard reads the IT-full payload into a financial scorecard.
 // The ATECO code (for the Fase 4 sector-multiple lookup) is read from the payload.
-func buildMADeepScorecard(payload json.RawMessage) *MADeepScorecard {
+// Le soglie di margine/ROS/ciclo arrivano dal chiamante (per famiglia, Fase 3).
+func buildMADeepScorecard(payload json.RawMessage, th maDeepThresholds) *MADeepScorecard {
 	object, err := decodeVendorObject(payload)
 	if err != nil || object == nil {
 		return nil
@@ -65,14 +93,14 @@ func buildMADeepScorecard(payload json.RawMessage) *MADeepScorecard {
 	}
 
 	// Redditività
-	add("redditivita", "ros", "ROS (margine operativo)", "profitability.ros", "%", 1, ragHigher(5, 10))
+	add("redditivita", "ros", "ROS (margine operativo)", "profitability.ros", "%", 1, ragHigher(th.ROSOK, th.ROSGood))
 	add("redditivita", "roe", "ROE", "profitability.roe", "%", 1, ragHigher(5, 12))
 	add("redditivita", "roi", "ROI", "profitability.roi", "%", 1, ragHigher(5, 10))
 	if sc.Ebitda != nil && sc.Turnover != nil && *sc.Turnover > 0 {
 		margin := *sc.Ebitda / *sc.Turnover * 100
 		sc.Metrics = append(sc.Metrics, MADeepMetric{
 			Group: "redditivita", Key: "ebitda_margin", Label: "Margine EBITDA", Unit: "%",
-			Value: &margin, RAG: ragHigher(8, 15)(margin),
+			Value: &margin, RAG: ragHigher(th.MarginOK, th.MarginGood)(margin),
 		})
 	}
 
@@ -88,7 +116,7 @@ func buildMADeepScorecard(payload json.RawMessage) *MADeepScorecard {
 	add("liquidita", "acid_test", "Acid test (quick ratio)", "financialStability.acidTest", "x", 1, ragHigher(0.8, 1))
 
 	// Efficienza / ciclo
-	add("efficienza", "financial_cycle", "Ciclo finanziario", "financialCycle.financialCycleDuration", "gg", 1, ragLower(60, 120))
+	add("efficienza", "financial_cycle", "Ciclo finanziario", "financialCycle.financialCycleDuration", "gg", 1, ragLower(th.CicloGood, th.CicloOK))
 
 	// Crescita (turnoverTrend is already a percentage; ebitVariation is a fraction)
 	add("crescita", "turnover_trend", "Trend fatturato", "ecofin.turnoverTrend", "%", 1, ragHigher(0, 8))
@@ -102,6 +130,17 @@ func buildMADeepScorecard(payload json.RawMessage) *MADeepScorecard {
 			if sc.Metrics[i].Key == "leverage" && sc.Metrics[i].Value != nil {
 				sc.Metrics[i].RAG = maRAGRed
 			}
+		}
+	}
+
+	// Lente compratore (Fase 3): leva, capitalizzazione, liquidità e ROE
+	// fotografano la struttura del capitale del VENDITORE — che il compratore
+	// sostituisce al closing. Restano visibili (segnale negoziale: dicono quanta
+	// fretta ha il venditore) ma non guidano l'overall RAG.
+	for i := range sc.Metrics {
+		switch sc.Metrics[i].Key {
+		case "leverage", "capitalizzazione", "current_ratio", "acid_test", "roe":
+			sc.Metrics[i].Tier = maMetricTierContorno
 		}
 	}
 
@@ -191,10 +230,15 @@ func ragLower(good, ok float64) func(float64) string {
 }
 
 // deepOverallRAG summarizes the scorecard: any two reds (or one red plus ambers)
-// makes the company red; scattered ambers make it amber; otherwise green.
+// makes the company red; scattered ambers make it amber; otherwise green. Dal
+// redesign (Fase 3) le metriche di contorno sono ESCLUSE: il semaforo risponde ad
+// "attrattività per un acquirente", non al merito di credito del venditore.
 func deepOverallRAG(metrics []MADeepMetric) string {
 	red, amber, scored := 0, 0, 0
 	for _, metric := range metrics {
+		if metric.Tier == maMetricTierContorno {
+			continue
+		}
 		switch metric.RAG {
 		case maRAGRed:
 			red++
@@ -278,7 +322,8 @@ func buildMADeepValuation(sc *MADeepScorecard, reading *maCEEReading, multiple *
 	if sc == nil || multiple == nil {
 		return nil
 	}
-	haircut := pricing.SMEHaircutPct / 100.0
+	haircutPct := pricing.haircutForTurnover(sc.Turnover)
+	haircut := haircutPct / 100.0
 	if haircut < 0 {
 		haircut = 0
 	}
@@ -338,7 +383,7 @@ func buildMADeepValuation(sc *MADeepScorecard, reading *maCEEReading, multiple *
 		Method:           method,
 		LowMethod:        lowMethod,
 		Multiple:         math.Round(mult*100) / 100,
-		HaircutPct:       pricing.SMEHaircutPct,
+		HaircutPct:       haircutPct,
 		EVLow:            math.Round(evLowBase * (1 - spread)),
 		EVHigh:           math.Round(evHighBase * (1 + spread)),
 		PrudentialEbitda: prudential,

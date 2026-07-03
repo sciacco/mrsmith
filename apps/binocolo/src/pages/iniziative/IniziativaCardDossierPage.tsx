@@ -360,7 +360,9 @@ function DeepAnalysisTab({ deep }: { deep?: MADeepAnalysis }) {
       {deep.valuation ? <DeepValuation valuation={deep.valuation} flags={deep.scorecard?.qualityFlags} /> : null}
 
       {groups.map((group) => {
-        const metrics = scorecard.metrics.filter((metric) => metric.group === group.key);
+        const metrics = scorecard.metrics.filter(
+          (metric) => metric.group === group.key && metric.tier !== 'contorno',
+        );
         if (metrics.length === 0) return null;
         return (
           <div key={group.key}>
@@ -371,6 +373,17 @@ function DeepAnalysisTab({ deep }: { deep?: MADeepAnalysis }) {
           </div>
         );
       })}
+      {scorecard.metrics.some((metric) => metric.tier === 'contorno') ? (
+        <div style={{ opacity: 0.72 }}>
+          <h5>Struttura finanziaria del venditore</h5>
+          {scorecard.metrics
+            .filter((metric) => metric.tier === 'contorno')
+            .map((metric) => (
+              <DeepMetricRow key={metric.key} metric={metric} />
+            ))}
+          <small>Fuori dal giudizio complessivo: il compratore sostituisce la struttura del capitale al closing.</small>
+        </div>
+      ) : null}
     </div>
   );
 }

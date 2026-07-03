@@ -132,10 +132,16 @@ type maCEEReading struct {
 	OperatingGrants     float64  // A.5 di cui contributi in conto esercizio (129)
 	OtherRevenuesA5     float64  // A.5 totale altri ricavi (128)
 	Revenues            *float64 // A.1 ricavi vendite e prestazioni (124)
+	ProductionValue     *float64 // A totale valore della produzione (130)
+	MaterialCosts       float64  // B.6 materie prime/merci (131)
+	ServiceCosts        float64  // B.7 servizi (132)
+	StaffCosts          float64  // B.9 totale costo personale (139)
+	OtherOperatingCosts float64  // B.14 oneri diversi (148)
 	LeaseCosts          float64  // B.8 godimento beni di terzi (133)
 	InventoryVariation  float64  // B.11 variazione rimanenze materie (145)
 	ProvisionsB12B13    float64  // B.12(146) + B.13(147)
 	ParticipationIncome float64  // C.15 proventi da partecipazioni (150)
+	Inventory           *float64 // C.I totale rimanenze (045)
 
 	// Risultato d'esercizio (semantica verificata: 178 = imposte, non utile).
 	PreTaxResult *float64 // (177)
@@ -240,10 +246,16 @@ func maCEEReadingFromRoot(root map[string]any) *maCEEReading {
 	reading.OperatingGrants = codes["129"]
 	reading.OtherRevenuesA5 = codes["128"]
 	reading.Revenues = optional("124")
+	reading.ProductionValue = optional("130")
+	reading.MaterialCosts = codes["131"]
+	reading.ServiceCosts = codes["132"]
+	reading.StaffCosts = codes["139"]
+	reading.OtherOperatingCosts = codes["148"]
 	reading.LeaseCosts = codes["133"]
 	reading.InventoryVariation = codes["145"]
 	reading.ProvisionsB12B13 = codes["146"] + codes["147"]
 	reading.ParticipationIncome = codes["150"]
+	reading.Inventory = optional("045")
 
 	reading.PreTaxResult = optional("177")
 	reading.Taxes = optional("178")

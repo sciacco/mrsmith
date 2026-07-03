@@ -230,6 +230,15 @@ const (
 	maParticipationAssetsFlagPctDefault = 25.0
 	maParticipationIncomeFlagPctDefault = 20.0
 
+	// Haircut PMI graduato per taglia (Fase 3, mig 095): sostituisce il flat
+	// sme_haircut_pct, che resta come fallback quando il fatturato non è noto.
+	// Tier2 = 30 = status quo, così le mid-size non cambiano banda.
+	maHaircutTier1PctDefault    = 35.0
+	maHaircutTier2PctDefault    = 30.0
+	maHaircutTier3PctDefault    = 20.0
+	maHaircutTier1MaxEURDefault = 5_000_000.0
+	maHaircutTier2MaxEURDefault = 20_000_000.0
+
 	// maDefaultBudgetEUR caps the projected enrichment spend of a single run
 	// unless the analyst explicitly acknowledges a higher cost.
 	maDefaultBudgetEUR = 50.0
@@ -1252,6 +1261,40 @@ type MADeepMetric struct {
 	Value *float64 `json:"value,omitempty"`
 	Unit  string   `json:"unit"`
 	RAG   string   `json:"rag"`
+	// Tier (Fase 3, lente compratore): "contorno" = metrica sulla struttura del
+	// capitale del VENDITORE (che il compratore sostituisce al closing) — resta
+	// visibile ma non guida l'overall RAG. Vuoto = core.
+	Tier string `json:"tier,omitempty"`
+}
+
+// MABMFamily — famiglia di business model di un'azienda (Fase 3, mig 093):
+// suggerimento deterministico del motore + ratifica dell'analista. Alimenta le
+// soglie RAG e la selezione della riga Damodaran (mai i fact presentation-only
+// di ma_company_fact, che restano fuori da gate/scoring per PRD §6).
+type MABMFamily struct {
+	CompanyKey        string     `json:"companyKey"`
+	SuggestedFamily   string     `json:"suggestedFamily,omitempty"`
+	SuggestedSource   string     `json:"suggestedSource,omitempty"`
+	SuggestedEvidence string     `json:"suggestedEvidence,omitempty"`
+	Family            string     `json:"family,omitempty"`
+	RatifiedByEmail   string     `json:"ratifiedByEmail,omitempty"`
+	RatifiedAt        *time.Time `json:"ratifiedAt,omitempty"`
+}
+
+// Effective è la famiglia usata da soglie e multiplo: la ratifica vince; il solo
+// suggerimento vale ma la valuation porta il caveat "non ratificata".
+func (f *MABMFamily) Effective() (string, bool) {
+	if f == nil {
+		return "", false
+	}
+	if f.Family != "" {
+		return f.Family, true
+	}
+	return f.SuggestedFamily, false
+}
+
+type MABMFamilyRequest struct {
+	Family string `json:"family"` // vuoto = revoca della ratifica
 }
 
 // MADeepValuation is populated in Fase 4 (Damodaran sector multiples). Dal redesign
@@ -1410,6 +1453,7 @@ type MACompanyDossier struct {
 	Scorecard *MADeepScorecard `json:"scorecard,omitempty"`
 	Valuation *MADeepValuation `json:"valuation,omitempty"`
 	Brief     *MADeepBrief     `json:"brief,omitempty"`
+	BMFamily  *MABMFamily      `json:"bmFamily,omitempty"`
 	Raw       json.RawMessage  `json:"raw,omitempty"`
 	CostEUR   float64          `json:"costEur,omitempty"`
 	ErrorCode string           `json:"errorCode,omitempty"`

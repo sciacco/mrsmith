@@ -204,9 +204,14 @@ definizioni vendor sono pinnate da riconciliazioni esatte su due fixture.
 > pulito sui file toccati (errori pre-esistenti solo in
 > IniziativaBoardPage/RicerchePage, estranei); smoke UI su dev server attivo
 > (dossier CDLAN, valuation vecchio formato → ramo fallback ok, console
-> pulita). **Da fare per attivarla**: mig 092 su ANISETTA_DSN, poi
-> `POST /ma/deep/recompute {"valuation": true}` per propagare bridge/banda/
-> flag alle 10 righe in cache — e verifica visiva del bridge nuovo.
+> pulita). **ATTIVATA 2026-07-03**: mig 092 applicata, recompute con
+> `{"valuation": true}` eseguito (10 righe); dossier CDLAN verificato via API
+> (valori identici ai golden: EV 10.693.024–14.637.054 su Telecom 7,19×,
+> equity 8.732.443–12.676.473, riconciliazione a zero) e visivamente (bridge
+> EV−PFN−TFR=Equity, entrambi i flag con evidenza e domanda DD). Nota: il
+> `valuationRationale` del brief LLM cached narra ancora i numeri della
+> valuation vecchia — si riallinea con `POST /ma/deep/regenerate-briefs`
+> (10 chiamate LLM, centesimi), a discrezione dell'utente.
 
 **Obiettivo:** il numero che l'IC guarda diventa onesto: bridge esplicito,
 banda ancorata all'EBITDA prudenziale, flag di confidenza fuori da banda e RAG.
@@ -261,6 +266,40 @@ distorsione misurata; nessun flag dentro la matematica.
 ---
 
 ## Fase 3 — Filoni C+D: lente compratore, famiglie, multipli
+
+> **STATO 2026-07-03: IMPLEMENTATA** — mig 093 (`ma_company_bm_family`:
+> suggested vs ratified), 094 (righe `FAMILY:*` nella stessa
+> sector_valuation_multiple: Computer Services 12,03×, Engineering/
+> Construction 9,71×, Retail Distributors 11,64×, Software 20,85× — valori da
+> docs/sector_valuation_multiples.json, vintage confermata), 095 (24 soglie
+> famiglia + 5 parametri haircut graduato 35/30/20 con soglie 5M/20M).
+> Backend: lente compratore (leverage/capitalizzazione/current/acid/ROE →
+> tier "contorno", escluse dall'overall RAG), `suggestBMFamily` (ATECO
+> univoci + euristica struttura costi CE per il blob 62/63, con evidenza),
+> percorso condiviso `computeMADeepScorecard`/`resolveMADeepValuation`
+> (worker + recompute + regenerate), endpoint PUT
+> `/ma/companies/{companyKey}/bm-family` (ratifica/revoca con trace),
+> famiglia nel dossier P.IVA. **Raffinamento di design rispetto alla bozza**:
+> la riga famiglia scavalca il prefisso SOLO dove il prefisso è fuorviante
+> (`maFamilyFirstPrefixes`: 43/46/58/62/620/6201/63) — un prefisso specifico
+> corretto (61 → Telecom 7,19×) è un comparable migliore del proxy di
+> famiglia (senza questa regola CDLAN sarebbe salita immotivatamente a
+> Computer Services 12,03×, +67%); altrove famiglia = fallback pre-TOTAL.
+> **Rettifica fattuale**: la mig 039 aveva già granularità 4 cifre su 62xx
+> (6202/6203/6209 → Computer Services) — il bug "tutto il 62 a 20,85×" era
+> più circoscritto di quanto scritto nel brainstorm; resta il disallineamento
+> identità-vs-codice che la famiglia risolve. **Cambio semantico ratificato
+> nei test**: KRAL (equity negativa, patrimoniale tutto rosso) passa da red a
+> amber overall — l'insolvenza urla dal flag patrimonio_eroso e dai contorno
+> rossi, non dal semaforo core; MFT resta red ma per ragioni core (ROS 1,56%,
+> ricavi in calo), col margine 7,77% che da rosso diventa ambra nelle soglie
+> progetto. UI: gruppo "Struttura finanziaria del venditore" subordinato su
+> 3 superfici; sezione "Business model" con ratifica sul dossier P.IVA.
+> Test: 6 nuovi (classificatore su fixture+sintetici, ordine risoluzione,
+> soglie famiglia, contorno, haircut tiers, caveat) tutti verdi; tsc pulito.
+> **Da fare per attivarla**: mig 093-095, poi recompute
+> `{"valuation": true}` (le famiglie vengono suggerite e applicate); ratifica
+> analista dal dossier.
 
 **Obiettivo:** il semaforo risponde all'acquirente; una classificazione
 alimenta soglie e riga Damodaran; haircut graduato.

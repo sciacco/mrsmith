@@ -641,6 +641,15 @@ type maPricing struct {
 	ParticipationAssetsFlagPct float64
 	ParticipationIncomeFlagPct float64
 	ThesisFitHoldingHaircutPct float64
+	// Fase 3: haircut PMI graduato per taglia + soglie RAG per famiglia di
+	// business model (mig 095). SMEHaircutPct resta il fallback senza fatturato
+	// o senza configurazione tier.
+	HaircutTier1Pct    float64
+	HaircutTier2Pct    float64
+	HaircutTier3Pct    float64
+	HaircutTier1MaxEUR float64
+	HaircutTier2MaxEUR float64
+	FamilyThresholds   map[string]maDeepThresholds
 	// Gated-search pipeline levers (migration 074): CostAddress = per-company gate
 	// enrichment, CostScrapePage/CostSearch = fastcrw unit costs, SurvivorRate =
 	// expected keep+forse fraction (0-1) used by the estimate's Advanced projection.
@@ -673,6 +682,34 @@ func maScoringParamsFromPricing(pricing maPricing) maScoringParams {
 	}
 }
 
+// thresholdsForFamily: soglie RAG per la famiglia di business model effettiva;
+// senza famiglia (o con pricing costruito a mano nei test) valgono i default.
+func (p maPricing) thresholdsForFamily(family string) maDeepThresholds {
+	if th, ok := p.FamilyThresholds[family]; ok {
+		return th
+	}
+	if th, ok := maFamilyThresholdDefaults[family]; ok {
+		return th
+	}
+	return defaultMADeepThresholds()
+}
+
+// haircutForTurnover: sconto PMI graduato per taglia (Fase 3). Senza fatturato o
+// senza configurazione tier valida si degrada al flat storico SMEHaircutPct.
+func (p maPricing) haircutForTurnover(turnover *float64) float64 {
+	if turnover == nil || p.HaircutTier1MaxEUR <= 0 || p.HaircutTier2MaxEUR <= p.HaircutTier1MaxEUR {
+		return p.SMEHaircutPct
+	}
+	switch {
+	case *turnover < p.HaircutTier1MaxEUR:
+		return p.HaircutTier1Pct
+	case *turnover < p.HaircutTier2MaxEUR:
+		return p.HaircutTier2Pct
+	default:
+		return p.HaircutTier3Pct
+	}
+}
+
 // loadPricing reads the configurable pricing levers; missing/unreadable values
 // fall back to the compiled defaults so the feature degrades gracefully.
 func (s *maService) loadPricing(ctx context.Context) maPricing {
@@ -700,6 +737,11 @@ func maPricingFromParameters(params []MAParameter) maPricing {
 		B8RevenueFlagPct:           maB8RevenueFlagPctDefault,
 		ParticipationAssetsFlagPct: maParticipationAssetsFlagPctDefault,
 		ParticipationIncomeFlagPct: maParticipationIncomeFlagPctDefault,
+		HaircutTier1Pct:            maHaircutTier1PctDefault,
+		HaircutTier2Pct:            maHaircutTier2PctDefault,
+		HaircutTier3Pct:            maHaircutTier3PctDefault,
+		HaircutTier1MaxEUR:         maHaircutTier1MaxEURDefault,
+		HaircutTier2MaxEUR:         maHaircutTier2MaxEURDefault,
 		ThesisFitHoldingHaircutPct: maThesisFitHoldingHaircutPctDefault,
 		CostAddress:                maCostPerAddressEUR,
 		CostScrapePage:             maCostPerScrapePageEUR,
@@ -750,6 +792,46 @@ func maPricingFromParameters(params []MAParameter) maPricing {
 	}
 	if v, ok := paramFloat(values, "participation_income_flag_pct"); ok {
 		pricing.ParticipationIncomeFlagPct = v
+	}
+	if v, ok := paramFloat(values, "haircut_pct_tier1"); ok {
+		pricing.HaircutTier1Pct = v
+	}
+	if v, ok := paramFloat(values, "haircut_pct_tier2"); ok {
+		pricing.HaircutTier2Pct = v
+	}
+	if v, ok := paramFloat(values, "haircut_pct_tier3"); ok {
+		pricing.HaircutTier3Pct = v
+	}
+	if v, ok := paramFloat(values, "haircut_tier1_max_eur"); ok {
+		pricing.HaircutTier1MaxEUR = v
+	}
+	if v, ok := paramFloat(values, "haircut_tier2_max_eur"); ok {
+		pricing.HaircutTier2MaxEUR = v
+	}
+	// Soglie RAG per famiglia: partono dalla tabella di prassi e accettano
+	// override puntuali da ma_parameter (chiavi rag_{metrica}_{banda}_{famiglia}).
+	pricing.FamilyThresholds = map[string]maDeepThresholds{}
+	for family, defaults := range maFamilyThresholdDefaults {
+		th := defaults
+		if v, ok := paramFloat(values, "rag_margin_ok_"+family); ok {
+			th.MarginOK = v
+		}
+		if v, ok := paramFloat(values, "rag_margin_good_"+family); ok {
+			th.MarginGood = v
+		}
+		if v, ok := paramFloat(values, "rag_ros_ok_"+family); ok {
+			th.ROSOK = v
+		}
+		if v, ok := paramFloat(values, "rag_ros_good_"+family); ok {
+			th.ROSGood = v
+		}
+		if v, ok := paramFloat(values, "rag_ciclo_good_"+family); ok {
+			th.CicloGood = v
+		}
+		if v, ok := paramFloat(values, "rag_ciclo_ok_"+family); ok {
+			th.CicloOK = v
+		}
+		pricing.FamilyThresholds[family] = th
 	}
 	if v, ok := paramFloat(values, "thesis_fit_holding_haircut_pct"); ok && v < 100 {
 		pricing.ThesisFitHoldingHaircutPct = v
@@ -2584,9 +2666,10 @@ func (s *maService) regenerateMADeepBriefs(ctx context.Context) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	pricing := s.loadPricing(ctx)
 	regenerated := 0
 	for _, row := range rows {
-		scorecard := buildMADeepScorecard(row.Payload)
+		scorecard, _, _, _ := computeMADeepScorecard(ctx, s.store, row.Payload, row.CompanyKey, "", "", pricing)
 		if scorecard == nil {
 			continue
 		}
@@ -2621,20 +2704,15 @@ func (s *maService) recomputeMADeepScorecards(ctx context.Context, withValuation
 	pricing := s.loadPricing(ctx)
 	recomputed := 0
 	for _, row := range rows {
-		scorecard := buildMADeepScorecard(row.Payload)
+		scorecard, reading, family, ratified := computeMADeepScorecard(ctx, s.store, row.Payload, row.CompanyKey, row.VATCode, row.TaxCode, pricing)
 		if scorecard == nil {
 			continue
 		}
-		reading := maCEEReadingFromPayload(row.Payload)
-		scorecard.QualityFlags = buildMADeepQualityFlags(scorecard, reading, pricing)
 		if err := s.store.UpdateMADeepScorecard(ctx, row.CompanyKey, scorecard); err != nil {
 			return recomputed, err
 		}
 		if withValuation {
-			multiple, err := s.store.ResolveSectorMultiple(ctx, scorecard.AtecoCode)
-			if err != nil {
-				logging.FromContext(ctx).Warn("binocolo recompute sector multiple failed", "component", "binocolo", "company_key", row.CompanyKey, "error", err)
-			} else if valuation := buildMADeepValuation(scorecard, reading, multiple, pricing); valuation != nil {
+			if valuation := resolveMADeepValuation(ctx, s.store, scorecard, reading, family, ratified, pricing); valuation != nil {
 				if err := s.store.UpdateMADeepValuation(ctx, row.CompanyKey, valuation); err != nil {
 					return recomputed, err
 				}
@@ -2643,6 +2721,31 @@ func (s *maService) recomputeMADeepScorecards(ctx context.Context, withValuation
 		recomputed++
 	}
 	return recomputed, nil
+}
+
+// ratifyBMFamily registra la ratifica/override dell'analista sulla famiglia di
+// business model (family vuota = revoca) e traccia l'evento. La classificazione
+// entra in soglie e multiplo al prossimo recompute/refresh dell'azienda.
+func (s *maService) ratifyBMFamily(ctx context.Context, companyKey, family, subject, email string) (*MABMFamily, error) {
+	if s.store == nil {
+		return nil, errMAStoreUnavailable
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey == "" {
+		return nil, fmt.Errorf("%w: company key", errMAStrategyInvalid)
+	}
+	if family != "" && !maBMFamilies[family] {
+		return nil, fmt.Errorf("%w: famiglia sconosciuta", errMAStrategyInvalid)
+	}
+	if err := s.store.RatifyMABMFamily(ctx, companyKey, family, subject, email); err != nil {
+		return nil, err
+	}
+	_ = s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_bm_family_ratified",
+		Status:    maTraceEventSucceeded,
+		Metadata:  maTraceJSON(map[string]any{"company_key": companyKey, "family": family, "by": email}),
+	})
+	return s.store.GetMABMFamily(ctx, companyKey)
 }
 
 // inspectMADeep computes the Fase 0 read-only diagnostics over the cached deep
@@ -2899,7 +3002,13 @@ func (s *maService) getCompanyDossier(ctx context.Context, vat string) (MACompan
 	if err != nil {
 		return MACompanyDossier{}, err
 	}
-	return mapMACompanyDossier(vat, rec), nil
+	dossier := mapMACompanyDossier(vat, rec)
+	// Famiglia di business model (Fase 3): best-effort, il dossier vive anche
+	// senza classificazione.
+	if bmFamily, err := s.store.GetMABMFamily(ctx, normalizeMACompanyKey(vat)); err == nil {
+		dossier.BMFamily = bmFamily
+	}
+	return dossier, nil
 }
 
 func mapMACompanyDossier(vat string, rec *maDeepVATRecord) MACompanyDossier {

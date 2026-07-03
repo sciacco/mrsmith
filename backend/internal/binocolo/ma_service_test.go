@@ -1544,8 +1544,20 @@ func (f *fakeMAWorkspaceStore) UpdateMADeepValuation(context.Context, string, *M
 	return nil
 }
 
-func (f *fakeMAWorkspaceStore) ResolveSectorMultiple(context.Context, string) (*sectorMultiple, error) {
+func (f *fakeMAWorkspaceStore) ResolveSectorMultipleKeys(context.Context, []string) (*sectorMultiple, error) {
 	return nil, nil
+}
+
+func (f *fakeMAWorkspaceStore) UpsertMABMFamilySuggestion(context.Context, string, string, string, string, maBMFamilySuggestion) error {
+	return nil
+}
+
+func (f *fakeMAWorkspaceStore) GetMABMFamily(context.Context, string) (*MABMFamily, error) {
+	return nil, nil
+}
+
+func (f *fakeMAWorkspaceStore) RatifyMABMFamily(context.Context, string, string, string, string) error {
+	return nil
 }
 
 func (f *fakeMAWorkspaceStore) CountMADeepVintage(context.Context) (int, int, error) {

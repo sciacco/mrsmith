@@ -238,13 +238,17 @@ decidibile solo con un bilancio precedente in mano, arriverà con le vintage.
    magazzino + risconti → progetto; A.4 rilevante → software prodotto;
    personale/VA alto + magazzino ~0 → servizi), mostrato **con la sua
    evidenza**, ratifica/override un-click dell'analista. No LLM nel percorso.
-5. **Bug di selezione riga dimostrato nel seed 039**: prefisso 62 → "Software
-   (System & Application)" 20.85× EV/EBITDA per *tutto* (MSP e body rental a
-   multipli da software product quotato ≈ sopravvalutazione ~3×); 58 →
-   "Publishing & Newspapers" (software house a multipli da giornali); 43 →
-   "Construction Supplies" (fornitori di materiali, non installatori); 63 →
-   n=6. Fix: righe Damodaran per famiglia (stesso dataset gratuito, righe in
-   più), risoluzione multiplo = fatto-famiglia → prefisso ATECO → niente.
+5. **Bug di selezione riga nel seed 039** (*rettificato in Fase 3*: il seed ha
+   già granularità a 4 cifre su 62xx — 6202/6203/6209 → Computer Services
+   12.03×; il problema "tutto il 62 a 20.85×" riguarda solo i codici 62/620
+   generici e il 6201, e resta il disallineamento identità-vs-codice: la
+   software house codificata 6202 o l'MSP codificato 6201 prendono il multiplo
+   sbagliato). Restano interi: 58 → "Publishing & Newspapers" (software house
+   a multipli da giornali); 43 → "Construction Supplies" (fornitori di
+   materiali, non installatori — Engineering/Construction 9.71× è la riga
+   giusta); 63 → n=6. Fix: righe Damodaran per famiglia (stesso dataset,
+   chiave sintetica `FAMILY:*`), risoluzione = famiglia → prefisso → TOTAL:
+   la classificazione segue l'identità dell'azienda, non il codice camerale.
 6. **Haircut PMI graduato per taglia** al posto del flat 30%: 3 scaglioni di
    fatturato parametrizzati (indicativi: <€5M → 35-40%; €5-20M → 25-30%;
    >€20M → 15-20%).

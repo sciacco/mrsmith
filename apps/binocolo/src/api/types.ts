@@ -523,6 +523,17 @@ export interface MADeepMetric {
   value?: number;
   unit: string;
   rag: string;
+  tier?: string; // 'contorno' = struttura del capitale del venditore, fuori dall'overall RAG
+}
+
+export interface MABMFamily {
+  companyKey: string;
+  suggestedFamily?: string;
+  suggestedSource?: string;
+  suggestedEvidence?: string;
+  family?: string;
+  ratifiedByEmail?: string;
+  ratifiedAt?: string;
 }
 
 export interface MADeepValuation {
@@ -578,6 +589,7 @@ export interface MACompanyDossier {
   scorecard?: MADeepScorecard;
   valuation?: MADeepValuation;
   brief?: MADeepBrief;
+  bmFamily?: MABMFamily;
   raw?: unknown;
   costEur?: number;
   errorCode?: string;

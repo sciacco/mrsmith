@@ -26,7 +26,7 @@ func TestBuildMADeepScorecardHealthy(t *testing.T) {
 		"financialCycle": {"financialCycleDuration": 40.0},
 		"development": {"ebitVariation": 0.10}
 	}`)
-	sc := buildMADeepScorecard(payload)
+	sc := buildMADeepScorecard(payload, defaultMADeepThresholds())
 	if sc == nil {
 		t.Fatal("nil scorecard")
 	}
@@ -73,7 +73,7 @@ func TestBuildMADeepScorecardStressedAndMissing(t *testing.T) {
 		"indebtedness": {"leverage": 8.0, "debtRatio": 90.0, "capitalizationDegree": 0.10},
 		"leverageRatios": {"pfnEbitda": 7.0}
 	}`)
-	sc := buildMADeepScorecard(payload)
+	sc := buildMADeepScorecard(payload, defaultMADeepThresholds())
 	if sc == nil {
 		t.Fatal("nil scorecard")
 	}
@@ -141,7 +141,7 @@ func TestBuildMADeepValuationFallbackEVSales(t *testing.T) {
 
 func TestDeepFullRootUnwrapsDataEnvelope(t *testing.T) {
 	payload := json.RawMessage(`{"data": {"ecofin": {"turnover": 100}, "operatingResults": {"ebitda": 10}}}`)
-	sc := buildMADeepScorecard(payload)
+	sc := buildMADeepScorecard(payload, defaultMADeepThresholds())
 	if sc == nil || sc.Turnover == nil || *sc.Turnover != 100 {
 		t.Fatalf("unwrap failed: %+v", sc)
 	}
@@ -181,6 +181,9 @@ func TestBuildMADeepScorecardRealPayloads(t *testing.T) {
 		{
 			// KRAL SRLS: negative equity (-81.980). leverage raw is -0.54, which
 			// ragLower would read as healthy green; the sign guard forces red.
+			// Dalla lente compratore (Fase 3) le metriche patrimoniali sono di
+			// contorno: l'overall scende ad ambra (resta il rosso core sul trend
+			// -27,6%), e l'insolvenza urla dal flag patrimonio_eroso + contorno rossi.
 			name: "kral_insolvent_sign_guard",
 			payload: `{
 				"ecofin": {"turnover": 99747, "turnoverYear": 2025, "turnoverTrend": -27.64, "netWorth": -81980},
@@ -190,7 +193,7 @@ func TestBuildMADeepScorecardRealPayloads(t *testing.T) {
 				"indebtedness": {"leverage": -0.5407, "capitalizationDegree": -1.8495},
 				"development": {"ebitVariation": 37.3947}
 			}`,
-			overall: maRAGRed,
+			overall: maRAGAmber, // era red quando il patrimoniale guidava l'overall
 			metricRAGs: map[string]string{
 				"leverage":         maRAGRed, // sign guard (raw -0.5407 would be green)
 				"capitalizzazione": maRAGRed, // -184.95%
@@ -220,7 +223,7 @@ func TestBuildMADeepScorecardRealPayloads(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			sc := buildMADeepScorecard(json.RawMessage(tc.payload))
+			sc := buildMADeepScorecard(json.RawMessage(tc.payload), defaultMADeepThresholds())
 			if sc == nil {
 				t.Fatal("nil scorecard")
 			}

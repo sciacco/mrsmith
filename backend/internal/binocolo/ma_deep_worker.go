@@ -22,7 +22,7 @@ type maDeepWorkerStore interface {
 	ClaimMADeepQueued(ctx context.Context, companyKey string) (bool, error)
 	SetMADeepVendorRequest(ctx context.Context, companyKey, vendorRequestID string) error
 	InsertMADeepVintage(ctx context.Context, companyKey, balanceSheetDate string, turnoverYear *int, payload json.RawMessage) error
-	ResolveSectorMultiple(ctx context.Context, ateco string) (*sectorMultiple, error)
+	maDeepFamilyStore
 	SaveMADeepReady(ctx context.Context, companyKey string, result maDeepResult) error
 	MarkMADeepFailed(ctx context.Context, companyKey, errorCode string) error
 	BumpMADeepAttempt(ctx context.Context, companyKey string) (int, error)
@@ -155,23 +155,19 @@ func (w *maDeepWorker) process(ctx context.Context, job maDeepJob) {
 		} else {
 			logging.FromContext(ctx).Warn("binocolo deep worker vintage key unreadable", "component", "binocolo", "company_key", job.CompanyKey)
 		}
-		scorecard := buildMADeepScorecard(resp.Data)
+		pricing := w.pricing(ctx)
+		// Percorso condiviso con recompute (Fase 3): lettura CEE, suggerimento
+		// famiglia (mai sovrascrive la ratifica), soglie per famiglia, scorecard
+		// con flag, multiplo famiglia→prefisso→TOTAL e valuation con caveat.
+		scorecard, reading, family, ratified := computeMADeepScorecard(ctx, w.store, resp.Data, job.CompanyKey, job.VATCode, job.TaxCode, pricing)
 		if scorecard == nil || (scorecard.Turnover == nil && scorecard.Ebitda == nil && !scorecardHasMetric(scorecard)) {
 			// Paid call returned, but no KPI could be read — keep the payload but
 			// flag it so a path mismatch is diagnosable on the first real run.
 			logging.FromContext(ctx).Warn("binocolo deep worker empty scorecard", "component", "binocolo", "company_key", job.CompanyKey)
 		}
-		pricing := w.pricing(ctx)
-		reading := maCEEReadingFromPayload(resp.Data)
 		var valuation *MADeepValuation
 		if scorecard != nil {
-			scorecard.QualityFlags = buildMADeepQualityFlags(scorecard, reading, pricing)
-			multiple, err := w.store.ResolveSectorMultiple(ctx, scorecard.AtecoCode)
-			if err != nil {
-				logging.FromContext(ctx).Warn("binocolo deep worker sector multiple failed", "component", "binocolo", "company_key", job.CompanyKey, "error", err)
-			} else {
-				valuation = buildMADeepValuation(scorecard, reading, multiple, pricing)
-			}
+			valuation = resolveMADeepValuation(ctx, w.store, scorecard, reading, family, ratified, pricing)
 		}
 		result := maDeepResult{Payload: resp.Data, Scorecard: scorecard, Valuation: valuation, CostEUR: pricing.CostFull}
 		if w.llmp != nil && scorecard != nil {

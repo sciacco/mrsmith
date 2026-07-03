@@ -1614,6 +1614,9 @@
 .qualityFlagDD {
   color: var(--color-text-muted);
 }
+.deepGroupContorno {
+  opacity: 0.72;
+}
 .deepBrief p,
 .deepBrief li {
   font-size: 0.8125rem;

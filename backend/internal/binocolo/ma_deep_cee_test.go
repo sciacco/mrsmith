@@ -176,7 +176,7 @@ func TestMACEEReadingFallbacks(t *testing.T) {
 // sui payload senza CEE, e ROE in punti percentuali.
 func TestMADeepScorecardReconciliation(t *testing.T) {
 	mft, _ := loadFixturePayload(t, "testdata/itfull_mft_2024.json")
-	sc := buildMADeepScorecard(mft)
+	sc := buildMADeepScorecard(mft, defaultMADeepThresholds())
 	if sc == nil || sc.Reconciliation == nil {
 		t.Fatal("reconciliation mancante su MFT")
 	}
@@ -194,7 +194,7 @@ func TestMADeepScorecardReconciliation(t *testing.T) {
 	}
 
 	cdlan, _ := loadFixturePayload(t, "testdata/itfull_cdlan_2025.json")
-	sc = buildMADeepScorecard(cdlan)
+	sc = buildMADeepScorecard(cdlan, defaultMADeepThresholds())
 	if sc == nil || sc.Reconciliation == nil {
 		t.Fatal("reconciliation mancante su CDLAN")
 	}
@@ -214,7 +214,7 @@ func TestMADeepScorecardReconciliation(t *testing.T) {
 		"ecofin": {"turnover": 1000000, "netWorth": 50000},
 		"operatingResults": {"ebitda": 30000},
 		"leverageRatios": {"pfnEbitda": 7.0}
-	}`))
+	}`), defaultMADeepThresholds())
 	if sc == nil || sc.Reconciliation != nil {
 		t.Fatalf("reconciliation attesa assente: %+v", sc.Reconciliation)
 	}
@@ -234,7 +234,7 @@ func fase2Pricing() maPricing {
 // porta PFN CEE, TFR pieno e la riga soci informativa.
 func TestValuationBandDegeneratesSymmetric(t *testing.T) {
 	payload, _ := loadFixturePayload(t, "testdata/itfull_mft_2024.json")
-	sc := buildMADeepScorecard(payload)
+	sc := buildMADeepScorecard(payload, defaultMADeepThresholds())
 	reading := maCEEReadingFromPayload(payload)
 	evEbitda := 8.0
 	multiple := &sectorMultiple{Industry: "Engineering/Construction", EVEbitda: &evEbitda, NFirms: 100}
@@ -341,7 +341,7 @@ func TestValuationNegativeEBITDAStaysSymmetricSales(t *testing.T) {
 // completo sulla fixture CDLAN.
 func TestValuationBridgeCDLAN(t *testing.T) {
 	payload, _ := loadFixturePayload(t, "testdata/itfull_cdlan_2025.json")
-	sc := buildMADeepScorecard(payload)
+	sc := buildMADeepScorecard(payload, defaultMADeepThresholds())
 	reading := maCEEReadingFromPayload(payload)
 	if sc.PFN == nil || *sc.PFN != 1666053 { // PFN CEE, non più ratio vendor
 		t.Fatalf("scorecard PFN: %v", sc.PFN)
@@ -368,14 +368,14 @@ func TestValuationBridgeCDLAN(t *testing.T) {
 // CDLAN → perimetro_standalone (warning, prima) + b8_beni_terzi (info, dopo).
 func TestQualityFlagsRealPayloads(t *testing.T) {
 	mft, _ := loadFixturePayload(t, "testdata/itfull_mft_2024.json")
-	sc := buildMADeepScorecard(mft)
+	sc := buildMADeepScorecard(mft, defaultMADeepThresholds())
 	flags := buildMADeepQualityFlags(sc, maCEEReadingFromPayload(mft), fase2Pricing())
 	if len(flags) != 1 || flags[0].Code != "a5_altri_ricavi" || flags[0].Severity != "warning" {
 		t.Fatalf("mft flags: %+v", flags)
 	}
 
 	cdlan, _ := loadFixturePayload(t, "testdata/itfull_cdlan_2025.json")
-	sc = buildMADeepScorecard(cdlan)
+	sc = buildMADeepScorecard(cdlan, defaultMADeepThresholds())
 	flags = buildMADeepQualityFlags(sc, maCEEReadingFromPayload(cdlan), fase2Pricing())
 	if len(flags) != 2 {
 		t.Fatalf("cdlan flags: %+v", flags)

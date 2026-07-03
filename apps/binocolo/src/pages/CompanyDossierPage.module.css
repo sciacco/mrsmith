@@ -529,6 +529,26 @@
   color: var(--color-text-muted);
 }
 
+.metricGroupContorno {
+  opacity: 0.72;
+}
+
+.familyControls {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  margin-top: var(--space-3);
+}
+
+.familySelect {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  font-size: 0.8125rem;
+}
+
 .valFlags {
   margin: var(--space-3) 0 0;
   padding: 0;

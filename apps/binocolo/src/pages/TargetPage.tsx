@@ -2856,7 +2856,9 @@ function DeepAnalysisTab({ deep }: { deep?: MADeepAnalysis }) {
           
           <div className={styles.deepMetricsStack}>
             {groups.map((group) => {
-              const metrics = scorecard.metrics.filter((metric) => metric.group === group.key);
+              const metrics = scorecard.metrics.filter(
+                (metric) => metric.group === group.key && metric.tier !== 'contorno',
+              );
               if (metrics.length === 0) return null;
               return (
                 <div key={group.key} className={styles.deepGroup}>
@@ -2869,6 +2871,21 @@ function DeepAnalysisTab({ deep }: { deep?: MADeepAnalysis }) {
                 </div>
               );
             })}
+            {scorecard.metrics.some((metric) => metric.tier === 'contorno') ? (
+              <div className={`${styles.deepGroup} ${styles.deepGroupContorno}`}>
+                <h5>Struttura finanziaria del venditore</h5>
+                <div className={styles.deepMetrics}>
+                  {scorecard.metrics
+                    .filter((metric) => metric.tier === 'contorno')
+                    .map((metric) => (
+                      <DeepMetricRow key={metric.key} metric={metric} />
+                    ))}
+                </div>
+                <small className={styles.deepValCaveat}>
+                  Fuori dal giudizio complessivo: il compratore sostituisce la struttura del capitale al closing.
+                </small>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

@@ -4,6 +4,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { Button, Icon } from '@mrsmith/ui';
 import { useApiClient } from '../api/client';
 import type {
+  MABMFamily,
   MACompanyDossier,
   MADeepBrief,
   MADeepMetric,
@@ -162,6 +163,7 @@ function bilancioRows(entries?: CodeValue[]): BilancioRow[] {
 const SECTIONS = [
   { id: 'sintesi', label: 'Sintesi' },
   { id: 'valutazione', label: 'Valutazione' },
+  { id: 'famiglia', label: 'Business model' },
   { id: 'kpi', label: 'Indicatori' },
   { id: 'bilancio', label: 'Bilancio' },
   { id: 'soci', label: 'Soci e gruppo' },
@@ -378,28 +380,108 @@ function ValItem({ label, value, strong }: { label: string; value: string; stron
   );
 }
 
+const FAMILY_LABEL: Record<string, string> = {
+  servizi_ricorrenti: 'Servizi ricorrenti',
+  progetto_integrazione: 'Progetto & integrazione',
+  rivendita_var: 'Rivendita / VAR',
+  software_prodotto: 'Software prodotto',
+};
+
+// FamilySection — famiglia di business model (Fase 3): suggerimento del motore
+// con evidenza + ratifica/override dell'analista. La famiglia guida soglie RAG e
+// riga Damodaran; entra in vigore al prossimo ricalcolo dell'azienda.
+function FamilySection({ vatCode, bmFamily }: { vatCode: string; bmFamily?: MABMFamily }) {
+  const api = useApiClient();
+  const [current, setCurrent] = useState<MABMFamily | undefined>(bmFamily);
+  const [selected, setSelected] = useState<string>(bmFamily?.family ?? '');
+  const ratify = useMutation({
+    mutationFn: (family: string) =>
+      api.put<MABMFamily>(`/binocolo/v1/ma/companies/${encodeURIComponent(vatCode)}/bm-family`, { family }),
+    onSuccess: (data) => {
+      setCurrent(data ?? undefined);
+      setSelected(data?.family ?? '');
+    },
+  });
+  const effective = current?.family || current?.suggestedFamily || '';
+  return (
+    <section className={styles.section}>
+      <SectionHead id="famiglia" title="Business model" prov="elab" />
+      <div className={styles.valGrid}>
+        <ValItem
+          label="Famiglia"
+          value={effective ? `${FAMILY_LABEL[effective] ?? effective}${current?.family ? ' (ratificata)' : ' (suggerita)'}` : 'non classificata'}
+          strong
+        />
+        {current?.suggestedFamily && !current.family ? (
+          <ValItem label="Evidenza" value={current.suggestedEvidence || current.suggestedSource || '—'} />
+        ) : null}
+        {current?.family && current.suggestedFamily && current.family !== current.suggestedFamily ? (
+          <ValItem
+            label="Suggerita dal motore"
+            value={`${FAMILY_LABEL[current.suggestedFamily] ?? current.suggestedFamily} — ${current.suggestedEvidence}`}
+          />
+        ) : null}
+      </div>
+      <div className={styles.familyControls}>
+        <select
+          className={styles.familySelect}
+          value={selected}
+          onChange={(event) => setSelected(event.target.value)}
+          aria-label="Famiglia di business model"
+        >
+          <option value="">— nessuna ratifica —</option>
+          {Object.entries(FAMILY_LABEL).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <Button
+          variant="secondary"
+          onClick={() => ratify.mutate(selected)}
+          loading={ratify.isPending}
+          disabled={selected === (current?.family ?? '')}
+        >
+          {selected ? 'Ratifica' : 'Revoca ratifica'}
+        </Button>
+      </div>
+      <p className={styles.valSource}>
+        La famiglia guida le soglie degli indicatori e il multiplo di settore; entra in vigore al prossimo ricalcolo
+        dell'analisi.
+      </p>
+      {ratify.isError ? <p className={styles.valSource}>Errore nel salvataggio: riprova.</p> : null}
+    </section>
+  );
+}
+
 const GROUP_LABEL: Record<string, string> = {
   redditivita: 'Redditività',
   leva: 'Leva e struttura',
   liquidita: 'Liquidità',
   efficienza: 'Efficienza',
   crescita: 'Crescita',
+  contorno: 'Struttura finanziaria del venditore',
 };
 
 function ScorecardSection({ scorecard }: { scorecard?: MADeepScorecard }) {
   if (!scorecard || scorecard.metrics.length === 0) return null;
   const groups = new Map<string, MADeepMetric[]>();
   for (const m of scorecard.metrics) {
+    if (m.tier === 'contorno') continue;
     const arr = groups.get(m.group) ?? [];
     arr.push(m);
     groups.set(m.group, arr);
+  }
+  const contorno = scorecard.metrics.filter((m) => m.tier === 'contorno');
+  if (contorno.length > 0) {
+    groups.set('contorno', contorno);
   }
   return (
     <section className={styles.section}>
       <SectionHead id="kpi" title="Indicatori finanziari" prov="elab" />
       <div className={styles.metricGroups}>
         {[...groups.entries()].map(([group, metrics]) => (
-          <div key={group} className={styles.metricGroup}>
+          <div key={group} className={`${styles.metricGroup} ${group === 'contorno' ? styles.metricGroupContorno : ''}`}>
             <h3 className={styles.metricGroupTitle}>{GROUP_LABEL[group] ?? group}</h3>
             <div className={styles.metricGrid}>
               {metrics.map((m) => (
@@ -410,6 +492,11 @@ function ScorecardSection({ scorecard }: { scorecard?: MADeepScorecard }) {
                 </div>
               ))}
             </div>
+            {group === 'contorno' ? (
+              <p className={styles.valSource}>
+                Fuori dal giudizio complessivo: il compratore sostituisce la struttura del capitale al closing.
+              </p>
+            ) : null}
           </div>
         ))}
       </div>
@@ -620,6 +707,7 @@ function Dossier({ dossier }: { dossier: MACompanyDossier }) {
         <div className={styles.body}>
           <BriefSection brief={dossier.brief} />
           <ValuationSection valuation={dossier.valuation} brief={dossier.brief} flags={dossier.scorecard?.qualityFlags} />
+          <FamilySection vatCode={dossier.vatCode} bmFamily={dossier.bmFamily} />
           <ScorecardSection scorecard={dossier.scorecard} />
           <BilancioSection itf={itf} />
           <SociSection itf={itf} />
