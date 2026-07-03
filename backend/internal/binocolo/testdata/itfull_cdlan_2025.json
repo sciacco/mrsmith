@@ -1,0 +1,791 @@
+{
+    "pec": "CORPORATE@PEC.CDLAN.IT",
+    "rae": {
+        "code": "790",
+        "description": "SERVIZI DELLE COMUNICAZIONI"
+    },
+    "sae": {
+        "code": "430",
+        "description": "Imprese produttive"
+    },
+    "mail": {
+        "email": "info@cdlan.it,acquisti@cdlan.it"
+    },
+    "debts": [
+        { "code": "IIC099", "value": 0 },
+        { "code": "IIC098", "value": 9948 },
+        { "code": "IIC091", "value": 0 },
+        { "code": "IIC090", "value": 0 },
+        { "code": "IIC092", "value": 0 },
+        { "code": "IIC093", "value": 0 },
+        { "code": "IIC103", "value": 0 },
+        { "code": "IIC102", "value": 0 },
+        { "code": "IIC117", "value": 3152407 },
+        { "code": "IIC097", "value": 0 },
+        { "code": "IIC107", "value": 0 },
+        { "code": "IIC112", "value": 135461 },
+        { "code": "IIC113", "value": 0 },
+        { "code": "IIC109", "value": 0 },
+        { "code": "IIC105", "value": 0 },
+        { "code": "IIC220", "value": 0 },
+        { "code": "IIC221", "value": 0 },
+        { "code": "IIC106", "value": 0 },
+        { "code": "IIC094", "value": 1762969 },
+        { "code": "IIC095", "value": 3152407 },
+        { "code": "IIC096", "value": 0 },
+        { "code": "IIC108", "value": 0 },
+        { "code": "IIC185", "value": 0 },
+        { "code": "IIC184", "value": 0 },
+        { "code": "IIC104", "value": 5217 },
+        { "code": "IIC101", "value": 0 },
+        { "code": "IIC100", "value": 1427951 },
+        { "code": "IIC114", "value": 110514 },
+        { "code": "IIC115", "value": 0 },
+        { "code": "IIC116", "value": 3749508 },
+        { "code": "IIC110", "value": 297448 },
+        { "code": "IIC111", "value": 0 },
+        { "code": "IIC334", "value": 9948 },
+        { "code": "IIC329", "value": 0 },
+        { "code": "IIC333", "value": 0 },
+        { "code": "IIC338", "value": 0 },
+        { "code": "IIC337", "value": 5217 },
+        { "code": "IIC330", "value": 0 },
+        { "code": "IIC336", "value": 0 },
+        { "code": "IIC342", "value": 135461 },
+        { "code": "IIC340", "value": 0 },
+        { "code": "IIC339", "value": 0 },
+        { "code": "IIC331", "value": 0 },
+        { "code": "IIC332", "value": 4915376 },
+        { "code": "IIC343", "value": 110514 },
+        { "code": "IIC341", "value": 297448 },
+        { "code": "IIC335", "value": 1427951 }
+    ],
+    "ecofin": {
+        "netWorth": 7876018,
+        "turnover": 12424613,
+        "shareCapital": 2000000,
+        "turnoverYear": 2025,
+        "turnoverRange": {
+            "code": "TR9",
+            "description": "10000000 - 49999999"
+        },
+        "turnoverTrend": 1.35,
+        "enterpriseSize": {
+            "code": "MEDIUM",
+            "description": "Medium enterprise"
+        },
+        "balanceSheetDate": "2025-12-31T00:00:00+01:00"
+    },
+    "address": {
+        "town": "MILANO",
+        "region": { "code": "03", "description": "LOMBARDY" },
+        "country": { "code": "IT", "description": "Italia" },
+        "zipCode": "20153",
+        "province": { "code": "MI", "description": "MILANO" },
+        "streetName": "VIA CALDERA, 21"
+    },
+    "credits": [
+        { "code": "IIC057", "value": 0 },
+        { "code": "IIC052", "value": 0 },
+        { "code": "IIC053", "value": 0 },
+        { "code": "IIC046", "value": 1547226 },
+        { "code": "IIC047", "value": 0 },
+        { "code": "IIC054", "value": 64775 },
+        { "code": "IIC055", "value": 0 },
+        { "code": "IIC050", "value": 0 },
+        { "code": "IIC051", "value": 0 },
+        { "code": "IIC048", "value": 768 },
+        { "code": "IIC049", "value": 0 },
+        { "code": "IIC198", "value": 0 },
+        { "code": "IIC199", "value": 0 },
+        { "code": "IIC056", "value": 1788681 },
+        { "code": "IIC180", "value": 175912 },
+        { "code": "IIC181", "value": 0 },
+        { "code": "IIC324", "value": 0 },
+        { "code": "IIC321", "value": 1547226 },
+        { "code": "IIC058", "value": 1788681 },
+        { "code": "IIC325", "value": 0 },
+        { "code": "IIC326", "value": 175912 },
+        { "code": "IIC328", "value": 64775 },
+        { "code": "IIC323", "value": 0 },
+        { "code": "IIC322", "value": 768 },
+        { "code": "IIC327", "value": 0 }
+    ],
+    "branches": {
+        "numberOfBranches": 1
+    },
+    "contacts": {
+        "fax": ""
+    },
+    "managers": [
+        {
+            "age": 59,
+            "name": "CORRADO",
+            "roles": [
+                {
+                    "role": { "code": "AUN", "description": "Managing director" },
+                    "roleStartDate": "2025-05-29T00:00:00+02:00"
+                }
+            ],
+            "gender": { "code": "M", "description": "Man" },
+            "surname": "DEL PO",
+            "taxCode": "DLPCRD67E10F205M",
+            "birthDate": "1967-05-10T00:00:00+02:00",
+            "birthTown": "MILANO (MI)",
+            "isLegalRepresentative": true
+        },
+        {
+            "age": 53,
+            "name": "STEFANO",
+            "roles": [
+                {
+                    "role": { "code": "PCS", "description": "Chairman of board of auditors" },
+                    "roleStartDate": "2025-04-29T00:00:00+02:00"
+                }
+            ],
+            "gender": { "code": "M", "description": "Man" },
+            "surname": "SAVARESE",
+            "taxCode": "SVRSFN72M06F839D",
+            "birthDate": "1972-08-06T00:00:00+02:00",
+            "birthTown": "NAPOLI (NA)",
+            "isLegalRepresentative": false
+        },
+        {
+            "age": 51,
+            "name": "EVA MARIA",
+            "roles": [
+                {
+                    "role": { "code": "PC", "description": "Procurator/attorney/representative" },
+                    "roleStartDate": "2023-01-20T00:00:00+01:00"
+                }
+            ],
+            "gender": { "code": "F", "description": "Woman" },
+            "surname": "GRIMALDI",
+            "taxCode": "GRMVMR74M53L219N",
+            "birthDate": "1974-08-13T00:00:00+02:00",
+            "birthTown": "TORINO (TO)",
+            "isLegalRepresentative": false
+        },
+        {
+            "age": 70,
+            "name": "MAURIZIO",
+            "roles": [
+                {
+                    "role": { "code": "SIE", "description": "Permanent auditor" },
+                    "roleStartDate": "2025-04-29T00:00:00+02:00"
+                }
+            ],
+            "gender": { "code": "M", "description": "Man" },
+            "surname": "BRESSA",
+            "taxCode": "BRSMRZ55M25I441Q",
+            "birthDate": "1955-08-25T00:00:00+02:00",
+            "birthTown": "SARONNO (VA)",
+            "isLegalRepresentative": false
+        },
+        {
+            "age": 52,
+            "name": "LORENZO",
+            "roles": [
+                {
+                    "role": { "code": "SIE", "description": "Permanent auditor" },
+                    "roleStartDate": "2025-04-29T00:00:00+02:00"
+                }
+            ],
+            "gender": { "code": "M", "description": "Man" },
+            "surname": "SUARDI",
+            "taxCode": "SRDLNZ74D20A794C",
+            "birthDate": "1974-04-20T00:00:00+02:00",
+            "birthTown": "BERGAMO (BG)",
+            "isLegalRepresentative": false
+        },
+        {
+            "age": 42,
+            "name": "GABRIELE",
+            "roles": [
+                {
+                    "role": { "code": "SIS", "description": "Temporary auditor" },
+                    "roleStartDate": "2025-04-29T00:00:00+02:00"
+                }
+            ],
+            "gender": { "code": "M", "description": "Man" },
+            "surname": "CORVI",
+            "taxCode": "CRVGRL84B02L400C",
+            "birthDate": "1984-02-02T00:00:00+01:00",
+            "birthTown": "TREVIGLIO (BG)",
+            "isLegalRepresentative": false
+        },
+        {
+            "age": 74,
+            "name": "GIOVANNI",
+            "roles": [
+                {
+                    "role": { "code": "SIS", "description": "Temporary auditor" },
+                    "roleStartDate": "2025-04-29T00:00:00+02:00"
+                }
+            ],
+            "gender": { "code": "M", "description": "Man" },
+            "surname": "TORNELLO",
+            "taxCode": "TRNGNN51S03E133H",
+            "birthDate": "1951-11-03T00:00:00+01:00",
+            "birthTown": "GRAMMICHELE (CT)",
+            "isLegalRepresentative": false
+        },
+        {
+            "roles": [
+                {
+                    "role": { "code": "SDR", "description": "Auditing company" },
+                    "roleStartDate": "2025-04-29T00:00:00+02:00"
+                }
+            ],
+            "taxCode": "03049560166",
+            "companyName": "DELOITTE & TOUCHE SPA",
+            "isLegalRepresentative": false
+        }
+    ],
+    "netWorth": [
+        { "code": "IIC211", "value": 0 },
+        { "code": "IIC207", "value": 0 },
+        { "code": "IIC209", "value": 0 },
+        { "code": "IIC210", "value": 0 },
+        { "code": "IIC208", "value": 0 },
+        { "code": "IIC203", "value": 3519692 },
+        { "code": "IIC206", "value": 0 },
+        { "code": "IIC078", "value": 185089 },
+        { "code": "IIC212", "value": 0 },
+        { "code": "IIC216", "value": 0 },
+        { "code": "IIC214", "value": 1 },
+        { "code": "IIC218", "value": 0 },
+        { "code": "IIC081", "value": 3519693 },
+        { "code": "IIC082", "value": 0 },
+        { "code": "IIC083", "value": 2171236 },
+        { "code": "IIC345", "value": 0 },
+        { "code": "IIC204", "value": 0 },
+        { "code": "IIC213", "value": 0 },
+        { "code": "IIC215", "value": 0 },
+        { "code": "IIC077", "value": 0 },
+        { "code": "IIC075", "value": 2000000 },
+        { "code": "IIC076", "value": 0 },
+        { "code": "IIC205", "value": 0 },
+        { "code": "IIC080", "value": 0 }
+    ],
+    "employees": {
+        "employee": 45,
+        "employeeRange": { "code": "ER5", "description": "21 - 49" },
+        "employeeTrend": -13.46
+    },
+    "inventory": [
+        { "code": "IIC043", "value": 0 },
+        { "code": "IIC044", "value": 0 },
+        { "code": "IIC040", "value": 0 },
+        { "code": "IIC041", "value": 0 },
+        { "code": "IIC349", "value": 0 },
+        { "code": "IIC045", "value": 0 },
+        { "code": "IIC042", "value": 0 }
+    ],
+    "legalForm": {
+        "legalForm": { "code": "SC", "description": "Joint stock business" },
+        "detailedLegalForm": { "code": "SP", "description": "Limited company" }
+    },
+    "allOffices": [
+        {
+            "address": {
+                "town": "MILANO",
+                "region": { "code": "03", "description": "LOMBARDY" },
+                "country": { "code": "IT", "description": "Italia" },
+                "zipCode": "20153",
+                "province": { "code": "MI", "description": "MILANO" },
+                "streetName": "VIA CALDERA, 21"
+            },
+            "companyStatus": {
+                "activityStatus": { "code": "CF", "description": "Out of business (in a positive way)" }
+            },
+            "companyDetails": {
+                "cciaa": "MI",
+                "leiCode": "81560077E73936146385",
+                "reaCode": "1614446",
+                "taxCode": "13064680153",
+                "vatCode": "13064680153",
+                "officeType": { "code": "SL", "description": "Registered office" },
+                "companyName": "CDLAN SPA SOCIETA' BENEFIT",
+                "openapiNumber": "ITBC090901L4001",
+                "lastUpdateDate": "2026-06-15T16:56:40.4156453Z"
+            }
+        },
+        {
+            "address": {
+                "town": "MILANO",
+                "region": { "code": "03", "description": "LOMBARDY" },
+                "country": { "code": "IT", "description": "Italia" },
+                "zipCode": "20153",
+                "province": { "code": "MI", "description": "MILANO" },
+                "streetName": "VIA CALDERA, 21"
+            },
+            "companyStatus": {
+                "activityStatus": { "code": "A", "description": "Enable" }
+            },
+            "companyDetails": {
+                "cciaa": "MI",
+                "leiCode": "81560077E73936146385",
+                "reaCode": "1614446",
+                "taxCode": "13064680153",
+                "vatCode": "13064680153",
+                "officeType": { "code": "SSL", "description": "Administrative headquarter and registered office" },
+                "companyName": "CDLAN SPA SOCIETA' BENEFIT",
+                "openapiNumber": "ITBC090901S0001",
+                "lastUpdateDate": "2026-06-15T16:56:40.4156453Z"
+            }
+        },
+        {
+            "address": {
+                "town": "TRESCORE BALNEARIO",
+                "region": { "code": "03", "description": "LOMBARDY" },
+                "country": { "code": "IT", "description": "Italia" },
+                "zipCode": "24069",
+                "province": { "code": "BG", "description": "BERGAMO" },
+                "streetName": "VIA ALESSANDRO VOLTA, 20"
+            },
+            "companyStatus": {
+                "activityStatus": { "code": "A", "description": "Enable" }
+            },
+            "companyDetails": {
+                "cciaa": "BG",
+                "leiCode": "81560077E73936146385",
+                "reaCode": "498186",
+                "taxCode": "13064680153",
+                "vatCode": "13064680153",
+                "officeType": { "code": "UL", "description": "Local units" },
+                "companyName": "CDLAN SPA SOCIETA' BENEFIT",
+                "openapiNumber": "ITBC090901U8001",
+                "lastUpdateDate": "2026-06-15T16:56:40.7674021Z"
+            }
+        }
+    ],
+    "efficiency": {
+        "turnoverIndex": 0.7941,
+        "accountsReceivableRotation": 8.0303
+    },
+    "marketable": {
+        "isMarketable": true
+    },
+    "adjustments": [
+        { "code": "IIC163", "value": 0 },
+        { "code": "IIC162", "value": 0 },
+        { "code": "IIC164", "value": 0 },
+        { "code": "IIC246", "value": 0 },
+        { "code": "IIC245", "value": 5277 },
+        { "code": "IIC350", "value": 0 },
+        { "code": "IICC351", "value": 0 },
+        { "code": "IIC167", "value": 0 },
+        { "code": "IIC168", "value": 0 },
+        { "code": "IIC166", "value": 0 },
+        { "code": "IIC165", "value": 5277 },
+        { "code": "IIC169", "value": 0 }
+    ],
+    "development": {
+        "mol": 22.6,
+        "addedValue": 2.49,
+        "totalAssets": 1.78,
+        "ebitVariation": 0.6499,
+        "productionValue": 0.94,
+        "grossFinancialDebt": -0.2509
+    },
+    "annualResult": [
+        { "code": "IIC191", "value": 471598 },
+        { "code": "IIC192", "value": 0 },
+        { "code": "IIC250", "value": 0 },
+        { "code": "IIC179", "value": 2171236 },
+        { "code": "IIC177", "value": 2642834 },
+        { "code": "IIC347", "value": 0 },
+        { "code": "IIC178", "value": 471598 }
+    ],
+    "companyDates": {
+        "startDate": "2000-05-03T00:00:00+02:00",
+        "registrationDate": "2000-04-18T00:00:00+02:00",
+        "incorporationDate": "2000-03-01T00:00:00+01:00"
+    },
+    "foreignTrade": {
+        "isExporter": true,
+        "isImporter": true,
+        "exportCountries": "Unione Europea, Altri Paesi",
+        "importCountries": "Germania, Austria",
+        "exportPercentShare": 3,
+        "importPercentShare": 20
+    },
+    "indebtedness": {
+        "leverage": 1.9866,
+        "debtRatio": 0.8763,
+        "bankDebtRatio": 0.6241,
+        "bankDebtTotalAssets": 0.3142,
+        "capitalizationDegree": 0.5034
+    },
+    "shareholders": [
+        {
+            "shareType": { "code": "ND99", "description": "N. a." },
+            "percentShare": 95,
+            "shareholdersInformation": [
+                {
+                    "name": "CORRADO",
+                    "town": "MILANO",
+                    "surname": "DEL PO",
+                    "taxCode": "DLPCRD67E10F205M",
+                    "zipCode": "20153",
+                    "sinceDate": "2026-04-30T00:00:00+02:00",
+                    "streetName": "VIA CALDERA 21"
+                }
+            ]
+        },
+        {
+            "shareType": { "code": "ND99", "description": "N. a." },
+            "percentShare": 5,
+            "shareholdersInformation": [
+                {
+                    "name": "LORENA",
+                    "town": "MILANO",
+                    "surname": "SANVITTORE",
+                    "taxCode": "SNVLRN67M67G220O",
+                    "zipCode": "20153",
+                    "sinceDate": "2026-04-30T00:00:00+02:00",
+                    "streetName": "VIA CALDERA 21"
+                }
+            ]
+        }
+    ],
+    "subsidiaries": [
+        {
+            "town": "MILANO",
+            "taxCode": "13599420968",
+            "zipCode": "20153",
+            "province": { "code": "MI", "description": "MILANO" },
+            "streetName": "VIA CALDERA 21",
+            "companyName": "GUINEA SRL"
+        }
+    ],
+    "webAndSocial": {
+        "website": "www.cdlan.it",
+        "linkedin": "https://www.linkedin.com/company/cdlan/",
+        "hasSocial": true,
+        "instagram": "https://www.instagram.com/cdlan_official/"
+    },
+    "companyStatus": {
+        "activityStatus": { "code": "A", "description": "Enable" }
+    },
+    "profitability": {
+        "roe": 27.57,
+        "roi": 17.33,
+        "ros": 13.31,
+        "roaMonetary": 10.57,
+        "incidenceOfExtraFeaturesManagement": 131.29
+    },
+    "companyDetails": {
+        "cciaa": "MI",
+        "leiCode": "81560077E73936146385",
+        "reaCode": "1614446",
+        "taxCode": "13064680153",
+        "vatCode": "13064680153",
+        "officeType": { "code": "SSL", "description": "Administrative headquarter and registered office" },
+        "companyName": "CDLAN SPA SOCIETA' BENEFIT",
+        "openapiNumber": "ITBC090901S0001",
+        "lastUpdateDate": "2026-06-15T18:56:40.4156453+02:00"
+    },
+    "coverageRatios": {
+        "ffoNetInterestCoverage": 31.2101,
+        "ebitNetInterestCoverage": 14.5196,
+        "ebitGrossInterestCoverage": 9.7036,
+        "ebitdaNetInterestCoverage": 22.2021,
+        "ebitdaGrossInterestCoverage": 14.8378
+    },
+    "financialCycle": {
+        "stockDuration": 0,
+        "financialCycleDuration": -45.1177,
+        "debtsToSuppliersDuration": 89.9482,
+        "accountsReceivableDuration": 44.8305
+    },
+    "leverageRatios": {
+        "pfnEbitda": 0.6588,
+        "ffoNetLeverage": 0.4687,
+        "ebitdaNetLeverage": 0.6588,
+        "ebitdaGrossLeverage": 1.9466
+    },
+    "riskProvisions": [
+        { "code": "IIC087", "value": 0 },
+        { "code": "IIC219", "value": 7241 },
+        { "code": "IIC085", "value": 35000 },
+        { "code": "IIC086", "value": 0 }
+    ],
+    "cashEquivalents": [
+        { "code": "IIC067", "value": 3256429 },
+        { "code": "IIC070", "value": 3256564 },
+        { "code": "IIC069", "value": 135 },
+        { "code": "IIC068", "value": 0 }
+    ],
+    "corporateGroups": {
+        "groupName": "DEL PO",
+        "belongsToGroup": true,
+        "hasForeignParents": false,
+        "holdingCompanyName": "CORRADO DEL PO",
+        "nationalParentCompany": {
+            "province": { "code": "ND99", "description": "N. A." }
+        },
+        "hasForeignSubsidiaries": false,
+        "totalGroupSubsidiaries": 1
+    },
+    "financialAssets": [
+        { "code": "IIC201", "value": 0 },
+        { "code": "IIC202", "value": 0 },
+        { "code": "IIC200", "value": 0 },
+        { "code": "IIC062", "value": 0 },
+        { "code": "IIC065", "value": 0 },
+        { "code": "IIC060", "value": 0 },
+        { "code": "IIC059", "value": 0 },
+        { "code": "IIC061", "value": 0 },
+        { "code": "IIC066", "value": 0 }
+    ],
+    "financialBurden": {
+        "rod": 3.46,
+        "burdenIndex": 6.74,
+        "rodFinanziario": 3.47
+    },
+    "liquidityRatios": {
+        "cashShortTermBankDebt": 1.8472,
+        "cashTotalShortTermDebt": 0.8685,
+        "fcfShortTermFinancialDebt": 1.4457,
+        "cashShortTermFinancialDebt": 1.8472
+    },
+    "productionCosts": [
+        { "code": "IIC134", "value": 2171072 },
+        { "code": "IIC188", "value": 867115 },
+        { "code": "IIC140", "value": 140658 },
+        { "code": "IIC141", "value": 726457 },
+        { "code": "IIC142", "value": 0 },
+        { "code": "IIC143", "value": 7944 },
+        { "code": "IIC133", "value": 1517608 },
+        { "code": "IIC138", "value": 0 },
+        { "code": "IIC148", "value": 87893 },
+        { "code": "IIC147", "value": 0 },
+        { "code": "IIC137", "value": 0 },
+        { "code": "IIC131", "value": 71309 },
+        { "code": "IIC146", "value": 0 },
+        { "code": "IIC132", "value": 5643785 },
+        { "code": "IIC136", "value": 149735 },
+        { "code": "IIC187", "value": 149735 },
+        { "code": "IIC135", "value": 630884 },
+        { "code": "IIC144", "value": 875059 },
+        { "code": "IIC139", "value": 2951691 },
+        { "code": "IIC145", "value": 0 }
+    ],
+    "productionValue": [
+        { "code": "IIC127", "value": 0 },
+        { "code": "IIC129", "value": 29375 },
+        { "code": "IIC223", "value": 347182 },
+        { "code": "IIC125", "value": 0 },
+        { "code": "IIC124", "value": 12424613 },
+        { "code": "IIC128", "value": 376557 },
+        { "code": "IIC186", "value": 0 },
+        { "code": "IIC126", "value": 0 }
+    ],
+    "structureRatios": {
+        "pfnNetWorth": 0.2115,
+        "netDebtTotalSources": 0.1746,
+        "financialDebtComposition": 0.3581,
+        "grossFinancialDebtNetWorth": 0.625,
+        "netFinancialDebtEquityNetWorth": 0.2115
+    },
+    "operatingResults": {
+        "ebit": 1653825,
+        "ebitda": 2528884,
+        "ebitL2Y": 1002368,
+        "cashFlow": 3046295,
+        "ebitdaL2Y": 2062747,
+        "cashFlowL2Y": 1761435
+    },
+    "soaCertification": {
+        "hasSoaCertification": false
+    },
+    "affiliateCompanies": [
+        {
+            "taxCode": "13599420968",
+            "companyName": "GUINEA SRL",
+            "percentShare": 100
+        }
+    ],
+    "employeesStatistic": {
+        "director": 4,
+        "apprentice": 7,
+        "whiteCollar": 85,
+        "fullTimeContract": 93,
+        "fixedTermContract": 4,
+        "frameworkContract": 4,
+        "permanentContract": 96,
+        "partialTimeContract": 7
+    },
+    "financialStability": {
+        "acidTest": 1.3108,
+        "currentRatio": 1.3108,
+        "marginStructure": 0.7849,
+        "marginStructureIndex": -2158758,
+        "workingCapitalCoverage": 0.1039,
+        "fixedAssetsCoverageRate": 1.099,
+        "secondaryMarginStructure ": 993649
+    },
+    "innovativeSmeAndSu": {
+        "isInnovativeSme": false,
+        "isInnovativeStartUp": false
+    },
+    "atecoClassification": {
+        "ateco": {
+            "code": "61901",
+            "description": "Provision of internet access"
+        },
+        "ateco2022": {
+            "code": "61901",
+            "description": "Supply of internet access services (isp)"
+        },
+        "firstLevel": {
+            "ateco": {
+                "code": "J",
+                "description": "J - Information and communication"
+            },
+            "ateco2025": {
+                "code": "K",
+                "description": "K - Telecommunication, computer programming, consulting, computing infrastructure and other information service activities"
+            }
+        },
+        "secondaryAteco": "611001, 62202, 47401",
+        "secondaryAteco2022": "611, 4741, 6203"
+    },
+    "tangibleFixedAssets": [
+        { "code": "IIC016", "value": 0 },
+        { "code": "IIC014", "value": 68756 },
+        { "code": "IIC012", "value": 370000 },
+        { "code": "IIC015", "value": 377453 },
+        { "code": "IIC013", "value": 1103528 },
+        { "code": "IIC018", "value": 1919737 }
+    ],
+    "financialFixedAssets": [
+        { "code": "IIC026", "value": 0 },
+        { "code": "IIC027", "value": 0 },
+        { "code": "IIC029", "value": 0 },
+        { "code": "IIC028", "value": 0 },
+        { "code": "IIC025", "value": 0 },
+        { "code": "IIC024", "value": 0 },
+        { "code": "IIC030", "value": 0 },
+        { "code": "IIC031", "value": 0 },
+        { "code": "IIC197", "value": 0 },
+        { "code": "IIC194", "value": 0 },
+        { "code": "IIC033", "value": 0 },
+        { "code": "IIC035", "value": 0 },
+        { "code": "IIC020", "value": 0 },
+        { "code": "IIC022", "value": 5000 },
+        { "code": "IIC021", "value": 0 },
+        { "code": "IIC019", "value": 7693063 },
+        { "code": "IIC195", "value": 0 },
+        { "code": "IIC196", "value": 0 },
+        { "code": "IIC032", "value": 0 },
+        { "code": "IIC317", "value": 0 },
+        { "code": "IIC318", "value": 0 },
+        { "code": "IIC316", "value": 0 },
+        { "code": "IIC034", "value": 0 },
+        { "code": "IIC320", "value": 0 },
+        { "code": "IIC038", "value": 7698063 },
+        { "code": "IIC023", "value": 7698063 },
+        { "code": "IIC319", "value": 0 }
+    ],
+    "assetsAggregateValues": [
+        { "code": "IIC072", "value": 566292 },
+        { "code": "IIC001", "value": 0 },
+        { "code": "IIC071", "value": 5045245 },
+        { "code": "IIC074", "value": 15646313 },
+        { "code": "IIC039", "value": 10034776 }
+    ],
+    "creditsToShareholders": [
+        { "code": "IIC002", "value": 0 },
+        { "code": "IIC193", "value": 0 }
+    ],
+    "financialStatementKpi": {
+        "ebitdaMargin": 20.35,
+        "debtsTurnover": 0.5555,
+        "netWorthOnAssets": 0.5034,
+        "financialCostsOnEbitda": 0.0674,
+        "totalInventoryTurnover": 0
+    },
+    "intangibleFixedAssets": [
+        { "code": "IIC008", "value": 0 },
+        { "code": "IIC007", "value": 63000 },
+        { "code": "IIC009", "value": 176759 },
+        { "code": "IIC005", "value": 0 },
+        { "code": "IIC006", "value": 177217 },
+        { "code": "IIC004", "value": 0 },
+        { "code": "IIC003", "value": 0 },
+        { "code": "IIC011", "value": 416976 }
+    ],
+    "artisanBusinessRegistry": {
+        "belongsToArtisanBusinessRegistry": false
+    },
+    "revenuesFinancialCharges": [
+        { "code": "IIC226", "value": 0 },
+        { "code": "IPL231", "value": 0 },
+        { "code": "IIC236", "value": 0 },
+        { "code": "IIC227", "value": 0 },
+        { "code": "IPL232", "value": 0 },
+        { "code": "IIC237", "value": 0 },
+        { "code": "IIC225", "value": 1100000 },
+        { "code": "IIC230", "value": 0 },
+        { "code": "IIC235", "value": 0 },
+        { "code": "IIC228", "value": 0 },
+        { "code": "IIC233", "value": 0 },
+        { "code": "IIC238", "value": 0 },
+        { "code": "IIC229", "value": 0 },
+        { "code": "IIC234", "value": 0 },
+        { "code": "IIC239", "value": 56532 },
+        { "code": "IIC156", "value": 56532 },
+        { "code": "IIC190", "value": -2365 },
+        { "code": "IIC152", "value": 0 },
+        { "code": "IIC155", "value": 0 },
+        { "code": "IIC154", "value": 0 },
+        { "code": "IIC150", "value": 1100000 },
+        { "code": "IIC189", "value": 0 },
+        { "code": "IIC241", "value": 0 },
+        { "code": "IIC243", "value": 0 },
+        { "code": "IIC244", "value": 170435 },
+        { "code": "IIC242", "value": 0 },
+        { "code": "IIC240", "value": 0 },
+        { "code": "IIC159", "value": 170435 },
+        { "code": "IIC158", "value": 56532 }
+    ],
+    "liabilitiesAggregateValues": [
+        { "code": "IIC119", "value": 531611 },
+        { "code": "IIC089", "value": 294528 },
+        { "code": "IIC118", "value": 6901915 },
+        { "code": "IIC121", "value": 15646313 },
+        { "code": "IIC084", "value": 7876018 },
+        { "code": "IIC088", "value": 42241 }
+    ],
+    "internationalClassification": {
+        "nace": {
+            "code": "619",
+            "description": "Other telecommunications activities"
+        },
+        "firstLevel": {
+            "nace": {
+                "code": "61",
+                "description": "61 - Telecommunications"
+            },
+            "primarySic": {
+                "code": "COD_05",
+                "description": "E - Transport, distribution"
+            }
+        },
+        "primarySic": {
+            "code": "4899",
+            "description": "Misc communication services"
+        },
+        "secondarySic": "5065, 7629, 7372, 5732"
+    },
+    "incomeStatementAggregateValues": [
+        { "code": "IIC224", "value": 1653825 },
+        { "code": "IIC149", "value": 11147345 },
+        { "code": "IIC130", "value": 12801170 },
+        { "code": "IIC161", "value": 983732 },
+        { "code": "IIC170", "value": 5277 }
+    ]
+}

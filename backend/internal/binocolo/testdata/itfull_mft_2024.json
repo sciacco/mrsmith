@@ -1,0 +1,637 @@
+{
+    "pec": "POSTACERTIFICATA@PEC.VOLACOLVENTO.IT",
+    "rae": { "code": "505", "description": "ABITAZIONI" },
+    "sae": { "code": "430", "description": "Imprese produttive" },
+    "mail": { "email": "info@mftitalia.it,amministrazione@mftitalia.it" },
+    "debts": [
+        { "code": "IIC099", "value": 0 },
+        { "code": "IIC098", "value": 5581 },
+        { "code": "IIC091", "value": 0 },
+        { "code": "IIC090", "value": 0 },
+        { "code": "IIC092", "value": 0 },
+        { "code": "IIC093", "value": 0 },
+        { "code": "IIC103", "value": 0 },
+        { "code": "IIC102", "value": 0 },
+        { "code": "IIC117", "value": 10422 },
+        { "code": "IIC097", "value": 0 },
+        { "code": "IIC107", "value": 0 },
+        { "code": "IIC112", "value": 20986 },
+        { "code": "IIC113", "value": 0 },
+        { "code": "IIC109", "value": 0 },
+        { "code": "IIC105", "value": 0 },
+        { "code": "IIC220", "value": 0 },
+        { "code": "IIC221", "value": 0 },
+        { "code": "IIC106", "value": 0 },
+        { "code": "IIC094", "value": 24492 },
+        { "code": "IIC095", "value": 0 },
+        { "code": "IIC096", "value": 0 },
+        { "code": "IIC108", "value": 0 },
+        { "code": "IIC185", "value": 0 },
+        { "code": "IIC184", "value": 10000 },
+        { "code": "IIC104", "value": 0 },
+        { "code": "IIC101", "value": 0 },
+        { "code": "IIC100", "value": 75129 },
+        { "code": "IIC114", "value": 40774 },
+        { "code": "IIC115", "value": 10422 },
+        { "code": "IIC116", "value": 186711 },
+        { "code": "IIC110", "value": 9749 },
+        { "code": "IIC111", "value": 0 },
+        { "code": "IIC334", "value": 5581 },
+        { "code": "IIC329", "value": 0 },
+        { "code": "IIC333", "value": 0 },
+        { "code": "IIC338", "value": 0 },
+        { "code": "IIC337", "value": 0 },
+        { "code": "IIC330", "value": 0 },
+        { "code": "IIC336", "value": 0 },
+        { "code": "IIC342", "value": 20986 },
+        { "code": "IIC340", "value": 0 },
+        { "code": "IIC339", "value": 0 },
+        { "code": "IIC331", "value": 10000 },
+        { "code": "IIC332", "value": 24492 },
+        { "code": "IIC343", "value": 51196 },
+        { "code": "IIC341", "value": 9749 },
+        { "code": "IIC335", "value": 75129 }
+    ],
+    "ecofin": {
+        "netWorth": 80993,
+        "turnover": 1222493,
+        "shareCapital": 10000,
+        "turnoverYear": 2024,
+        "turnoverRange": { "code": "TR7", "description": "1000000 - 4999999" },
+        "turnoverTrend": -0.85,
+        "enterpriseSize": { "code": "MICRO", "description": "Micro enterprise" },
+        "balanceSheetDate": "2024-12-31T00:00:00"
+    },
+    "address": {
+        "town": "RICENGO",
+        "region": { "code": "03", "description": "LOMBARDY" },
+        "country": { "code": "IT", "description": "Italia" },
+        "zipCode": "26010",
+        "province": { "code": "CR", "description": "CREMONA" },
+        "streetName": "VIA OFFANENGO, 7"
+    },
+    "credits": [
+        { "code": "IIC057", "value": 0 },
+        { "code": "IIC052", "value": 0 },
+        { "code": "IIC053", "value": 0 },
+        { "code": "IIC046", "value": 116813 },
+        { "code": "IIC047", "value": 0 },
+        { "code": "IIC054", "value": 49135 },
+        { "code": "IIC055", "value": 0 },
+        { "code": "IIC050", "value": 0 },
+        { "code": "IIC051", "value": 0 },
+        { "code": "IIC048", "value": 0 },
+        { "code": "IIC049", "value": 0 },
+        { "code": "IIC198", "value": 0 },
+        { "code": "IIC199", "value": 0 },
+        { "code": "IIC056", "value": 170390 },
+        { "code": "IIC180", "value": 4442 },
+        { "code": "IIC181", "value": 0 },
+        { "code": "IIC324", "value": 0 },
+        { "code": "IIC321", "value": 116813 },
+        { "code": "IIC058", "value": 170390 },
+        { "code": "IIC325", "value": 0 },
+        { "code": "IIC326", "value": 4442 },
+        { "code": "IIC328", "value": 49135 },
+        { "code": "IIC323", "value": 0 },
+        { "code": "IIC322", "value": 0 },
+        { "code": "IIC327", "value": 0 }
+    ],
+    "branches": { "numberOfBranches": 1 },
+    "contacts": { "fax": "0373387617", "telephoneNumber": "0373736363" },
+    "managers": [
+        {
+            "age": 45,
+            "name": "MARCO",
+            "roles": [
+                {
+                    "role": { "code": "AUN", "description": "Managing director" },
+                    "roleStartDate": "2011-03-29T00:00:00"
+                }
+            ],
+            "gender": { "code": "M", "description": "Man" },
+            "surname": "ONETA",
+            "taxCode": "NTOMRC80R27E648E",
+            "birthDate": "1980-10-27T00:00:00",
+            "birthTown": "LODI (LO)",
+            "isLegalRepresentative": true
+        },
+        {
+            "age": 47,
+            "name": "ALESSANDRO",
+            "roles": [
+                {
+                    "role": { "code": "PTS", "description": "Responsible for technical management (d.m. 37/2008)" },
+                    "roleStartDate": "2023-06-01T00:00:00"
+                }
+            ],
+            "gender": { "code": "M", "description": "Man" },
+            "surname": "ILGRANDE",
+            "taxCode": "LGRLSN78T30F205Q",
+            "birthDate": "1978-12-30T00:00:00",
+            "birthTown": "MILANO (MI)",
+            "isLegalRepresentative": false
+        }
+    ],
+    "netWorth": [
+        { "code": "IIC211", "value": 0 },
+        { "code": "IIC207", "value": 0 },
+        { "code": "IIC209", "value": 0 },
+        { "code": "IIC210", "value": 0 },
+        { "code": "IIC208", "value": 36035 },
+        { "code": "IIC203", "value": 32472 },
+        { "code": "IIC206", "value": 0 },
+        { "code": "IIC078", "value": 2000 },
+        { "code": "IIC212", "value": 0 },
+        { "code": "IIC216", "value": 0 },
+        { "code": "IIC214", "value": -1 },
+        { "code": "IIC218", "value": 0 },
+        { "code": "IIC081", "value": 68507 },
+        { "code": "IIC082", "value": 0 },
+        { "code": "IIC083", "value": 486 },
+        { "code": "IIC345", "value": 0 },
+        { "code": "IIC204", "value": 0 },
+        { "code": "IIC213", "value": 0 },
+        { "code": "IIC215", "value": 0 },
+        { "code": "IIC077", "value": 0 },
+        { "code": "IIC075", "value": 10000 },
+        { "code": "IIC076", "value": 0 },
+        { "code": "IIC205", "value": 0 },
+        { "code": "IIC080", "value": 0 }
+    ],
+    "employees": {
+        "employee": 9,
+        "employeeRange": { "code": "ER3", "description": "6 - 10" },
+        "employeeTrend": 0
+    },
+    "inventory": [
+        { "code": "IIC043", "value": 0 },
+        { "code": "IIC044", "value": 0 },
+        { "code": "IIC040", "value": 341073 },
+        { "code": "IIC041", "value": 0 },
+        { "code": "IIC349", "value": 0 },
+        { "code": "IIC045", "value": 341073 },
+        { "code": "IIC042", "value": 0 }
+    ],
+    "legalForm": {
+        "legalForm": { "code": "SC", "description": "Joint stock business" },
+        "detailedLegalForm": { "code": "SR", "description": "Limited liability company/ limited company" }
+    },
+    "allOffices": [
+        {
+            "address": {
+                "town": "RICENGO",
+                "region": { "code": "03", "description": "LOMBARDY" },
+                "country": { "code": "IT", "description": "Italia" },
+                "zipCode": "26010",
+                "province": { "code": "CR", "description": "CREMONA" },
+                "streetName": "VIA OFFANENGO, 7"
+            },
+            "companyStatus": {
+                "activityStatus": { "code": "A", "description": "Enable" }
+            },
+            "companyDetails": {
+                "cciaa": "CR",
+                "reaCode": "179051",
+                "taxCode": "01522380193",
+                "vatCode": "01522380193",
+                "officeType": { "code": "SSL", "description": "Administrative headquarter and registered office" },
+                "companyName": "MFT ITALIA SRL",
+                "openapiNumber": "ITA6E90006S0001",
+                "lastUpdateDate": "2026-06-14T11:42:02.5513308Z"
+            }
+        },
+        {
+            "address": {
+                "town": "ISSO",
+                "region": { "code": "03", "description": "LOMBARDY" },
+                "country": { "code": "IT", "description": "Italia" },
+                "zipCode": "24040",
+                "province": { "code": "BG", "description": "BERGAMO" },
+                "streetName": "VIA CASCINA SECCHI, 351"
+            },
+            "companyStatus": {
+                "activityStatus": { "code": "A", "description": "Enable" }
+            },
+            "companyDetails": {
+                "cciaa": "BG",
+                "reaCode": "437716",
+                "taxCode": "01522380193",
+                "vatCode": "01522380193",
+                "officeType": { "code": "UL", "description": "Local units" },
+                "companyName": "MFT ITALIA SRL",
+                "openapiNumber": "ITA6E90006U4001",
+                "lastUpdateDate": "2026-06-14T11:42:02.5513308Z"
+            }
+        },
+        {
+            "address": {
+                "town": "CREMA",
+                "region": { "code": "03", "description": "LOMBARDY" },
+                "country": { "code": "IT", "description": "Italia" },
+                "zipCode": "26013",
+                "province": { "code": "CR", "description": "CREMONA" },
+                "streetName": "VIA LODI, 14"
+            },
+            "companyStatus": {
+                "activityStatus": { "code": "CF", "description": "Out of business (in a positive way)" }
+            },
+            "companyDetails": {
+                "taxCode": "01522380193",
+                "vatCode": "01522380193",
+                "officeType": { "code": "UL", "description": "Local units" },
+                "companyName": "MFT ITALIA SRL",
+                "openapiNumber": "ITA6E90006U8001",
+                "lastUpdateDate": "2026-06-14T11:42:02.5513308Z"
+            }
+        }
+    ],
+    "efficiency": {
+        "turnoverIndex": 1.7247,
+        "inventoryRotation": 3.5843,
+        "accountsReceivableRotation": 10.4654
+    },
+    "marketable": { "isMarketable": true },
+    "adjustments": [
+        { "code": "IIC163", "value": 0 },
+        { "code": "IIC162", "value": 0 },
+        { "code": "IIC164", "value": 0 },
+        { "code": "IIC246", "value": 0 },
+        { "code": "IIC245", "value": 0 },
+        { "code": "IIC350", "value": 0 },
+        { "code": "IICC351", "value": 0 },
+        { "code": "IIC167", "value": 0 },
+        { "code": "IIC168", "value": 0 },
+        { "code": "IIC166", "value": 0 },
+        { "code": "IIC165", "value": 0 },
+        { "code": "IIC169", "value": 0 }
+    ],
+    "development": {
+        "mol": 22.76,
+        "addedValue": 10.56,
+        "totalAssets": 13.47,
+        "ebitVariation": 0.3351,
+        "productionValue": 0.85,
+        "grossFinancialDebt": 1.4134
+    },
+    "annualResult": [
+        { "code": "IIC191", "value": 11691 },
+        { "code": "IIC192", "value": 0 },
+        { "code": "IIC250", "value": 0 },
+        { "code": "IIC179", "value": 486 },
+        { "code": "IIC177", "value": 12177 },
+        { "code": "IIC347", "value": 0 },
+        { "code": "IIC178", "value": 11691 }
+    ],
+    "companyDates": {
+        "startDate": "2012-02-16T00:00:00",
+        "registrationDate": "2011-04-06T00:00:00",
+        "incorporationDate": "2011-03-29T00:00:00"
+    },
+    "foreignTrade": { "isExporter": false, "isImporter": false },
+    "indebtedness": {
+        "leverage": 8.7515,
+        "debtRatio": 2.434,
+        "bankDebtRatio": 0.3024,
+        "bankDebtTotalAssets": 0.0346,
+        "capitalizationDegree": 0.1143
+    },
+    "shareholders": [
+        {
+            "shareType": { "code": "ND99", "description": "N. a." },
+            "percentShare": 100,
+            "shareholdersInformation": [
+                {
+                    "name": "MARCO",
+                    "town": "RICENGO",
+                    "surname": "ONETA",
+                    "taxCode": "NTOMRC80R27E648E",
+                    "zipCode": "26010",
+                    "sinceDate": "2011-03-29T00:00:00",
+                    "streetName": "VIA OFFANENGO 7"
+                }
+            ]
+        }
+    ],
+    "subsidiaries": [
+        {
+            "town": "Radom",
+            "province": { "code": "ND99", "description": "N. A." },
+            "streetName": "Ul. Chorzowska 3-25",
+            "companyName": "MA GI LOGISTICS SP Z O O"
+        }
+    ],
+    "webAndSocial": {
+        "website": "internet.mftitalia.it",
+        "linkedin": "https://it.linkedin.com/company/mft-italia",
+        "hasSocial": true
+    },
+    "companyStatus": {
+        "activityStatus": { "code": "A", "description": "Enable" }
+    },
+    "profitability": {
+        "roe": 0.6,
+        "roi": 19.9,
+        "ros": 1.56,
+        "roaMonetary": 2.69,
+        "incidenceOfExtraFeaturesManagement": 2.55
+    },
+    "publicTenders": [
+        { "won": 2, "year": "2025", "value": 45669.49, "applied": 2 },
+        { "won": 10, "year": "2024", "value": 237119.97, "applied": 10 }
+    ],
+    "companyDetails": {
+        "cciaa": "CR",
+        "reaCode": "179051",
+        "taxCode": "01522380193",
+        "vatCode": "01522380193",
+        "officeType": { "code": "SSL", "description": "Administrative headquarter and registered office" },
+        "companyName": "MFT ITALIA SRL",
+        "openapiNumber": "ITA6E90006S0001",
+        "lastUpdateDate": "2026-06-14T11:42:02.5513308Z"
+    },
+    "coverageRatios": {
+        "ebitNetInterestCoverage": 2.7735,
+        "ebitGrossInterestCoverage": 2.5811,
+        "ebitdaNetInterestCoverage": 13.8267,
+        "ebitdaGrossInterestCoverage": 12.8672
+    },
+    "financialCycle": {
+        "stockDuration": 100.4393,
+        "financialCycleDuration": 104.8978,
+        "debtsToSuppliersDuration": 29.9406,
+        "accountsReceivableDuration": 34.3991
+    },
+    "leverageRatios": {
+        "pfnEbitda": 0.1547,
+        "ebitdaNetLeverage": 0.1547,
+        "ebitdaGrossLeverage": 0.3633
+    },
+    "riskProvisions": [
+        { "code": "IIC087", "value": 0 },
+        { "code": "IIC219", "value": 0 },
+        { "code": "IIC085", "value": 0 },
+        { "code": "IIC086", "value": 0 }
+    ],
+    "cashEquivalents": [
+        { "code": "IIC067", "value": 19597 },
+        { "code": "IIC070", "value": 19810 },
+        { "code": "IIC069", "value": 213 },
+        { "code": "IIC068", "value": 0 }
+    ],
+    "corporateGroups": {
+        "groupName": "ONETA",
+        "belongsToGroup": true,
+        "hasForeignParents": false,
+        "holdingCompanyName": "MARCO ONETA",
+        "nationalParentCompany": {
+            "province": { "code": "ND99", "description": "N. A." }
+        },
+        "hasForeignSubsidiaries": true,
+        "totalGroupSubsidiaries": 1
+    },
+    "financialAssets": [
+        { "code": "IIC201", "value": 0 },
+        { "code": "IIC202", "value": 0 },
+        { "code": "IIC200", "value": 0 },
+        { "code": "IIC062", "value": 0 },
+        { "code": "IIC065", "value": 0 },
+        { "code": "IIC060", "value": 0 },
+        { "code": "IIC059", "value": 0 },
+        { "code": "IIC061", "value": 0 },
+        { "code": "IIC066", "value": 0 }
+    ],
+    "financialBurden": {
+        "rod": 21.39,
+        "burdenIndex": 7.77,
+        "rodFinanziario": 30.12
+    },
+    "liquidityRatios": {
+        "cashShortTermBankDebt": 0.8088,
+        "cashTotalShortTermDebt": 0.1061,
+        "cashShortTermFinancialDebt": 0.5743
+    },
+    "productionCosts": [
+        { "code": "IIC134", "value": 255092 },
+        { "code": "IIC188", "value": 75891 },
+        { "code": "IIC140", "value": 54754 },
+        { "code": "IIC141", "value": 21137 },
+        { "code": "IIC142", "value": 0 },
+        { "code": "IIC143", "value": 0 },
+        { "code": "IIC133", "value": 14981 },
+        { "code": "IIC138", "value": 0 },
+        { "code": "IIC148", "value": 9820 },
+        { "code": "IIC147", "value": 0 },
+        { "code": "IIC137", "value": 0 },
+        { "code": "IIC131", "value": 554249 },
+        { "code": "IIC146", "value": 0 },
+        { "code": "IIC132", "value": 349089 },
+        { "code": "IIC136", "value": 19344 },
+        { "code": "IIC187", "value": 19344 },
+        { "code": "IIC135", "value": 72354 },
+        { "code": "IIC144", "value": 75891 },
+        { "code": "IIC139", "value": 346790 },
+        { "code": "IIC145", "value": -115701 }
+    ],
+    "productionValue": [
+        { "code": "IIC127", "value": 0 },
+        { "code": "IIC129", "value": 0 },
+        { "code": "IIC223", "value": 31669 },
+        { "code": "IIC125", "value": 0 },
+        { "code": "IIC124", "value": 1222493 },
+        { "code": "IIC128", "value": 31669 },
+        { "code": "IIC186", "value": 0 },
+        { "code": "IIC126", "value": 0 }
+    ],
+    "structureRatios": {
+        "pfnNetWorth": 0.1813,
+        "netDebtTotalSources": 0.1535,
+        "financialDebtComposition": 1,
+        "grossFinancialDebtNetWorth": 0.4259,
+        "netFinancialDebtEquityNetWorth": 0.1813
+    },
+    "operatingResults": {
+        "ebit": 19043,
+        "ebitda": 94934,
+        "ebitL2Y": 14263,
+        "cashFlow": 76377,
+        "ebitdaL2Y": 77335,
+        "cashFlowL2Y": 66557
+    },
+    "soaCertification": { "hasSoaCertification": false },
+    "employeesStatistic": {
+        "apprentice": 11,
+        "whiteCollar": 89,
+        "fullTimeContract": 78,
+        "permanentContract": 100,
+        "partialTimeContract": 22
+    },
+    "financialStability": {
+        "acidTest": 0.5082,
+        "currentRatio": 1.1682,
+        "marginStructure": 0.7708,
+        "marginStructureIndex": -24085,
+        "workingCapitalCoverage": 0.0693,
+        "fixedAssetsCoverageRate": 0.87,
+        "secondaryMarginStructure ": -13663
+    },
+    "innovativeSmeAndSu": {
+        "isInnovativeSme": false,
+        "isInnovativeStartUp": false
+    },
+    "atecoClassification": {
+        "ateco": {
+            "code": "432102",
+            "description": "Installation of telecommunication wiring and other similar systems"
+        },
+        "ateco2022": {
+            "code": "432102",
+            "description": "Installation of electrical plant (including maintenance and repair)"
+        },
+        "firstLevel": {
+            "ateco": { "code": "F", "description": "F - Construction" },
+            "ateco2025": { "code": "F", "description": "F - Construction" }
+        },
+        "secondaryAteco": "4222, 432101, 332006, 432409, 63101, 471, 46501, 262, 621, 61901, 95101",
+        "secondaryAteco2022": "432101, 47911, 47991, 9511, 61901, 262, 4222, 4651, 63113, 6201, 332006, 432909"
+    },
+    "tangibleFixedAssets": [
+        { "code": "IIC016", "value": 0 },
+        { "code": "IIC014", "value": 15378 },
+        { "code": "IIC012", "value": 0 },
+        { "code": "IIC015", "value": 31363 },
+        { "code": "IIC013", "value": 7976 },
+        { "code": "IIC018", "value": 54717 }
+    ],
+    "financialFixedAssets": [
+        { "code": "IIC026", "value": 0 },
+        { "code": "IIC027", "value": 0 },
+        { "code": "IIC029", "value": 0 },
+        { "code": "IIC028", "value": 0 },
+        { "code": "IIC025", "value": 0 },
+        { "code": "IIC024", "value": 0 },
+        { "code": "IIC030", "value": 0 },
+        { "code": "IIC031", "value": 2750 },
+        { "code": "IIC197", "value": 0 },
+        { "code": "IIC194", "value": 0 },
+        { "code": "IIC033", "value": 2750 },
+        { "code": "IIC035", "value": 0 },
+        { "code": "IIC020", "value": 0 },
+        { "code": "IIC022", "value": 5 },
+        { "code": "IIC021", "value": 0 },
+        { "code": "IIC019", "value": 0 },
+        { "code": "IIC195", "value": 0 },
+        { "code": "IIC196", "value": 0 },
+        { "code": "IIC032", "value": 0 },
+        { "code": "IIC317", "value": 0 },
+        { "code": "IIC318", "value": 0 },
+        { "code": "IIC316", "value": 0 },
+        { "code": "IIC034", "value": 2750 },
+        { "code": "IIC320", "value": 2750 },
+        { "code": "IIC038", "value": 2755 },
+        { "code": "IIC023", "value": 5 },
+        { "code": "IIC319", "value": 0 }
+    ],
+    "assetsAggregateValues": [
+        { "code": "IIC072", "value": 72456 },
+        { "code": "IIC001", "value": 0 },
+        { "code": "IIC071", "value": 531273 },
+        { "code": "IIC074", "value": 708807 },
+        { "code": "IIC039", "value": 105078 }
+    ],
+    "creditsToShareholders": [
+        { "code": "IIC002", "value": 0 },
+        { "code": "IIC193", "value": 0 }
+    ],
+    "financialStatementKpi": {
+        "ebitdaMargin": 7.77,
+        "debtsTurnover": 0.1613,
+        "netWorthOnAssets": 0.1143,
+        "financialCostsOnEbitda": 0.0777,
+        "totalInventoryTurnover": 100.44
+    },
+    "intangibleFixedAssets": [
+        { "code": "IIC008", "value": 0 },
+        { "code": "IIC007", "value": 0 },
+        { "code": "IIC009", "value": 5940 },
+        { "code": "IIC005", "value": 41666 },
+        { "code": "IIC006", "value": 0 },
+        { "code": "IIC004", "value": 0 },
+        { "code": "IIC003", "value": 0 },
+        { "code": "IIC011", "value": 47606 }
+    ],
+    "artisanBusinessRegistry": {
+        "artisanBusinessRegistry": {
+            "registrationDate": "2012-07-02T00:00:00",
+            "registrationNumber": "50464"
+        },
+        "belongsToArtisanBusinessRegistry": false
+    },
+    "revenuesFinancialCharges": [
+        { "code": "IIC226", "value": 0 },
+        { "code": "IPL231", "value": 0 },
+        { "code": "IIC236", "value": 0 },
+        { "code": "IIC227", "value": 0 },
+        { "code": "IPL232", "value": 0 },
+        { "code": "IIC237", "value": 0 },
+        { "code": "IIC225", "value": 0 },
+        { "code": "IIC230", "value": 0 },
+        { "code": "IIC235", "value": 0 },
+        { "code": "IIC228", "value": 0 },
+        { "code": "IIC233", "value": 0 },
+        { "code": "IIC238", "value": 0 },
+        { "code": "IIC229", "value": 0 },
+        { "code": "IIC234", "value": 0 },
+        { "code": "IIC239", "value": 512 },
+        { "code": "IIC156", "value": 512 },
+        { "code": "IIC190", "value": 0 },
+        { "code": "IIC152", "value": 0 },
+        { "code": "IIC155", "value": 0 },
+        { "code": "IIC154", "value": 0 },
+        { "code": "IIC150", "value": 0 },
+        { "code": "IIC189", "value": 0 },
+        { "code": "IIC241", "value": 0 },
+        { "code": "IIC243", "value": 0 },
+        { "code": "IIC244", "value": 7378 },
+        { "code": "IIC242", "value": 0 },
+        { "code": "IIC240", "value": 0 },
+        { "code": "IIC159", "value": 7378 },
+        { "code": "IIC158", "value": 512 }
+    ],
+    "liabilitiesAggregateValues": [
+        { "code": "IIC119", "value": 330108 },
+        { "code": "IIC089", "value": 100573 },
+        { "code": "IIC118", "value": 197133 },
+        { "code": "IIC121", "value": 708807 },
+        { "code": "IIC084", "value": 80993 },
+        { "code": "IIC088", "value": 0 }
+    ],
+    "internationalClassification": {
+        "nace": {
+            "code": "4321",
+            "description": "Electrical installation"
+        },
+        "firstLevel": {
+            "nace": {
+                "code": "43",
+                "description": "43 - Specialised construction activities"
+            },
+            "primarySic": {
+                "code": "COD_03",
+                "description": "C - Construction"
+            }
+        },
+        "primarySic": {
+            "code": "1731",
+            "description": "Electrical work contractors"
+        },
+        "secondarySic": "1623, 1799, 5999, 5065, 3573"
+    },
+    "incomeStatementAggregateValues": [
+        { "code": "IIC224", "value": 19043 },
+        { "code": "IIC149", "value": 1235119 },
+        { "code": "IIC130", "value": 1254162 },
+        { "code": "IIC161", "value": -6866 },
+        { "code": "IIC170", "value": 0 }
+    ]
+}
