@@ -1,0 +1,658 @@
+<meta charset="utf-8">
+<title>Binocolo — Wireframe D3 · Iniziative</title>
+<style>
+  :root{
+    --ink:#0f172a; --ink-2:#475569; --muted:#94a3b8; --faint:#cbd5e1;
+    --border:#e2e8f0; --border-soft:#f0f3f7;
+    --accent:#635bff; --accent-2:#7c6cff;
+    --accent-subtle:rgba(99,91,255,.08); --accent-muted:rgba(99,91,255,.15); --accent-glow:rgba(99,91,255,.25);
+    --danger:#ef4444; --danger-strong:#b91c1c; --danger-subtle:rgba(239,68,68,.08);
+    --warn:#f59e0b; --warn-strong:#b45309; --warn-subtle:rgba(245,158,11,.12);
+    --ok:#10b981; --ok-bg:#ecfdf5; --ok-strong:#047857;
+    --info-strong:#075985; --info-subtle:rgba(14,116,144,.10);
+    --doc-bg:#eef1f6; --doc-ink:#1e293b;
+    --sans:"DM Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    --mono:"JetBrains Mono","SF Mono",ui-monospace,Menlo,monospace;
+    --r-sm:6px; --r-md:10px; --r-lg:14px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--doc-bg);color:var(--doc-ink);font:400 15px/1.55 var(--sans)}
+
+  /* ---------- review-document chrome (come gated-ux-wireframe) ---------- */
+  .doc{max-width:1120px;margin:0 auto;padding:40px 24px 96px}
+  .doc-head .eyebrow{font:600 11px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2)}
+  .doc-head h1{margin:10px 0 6px;font-size:1.75rem;font-weight:700;letter-spacing:-.04em;color:var(--ink);text-wrap:balance}
+  .doc-head p{margin:0;max-width:70ch;color:var(--ink-2)}
+  .legend{display:flex;gap:16px;align-items:center;margin:18px 0 0;font-size:.8125rem;color:var(--ink-2)}
+  .statenav{position:sticky;top:0;z-index:20;display:flex;gap:8px;flex-wrap:wrap;padding:12px 0;margin:20px 0 8px;
+    background:linear-gradient(180deg,var(--doc-bg) 78%,rgba(238,241,246,0))}
+  .statenav a{font:600 12px/1 var(--mono);letter-spacing:.04em;text-decoration:none;color:var(--ink-2);
+    padding:8px 12px;border:1px solid var(--border);border-radius:999px;background:#fff}
+  .statenav a:hover{border-color:var(--accent);color:var(--accent)}
+  .flow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:22px 0 34px;padding:16px 18px;
+    background:#fff;border:1px solid var(--border);border-radius:var(--r-lg);font-size:.8125rem}
+  .flow b{font-weight:600;color:var(--ink)}
+  .flow .step{padding:7px 12px;border:1px solid var(--border);border-radius:999px;background:#fbfcfe;white-space:nowrap}
+  .flow .step.hot{border-color:var(--accent-muted);background:var(--accent-subtle);color:var(--accent)}
+  .flow .arr{color:var(--faint)}
+  section.state{margin:56px 0 0}
+  .state-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  .state-head .sid{font:700 12px/1 var(--mono);letter-spacing:.1em;color:#fff;background:var(--ink);padding:6px 10px;border-radius:6px}
+  .state-head h2{margin:0;font-size:1.15rem;font-weight:700;letter-spacing:-.02em;color:var(--ink)}
+  .state-head .ref{font:500 11px/1 var(--mono);color:var(--muted)}
+  .state-intent{margin:8px 0 18px;max-width:76ch;color:var(--ink-2);font-size:.875rem}
+  .m{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;
+    background:var(--ink);color:#fff;font:700 10.5px/1 var(--mono);vertical-align:2px;flex:none}
+  .notes{margin:16px 0 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px 22px;padding:0;list-style:none}
+  .notes li{display:flex;gap:9px;font-size:.8125rem;color:var(--ink-2)}
+  .notes li .m{margin-top:1px}
+  .notes li b{color:var(--ink);font-weight:600}
+  .notes li .ref{font:500 10.5px/1.5 var(--mono);color:var(--muted);white-space:nowrap}
+  .frame{background:#fff;border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;
+    box-shadow:0 10px 24px -14px rgba(15,23,42,.18)}
+  .frame-bar{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border-soft);background:#fbfcfe}
+  .frame-bar .dots{display:flex;gap:5px}
+  .frame-bar .dots i{width:9px;height:9px;border-radius:50%;background:var(--faint)}
+  .frame-bar .url{font:500 11px/1 var(--mono);color:var(--muted);background:#fff;border:1px solid var(--border-soft);border-radius:999px;padding:5px 12px}
+  .crop{border:1px dashed var(--faint);border-radius:var(--r-lg);background:#fff;overflow:hidden}
+  .crop-tag{font:600 10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+    padding:8px 14px;border-bottom:1px dashed var(--border-soft);background:#fbfcfe}
+  .croprow{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px;align-items:start}
+
+  /* ---------- clean-theme app ---------- */
+  .app{background:radial-gradient(circle at top left, rgba(99,91,255,.06), transparent 28%),
+      linear-gradient(180deg,#f8fafc 0%,#eef2ff 100%);color:var(--ink)}
+  .app-head{display:flex;align-items:center;gap:10px;padding:0 22px;height:52px;background:rgba(255,255,255,.85);border-bottom:1px solid var(--border)}
+  .app-logo{width:26px;height:26px;border-radius:7px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font:700 13px/1 var(--sans)}
+  .app-name{font-weight:700;font-size:.9375rem}
+  .app-back{margin-left:18px;font-size:.8125rem;color:var(--ink-2)}
+  .app-back b{color:var(--accent);font-weight:600}
+  .app-user{margin-left:auto;font-size:.8125rem;color:var(--muted)}
+  .app-body{max-width:1024px;margin:0 auto;padding:26px 18px 40px;display:flex;flex-direction:column;gap:16px}
+  .app-body.narrow{max-width:720px}
+  .page-title{font-size:1.35rem;font-weight:700;letter-spacing:-.03em;margin:0}
+  .page-sub{margin:2px 0 6px;font-size:.8125rem;color:var(--ink-2);max-width:64ch}
+  .titlerow{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .titlerow .btn{margin-left:auto}
+  .card{background:#fff;border:1px solid var(--border);border-radius:var(--r-lg);padding:18px 20px}
+  .lab{display:flex;align-items:center;gap:7px;font-size:.75rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);margin:0 0 8px}
+  .hint{font-size:.8125rem;color:var(--muted)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:38px;padding:0 18px;
+    border-radius:999px;font-weight:700;font-size:.875rem;border:1px solid transparent;white-space:nowrap}
+  .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;box-shadow:0 4px 14px var(--accent-glow)}
+  .btn.secondary{background:#f1f5f9;border-color:var(--border);color:var(--ink)}
+  .btn.danger{background:var(--danger-subtle);border-color:rgba(239,68,68,.3);color:var(--danger-strong)}
+  .btn.sm{min-height:30px;padding:0 12px;font-size:.75rem}
+  .actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .linkbtn{font-size:.8125rem;font-weight:600;color:var(--accent);white-space:nowrap}
+  .input{border:1.5px solid var(--border);border-radius:var(--r-md);padding:9px 12px;font-size:.875rem;color:var(--ink);background:#fff}
+  .input.ph{color:var(--muted)}
+  .modal{max-width:460px;margin:0 auto;background:#fff;border:1px solid var(--border);border-radius:var(--r-lg);
+    padding:20px 22px;box-shadow:0 24px 48px -18px rgba(15,23,42,.35)}
+  .modal h4{margin:0 0 6px;font-size:1rem}
+  .modal .sub{margin:0 0 14px;font-size:.8125rem;color:var(--ink-2)}
+
+  /* ---------- badge & marker ---------- */
+  .badge{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:999px;font-size:.6875rem;font-weight:600;white-space:nowrap}
+  .badge.info{background:var(--info-subtle);color:var(--info-strong)}
+  .badge.warn{background:var(--warn-subtle);color:var(--warn-strong)}
+  .badge.lav{background:var(--accent-subtle);color:var(--accent);border:1px dashed var(--accent-muted)}
+  .badge.ok{background:var(--ok-bg);color:var(--ok-strong)}
+  .badge.mut{background:var(--border-soft);color:var(--ink-2)}
+  .stars{font-size:.75rem;color:var(--warn);letter-spacing:.05em}
+  .stars .off{color:var(--faint)}
+
+  /* ---------- indice iniziative ---------- */
+  .ini-card{display:flex;flex-direction:column;gap:10px;background:#fff;border:1px solid var(--border);border-radius:var(--r-lg);padding:18px 20px}
+  .ini-card:hover{border-color:var(--accent-muted)}
+  .ini-top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+  .ini-top h3{margin:0;font-size:1rem;font-weight:700}
+  .ini-top .hint{margin-left:auto;white-space:nowrap}
+  .ini-desc{margin:0;font-size:.8125rem;color:var(--ink-2)}
+  .stationline{display:flex;gap:6px;flex-wrap:wrap}
+  .st-pill{display:inline-flex;gap:6px;align-items:center;padding:4px 9px;border-radius:999px;border:1px solid var(--border-soft);
+    background:#fbfcfe;font-size:.6875rem;font-weight:600;color:var(--ink-2)}
+  .st-pill b{color:var(--ink)}
+  .st-pill.on{border-color:var(--accent-muted);background:var(--accent-subtle);color:var(--accent)}
+  .ini-foot{display:flex;gap:14px;align-items:center;font-size:.75rem;color:var(--muted);flex-wrap:wrap}
+
+  /* ---------- board ---------- */
+  .board-head{display:flex;flex-direction:column;gap:8px}
+  .sess-chips{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+  .sess-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;background:#fff;
+    border:1px solid var(--border);font-size:.75rem;font-weight:600;color:var(--ink-2)}
+  .viewtoggle{display:inline-flex;border:1px solid var(--border);border-radius:999px;overflow:hidden;margin-left:auto}
+  .viewtoggle span{padding:7px 16px;font-size:.8125rem;font-weight:600;color:var(--ink-2);background:#fff}
+  .viewtoggle span.on{background:var(--ink);color:#fff}
+  .kanban{display:flex;gap:10px;align-items:flex-start;overflow-x:auto;padding-bottom:6px}
+  .kcol{flex:0 0 236px;background:rgba(255,255,255,.6);border:1px solid var(--border-soft);border-radius:var(--r-md);padding:10px}
+  .kcol.collapsed{flex:0 0 46px;display:flex;flex-direction:column;align-items:center;gap:10px;padding:12px 6px;min-height:180px}
+  .kcol.collapsed .vlab{writing-mode:vertical-rl;font-size:.65rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
+  .kcol.collapsed .exp{color:var(--muted);font-size:.75rem}
+  .kcol-head{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:.6875rem;font-weight:700;letter-spacing:.05em;
+    text-transform:uppercase;color:var(--ink-2);padding:2px 4px 10px}
+  .kcol-head .fold{margin-left:2px;color:var(--faint);font-size:.75rem}
+  .kcol-head .n{margin-left:auto;font:600 10.5px/1 var(--mono);color:var(--muted);background:#fff;border:1px solid var(--border-soft);border-radius:999px;padding:3px 7px}
+  .kcard{background:#fff;border:1px solid var(--border);border-radius:var(--r-md);padding:10px 12px;margin-bottom:8px;
+    display:flex;flex-direction:column;gap:6px;box-shadow:0 2px 6px -4px rgba(15,23,42,.15)}
+  .kcard .nm{font-size:.8125rem;font-weight:700;line-height:1.3}
+  .kcard .meta{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:.6875rem;color:var(--muted)}
+  .kcard .act{margin-top:2px}
+  .kcard .act .btn{width:100%;min-height:28px;font-size:.71875rem;padding:4px 10px;white-space:normal;line-height:1.25;text-align:center}
+  .pulse{position:relative}
+  .pulse::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--accent);margin-right:6px;
+    display:inline-block;animation:pu 1.4s ease-in-out infinite}
+  @keyframes pu{0%,100%{opacity:.35}50%{opacity:1}}
+  .kempty{font-size:.75rem;color:var(--faint);text-align:center;padding:18px 0}
+  .esito{display:inline-flex;padding:2px 8px;border-radius:999px;font-size:.65625rem;font-weight:700}
+  .esito.conclusa{background:var(--ok-bg);color:var(--ok-strong)}
+  .esito.nogo{background:var(--border-soft);color:var(--ink-2)}
+  .esito.nonidonea{background:var(--danger-subtle);color:var(--danger-strong)}
+  .esito.sfumata{background:var(--info-subtle);color:var(--info-strong)}
+  .esito.rimandata{background:var(--warn-subtle);color:var(--warn-strong)}
+
+  /* ---------- tabella ---------- */
+  table.tb{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;font-size:.8125rem}
+  .tb th{font-size:.6875rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);
+    text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);background:#fbfcfe}
+  .tb td{padding:9px 12px;border-bottom:1px solid var(--border-soft);vertical-align:middle}
+  .tb tr:last-child td{border-bottom:0}
+  .filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .select{display:inline-flex;align-items:center;gap:8px;border:1.5px solid var(--border);border-radius:var(--r-md);
+    padding:7px 12px;font-size:.8125rem;font-weight:600;color:var(--ink);background:#fff}
+  .select .car{color:var(--muted);font-size:.6875rem}
+
+  /* ---------- drawer ---------- */
+  .drawer{max-width:520px;margin:0 auto;background:#fff;border:1px solid var(--border);border-radius:var(--r-lg);
+    box-shadow:0 24px 48px -18px rgba(15,23,42,.3);overflow:hidden}
+  .drawer-head{padding:16px 20px;border-bottom:1px solid var(--border-soft);display:flex;flex-direction:column;gap:6px}
+  .drawer-head h3{margin:0;font-size:1.05rem}
+  .drawer-head .sub{display:flex;gap:10px;align-items:center;font-size:.75rem;color:var(--muted);flex-wrap:wrap}
+  .drawer-sec{padding:14px 20px;border-bottom:1px solid var(--border-soft)}
+  .drawer-sec:last-child{border-bottom:0}
+  .stationsel{display:flex;gap:5px;flex-wrap:wrap}
+  .stationsel span{padding:5px 10px;border-radius:999px;border:1px solid var(--border);font-size:.71875rem;font-weight:600;color:var(--ink-2);background:#fff}
+  .stationsel span.on{background:var(--ink);border-color:var(--ink);color:#fff}
+  .prov-row{display:flex;gap:10px;align-items:baseline;font-size:.8125rem;padding:4px 0}
+  .prov-row .sess{color:var(--ink-2);flex:1}
+  .prov-row .sc{font:600 11px/1.6 var(--mono);color:var(--muted)}
+  .tl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+  .tl li{position:relative;padding:0 0 14px 22px;font-size:.8125rem;color:var(--ink-2)}
+  .tl li::before{content:"";position:absolute;left:5px;top:6px;width:7px;height:7px;border-radius:50%;background:var(--faint)}
+  .tl li::after{content:"";position:absolute;left:8px;top:16px;bottom:-2px;width:1px;background:var(--border-soft)}
+  .tl li:last-child::after{display:none}
+  .tl li.hot::before{background:var(--accent)}
+  .tl .who{font:500 10.5px/1.8 var(--mono);color:var(--muted);display:block}
+  .tl b{color:var(--ink);font-weight:600}
+  .composer{display:flex;gap:8px;margin-top:10px}
+  .composer .input{flex:1}
+
+  /* ---------- radio esiti ---------- */
+  .radios{display:flex;flex-direction:column;gap:7px;margin:10px 0}
+  .radio{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--r-md);font-size:.8125rem}
+  .radio.on{border-color:var(--accent);background:var(--accent-subtle)}
+  .radio .dot{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--faint);flex:none;margin-top:2px}
+  .radio.on .dot{border-color:var(--accent);background:radial-gradient(circle at center,var(--accent) 45%,transparent 50%)}
+  .radio b{color:var(--ink)}
+  .radio small{display:block;color:var(--muted)}
+  .bridge{margin-top:12px;padding:12px 14px;border:1px dashed var(--accent-muted);border-radius:var(--r-md);background:var(--accent-subtle);font-size:.8125rem}
+  .bridge .lab{margin-bottom:6px}
+  .checkrow{display:flex;gap:9px;align-items:flex-start;padding:5px 0;font-size:.8125rem;color:var(--ink-2)}
+  .checkrow .box{width:14px;height:14px;border-radius:4px;border:1.5px solid var(--faint);flex:none;margin-top:2px;background:#fff}
+  .checkrow .box.on{background:var(--accent);border-color:var(--accent)}
+
+  /* ---------- registro nel dossier ---------- */
+  .fact{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--border-soft);font-size:.8125rem}
+  .fact:last-child{border-bottom:0}
+  .fact .body{flex:1}
+  .fact .body b{color:var(--ink)}
+  .fact .body .who{font:500 10.5px/1.9 var(--mono);color:var(--muted);display:block}
+  .fact .linkbtn{font-size:.75rem}
+  .empty{display:flex;flex-direction:column;align-items:center;gap:10px;padding:44px 20px;text-align:center}
+  .empty .ico{width:44px;height:44px;border-radius:12px;background:var(--accent-subtle);display:flex;align-items:center;justify-content:center;font-size:20px}
+  .empty p{margin:0;font-size:.8125rem;color:var(--ink-2);max-width:44ch}
+</style>
+
+<div class="doc">
+  <div class="doc-head">
+    <div class="eyebrow">Binocolo · Workstream D3 · Wireframe per revisione</div>
+    <h1>Iniziative e lavorazione target</h1>
+    <p>Esegue <b>INIZIATIVE-PRD.md</b> (iterazione 2, decisioni [DECISO]). Sette stati: indice e board delle iniziative,
+      drawer della card, chiusura e rimozione, registro azienda nel dossier, tocchi alle superfici esistenti.
+      Come per il wireframe gated: layout e copy qui mostrati sono la fonte di verità per i task F del piano esecutivo.</p>
+    <div class="legend"><span><span class="m">n</span> nota numerata ancorata al PRD</span><span>· Grigi = contenuto d'esempio</span></div>
+  </div>
+
+  <nav class="statenav">
+    <a href="#s1">S1 · Indice</a><a href="#s2">S2 · Board kanban</a><a href="#s3">S3 · Board tabella</a>
+    <a href="#s4">S4 · Drawer card</a><a href="#s5">S5 · Chiusura & rimozione</a><a href="#s6">S6 · Registro azienda</a>
+    <a href="#s7">S7 · Superfici esistenti</a>
+  </nav>
+
+  <div class="flow">
+    <b>Flusso</b><span class="arr">·</span>
+    <span class="step">Ricerca (D2) — risultati</span><span class="arr">→</span>
+    <span class="step hot">prima ★ → card «Da contattare»</span><span class="arr">→</span>
+    <span class="step">stati + diario</span><span class="arr">→</span>
+    <span class="step">Chiusa · esito</span><span class="arr">→</span>
+    <span class="step">ground truth score · registro azienda</span>
+  </div>
+
+  <!-- ============================== S1 ============================== -->
+  <section class="state" id="s1">
+    <div class="state-head"><span class="sid">S1</span><h2>Indice iniziative</h2><span class="ref">PRD §3.1 · §8</span></div>
+    <p class="state-intent">Il punto d'ingresso della lavorazione. Ogni iniziativa è un obiettivo largo di acquisizione;
+      la riga mostra dove sta il lavoro (conteggi per stato) e l'ultima attività. Entità volutamente light: titolo e descrizione, nient'altro.</p>
+    <div class="frame">
+      <div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span><span class="url">mrsmith.app/binocolo/iniziative</span></div>
+      <div class="app">
+        <div class="app-head"><span class="app-logo">B</span><span class="app-name">Binocolo</span>
+          <span class="app-back">Ricerche · <b>Iniziative</b> · Config</span><span class="app-user">s.sciacco</span></div>
+        <div class="app-body narrow">
+          <div class="titlerow">
+            <h1 class="page-title">Iniziative</h1>
+            <span class="btn primary">Nuova iniziativa <span class="m">1</span></span>
+          </div>
+          <p class="page-sub">Un'iniziativa raccoglie le ricerche di uno stesso obiettivo di acquisizione e le aziende in lavorazione.</p>
+
+          <div class="ini-card">
+            <div class="ini-top"><h3>Acquisizione MSP 2026</h3><span class="hint">aggiornata 2 g fa</span></div>
+            <p class="ini-desc">MSP lombardi, 1–5 mln, tesi successione.</p>
+            <div class="stationline"><span class="m">2</span>
+              <span class="st-pill on">Da contattare <b>4</b></span><span class="st-pill">Contattata <b>2</b></span>
+              <span class="st-pill">In dialogo <b>2</b></span><span class="st-pill">Approfondimento <b>1</b></span>
+              <span class="st-pill">Offerta <b>0</b></span><span class="st-pill">Chiuse <b>3</b></span>
+            </div>
+            <div class="ini-foot"><span>2 ricerche agganciate</span><span>·</span><span>Ultima attività: nota su Nexa Systems S.r.l.</span></div>
+          </div>
+
+          <div class="ini-card">
+            <div class="ini-top"><h3>Consulenza AI</h3><span class="hint">aggiornata 6 g fa</span></div>
+            <p class="ini-desc">Boutique di consulenza AI/ML nel nord Italia.</p>
+            <div class="stationline">
+              <span class="st-pill on">Da contattare <b>3</b></span><span class="st-pill">Contattata <b>1</b></span>
+              <span class="st-pill">In dialogo <b>0</b></span><span class="st-pill">Approfondimento <b>0</b></span>
+              <span class="st-pill">Offerta <b>0</b></span><span class="st-pill">Chiuse <b>1</b></span>
+            </div>
+            <div class="ini-foot"><span>1 ricerca agganciata</span></div>
+          </div>
+
+          <p class="hint" style="margin:2px 4px"><span class="linkbtn">Archivio (1)</span> <span class="m">3</span></p>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><span class="m">1</span><span><b>Nuova iniziativa</b> apre il modal light (variante sotto). Creabile anche inline da D1 (S7). <span class="ref">PRD §3.1–3.2</span></span></li>
+      <li><span class="m">2</span><span>Conteggi per stato = riepilogo azionabile del lavoro (click → board filtrato); non contatori decorativi. <span class="ref">PRD §8</span></span></li>
+      <li><span class="m">3</span><span>Archiviazione = uscita di scena dell'iniziativa conclusa; card e diario restano consultabili. <span class="ref">PRD §3.1</span></span></li>
+    </ul>
+
+    <div class="croprow" style="margin-top:22px">
+      <div class="crop">
+        <div class="crop-tag">Variante · empty state</div>
+        <div style="padding:24px;background:linear-gradient(180deg,#f8fafc,#eef2ff)">
+          <div class="card"><div class="empty">
+            <span class="ico">◎</span>
+            <p><b>Nessuna iniziativa.</b> Le iniziative raccolgono le ricerche di uno stesso obiettivo di acquisizione e le aziende promosse in lavorazione.</p>
+            <span class="btn primary">Nuova iniziativa</span>
+          </div></div>
+        </div>
+      </div>
+      <div class="crop">
+        <div class="crop-tag">Variante · modal nuova iniziativa</div>
+        <div style="padding:24px;background:linear-gradient(180deg,#f8fafc,#eef2ff)">
+          <div class="modal">
+            <h4>Nuova iniziativa</h4>
+            <p class="sub">Un obiettivo largo, non una ricerca: le ricerche si agganciano dopo.</p>
+            <p class="lab">Titolo</p>
+            <span class="input" style="display:block">Acquisizione MSP 2026</span>
+            <p class="lab" style="margin-top:12px">Descrizione <span class="hint" style="text-transform:none;letter-spacing:0">(opzionale)</span></p>
+            <span class="input ph" style="display:block">Perimetro e razionale in una riga…</span>
+            <div class="actions" style="margin-top:16px"><span class="btn primary" style="min-height:34px">Crea</span><span class="btn secondary" style="min-height:34px">Annulla</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== S2 ============================== -->
+  <section class="state" id="s2">
+    <div class="state-head"><span class="sid">S2</span><h2>Board — vista kanban</h2><span class="ref">PRD §4 · §6.1 · §7 · §8</span></div>
+    <p class="state-intent">Il banco di lavoro dell'iniziativa. Sei stati fissi ma <b>colonne flessibili</b>: larghezza confortevole,
+      board a scorrimento orizzontale, colonne collassabili a rail — le card non si comprimono mai. Transizioni libere per drag.
+      Ogni card è una coppia (iniziativa, azienda): badge dal registro azienda, marker di collisione cross-iniziativa,
+      bottone dell'analisi completa nel suo ciclo a tre stati.</p>
+    <div class="frame">
+      <div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span><span class="url">mrsmith.app/binocolo/iniziative/acquisizione-msp-2026</span></div>
+      <div class="app">
+        <div class="app-head"><span class="app-logo">B</span><span class="app-name">Binocolo</span>
+          <span class="app-back"><b>← Iniziative</b></span><span class="app-user">s.sciacco</span></div>
+        <div class="app-body">
+          <div class="board-head">
+            <div class="titlerow">
+              <h1 class="page-title">Acquisizione MSP 2026</h1>
+              <div class="viewtoggle"><span class="on">Kanban</span><span>Tabella <span class="m">1</span></span></div>
+            </div>
+            <p class="page-sub">MSP lombardi, 1–5 mln, tesi successione.</p>
+            <div class="sess-chips">
+              <span class="hint" style="margin-right:2px">Ricerche:</span>
+              <span class="sess-chip">MSP Lombardia · giu</span>
+              <span class="sess-chip">MSP Lombardia est · lug</span>
+              <span class="linkbtn">+ Aggancia ricerca <span class="m">2</span></span>
+            </div>
+          </div>
+
+          <div class="kanban">
+            <div class="kcol">
+              <div class="kcol-head">Da contattare <span class="n">4</span></div>
+              <div class="kcard"><span class="nm">Nexa Systems S.r.l.</span>
+                <span class="meta">MI <span class="badge info">Già cliente <span class="m">4</span></span></span>
+                <span class="act"><span class="btn secondary sm">Avvia analisi completa <span class="m">5</span></span></span></div>
+              <div class="kcard"><span class="nm">Retelia Net</span>
+                <span class="meta">BG</span>
+                <span class="act"><span class="btn secondary sm">Apri dossier <span class="m">6</span></span></span></div>
+              <div class="kcard"><span class="nm">Officine Dati S.r.l.</span>
+                <span class="meta">MB <span class="badge lav">anche in: Consulenza AI <span class="m">7</span></span></span>
+                <span class="act"><span class="btn secondary sm">Avvia analisi completa</span></span></div>
+              <div class="kcard"><span class="nm">Sistemi Aperti</span><span class="meta">BS</span>
+                <span class="act"><span class="btn secondary sm">Avvia analisi completa</span></span></div>
+            </div>
+            <div class="kcol">
+              <div class="kcol-head">Contattata <span class="n">2</span></div>
+              <div class="kcard"><span class="nm">Gruppo Icario</span><span class="meta">MI</span>
+                <span class="act"><span class="btn secondary sm pulse">Analisi in corso…</span></span></div>
+              <div class="kcard"><span class="nm">DatiSicuri S.r.l.</span><span class="meta">CO</span>
+                <span class="act"><span class="btn secondary sm">Apri dossier</span></span></div>
+            </div>
+            <div class="kcol">
+              <div class="kcol-head">In dialogo <span class="n">2</span></div>
+              <div class="kcard"><span class="nm">BlueStack S.r.l.</span><span class="meta">MI</span>
+                <span class="act"><span class="btn secondary sm">Apri dossier</span></span></div>
+              <div class="kcard"><span class="nm">NordNet Servizi</span><span class="meta">VA <span class="badge warn">In trattativa con altri</span></span>
+                <span class="act"><span class="btn secondary sm">Apri dossier</span></span></div>
+            </div>
+            <div class="kcol">
+              <div class="kcol-head">Approfondimento <span class="m">8</span> <span class="n">1</span></div>
+              <div class="kcard"><span class="nm">Elabora S.p.A.</span><span class="meta">MI</span>
+                <span class="act"><span class="btn secondary sm">Apri dossier</span></span></div>
+            </div>
+            <div class="kcol collapsed"><span class="n">0</span><span class="vlab">Offerta</span><span class="exp">›</span><span class="m">10</span></div>
+            <div class="kcol">
+              <div class="kcol-head">Chiusa <span class="fold">‹</span> <span class="n">3</span></div>
+              <div class="kcard"><span class="nm">TecnoOrbita</span><span class="meta"><span class="esito conclusa">Conclusa</span></span></div>
+              <div class="kcard"><span class="nm">WebArti Studio</span><span class="meta"><span class="esito nonidonea">Non idonea</span> <span class="m">9</span></span></div>
+              <div class="kcard"><span class="nm">StudioReti</span><span class="meta"><span class="esito rimandata">Rimandata</span></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><span class="m">1</span><span><b>Viste indipendenti</b>: kanban e tabella hanno filtri propri, nessun master-detail forzato. <span class="ref">PRD §8</span></span></li>
+      <li><span class="m">2</span><span><b>Retro-aggancio</b> di sessioni esistenti; le ≥1★ già presenti creano le card mancanti (backfill). <span class="ref">PRD §3.2</span></span></li>
+      <li><span class="m">3</span><span>Transizioni <b>libere</b> per drag, nessun vincolo di sequenza: una chiusura può arrivare da «Da contattare». <span class="ref">PRD §4.4</span></span></li>
+      <li><span class="m">4</span><span>Badge dal <b>registro azienda</b> (fatti tipizzati, dichiarati a mano in v1). Solo presentazione, mai effetti su pipeline. <span class="ref">PRD §6</span></span></li>
+      <li><span class="m">5</span><span>Azione «<b>Avvia analisi completa</b>» = recupero dati completi + analisi LLM. Conferma deliberata, nessun costo in UI. <span class="ref">PRD §7</span></span></li>
+      <li><span class="m">6</span><span>Ciclo a tre stati: Avvia analisi completa → Analisi in corso… → <b>Apri dossier</b>. Azienda già analizzata altrove nasce direttamente qui (cache, zero spesa). <span class="ref">PRD §7</span></span></li>
+      <li><span class="m">7</span><span><b>Marker di collisione</b>: card attiva per la stessa azienda in un'altra iniziativa — il contatto col titolare è unico, coordinarsi prima. <span class="ref">PRD §6.1</span></span></li>
+      <li><span class="m">8</span><span>Lo stato «Approfondimento» è la fase del deal (incontri, NDA, dataroom) — nome distinto dall'azione di analisi, per non confondere. <span class="ref">PRD §7</span></span></li>
+      <li><span class="m">9</span><span>Colonna Chiusa: card compatte col solo esito (5 valori). Il dettaglio resta nel drawer; niente colonne separate per esito. <span class="ref">PRD §4.4</span></span></li>
+      <li><span class="m">10</span><span><b>Colonne flessibili</b>: larghezza fissa confortevole (~240px) e board a scroll orizzontale — mai compresse a francobollo. Ogni colonna è collassabile a rail (‹/›); le vuote e «Chiusa» nascono collassate, lo stato è ricordato per utente. <span class="ref">PRD §8</span></span></li>
+    </ul>
+  </section>
+
+  <!-- ============================== S3 ============================== -->
+  <section class="state" id="s3">
+    <div class="state-head"><span class="sid">S3</span><h2>Board — vista tabella</h2><span class="ref">PRD §8</span></div>
+    <p class="state-intent">La stessa popolazione del kanban in forma tabellare, con filtri propri: utile per rivedere le chiuse per esito o cercare un'azienda.</p>
+    <div class="frame">
+      <div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span><span class="url">mrsmith.app/binocolo/iniziative/acquisizione-msp-2026</span></div>
+      <div class="app">
+        <div class="app-body">
+          <div class="titlerow">
+            <h1 class="page-title" style="font-size:1.15rem">Acquisizione MSP 2026</h1>
+            <div class="viewtoggle"><span>Kanban</span><span class="on">Tabella</span></div>
+          </div>
+          <div class="filters">
+            <span class="select">Stato: tutti <span class="car">▾</span></span>
+            <span class="select">Esito: tutti <span class="car">▾</span></span>
+            <span class="input ph" style="min-width:200px">Cerca azienda…</span>
+            <span class="m">1</span>
+          </div>
+          <table class="tb">
+            <tr><th>Azienda</th><th>Prov.</th><th>Stato</th><th>Dossier</th><th>Registro</th><th>Ultima attività</th></tr>
+            <tr><td><b>Nexa Systems S.r.l.</b></td><td>MI</td><td>Da contattare</td><td><span class="linkbtn">Avvia analisi</span></td>
+              <td><span class="badge info">Già cliente</span></td><td class="hint">card creata · 2 g fa</td></tr>
+            <tr><td><b>Gruppo Icario</b></td><td>MI</td><td>Contattata</td><td><span class="badge mut">in corso…</span></td>
+              <td>—</td><td class="hint">contattato · ieri</td></tr>
+            <tr><td><b>NordNet Servizi</b></td><td>VA</td><td>In dialogo</td><td><span class="linkbtn">Apri dossier</span></td>
+              <td><span class="badge warn">In trattativa con altri</span></td><td class="hint">nota · 4 g fa</td></tr>
+            <tr><td><b>WebArti Studio</b></td><td>MI</td><td>Chiusa <span class="esito nonidonea">Non idonea</span></td><td><span class="linkbtn">Apri dossier</span></td>
+              <td>—</td><td class="hint">chiusura · 8 g fa <span class="m">2</span></td></tr>
+            <tr><td><b>StudioReti</b></td><td>LC</td><td>Chiusa <span class="esito rimandata">Rimandata</span></td><td>—</td>
+              <td><span class="badge warn">Non vende</span></td><td class="hint">chiusura · 15 g fa <span class="m">3</span></td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><span class="m">1</span><span>Filtri propri della vista, indipendenti dal kanban. Popolazione = tutte le card dell'iniziativa, chiuse comprese. <span class="ref">PRD §8</span></span></li>
+      <li><span class="m">2</span><span>«Non idonea» = fuori profilo alla prova dei fatti: il segnale d'errore dello screening, prezioso per la calibrazione. Non scrive mai il registro (giudizio di contesto). <span class="ref">PRD §4.4</span></span></li>
+      <li><span class="m">3</span><span>«Rimandata» chiusa senza reminder: la ripresa è organica — una ricerca futura che la ripesca (≥1★) riapre la stessa card, o riapertura manuale. Il fatto «Non vende» è nel registro, revocabile quando le condizioni cambiano. <span class="ref">PRD §4.3–4.4 · §6</span></span></li>
+    </ul>
+  </section>
+
+  <!-- ============================== S4 ============================== -->
+  <section class="state" id="s4">
+    <div class="state-head"><span class="sid">S4</span><h2>Drawer card</h2><span class="ref">PRD §4 · §5 · §6 · §7</span></div>
+    <p class="state-intent">Tutto il contesto di lavorazione di un'azienda dentro l'iniziativa: stato, provenienze, scheda azienda in sola lettura, dossier, diario col composer. Il composer scrive <b>solo</b> il diario: la nota d'azienda ha la sua casa nel dossier (S6).</p>
+    <div class="crop">
+      <div class="crop-tag">Drawer sopra il board (qui isolato)</div>
+      <div style="padding:26px;background:linear-gradient(180deg,#f8fafc,#eef2ff)">
+        <div class="drawer">
+          <div class="drawer-head">
+            <h3>Officine Dati S.r.l.</h3>
+            <div class="sub"><span>P.IVA 04512380962 · Monza e Brianza</span><span class="linkbtn">Apri dossier azienda ↗ <span class="m">1</span></span></div>
+            <div><span class="badge lav">In lavorazione anche in: Consulenza AI <span class="m">2</span></span></div>
+          </div>
+          <div class="drawer-sec">
+            <p class="lab">Stato <span class="m">3</span></p>
+            <div class="stationsel">
+              <span>Da contattare</span><span class="on">Contattata</span><span>In dialogo</span>
+              <span>Approfondimento</span><span>Offerta</span><span>Chiusa…</span>
+            </div>
+          </div>
+          <div class="drawer-sec">
+            <p class="lab">Provenienze <span class="m">4</span></p>
+            <div class="prov-row"><span class="sess">MSP Lombardia · giu</span><span class="stars">★★★<span class="off">☆</span></span><span class="sc">score 78</span></div>
+            <div class="prov-row"><span class="sess">MSP Lombardia est · lug</span><span class="stars">★★<span class="off">☆☆</span></span><span class="sc">score 71</span></div>
+          </div>
+          <div class="drawer-sec">
+            <p class="lab">Scheda azienda <span class="m">5</span></p>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px"><span class="badge info">Già cliente</span></div>
+            <p class="hint" style="margin:0">«Gruppo familiare, molto radicato sul territorio…» — ultima nota d'azienda, 06/2026.
+              <span class="linkbtn">Gestione dal dossier ↗</span></p>
+          </div>
+          <div class="drawer-sec">
+            <p class="lab">Analisi completa</p>
+            <div class="actions"><span class="btn secondary sm">Avvia analisi completa <span class="m">6</span></span>
+              <span class="hint">Recupero dei dati completi e analisi. Richiede tempo; il dossier resta disponibile qui.</span></div>
+          </div>
+          <div class="drawer-sec">
+            <p class="lab">Diario <span class="m">7</span></p>
+            <ul class="tl">
+              <li class="hot"><b>Contattata</b> — telefonata col titolare, disponibile a un incontro a settembre.<span class="who">g.rossi · 30 giu 2026</span></li>
+              <li><b>Nota</b> — il commercialista di riferimento è lo studio Ferri (contatto comune).<span class="who">s.sciacco · 24 giu 2026</span></li>
+              <li><b>Card creata</b> da MSP Lombardia · giu (★★★).<span class="who">s.sciacco · 18 giu 2026</span></li>
+            </ul>
+            <div class="composer"><span class="input ph" style="flex:1">Aggiungi nota al diario… <span class="m">8</span></span><span class="btn secondary sm" style="min-height:36px">Aggiungi</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><span class="m">1</span><span>Link al dossier <b>/azienda</b>: dati, dossier d'analisi e registro (S6) vivono lì. <span class="ref">PRD §8</span></span></li>
+      <li><span class="m">2</span><span>Marker derivato dalle card attive delle altre iniziative: il titolare è uno solo, il contatto va coordinato. <span class="ref">PRD §6.1</span></span></li>
+      <li><span class="m">3</span><span>Cambio di stato dal drawer o per drag; «Chiusa…» apre il flusso esiti (S5). Ogni transizione è un evento del diario con autore. <span class="ref">PRD §4.4 · §5</span></span></li>
+      <li><span class="m">4</span><span><b>Provenienze</b>, non aggregati: ogni riga = sessione, stella e score al momento del giudizio. La card è autonoma: cambiare una stella dopo il primo evento non la tocca. <span class="ref">PRD §4.2</span></span></li>
+      <li><span class="m">5</span><span>Scheda azienda in <b>sola lettura</b> (fatti + ultima nota): quello che scopri lavorando si registra nella casa giusta, a un click. Nessun toggle di scope. <span class="ref">PRD §2 · §6</span></span></li>
+      <li><span class="m">6</span><span>Conferma deliberata senza cifre; se l'azienda è già analizzata il bottone nasce come «Apri dossier». <span class="ref">PRD §7</span></span></li>
+      <li><span class="m">7</span><span>Diario append-only = il log unico evoluto (mig 080→D3): eventi e note con autore, ground truth per la calibrazione dello score. <span class="ref">PRD §5</span></span></li>
+      <li><span class="m">8</span><span>Il composer scrive <b>solo il diario dell'iniziativa</b>: la nota d'azienda è un genere diverso e si scrive dal dossier (S6). <span class="ref">PRD §2 · §6</span></span></li>
+    </ul>
+  </section>
+
+  <!-- ============================== S5 ============================== -->
+  <section class="state" id="s5">
+    <div class="state-head"><span class="sid">S5</span><h2>Chiusura ed esiti · Rimozione</h2><span class="ref">PRD §4.3–4.4 · §6 ponte</span></div>
+    <p class="state-intent">Due uscite con significati opposti: la <b>chiusura</b> è il verdetto di una lavorazione avvenuta (5 esiti, ciascuno un segnale di calibrazione);
+      la <b>rimozione</b> è la correzione di un errore di triage, nessun verdetto.</p>
+    <div class="croprow">
+      <div class="crop">
+        <div class="crop-tag">Chiusura card · esiti</div>
+        <div style="padding:24px;background:linear-gradient(180deg,#f8fafc,#eef2ff)">
+          <div class="modal">
+            <h4>Chiudi lavorazione — NordNet Servizi</h4>
+            <p class="sub">L'esito resta nel diario e alimenta la calibrazione del punteggio.</p>
+            <div class="radios">
+              <div class="radio"><span class="dot"></span><span><b>Conclusa</b><small>l'operazione è andata in porto</small></span></div>
+              <div class="radio on"><span class="dot"></span><span><b>No-go</b><small>idonea, ma si sceglie di non procedere</small></span></div>
+              <div class="radio"><span class="dot"></span><span><b>Non idonea</b><small>alla prova dei fatti non è in profilo per questa iniziativa <span class="m">1</span></small></span></div>
+              <div class="radio"><span class="dot"></span><span><b>Sfumata</b><small>decisione della controparte o di terzi</small></span></div>
+              <div class="radio"><span class="dot"></span><span><b>Rimandata</b><small>condizioni non mature, da riprendere <span class="m">2</span></small></span></div>
+            </div>
+            <div class="bridge"><span class="m">3</span>
+              <p class="lab" style="margin-top:4px">Registra anche nel registro azienda <span class="hint" style="text-transform:none;letter-spacing:0">(vale per tutte le iniziative)</span></p>
+              <div class="checkrow"><span class="box on"></span><span><b>Non vende</b> — il titolare non intende vendere</span></div>
+              <div class="checkrow"><span class="box"></span><span><b>In trattativa con altri</b></span></div>
+            </div>
+            <p class="lab" style="margin-top:12px">Nota</p>
+            <span class="input ph" style="display:block">Motivo in una riga…</span>
+            <div class="actions" style="margin-top:16px"><span class="btn primary" style="min-height:34px">Chiudi card</span><span class="btn secondary" style="min-height:34px">Annulla</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="crop">
+        <div class="crop-tag">Rimozione · errore di triage</div>
+        <div style="padding:24px;background:linear-gradient(180deg,#f8fafc,#eef2ff)">
+          <div class="modal">
+            <h4>Rimuovi dalla lavorazione — Sistemi Aperti</h4>
+            <p class="sub">La rimozione è per le card create per errore: <b>nessun verdetto</b> viene registrato. <span class="m">4</span></p>
+            <div class="checkrow"><span class="box on"></span><span>Correggi anche la valutazione nella ricerca di provenienza: <b>escludi (−1)</b> <span class="m">5</span></span></div>
+            <p class="lab" style="margin-top:10px">Motivo dell'esclusione</p>
+            <span class="input ph" style="display:block">Es. non è un MSP, rivende solo licenze…</span>
+            <div class="actions" style="margin-top:16px"><span class="btn danger" style="min-height:34px">Rimuovi</span><span class="btn secondary" style="min-height:34px">Annulla</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><span class="m">1</span><span><b>Non idonea</b> non mostra il ponte registro: è un giudizio di contesto (fuori profilo per QUESTA iniziativa), non un fatto d'azienda. <span class="ref">PRD §4.4</span></span></li>
+      <li><span class="m">2</span><span><b>Rimandata</b>: esito, non stato del board — niente colonna «parcheggiate», niente reminder. Ripresa organica via riapertura. <span class="ref">PRD §4.3–4.4</span></span></li>
+      <li><span class="m">3</span><span>Il <b>ponte tipizzato</b> compare solo per No-go e Rimandata, con i fatti strutturali pertinenti: due scritture ben tipizzate (evento di chiusura + fatto di registro), mai una nota che cambia natura. <span class="ref">PRD §6</span></span></li>
+      <li><span class="m">4</span><span>Confine rimozione/chiusura: la card non doveva esistere ↔ la lavorazione ha prodotto un verdetto. <span class="ref">PRD §4.3</span></span></li>
+      <li><span class="m">5</span><span>Correzione-stella opzionale: scrive il rating (−1 + motivo) nella sessione di provenienza — anche l'errore diventa ground truth coerente. <span class="ref">PRD §4.3</span></span></li>
+    </ul>
+  </section>
+
+  <!-- ============================== S6 ============================== -->
+  <section class="state" id="s6">
+    <div class="state-head"><span class="sid">S6</span><h2>Registro azienda — nel dossier</h2><span class="ref">PRD §6</span></div>
+    <p class="state-intent">L'unica superficie di scrittura del piano dell'entità: fatti tipizzati (set chiuso) e note libere di caratterizzazione.
+      Tutto ciò che si vede qui vale per ogni iniziativa, presente e futura.</p>
+    <div class="frame">
+      <div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span><span class="url">mrsmith.app/binocolo/azienda?vat=04512380962</span></div>
+      <div class="app">
+        <div class="app-body narrow">
+          <div class="titlerow"><h1 class="page-title" style="font-size:1.15rem">Officine Dati S.r.l.</h1><span class="hint">P.IVA 04512380962 · Monza e Brianza</span></div>
+          <p class="hint" style="margin:-6px 0 0">[…dossier: anagrafica, indicatori, analisi — sezioni esistenti…]</p>
+          <div class="card">
+            <p class="lab">Registro azienda <span class="m">1</span></p>
+            <div class="fact">
+              <span class="badge info">Già cliente</span>
+              <span class="body">Cliente connettività dal 2021.<span class="who">s.sciacco · 12 giu 2026</span></span>
+              <span class="linkbtn">Revoca <span class="m">2</span></span>
+            </div>
+            <div class="fact">
+              <span class="badge warn">Non vende</span>
+              <span class="body">Colloquio 06/2026: il titolare non intende vendere ora; disponibile a riparlarne nel 2027.<span class="who">g.rossi · 30 giu 2026</span></span>
+              <span class="linkbtn">Revoca</span>
+            </div>
+            <div class="actions" style="margin-top:10px"><span class="btn secondary sm">+ Registra fatto <span class="m">3</span></span></div>
+          </div>
+          <div class="card">
+            <p class="lab">Note d'azienda <span class="m">4</span></p>
+            <ul class="tl">
+              <li><b>Nota</b> — gruppo familiare, molto radicato sul territorio; il figlio segue la parte commerciale.<span class="who">s.sciacco · 24 giu 2026</span></li>
+              <li><b>Nota</b> — sito in rifacimento, i numeri del team sono su LinkedIn (28 persone).<span class="who">g.rossi · 19 giu 2026</span></li>
+            </ul>
+            <div class="composer"><span class="input ph" style="flex:1">Aggiungi nota d'azienda…</span><span class="btn secondary sm" style="min-height:36px">Aggiungi</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><span class="m">1</span><span>Fatti tipizzati, set chiuso: Non vende · In trattativa con altri · Da evitare (warning) + Già cliente · Partner (informativi). Dichiarati a mano in v1. Effetto solo di presentazione, mai su gate/routing/scoring. <span class="ref">PRD §6</span></span></li>
+      <li><span class="m">2</span><span>Revoca = intervento successivo che conserva la storia (chi, quando, perché); il badge sparisce dalle superfici. <span class="ref">PRD §6</span></span></li>
+      <li><span class="m">3</span><span>«Registra fatto» apre il menu dei 5 tipi + nota. Il ponte dalla chiusura card (S5) scrive le stesse righe. <span class="ref">PRD §6</span></span></li>
+      <li><span class="m">4</span><span>Note libere di <b>caratterizzazione</b> (append-only, autore+data): l'espressività che il set chiuso non dà. Genere diverso dalla nota di diario: qui si descrive l'azienda, non il lavoro di un deal. <span class="ref">PRD §2 · §6</span></span></li>
+    </ul>
+  </section>
+
+  <!-- ============================== S7 ============================== -->
+  <section class="state" id="s7">
+    <div class="state-head"><span class="sid">S7</span><h2>Tocchi alle superfici esistenti</h2><span class="ref">PRD §3.2 · §6.1 · R-D3-7</span></div>
+    <p class="state-intent">Tre innesti minimi: il dropdown opzionale in D1, il chip/retro-aggancio nell'indice ricerche, i badge nelle tabelle risultati D2.</p>
+    <div class="croprow">
+      <div class="crop">
+        <div class="crop-tag">D1 · /ricerche/nuova</div>
+        <div style="padding:20px;background:linear-gradient(180deg,#f8fafc,#eef2ff)">
+          <div class="card">
+            <p class="lab">Iniziativa <span class="hint" style="text-transform:none;letter-spacing:0">(opzionale)</span> <span class="m">1</span></p>
+            <div class="actions">
+              <span class="select">Acquisizione MSP 2026 <span class="car">▾</span></span>
+              <span class="linkbtn">+ Nuova iniziativa</span>
+            </div>
+            <p class="hint" style="margin:8px 0 0">Le aziende con almeno una stella entreranno nella lavorazione dell'iniziativa.</p>
+          </div>
+        </div>
+      </div>
+      <div class="crop">
+        <div class="crop-tag">Indice /ricerche · chip e retro-aggancio</div>
+        <div style="padding:20px;background:linear-gradient(180deg,#f8fafc,#eef2ff)">
+          <div class="card" style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <b style="font-size:.875rem">MSP Lombardia est</b>
+              <span class="badge ok">completata</span>
+              <span class="badge lav">Acquisizione MSP 2026</span>
+              <span class="hint" style="margin-left:auto">1 lug</span>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--border-soft);padding-top:10px">
+              <b style="font-size:.875rem">Software house Emilia</b>
+              <span class="badge ok">completata</span>
+              <span class="linkbtn">Aggancia a iniziativa… <span class="m">2</span></span>
+              <span class="hint" style="margin-left:auto">28 giu</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="crop">
+        <div class="crop-tag">D2 · tabella risultati (badge)</div>
+        <div style="padding:20px;background:linear-gradient(180deg,#f8fafc,#eef2ff)">
+          <table class="tb">
+            <tr><th>Azienda</th><th>Prov.</th><th>Punteggio</th><th>Preferenza</th></tr>
+            <tr><td><b>Officine Dati S.r.l.</b><br><span class="badge lav">In lavorazione · MSP 2026 <span class="m">3</span></span></td><td>MB</td><td>78</td><td class="stars">★★★<span class="off">☆</span></td></tr>
+            <tr><td><b>Nexa Systems S.r.l.</b><br><span class="badge info">Già cliente</span></td><td>MI</td><td>74</td><td class="stars">★★<span class="off">☆☆</span></td></tr>
+            <tr><td><b>StudioReti</b><br><span class="badge warn">Non vende <span class="m">4</span></span></td><td>LC</td><td>69</td><td class="stars"><span class="off">☆☆☆☆</span></td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><span class="m">1</span><span>Campo <b>opzionale</b>: zero attrito per le ricerche esplorative; le sessioni orfane sono legittime e non alimentano lavorazioni. <span class="ref">PRD §3.2</span></span></li>
+      <li><span class="m">2</span><span><b>Retro-aggancio</b> con backfill: le ≥1★ già assegnate creano le card mancanti nell'iniziativa scelta. <span class="ref">PRD §3.2</span></span></li>
+      <li><span class="m">3</span><span>Marker «in lavorazione» già al triage: previene il doppio contatto tra iniziative. Veicolo dati: proiezione righe target. <span class="ref">PRD §6.1 · R-D3-7</span></span></li>
+      <li><span class="m">4</span><span>I fatti del registro seguono l'azienda in <b>ogni</b> ricerca, presente e futura: il triage vede subito ciò che la lavorazione ha imparato. <span class="ref">PRD §6</span></span></li>
+    </ul>
+  </section>
+</div>
