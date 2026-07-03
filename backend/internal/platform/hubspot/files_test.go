@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -13,16 +12,15 @@ import (
 
 func TestDeleteNoteAndFile(t *testing.T) {
 	var paths []string
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodDelete {
 			t.Fatalf("method = %s", r.Method)
 		}
 		paths = append(paths, r.URL.Path)
 		w.WriteHeader(http.StatusNoContent)
-	}))
-	t.Cleanup(server.Close)
+	})
 
-	client := NewWithBaseURL("test-token", server.URL, server.Client())
+	client := NewWithBaseURL("test-token", "http://hubspot.local", NewMockClient(handler))
 	if err := client.DeleteNote(context.Background(), 456); err != nil {
 		t.Fatalf("DeleteNote() error = %v", err)
 	}
@@ -45,7 +43,7 @@ func TestIsNotFound(t *testing.T) {
 }
 
 func TestCreateGenericNoteWithAttachment(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			t.Fatalf("method = %s", r.Method)
 		}
@@ -76,10 +74,9 @@ func TestCreateGenericNoteWithAttachment(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"id":987}`)
-	}))
-	t.Cleanup(server.Close)
+	})
 
-	client := NewWithBaseURL("test-token", server.URL, server.Client())
+	client := NewWithBaseURL("test-token", "http://hubspot.local", NewMockClient(handler))
 	noteID, err := client.CreateGenericNoteWithAttachment(context.Background(), NoteWithAttachmentRequest{
 		TargetObjectType:  ObjectTypeDeal,
 		TargetObjectID:    "deal-123",
@@ -97,7 +94,7 @@ func TestCreateGenericNoteWithAttachment(t *testing.T) {
 }
 
 func TestCreateNoteWithAttachmentCompatibility(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got, want := r.URL.Path, "/crm/v3/objects/notes"; got != want {
 			t.Fatalf("path = %s, want %s", got, want)
 		}
@@ -119,10 +116,9 @@ func TestCreateNoteWithAttachmentCompatibility(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"id":"456"}`)
-	}))
-	t.Cleanup(server.Close)
+	})
 
-	client := NewWithBaseURL("test-token", server.URL, server.Client())
+	client := NewWithBaseURL("test-token", "http://hubspot.local", NewMockClient(handler))
 	noteID, err := client.CreateNoteWithAttachment(context.Background(), "123", "file-123", 42)
 	if err != nil {
 		t.Fatalf("CreateNoteWithAttachment() error = %v", err)
@@ -133,26 +129,24 @@ func TestCreateNoteWithAttachmentCompatibility(t *testing.T) {
 }
 
 func TestCreateNoteWithAttachmentInvalidReturnedID(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"id":"note-456"}`)
-	}))
-	t.Cleanup(server.Close)
+	})
 
-	client := NewWithBaseURL("test-token", server.URL, server.Client())
+	client := NewWithBaseURL("test-token", "http://hubspot.local", NewMockClient(handler))
 	if _, err := client.CreateNoteWithAttachment(context.Background(), "123", "file-123", 42); err == nil {
 		t.Fatal("CreateNoteWithAttachment() error = nil")
 	}
 }
 
 func TestCreateGenericNoteWithAttachmentMissingReturnedID(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"properties":{}}`)
-	}))
-	t.Cleanup(server.Close)
+	})
 
-	client := NewWithBaseURL("test-token", server.URL, server.Client())
+	client := NewWithBaseURL("test-token", "http://hubspot.local", NewMockClient(handler))
 	_, err := client.CreateGenericNoteWithAttachment(context.Background(), NoteWithAttachmentRequest{
 		TargetObjectType:  ObjectTypeDeal,
 		TargetObjectID:    "123",

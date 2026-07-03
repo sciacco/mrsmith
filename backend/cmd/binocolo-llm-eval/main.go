@@ -23,11 +23,13 @@ func main() {
 	var (
 		sampleSize  = flag.Int("sample-size", 10, "numero aziende ready da selezionare dal DB")
 		iterations  = flag.Int("iterations", 10, "iterazioni LLM per azienda")
+		concurrency = flag.Int("concurrency", 10, "richieste LLM parallele")
 		outDir      = flag.String("out", "", "directory output artefatti (default artifacts/llm-evals/ma-deep-brief/...)")
 		modelID     = flag.String("model-id", "", "uuid modello mrsmith.llm_model; vuoto = default dello scope ma_deep_brief")
 		promptID    = flag.String("prompt-id", "", "uuid prompt mrsmith.llm_prompt; vuoto = default dello scope ma_deep_brief")
 		dsn         = flag.String("dsn", "", "ANISETTA_DSN override; vuoto = env/config")
 		manifest    = flag.String("manifest", "", "case_manifest.json da riusare per lo stesso campione")
+		rescore     = flag.String("rescore", "", "outputs.jsonl esistente da rivalutare senza chiamate LLM")
 		companyKeys = flag.String("company-keys", "", "company_key comma-separated; alternativa manuale al manifest")
 		dryRun      = flag.Bool("dry-run", false, "scrive manifest/input senza chiamare l'LLM")
 	)
@@ -50,6 +52,19 @@ func main() {
 	}
 	defer db.Close()
 
+	if strings.TrimSpace(*rescore) != "" {
+		manifestPath := resolveEvalArtifactPath(*manifest)
+		if strings.TrimSpace(manifestPath) == "" {
+			log.Fatal("--manifest è obbligatorio con --rescore")
+		}
+		report, err := binocolo.RescoreMADeepBriefEval(ctx, db, manifestPath, resolveEvalArtifactPath(*rescore), resolveEvalArtifactPath(*outDir))
+		if err != nil {
+			log.Fatal(err)
+		}
+		printReport(report)
+		return
+	}
+
 	keys, err := evalCompanyKeys(*manifest, *companyKeys)
 	if err != nil {
 		log.Fatal(err)
@@ -58,6 +73,7 @@ func main() {
 	report, err := binocolo.RunMADeepBriefEval(ctx, db, llm.New(db), binocolo.MADeepBriefEvalOptions{
 		SampleSize:  *sampleSize,
 		Iterations:  *iterations,
+		Concurrency: *concurrency,
 		OutputDir:   *outDir,
 		ModelID:     *modelID,
 		PromptID:    *promptID,
@@ -69,6 +85,10 @@ func main() {
 		log.Fatal(err)
 	}
 
+	printReport(report)
+}
+
+func printReport(report *binocolo.MADeepBriefEvalReport) {
 	fmt.Printf("Experiment: %s\n", report.ExperimentID)
 	fmt.Printf("Output dir: %s\n", report.OutputDir)
 	fmt.Printf("Cases: %d\n", report.Cases)
@@ -90,6 +110,7 @@ func main() {
 }
 
 func evalCompanyKeys(manifestPath, csvKeys string) ([]string, error) {
+	manifestPath = resolveEvalArtifactPath(manifestPath)
 	var keys []string
 	if strings.TrimSpace(csvKeys) != "" {
 		for _, part := range strings.Split(csvKeys, ",") {
@@ -103,15 +124,7 @@ func evalCompanyKeys(manifestPath, csvKeys string) ([]string, error) {
 	}
 	data, err := os.ReadFile(manifestPath)
 	if err != nil {
-		if strings.HasPrefix(manifestPath, "artifacts/") {
-			if fallback, fallbackErr := os.ReadFile("../" + manifestPath); fallbackErr == nil {
-				data = fallback
-			} else {
-				return nil, fmt.Errorf("read manifest: %w", err)
-			}
-		} else {
-			return nil, fmt.Errorf("read manifest: %w", err)
-		}
+		return nil, fmt.Errorf("read manifest: %w", err)
 	}
 	var doc struct {
 		Cases []struct {
@@ -127,4 +140,21 @@ func evalCompanyKeys(manifestPath, csvKeys string) ([]string, error) {
 		}
 	}
 	return keys, nil
+}
+
+func resolveEvalArtifactPath(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return ""
+	}
+	if _, err := os.Stat(path); err == nil {
+		return path
+	}
+	if strings.HasPrefix(path, "artifacts/") {
+		candidate := "../" + path
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+	return path
 }

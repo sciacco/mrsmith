@@ -199,10 +199,11 @@ update-mistra-api:    ## Scarica e aggiorna la specifica Mistra API da remoto
 
 BINOCOLO_LLM_EVAL_SAMPLE_SIZE ?= 10
 BINOCOLO_LLM_EVAL_ITERATIONS ?= 10
+BINOCOLO_LLM_EVAL_CONCURRENCY ?= 10
 
 .PHONY: binocolo-llm-eval
 binocolo-llm-eval:    ## Test varianza LLM Binocolo ma_deep_brief (ARGS="--dry-run" per solo manifest)
-	cd backend && go run ./cmd/binocolo-llm-eval --sample-size $(BINOCOLO_LLM_EVAL_SAMPLE_SIZE) --iterations $(BINOCOLO_LLM_EVAL_ITERATIONS) $(ARGS)
+	cd backend && go run ./cmd/binocolo-llm-eval --sample-size $(BINOCOLO_LLM_EVAL_SAMPLE_SIZE) --iterations $(BINOCOLO_LLM_EVAL_ITERATIONS) --concurrency $(BINOCOLO_LLM_EVAL_CONCURRENCY) $(ARGS)
 
 .PHONY: help
 help:                 ## Mostra questo help

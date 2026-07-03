@@ -6,14 +6,13 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
 )
 
 func TestCreateDealRequest(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			t.Fatalf("method = %s", r.Method)
 		}
@@ -36,10 +35,9 @@ func TestCreateDealRequest(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"id":123,"properties":{"dealname":"Q-1 - Example"}}`)
-	}))
-	t.Cleanup(server.Close)
+	})
 
-	client := NewWithBaseURL("test-token", server.URL, server.Client())
+	client := NewWithBaseURL("test-token", "http://hubspot.local", NewMockClient(handler))
 	obj, err := client.CreateDeal(context.Background(), map[string]any{
 		"dealname": "Q-1 - Example",
 	}, []ObjectAssociation{NewObjectAssociation("456", AssocTypeDealToCompany)})
@@ -52,7 +50,7 @@ func TestCreateDealRequest(t *testing.T) {
 }
 
 func TestUpdateDealRequestExcludesDealstageWhenNotSupplied(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPatch {
 			t.Fatalf("method = %s", r.Method)
 		}
@@ -73,17 +71,16 @@ func TestUpdateDealRequestExcludesDealstageWhenNotSupplied(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"id":"123","properties":{"dealname":"Updated"}}`)
-	}))
-	t.Cleanup(server.Close)
+	})
 
-	client := NewWithBaseURL("test-token", server.URL, server.Client())
+	client := NewWithBaseURL("test-token", "http://hubspot.local", NewMockClient(handler))
 	if _, err := client.UpdateDeal(context.Background(), "123", map[string]any{"dealname": "Updated"}); err != nil {
 		t.Fatalf("UpdateDeal() error = %v", err)
 	}
 }
 
 func TestGetDealStageRequest(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			t.Fatalf("method = %s", r.Method)
 		}
@@ -95,10 +92,9 @@ func TestGetDealStageRequest(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"id":"123","properties":{"pipeline":"pipe-1","dealstage":"stage-1"}}`)
-	}))
-	t.Cleanup(server.Close)
+	})
 
-	client := NewWithBaseURL("test-token", server.URL, server.Client())
+	client := NewWithBaseURL("test-token", "http://hubspot.local", NewMockClient(handler))
 	stage, err := client.GetDealStage(context.Background(), "123")
 	if err != nil {
 		t.Fatalf("GetDealStage() error = %v", err)
@@ -112,7 +108,7 @@ func TestGetDealStageRequest(t *testing.T) {
 }
 
 func TestSearchCompaniesByDomainRequest(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			t.Fatalf("method = %s", r.Method)
 		}
@@ -129,10 +125,9 @@ func TestSearchCompaniesByDomainRequest(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"results":[{"id":"456","properties":{"domain":"example.com"}}]}`)
-	}))
-	t.Cleanup(server.Close)
+	})
 
-	client := NewWithBaseURL("test-token", server.URL, server.Client())
+	client := NewWithBaseURL("test-token", "http://hubspot.local", NewMockClient(handler))
 	results, err := client.SearchCompaniesByDomain(context.Background(), "example.com", []string{"domain"})
 	if err != nil {
 		t.Fatalf("SearchCompaniesByDomain() error = %v", err)
@@ -144,7 +139,7 @@ func TestSearchCompaniesByDomainRequest(t *testing.T) {
 
 func TestGetContactByEmailDirectReadAndNotFound(t *testing.T) {
 	var requestedRawQuery string
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got, want := r.URL.EscapedPath(), "/crm/objects/2026-03/0-1/"+url.PathEscape("user+sales@example.com"); got != want {
 			t.Fatalf("path = %s, want %s", got, want)
 		}
@@ -156,10 +151,9 @@ func TestGetContactByEmailDirectReadAndNotFound(t *testing.T) {
 			t.Fatalf("properties = %s", r.URL.Query().Get("properties"))
 		}
 		http.Error(w, "missing", http.StatusNotFound)
-	}))
-	t.Cleanup(server.Close)
+	})
 
-	client := NewWithBaseURL("test-token", server.URL, server.Client())
+	client := NewWithBaseURL("test-token", "http://hubspot.local", NewMockClient(handler))
 	_, err := client.GetContactByEmail(context.Background(), "user+sales@example.com", []string{"email", "firstname"})
 	if err == nil {
 		t.Fatal("GetContactByEmail() error = nil")
@@ -181,7 +175,7 @@ func TestGetContactByEmailDirectReadAndNotFound(t *testing.T) {
 }
 
 func TestSearchContactsByEmailRequest(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got, want := r.URL.Path, "/crm/objects/2026-03/0-1/search"; got != want {
 			t.Fatalf("path = %s, want %s", got, want)
 		}
@@ -195,10 +189,9 @@ func TestSearchContactsByEmailRequest(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"results":[{"id":789,"properties":{"email":"person@example.com"}}]}`)
-	}))
-	t.Cleanup(server.Close)
+	})
 
-	client := NewWithBaseURL("test-token", server.URL, server.Client())
+	client := NewWithBaseURL("test-token", "http://hubspot.local", NewMockClient(handler))
 	results, err := client.SearchContactsByEmail(context.Background(), "person@example.com", []string{"email"})
 	if err != nil {
 		t.Fatalf("SearchContactsByEmail() error = %v", err)
@@ -209,7 +202,7 @@ func TestSearchContactsByEmailRequest(t *testing.T) {
 }
 
 func TestGetContactAssociationsParsesStringAndNumericIDs(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got, want := r.URL.Path, "/crm/objects/2026-03/0-1/123"; got != want {
 			t.Fatalf("path = %s, want %s", got, want)
 		}
@@ -218,10 +211,9 @@ func TestGetContactAssociationsParsesStringAndNumericIDs(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"id":"123","associations":{"companies":{"results":[{"id":"456"},{"id":789}]}}}`)
-	}))
-	t.Cleanup(server.Close)
+	})
 
-	client := NewWithBaseURL("test-token", server.URL, server.Client())
+	client := NewWithBaseURL("test-token", "http://hubspot.local", NewMockClient(handler))
 	ids, err := client.GetContactAssociations(context.Background(), "123", ObjectTypeCompany)
 	if err != nil {
 		t.Fatalf("GetContactAssociations() error = %v", err)
@@ -233,16 +225,15 @@ func TestGetContactAssociationsParsesStringAndNumericIDs(t *testing.T) {
 
 func TestDefaultAssociationPUTPaths(t *testing.T) {
 	var paths []string
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPut {
 			t.Fatalf("method = %s", r.Method)
 		}
 		paths = append(paths, r.URL.EscapedPath())
 		w.WriteHeader(http.StatusNoContent)
-	}))
-	t.Cleanup(server.Close)
+	})
 
-	client := NewWithBaseURL("test-token", server.URL, server.Client())
+	client := NewWithBaseURL("test-token", "http://hubspot.local", NewMockClient(handler))
 	if err := client.AssociateContactToCompany(context.Background(), "contact/id", "company id"); err != nil {
 		t.Fatalf("AssociateContactToCompany() error = %v", err)
 	}

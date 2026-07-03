@@ -1,6 +1,8 @@
 package binocolo
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"database/sql"
@@ -17,6 +19,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sciacco/mrsmith/internal/platform/llm"
@@ -28,6 +31,7 @@ import (
 type MADeepBriefEvalOptions struct {
 	SampleSize  int
 	Iterations  int
+	Concurrency int
 	OutputDir   string
 	ModelID     string
 	PromptID    string
@@ -81,6 +85,7 @@ type maDeepBriefEvalManifest struct {
 	Prompt       maDeepBriefEvalPrompt `json:"prompt"`
 	SampleSize   int                   `json:"sampleSize"`
 	Iterations   int                   `json:"iterations"`
+	Concurrency  int                   `json:"concurrency"`
 	DryRun       bool                  `json:"dryRun"`
 	SelectionSQL string                `json:"selectionSql"`
 	CompanyKeys  []string              `json:"companyKeys,omitempty"`
@@ -208,6 +213,9 @@ func RunMADeepBriefEval(ctx context.Context, db *sql.DB, llmSvc *llm.Service, op
 	if opts.Iterations <= 0 {
 		opts.Iterations = 10
 	}
+	if opts.Concurrency <= 0 {
+		opts.Concurrency = 10
+	}
 	if opts.Progress == nil {
 		opts.Progress = io.Discard
 	}
@@ -277,6 +285,7 @@ func RunMADeepBriefEval(ctx context.Context, db *sql.DB, llmSvc *llm.Service, op
 		},
 		SampleSize:   len(cases),
 		Iterations:   opts.Iterations,
+		Concurrency:  opts.Concurrency,
 		DryRun:       opts.DryRun,
 		SelectionSQL: evalSelectionDescription(opts.CompanyKeys),
 		CompanyKeys:  normalizedEvalCompanyKeys(opts.CompanyKeys),
@@ -323,19 +332,13 @@ func RunMADeepBriefEval(ctx context.Context, db *sql.DB, llmSvc *llm.Service, op
 		return nil, fmt.Errorf("build eval client: %w", err)
 	}
 
-	runs := make([]maDeepBriefEvalRunRecord, 0, len(cases)*opts.Iterations)
-	for ci := range cases {
-		c := cases[ci]
-		for iter := 1; iter <= opts.Iterations; iter++ {
-			fmt.Fprintf(opts.Progress, "[%d/%d] %s iterazione %d/%d\n", ci+1, len(cases), c.CompanyKey, iter, opts.Iterations)
-			rec := runMADeepBriefEvalIteration(ctx, provider, client, model, prompt, experimentID, c, iter)
-			if err := enc.Encode(rec); err != nil {
-				return nil, fmt.Errorf("write eval run: %w", err)
-			}
-			runs = append(runs, rec)
-			report.Runs++
-		}
+	runs, err := runMADeepBriefEvalIterations(ctx, provider, client, model, prompt, experimentID, cases, opts.Iterations, opts.Concurrency, opts.Progress, func(rec maDeepBriefEvalRunRecord) error {
+		return enc.Encode(rec)
+	})
+	if err != nil {
+		return nil, err
 	}
+	report.Runs = len(runs)
 
 	report.SummaryCSVPath = filepath.Join(opts.OutputDir, "summary.csv")
 	report.DashboardPath = filepath.Join(opts.OutputDir, "dashboard.html")
@@ -347,6 +350,205 @@ func RunMADeepBriefEval(ctx context.Context, db *sql.DB, llmSvc *llm.Service, op
 		return nil, err
 	}
 	return report, nil
+}
+
+// RescoreMADeepBriefEval recalculates the heuristic scores/dashboard from an existing
+// outputs.jsonl bundle. It performs zero LLM calls and is useful when the scorer is
+// refined after a run.
+func RescoreMADeepBriefEval(ctx context.Context, db *sql.DB, manifestPath, outputsPath, outputDir string) (*MADeepBriefEvalReport, error) {
+	if db == nil {
+		return nil, errors.New("binocolo llm eval rescore: nil db")
+	}
+	manifestRaw, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return nil, fmt.Errorf("read eval manifest: %w", err)
+	}
+	var manifest maDeepBriefEvalManifest
+	if err := json.Unmarshal(manifestRaw, &manifest); err != nil {
+		return nil, fmt.Errorf("decode eval manifest: %w", err)
+	}
+	keys := manifest.CompanyKeys
+	if len(keys) == 0 {
+		for _, c := range manifest.Cases {
+			keys = append(keys, c.CompanyKey)
+		}
+	}
+	cases, err := loadMADeepBriefEvalCases(ctx, db, len(keys), keys)
+	if err != nil {
+		return nil, err
+	}
+	for i := range cases {
+		inputRaw, err := buildMADeepBriefEvalInput(cases[i].payload, cases[i].scorecard, cases[i].valuation)
+		if err != nil {
+			return nil, fmt.Errorf("build eval input %s: %w", cases[i].CompanyKey, err)
+		}
+		cases[i].inputRaw = inputRaw
+	}
+	if strings.TrimSpace(outputsPath) == "" {
+		outputsPath = filepath.Join(filepath.Dir(manifestPath), "outputs.jsonl")
+	}
+	if strings.TrimSpace(outputDir) == "" {
+		outputDir = filepath.Dir(outputsPath)
+	}
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+		return nil, fmt.Errorf("create rescore output dir: %w", err)
+	}
+
+	in, err := os.Open(outputsPath)
+	if err != nil {
+		return nil, fmt.Errorf("open outputs jsonl: %w", err)
+	}
+	defer in.Close()
+	rescoredPath := filepath.Join(outputDir, "outputs.rescored.jsonl")
+	out, err := os.Create(rescoredPath)
+	if err != nil {
+		return nil, fmt.Errorf("create rescored outputs: %w", err)
+	}
+	defer out.Close()
+	enc := json.NewEncoder(out)
+	enc.SetEscapeHTML(false)
+	byKey := map[string]maDeepBriefEvalCase{}
+	for _, c := range cases {
+		byKey[c.CompanyKey] = c
+	}
+	var runs []maDeepBriefEvalRunRecord
+	scanner := bufio.NewScanner(in)
+	scanner.Buffer(make([]byte, 64*1024), 32*1024*1024)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		var rec maDeepBriefEvalRunRecord
+		if err := json.Unmarshal([]byte(line), &rec); err != nil {
+			return nil, fmt.Errorf("decode output jsonl: %w", err)
+		}
+		c, ok := byKey[rec.CompanyKey]
+		if !ok {
+			return nil, fmt.Errorf("output company %s not present in manifest/db cases", rec.CompanyKey)
+		}
+		brief, parseErr := parseMADeepBrief(rec.RawResponse)
+		if parseErr != nil {
+			rec.Status = "parse_failed"
+			rec.Error = parseErr.Error()
+			rec.ParsedBrief = nil
+		} else {
+			rec.Status = "succeeded"
+			rec.Error = ""
+			rec.ParsedBrief = brief
+		}
+		rec.Score = scoreMADeepBriefEval(c, string(c.inputRaw), rec.RawResponse, brief, parseErr)
+		if err := enc.Encode(rec); err != nil {
+			return nil, fmt.Errorf("write rescored output: %w", err)
+		}
+		runs = append(runs, rec)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("read outputs jsonl: %w", err)
+	}
+	manifest.Notes = append(manifest.Notes, "Rescored from existing outputs.jsonl with the current local scorer; no LLM calls.")
+	summaries := summarizeMADeepBriefEval(cases, runs)
+	report := &MADeepBriefEvalReport{
+		ExperimentID:   manifest.ExperimentID,
+		OutputDir:      outputDir,
+		Cases:          len(cases),
+		Runs:           len(runs),
+		ManifestPath:   manifestPath,
+		OutputsPath:    rescoredPath,
+		SummaryCSVPath: filepath.Join(outputDir, "summary.rescored.csv"),
+		DashboardPath:  filepath.Join(outputDir, "dashboard.rescored.html"),
+	}
+	if err := writeMADeepBriefEvalSummaryCSV(report.SummaryCSVPath, summaries); err != nil {
+		return nil, err
+	}
+	if err := writeMADeepBriefEvalDashboard(report.DashboardPath, manifest, summaries, runs); err != nil {
+		return nil, err
+	}
+	return report, nil
+}
+
+func runMADeepBriefEvalIterations(ctx context.Context, provider maLLMProvider, client maAIClient, model llm.Model, prompt llm.Prompt, experimentID string, cases []maDeepBriefEvalCase, iterations, concurrency int, progress io.Writer, writeRun func(maDeepBriefEvalRunRecord) error) ([]maDeepBriefEvalRunRecord, error) {
+	total := len(cases) * iterations
+	if total == 0 {
+		return nil, nil
+	}
+	if concurrency <= 0 {
+		concurrency = 1
+	}
+	if concurrency > total {
+		concurrency = total
+	}
+	baseCtx := ctx
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	type job struct {
+		casePos int
+		item    maDeepBriefEvalCase
+		iter    int
+	}
+	jobs := make(chan job)
+	results := make(chan maDeepBriefEvalRunRecord)
+	var wg sync.WaitGroup
+	var progressMu sync.Mutex
+
+	for worker := 0; worker < concurrency; worker++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := range jobs {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+				progressMu.Lock()
+				fmt.Fprintf(progress, "[%d/%d] %s iterazione %d/%d\n", j.casePos+1, len(cases), j.item.CompanyKey, j.iter, iterations)
+				progressMu.Unlock()
+				rec := runMADeepBriefEvalIteration(ctx, provider, client, model, prompt, experimentID, j.item, j.iter)
+				select {
+				case results <- rec:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+	}
+	go func() {
+		defer close(jobs)
+		for ci := range cases {
+			for iter := 1; iter <= iterations; iter++ {
+				select {
+				case jobs <- job{casePos: ci, item: cases[ci], iter: iter}:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
+	}()
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	runs := make([]maDeepBriefEvalRunRecord, 0, total)
+	var writeErr error
+	for rec := range results {
+		if writeRun != nil && writeErr == nil {
+			if err := writeRun(rec); err != nil {
+				writeErr = fmt.Errorf("write eval run: %w", err)
+				cancel()
+			}
+		}
+		runs = append(runs, rec)
+	}
+	if writeErr != nil {
+		return runs, writeErr
+	}
+	if err := baseCtx.Err(); err != nil {
+		return runs, err
+	}
+	return runs, nil
 }
 
 func loadMADeepBriefEvalCases(ctx context.Context, db *sql.DB, sampleSize int, companyKeys []string) ([]maDeepBriefEvalCase, error) {
@@ -552,7 +754,9 @@ func scoreMADeepBriefEval(c maDeepBriefEvalCase, inputText, rawResponse string, 
 		return score
 	}
 	score.JSONValid = true
-	score.Breakdown["json_schema"] = 10
+	schemaScore, schemaWarnings := scoreMADeepBriefSchema(brief)
+	score.Breakdown["json_schema"] = schemaScore
+	score.Warnings = append(score.Warnings, schemaWarnings...)
 
 	expectedRAG := strings.ToLower(strings.TrimSpace(c.OverallRAG))
 	actualRAG := strings.ToLower(strings.TrimSpace(brief.RAG))
@@ -657,7 +861,51 @@ func scoreMADeepBriefEval(c maDeepBriefEvalCase, inputText, rawResponse string, 
 	if score.Total > 100 {
 		score.Total = 100
 	}
+	// JSON formally valido ma sostanzialmente vuoto/non conforme non deve passare
+	// come output accettabile solo perché alcune rubriche sono n/a.
+	if schemaScore == 0 && score.Total > 20 {
+		score.Total = 20
+	} else if schemaScore < 6 && score.Total > 60 {
+		score.Total = 60
+	}
 	return score
+}
+
+func scoreMADeepBriefSchema(brief *MADeepBrief) (int, []string) {
+	missing := []string{}
+	if strings.TrimSpace(brief.Verdict) == "" {
+		missing = append(missing, "verdict")
+	}
+	if strings.TrimSpace(brief.RAG) == "" {
+		missing = append(missing, "rag")
+	}
+	if strings.TrimSpace(brief.BusinessProfile) == "" {
+		missing = append(missing, "businessProfile")
+	}
+	if strings.TrimSpace(brief.FinancialReading) == "" {
+		missing = append(missing, "financialReading")
+	}
+	if strings.TrimSpace(brief.ValuationRationale) == "" {
+		missing = append(missing, "valuationRationale")
+	}
+	if len(brief.Strengths) == 0 {
+		missing = append(missing, "strengths")
+	}
+	if len(brief.RedFlags) == 0 {
+		missing = append(missing, "redFlags")
+	}
+	if len(brief.DDQuestions) == 0 {
+		missing = append(missing, "ddQuestions")
+	}
+	if len(missing) == 0 {
+		return 10, nil
+	}
+	warnings := []string{"schema incompleto: mancano " + strings.Join(missing, ", ")}
+	points := 10 - len(missing)*2
+	if points < 0 {
+		points = 0
+	}
+	return points, warnings
 }
 
 func maDeepBriefEvalText(brief *MADeepBrief) string {
@@ -765,7 +1013,7 @@ func redFlagsHaveQuestions(flags []MADeepBriefFlag) bool {
 	return false
 }
 
-var maEvalNumberRE = regexp.MustCompile(`(?i)(?:€\s*)?[-+]?\d+(?:[\.\s]\d{3})*(?:[,.]\d+)?\s*(?:%|x|×|k|m|mln|milioni|mila)?`)
+var maEvalNumberRE = regexp.MustCompile(`(?i)(?:€\s*)?[-+]?\d+(?:\.\d{3})*(?:[,.]\d+)?\s*(?:%|x|×|k|mln|milioni|mila)?`)
 
 type maEvalNumberMention struct {
 	Raw     string
@@ -797,9 +1045,17 @@ func suspiciousNumberMentions(text string, allowed []float64) []string {
 }
 
 func extractEvalNumbers(text string) []maEvalNumberMention {
-	matches := maEvalNumberRE.FindAllString(text, -1)
+	matches := maEvalNumberRE.FindAllStringIndex(text, -1)
 	out := make([]maEvalNumberMention, 0, len(matches))
-	for _, raw := range matches {
+	for _, span := range matches {
+		raw := text[span[0]:span[1]]
+		// The regex deliberately avoids a bare "m" suffix to not capture "24 mesi".
+		// When the model writes magnitude shorthand like "1.186 M" / "€1.186 M",
+		// recover UPPERCASE M from local context and parse it as millions.
+		tail := strings.TrimLeft(text[span[1]:min(len(text), span[1]+6)], " \t\n\r\u00a0\u202f")
+		if strings.HasPrefix(tail, "M") {
+			raw = raw + " mln"
+		}
 		m, ok := parseEvalNumberMention(raw)
 		if ok {
 			out = append(out, m)
@@ -811,13 +1067,13 @@ func extractEvalNumbers(text string) []maEvalNumberMention {
 func parseEvalNumberMention(raw string) (maEvalNumberMention, bool) {
 	orig := strings.TrimSpace(raw)
 	lower := strings.ToLower(orig)
-	hasUnit := strings.Contains(lower, "€") || strings.Contains(lower, "%") || strings.Contains(lower, "x") || strings.Contains(lower, "×") || strings.Contains(lower, "mln") || strings.Contains(lower, "milion") || strings.Contains(lower, "mila") || strings.HasSuffix(strings.TrimSpace(lower), "m") || strings.HasSuffix(strings.TrimSpace(lower), "k")
+	hasUnit := strings.Contains(lower, "€") || strings.Contains(lower, "%") || strings.Contains(lower, "x") || strings.Contains(lower, "×") || strings.Contains(lower, "mln") || strings.Contains(lower, "milion") || strings.Contains(lower, "mila") || strings.HasSuffix(strings.TrimSpace(lower), "k")
 	mult := 1.0
 	trimmed := strings.TrimSpace(lower)
-	for _, suffix := range []string{"milioni", "mln", "mila", "k", "m", "%", "x", "×"} {
+	for _, suffix := range []string{"milioni", "mln", "mila", "k", "%", "x", "×"} {
 		if strings.HasSuffix(trimmed, suffix) {
 			switch suffix {
-			case "milioni", "mln", "m":
+			case "milioni", "mln":
 				mult = 1_000_000
 			case "mila", "k":
 				mult = 1_000
@@ -832,14 +1088,40 @@ func parseEvalNumberMention(raw string) (maEvalNumberMention, bool) {
 		return maEvalNumberMention{}, false
 	}
 	if strings.Contains(trimmed, ",") {
-		trimmed = strings.ReplaceAll(trimmed, ".", "")
-		trimmed = strings.ReplaceAll(trimmed, ",", ".")
+		lastComma := strings.LastIndex(trimmed, ",")
+		lastDot := strings.LastIndex(trimmed, ".")
+		fracLen := len(trimmed) - lastComma - 1
+		intLen := lastComma
+		if strings.HasPrefix(trimmed, "-") || strings.HasPrefix(trimmed, "+") {
+			intLen--
+		}
+		switch {
+		case lastDot >= 0 && lastDot < lastComma:
+			// 1.234,56 → European decimal.
+			trimmed = strings.ReplaceAll(trimmed, ".", "")
+			trimmed = strings.ReplaceAll(trimmed, ",", ".")
+		case fracLen == 3 && intLen <= 3 && mult > 1:
+			// 1,186 mln / 202,362k → decimal mantissa + magnitude suffix.
+			trimmed = strings.ReplaceAll(trimmed, ",", ".")
+		case fracLen == 3 && intLen <= 3:
+			// 220,000 → English thousands separator.
+			trimmed = strings.ReplaceAll(trimmed, ",", "")
+		case strings.Count(trimmed, ",") > 1:
+			trimmed = strings.ReplaceAll(trimmed, ",", "")
+		default:
+			trimmed = strings.ReplaceAll(trimmed, ",", ".")
+		}
 	} else if strings.Count(trimmed, ".") > 1 {
 		trimmed = strings.ReplaceAll(trimmed, ".", "")
 	} else if idx := strings.Index(trimmed, "."); idx >= 0 {
 		fracLen := len(trimmed) - idx - 1
 		intLen := idx
-		if fracLen == 3 && intLen <= 3 {
+		if strings.HasPrefix(trimmed, "-") || strings.HasPrefix(trimmed, "+") {
+			intLen--
+		}
+		if fracLen == 3 && intLen <= 3 && mult > 1 {
+			// 1.186 mln / 303.010 k → decimal mantissa + suffix.
+		} else if fracLen == 3 && intLen <= 3 {
 			trimmed = strings.ReplaceAll(trimmed, ".", "")
 		}
 	}
@@ -859,13 +1141,41 @@ func shouldIgnoreEvalNumber(m maEvalNumberMention) bool {
 		if abs <= 5 {
 			return true
 		}
+		if isCommonDDTimeHorizon(abs) {
+			return true
+		}
+		// ATECO/province/vendor identifiers are often plain 5-6 digit strings in the
+		// qualitative payload. They are facts, but not valuation numbers; do not let
+		// them dominate hallucination scoring.
+		if abs >= 10_000 && abs <= 999_999 && math.Abs(abs-math.Round(abs)) < 0.0001 {
+			return true
+		}
+	}
+	// Extremely large percentages are almost always parser artefacts from IDs or
+	// tax codes with a trailing percent sign; they are not useful FDD signals.
+	if strings.Contains(m.Raw, "%") && abs > 10_000 {
+		return true
 	}
 	return false
 }
 
+func isCommonDDTimeHorizon(abs float64) bool {
+	if math.Abs(abs-math.Round(abs)) > 0.0001 {
+		return false
+	}
+	switch int(math.Round(abs)) {
+	case 12, 18, 24, 30, 36, 60, 90, 120, 180:
+		return true
+	default:
+		return false
+	}
+}
+
 func collectAllowedNumbersFromJSON(raw []byte) []float64 {
 	var value any
-	if err := json.Unmarshal(raw, &value); err != nil {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+	if err := dec.Decode(&value); err != nil {
 		return nil
 	}
 	seen := map[string]bool{}
@@ -876,8 +1186,21 @@ func collectAllowedNumbersFromJSON(raw []byte) []float64 {
 			return
 		}
 		variants := []float64{v}
-		if math.Abs(v) <= 2 && v != 0 {
-			variants = append(variants, v*100)
+		if v != 0 {
+			// Some model phrasings turn ratios into percentages.
+			if math.Abs(v) <= 2 {
+				variants = append(variants, v*100)
+			}
+			// Italian thousands separator vs decimal-dot ambiguity: "3.004x" can be
+			// tokenised as 3004 by the lightweight parser, while the JSON source is 3.004.
+			if math.Abs(v) < 100 {
+				variants = append(variants, v*1000)
+			}
+			// Ranges can be tokenised with a leading minus; carry signed counterparts.
+			baseLen := len(variants)
+			for i := 0; i < baseLen; i++ {
+				variants = append(variants, -variants[i])
+			}
 		}
 		for _, vv := range variants {
 			key := strconv.FormatFloat(vv, 'f', 4, 64)
@@ -902,6 +1225,10 @@ func collectAllowedNumbersFromJSON(raw []byte) []float64 {
 		case json.Number:
 			if f, err := t.Float64(); err == nil {
 				add(f)
+			}
+		case string:
+			for _, m := range extractEvalNumbers(t) {
+				add(m.Value)
 			}
 		}
 	}
