@@ -197,6 +197,13 @@ tidy:                 ## go mod tidy
 update-mistra-api:    ## Scarica e aggiorna la specifica Mistra API da remoto
 	./scripts/update-mistra-dist.sh
 
+BINOCOLO_LLM_EVAL_SAMPLE_SIZE ?= 10
+BINOCOLO_LLM_EVAL_ITERATIONS ?= 10
+
+.PHONY: binocolo-llm-eval
+binocolo-llm-eval:    ## Test varianza LLM Binocolo ma_deep_brief (ARGS="--dry-run" per solo manifest)
+	cd backend && go run ./cmd/binocolo-llm-eval --sample-size $(BINOCOLO_LLM_EVAL_SAMPLE_SIZE) --iterations $(BINOCOLO_LLM_EVAL_ITERATIONS) $(ARGS)
+
 .PHONY: help
 help:                 ## Mostra questo help
 	@grep -h -E '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-18s\033[0m %s\n", $$1, $$2}'
