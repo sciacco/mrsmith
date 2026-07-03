@@ -16,10 +16,10 @@ import { dateLabel, errorLabel } from '../ricerche/helpers';
 import styles from './Iniziative.module.css';
 
 const STATES: Array<{ key: string; label: string }> = [
+  { key: 'approfondimento', label: 'Approfondimento' },
   { key: 'da_contattare', label: 'Da contattare' },
   { key: 'contattata', label: 'Contattata' },
   { key: 'in_dialogo', label: 'In dialogo' },
-  { key: 'approfondimento', label: 'Approfondimento' },
   { key: 'offerta', label: 'Offerta' },
   { key: 'chiusa', label: 'Chiusa' },
 ];

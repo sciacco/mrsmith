@@ -1578,7 +1578,7 @@ func (s *maService) setTargetRating(ctx context.Context, sessionID string, input
 }
 
 // ensureInitiativeCard applies the PRD §4.1/§4.3 entry rule: create the card
-// (state da_contattare) if it does not exist yet, reopen it if it exists
+// (state approfondimento) if it does not exist yet, reopen it if it exists
 // closed/removed (evento card_riaperta), or do nothing if it exists active
 // (autonomy, §4.2 — the star no longer governs an active card). Used both by
 // the setTargetRating hook and by the retro-anchor backfill.
@@ -1597,7 +1597,7 @@ func (s *maService) ensureInitiativeCard(ctx context.Context, initiativeID, sess
 	card := MAInitiativeCard{
 		InitiativeID:       initiativeID,
 		CompanyKey:         companyKey,
-		State:              maCardStateDaContattare,
+		State:              maCardStateApprofondimento,
 		CreatedFromSession: sessionID,
 	}
 	if existing != nil {
@@ -2025,7 +2025,7 @@ func (s *maService) reopenCard(ctx context.Context, initiativeID, companyKey, su
 	if card.State != maCardStateChiusa && card.State != maCardStateRimossa {
 		return MAInitiativeCard{}, fmt.Errorf("%w: card non chiusa né rimossa", errMAStrategyInvalid)
 	}
-	card.State = maCardStateDaContattare
+	card.State = maCardStateApprofondimento
 	card.Esito = ""
 	card.ClosedAt = nil
 	if err := s.store.UpsertMAInitiativeCard(ctx, card); err != nil {
