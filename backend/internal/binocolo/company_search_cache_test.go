@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 	"time"
-
+	"github.com/sciacco/mrsmith/internal/platform/httputil"
 	"github.com/sciacco/mrsmith/internal/platform/openapiit"
 )
 
@@ -297,16 +297,15 @@ func performCompanySearch(t *testing.T, h *Handler, rawQuery string) *httptest.R
 
 func newCompanySearchTestClient(t *testing.T, handler http.HandlerFunc) *openapiit.Client {
 	t.Helper()
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	wrappedHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/IT-search" {
 			t.Errorf("unexpected upstream path %q", r.URL.Path)
 			http.Error(w, "unexpected path", http.StatusNotFound)
 			return
 		}
 		handler(w, r)
-	}))
-	t.Cleanup(server.Close)
-	return openapiit.NewWithBaseURLs("test-token", server.URL, server.URL, server.Client())
+	})
+	return openapiit.NewWithBaseURLs("test-token", "http://openapiit.local", "http://openapiit.local", httputil.NewMockClient(wrappedHandler))
 }
 
 func responseSource(t *testing.T, rec *httptest.ResponseRecorder) string {

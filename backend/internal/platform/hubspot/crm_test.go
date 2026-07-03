@@ -9,6 +9,8 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
 
 func TestCreateDealRequest(t *testing.T) {
@@ -37,7 +39,7 @@ func TestCreateDealRequest(t *testing.T) {
 		_, _ = io.WriteString(w, `{"id":123,"properties":{"dealname":"Q-1 - Example"}}`)
 	})
 
-	client := NewWithBaseURL("test-token", "http://hubspot.local", NewMockClient(handler))
+	client := NewWithBaseURL("test-token", "http://hubspot.local", httputil.NewMockClient(handler))
 	obj, err := client.CreateDeal(context.Background(), map[string]any{
 		"dealname": "Q-1 - Example",
 	}, []ObjectAssociation{NewObjectAssociation("456", AssocTypeDealToCompany)})
@@ -73,7 +75,7 @@ func TestUpdateDealRequestExcludesDealstageWhenNotSupplied(t *testing.T) {
 		_, _ = io.WriteString(w, `{"id":"123","properties":{"dealname":"Updated"}}`)
 	})
 
-	client := NewWithBaseURL("test-token", "http://hubspot.local", NewMockClient(handler))
+	client := NewWithBaseURL("test-token", "http://hubspot.local", httputil.NewMockClient(handler))
 	if _, err := client.UpdateDeal(context.Background(), "123", map[string]any{"dealname": "Updated"}); err != nil {
 		t.Fatalf("UpdateDeal() error = %v", err)
 	}
@@ -94,7 +96,7 @@ func TestGetDealStageRequest(t *testing.T) {
 		_, _ = io.WriteString(w, `{"id":"123","properties":{"pipeline":"pipe-1","dealstage":"stage-1"}}`)
 	})
 
-	client := NewWithBaseURL("test-token", "http://hubspot.local", NewMockClient(handler))
+	client := NewWithBaseURL("test-token", "http://hubspot.local", httputil.NewMockClient(handler))
 	stage, err := client.GetDealStage(context.Background(), "123")
 	if err != nil {
 		t.Fatalf("GetDealStage() error = %v", err)
@@ -127,7 +129,7 @@ func TestSearchCompaniesByDomainRequest(t *testing.T) {
 		_, _ = io.WriteString(w, `{"results":[{"id":"456","properties":{"domain":"example.com"}}]}`)
 	})
 
-	client := NewWithBaseURL("test-token", "http://hubspot.local", NewMockClient(handler))
+	client := NewWithBaseURL("test-token", "http://hubspot.local", httputil.NewMockClient(handler))
 	results, err := client.SearchCompaniesByDomain(context.Background(), "example.com", []string{"domain"})
 	if err != nil {
 		t.Fatalf("SearchCompaniesByDomain() error = %v", err)
@@ -153,7 +155,7 @@ func TestGetContactByEmailDirectReadAndNotFound(t *testing.T) {
 		http.Error(w, "missing", http.StatusNotFound)
 	})
 
-	client := NewWithBaseURL("test-token", "http://hubspot.local", NewMockClient(handler))
+	client := NewWithBaseURL("test-token", "http://hubspot.local", httputil.NewMockClient(handler))
 	_, err := client.GetContactByEmail(context.Background(), "user+sales@example.com", []string{"email", "firstname"})
 	if err == nil {
 		t.Fatal("GetContactByEmail() error = nil")
@@ -191,7 +193,7 @@ func TestSearchContactsByEmailRequest(t *testing.T) {
 		_, _ = io.WriteString(w, `{"results":[{"id":789,"properties":{"email":"person@example.com"}}]}`)
 	})
 
-	client := NewWithBaseURL("test-token", "http://hubspot.local", NewMockClient(handler))
+	client := NewWithBaseURL("test-token", "http://hubspot.local", httputil.NewMockClient(handler))
 	results, err := client.SearchContactsByEmail(context.Background(), "person@example.com", []string{"email"})
 	if err != nil {
 		t.Fatalf("SearchContactsByEmail() error = %v", err)
@@ -213,7 +215,7 @@ func TestGetContactAssociationsParsesStringAndNumericIDs(t *testing.T) {
 		_, _ = io.WriteString(w, `{"id":"123","associations":{"companies":{"results":[{"id":"456"},{"id":789}]}}}`)
 	})
 
-	client := NewWithBaseURL("test-token", "http://hubspot.local", NewMockClient(handler))
+	client := NewWithBaseURL("test-token", "http://hubspot.local", httputil.NewMockClient(handler))
 	ids, err := client.GetContactAssociations(context.Background(), "123", ObjectTypeCompany)
 	if err != nil {
 		t.Fatalf("GetContactAssociations() error = %v", err)
@@ -233,7 +235,7 @@ func TestDefaultAssociationPUTPaths(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	client := NewWithBaseURL("test-token", "http://hubspot.local", NewMockClient(handler))
+	client := NewWithBaseURL("test-token", "http://hubspot.local", httputil.NewMockClient(handler))
 	if err := client.AssociateContactToCompany(context.Background(), "contact/id", "company id"); err != nil {
 		t.Fatalf("AssociateContactToCompany() error = %v", err)
 	}

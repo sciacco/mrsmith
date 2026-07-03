@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
 
 func TestNewUsesDefaultsAndDisablesWhenTokenMissing(t *testing.T) {
@@ -25,7 +26,7 @@ func TestNewUsesDefaultsAndDisablesWhenTokenMissing(t *testing.T) {
 }
 
 func TestLookupCAPSetsAuthAndDecodesResponse(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got, want := r.Method, http.MethodGet; got != want {
 			t.Fatalf("method = %s, want %s", got, want)
 		}
@@ -75,10 +76,9 @@ func TestLookupCAPSetsAuthAndDecodesResponse(t *testing.T) {
 			"message": "",
 			"error":   nil,
 		})
-	}))
-	t.Cleanup(server.Close)
+	})
 
-	client := NewWithBaseURL("test-token", server.URL, server.Client())
+	client := NewWithBaseURL("test-token", "http://openapiit.local", httputil.NewMockClient(handler))
 	got, err := client.CAP().LookupCAP(context.Background(), "00136")
 	if err != nil {
 		t.Fatalf("LookupCAP returned error: %v", err)
@@ -102,7 +102,7 @@ func TestLookupCAPSetsAuthAndDecodesResponse(t *testing.T) {
 }
 
 func TestSearchMunicipalitiesEncodesQuery(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got, want := r.URL.Path, "/cerca_comuni"; got != want {
 			t.Fatalf("path = %s, want %s", got, want)
 		}
@@ -118,10 +118,9 @@ func TestSearchMunicipalitiesEncodesQuery(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"data":{"result":[{"istat":"027033","comune":"San Dona di Piave","suppressed":false}],"suppressed":[]},"success":true,"message":"","error":null}`))
-	}))
-	t.Cleanup(server.Close)
+	})
 
-	client := NewWithBaseURL("test-token", server.URL, server.Client())
+	client := NewWithBaseURL("test-token", "http://openapiit.local", httputil.NewMockClient(handler))
 	got, err := client.CAP().SearchMunicipalities(context.Background(), MunicipalitySearchParams{
 		Comune:        " San Dona ",
 		CAP:           "30027",
@@ -136,23 +135,22 @@ func TestSearchMunicipalitiesEncodesQuery(t *testing.T) {
 }
 
 func TestGetProvinceEscapesPathSegment(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !strings.HasPrefix(r.RequestURI, "/province/A%2FB") {
-			t.Fatalf("request URI = %q, want escaped path segment", r.RequestURI)
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.URL.RequestURI(), "/province/A%2FB") {
+			t.Fatalf("request URI = %q, want escaped path segment", r.URL.RequestURI())
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"data":{"sigla":"A/B","provincia":"Test","superficie":1,"residenti":2,"num_comuni":3,"istat":"001","regione":"Test"},"success":true,"message":"","error":null}`))
-	}))
-	t.Cleanup(server.Close)
+	})
 
-	client := NewWithBaseURL("test-token", server.URL, server.Client())
+	client := NewWithBaseURL("test-token", "http://openapiit.local", httputil.NewMockClient(handler))
 	if _, err := client.CAP().GetProvince(context.Background(), "A/B"); err != nil {
 		t.Fatalf("GetProvince returned error: %v", err)
 	}
 }
 
 func TestGetMunicipalityAdvancedDecodesNestedStreetData(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got, want := r.URL.Path, "/comuni_advance/H501"; got != want {
 			t.Fatalf("path = %s, want %s", got, want)
 		}
@@ -199,10 +197,9 @@ func TestGetMunicipalityAdvancedDecodesNestedStreetData(t *testing.T) {
 			"message": "",
 			"error": null
 		}`))
-	}))
-	t.Cleanup(server.Close)
+	})
 
-	client := NewWithBaseURL("test-token", server.URL, server.Client())
+	client := NewWithBaseURL("test-token", "http://openapiit.local", httputil.NewMockClient(handler))
 	got, err := client.CAP().GetMunicipalityAdvanced(context.Background(), "H501")
 	if err != nil {
 		t.Fatalf("GetMunicipalityAdvanced returned error: %v", err)
@@ -223,7 +220,7 @@ func TestGetMunicipalityAdvancedDecodesNestedStreetData(t *testing.T) {
 }
 
 func TestSuppressedMunicipalitiesDecodeFlexibleCodFisco(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got, want := r.URL.Query().Get("sigla_provincia"), "VI"; got != want {
 			t.Fatalf("sigla_provincia = %q, want %q", got, want)
 		}
@@ -237,10 +234,9 @@ func TestSuppressedMunicipalitiesDecodeFlexibleCodFisco(t *testing.T) {
 			"message": "",
 			"error": null
 		}`))
-	}))
-	t.Cleanup(server.Close)
+	})
 
-	client := NewWithBaseURL("test-token", server.URL, server.Client())
+	client := NewWithBaseURL("test-token", "http://openapiit.local", httputil.NewMockClient(handler))
 	got, err := client.CAP().ListSuppressedMunicipalities(context.Background(), "VI")
 	if err != nil {
 		t.Fatalf("ListSuppressedMunicipalities returned error: %v", err)
@@ -254,14 +250,13 @@ func TestSuppressedMunicipalitiesDecodeFlexibleCodFisco(t *testing.T) {
 }
 
 func TestUpstreamErrorPreservesStatusBodyMessageAndCode(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusPaymentRequired)
 		_, _ = w.Write([]byte(`{"success":false,"message":"insufficient credit","error":610,"data":null}`))
-	}))
-	t.Cleanup(server.Close)
+	})
 
-	client := NewWithBaseURL("test-token", server.URL, server.Client())
+	client := NewWithBaseURL("test-token", "http://openapiit.local", httputil.NewMockClient(handler))
 	_, err := client.CAP().ListRegions(context.Background())
 	if err == nil {
 		t.Fatalf("expected upstream error")

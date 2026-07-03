@@ -15,6 +15,7 @@ import (
 
 	"github.com/sciacco/mrsmith/internal/auth"
 	"github.com/sciacco/mrsmith/internal/platform/arak"
+	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
 
 func TestCreatePOValidatesRDAAvailablePaymentMethod(t *testing.T) {
@@ -262,14 +263,13 @@ type paymentValidationFixture struct {
 func newPaymentValidationHandler(t *testing.T, fixture paymentValidationFixture) (*Handler, *paymentValidationArakState) {
 	t.Helper()
 	state := &paymentValidationArakState{fixture: fixture}
-	server := httptest.NewServer(state)
-	t.Cleanup(server.Close)
 
 	client := arak.New(arak.Config{
-		BaseURL:      server.URL,
-		TokenURL:     server.URL + "/token",
+		BaseURL:      "http://arak.local",
+		TokenURL:     "http://arak.local/token",
 		ClientID:     "client",
 		ClientSecret: "secret",
+		HTTPClient:   httputil.NewMockClient(state),
 	})
 
 	return &Handler{arak: client, arakDB: openPaymentValidationDB(t, fixture), quoteThreshold: normalizeQuoteThreshold(fixture.quoteThreshold)}, state
@@ -295,7 +295,10 @@ func (s *paymentValidationArakState) ServeHTTP(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	body, _ := io.ReadAll(r.Body)
+	var body []byte
+	if r.Body != nil {
+		body, _ = io.ReadAll(r.Body)
+	}
 	s.mu.Lock()
 	s.requests = append(s.requests, capturedArakRequest{method: r.Method, path: r.URL.Path, header: r.Header.Clone(), body: body})
 	s.mu.Unlock()

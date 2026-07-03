@@ -8,13 +8,13 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/sciacco/mrsmith/internal/platform/arak"
+	"github.com/sciacco/mrsmith/internal/platform/httputil"
 	"github.com/sciacco/mrsmith/internal/platform/hubspot"
 )
 
@@ -319,7 +319,7 @@ type orderConversionHubSpotServerState struct {
 func newOrderConversionHubSpotServer(t *testing.T, uploadID, noteID string) (*hubspot.Client, *orderConversionHubSpotServerState) {
 	t.Helper()
 	state := &orderConversionHubSpotServerState{}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/files/v3/files":
 			state.uploads++
@@ -344,15 +344,14 @@ func newOrderConversionHubSpotServer(t *testing.T, uploadID, noteID string) (*hu
 		default:
 			t.Fatalf("unexpected HubSpot request: %s %s", r.Method, r.URL.Path)
 		}
-	}))
-	t.Cleanup(server.Close)
-	return hubspot.NewWithBaseURL("test-token", server.URL, server.Client()), state
+	})
+	return hubspot.NewWithBaseURL("test-token", "http://hubspot.local", httputil.NewMockClient(handler)), state
 }
 
 func newOrderConversionArakClient(t *testing.T) (*arak.Client, *int) {
 	t.Helper()
 	pdfCalls := 0
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/token":
 			httputilJSON(t, w, map[string]any{"access_token": "test-token", "expires_in": 3600})
@@ -362,13 +361,13 @@ func newOrderConversionArakClient(t *testing.T) (*arak.Client, *int) {
 		default:
 			t.Fatalf("unexpected Arak request: %s %s", r.Method, r.URL.Path)
 		}
-	}))
-	t.Cleanup(server.Close)
+	})
 	return arak.New(arak.Config{
-		BaseURL:      server.URL,
-		TokenURL:     server.URL + "/token",
+		BaseURL:      "http://arak.local",
+		TokenURL:     "http://arak.local/token",
 		ClientID:     "client",
 		ClientSecret: "secret",
+		HTTPClient:   httputil.NewMockClient(handler),
 	}), &pdfCalls
 }
 

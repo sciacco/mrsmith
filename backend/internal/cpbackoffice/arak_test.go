@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/sciacco/mrsmith/internal/platform/arak"
+	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
 
 // capturedRequest is the minimum set of outgoing-request fields the tests
@@ -26,7 +27,7 @@ type capturedRequest struct {
 // status+body. Every non-token request is recorded so tests can assert on
 // path, query string, and body verbatim.
 type fakeUpstream struct {
-	server       *httptest.Server
+	handler      http.Handler
 	requests     []capturedRequest
 	hits         atomic.Int32
 	responseCode int
@@ -42,14 +43,17 @@ func newFakeUpstream(t *testing.T) *fakeUpstream {
 		responseCode: http.StatusOK,
 		responseBody: `{"total_number":0,"current_page":1,"total_pages":1,"items":[]}`,
 	}
-	fu.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	fu.handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/token" {
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"access_token":"test-token","expires_in":300}`))
 			return
 		}
 
-		bodyBytes, _ := io.ReadAll(r.Body)
+		var bodyBytes []byte
+		if r.Body != nil {
+			bodyBytes, _ = io.ReadAll(r.Body)
+		}
 		fu.requests = append(fu.requests, capturedRequest{
 			Method: r.Method,
 			Path:   r.URL.Path,
@@ -61,17 +65,17 @@ func newFakeUpstream(t *testing.T) *fakeUpstream {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(fu.responseCode)
 		_, _ = w.Write([]byte(fu.responseBody))
-	}))
-	t.Cleanup(fu.server.Close)
+	})
 	return fu
 }
 
 func (fu *fakeUpstream) client() *arak.Client {
 	return arak.New(arak.Config{
-		BaseURL:      fu.server.URL,
-		TokenURL:     fu.server.URL + "/token",
+		BaseURL:      "http://arak.local",
+		TokenURL:     "http://arak.local/token",
 		ClientID:     "cp-backoffice-test",
 		ClientSecret: "cp-backoffice-secret",
+		HTTPClient:   httputil.NewMockClient(fu.handler),
 	})
 }
 

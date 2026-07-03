@@ -14,6 +14,7 @@ import (
 
 	"github.com/sciacco/mrsmith/internal/auth"
 	"github.com/sciacco/mrsmith/internal/platform/arak"
+	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
 
 // Every registered route and the HTTP method used to exercise it, kept in one
@@ -259,21 +260,21 @@ func TestRequireArakAndRequireMistra(t *testing.T) {
 // is only used so requireArak returns true.
 func newStubArakClient(t *testing.T) *arak.Client {
 	t.Helper()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/token" {
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"access_token":"stub","expires_in":300}`))
 			return
 		}
 		http.Error(w, "stub", http.StatusNotImplemented)
-	}))
-	t.Cleanup(srv.Close)
+	})
 
 	return arak.New(arak.Config{
-		BaseURL:      srv.URL,
-		TokenURL:     srv.URL + "/token",
+		BaseURL:      "http://arak.local",
+		TokenURL:     "http://arak.local/token",
 		ClientID:     "cp-backoffice-test",
 		ClientSecret: "cp-backoffice-secret",
+		HTTPClient:   httputil.NewMockClient(handler),
 	})
 }
 

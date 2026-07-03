@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/sciacco/mrsmith/internal/platform/arak"
+	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
 
 func TestHandleArticlesMergesGoodAndServiceCatalogs(t *testing.T) {
@@ -178,14 +179,13 @@ type articleCatalogState struct {
 func newArticleCatalogHandler(t *testing.T, fixtures map[string][]article) (*Handler, *articleCatalogState) {
 	t.Helper()
 	state := &articleCatalogState{fixtures: fixtures}
-	server := httptest.NewServer(state)
-	t.Cleanup(server.Close)
 
 	client := arak.New(arak.Config{
-		BaseURL:      server.URL,
-		TokenURL:     server.URL + "/token",
+		BaseURL:      "http://arak.local",
+		TokenURL:     "http://arak.local/token",
 		ClientID:     "client",
 		ClientSecret: "secret",
+		HTTPClient:   httputil.NewMockClient(state),
 	})
 	return &Handler{arak: client}, state
 }

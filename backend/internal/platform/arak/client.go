@@ -21,6 +21,7 @@ type Config struct {
 	TokenURL     string // Keycloak token endpoint
 	ClientID     string
 	ClientSecret string
+	HTTPClient   *http.Client
 }
 
 // Client calls the Arak API using a cached service-account token.
@@ -37,9 +38,13 @@ const maxUnauthorizedRetries = 2
 
 // New creates a ready-to-use Arak client.
 func New(cfg Config) *Client {
+	httpClient := cfg.HTTPClient
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: 30 * time.Second}
+	}
 	return &Client{
 		cfg:        cfg,
-		httpClient: &http.Client{Timeout: 30 * time.Second},
+		httpClient: httpClient,
 	}
 }
 

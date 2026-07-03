@@ -9,6 +9,7 @@ import (
 
 	"github.com/sciacco/mrsmith/internal/auth"
 	"github.com/sciacco/mrsmith/internal/platform/arak"
+	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
 
 func TestBudgetRoutesRequireRole(t *testing.T) {
@@ -56,7 +57,7 @@ func TestBudgetProxyTranslatesUpstreamAuthFailures(t *testing.T) {
 		arakClient = nil
 	})
 
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/token":
 			w.Header().Set("Content-Type", "application/json")
@@ -69,15 +70,15 @@ func TestBudgetProxyTranslatesUpstreamAuthFailures(t *testing.T) {
 		default:
 			http.NotFound(w, r)
 		}
-	}))
-	defer upstream.Close()
+	})
 
 	mux := http.NewServeMux()
 	RegisterRoutes(mux, arak.New(arak.Config{
-		BaseURL:      upstream.URL,
-		TokenURL:     upstream.URL + "/token",
+		BaseURL:      "http://arak.local",
+		TokenURL:     "http://arak.local/token",
 		ClientID:     "budget-client",
 		ClientSecret: "budget-secret",
+		HTTPClient:   httputil.NewMockClient(handler),
 	}))
 
 	req := httptest.NewRequest(

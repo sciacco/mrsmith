@@ -6,13 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"reflect"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
 
 func TestTokenCachingExpiryRefreshAndUnauthorizedRetry(t *testing.T) {
@@ -23,7 +24,7 @@ func TestTokenCachingExpiryRefreshAndUnauthorizedRetry(t *testing.T) {
 	groupAuthHeaders := []string{}
 	unauthorizedOnce := true
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/token":
 			if err := r.ParseForm(); err != nil {
@@ -66,10 +67,9 @@ func TestTokenCachingExpiryRefreshAndUnauthorizedRetry(t *testing.T) {
 		default:
 			http.NotFound(w, r)
 		}
-	}))
-	defer server.Close()
+	})
 
-	client := newTestClient(server.URL)
+	client := newTestClient("http://keycloak.local", httputil.NewMockClient(handler))
 	client.now = func() time.Time { return now }
 
 	if _, err := client.UsersByRealmRole(context.Background(), "app_access", UsersByRealmRoleOptions{}); err != nil {
@@ -104,7 +104,7 @@ func TestUsersByRealmRolePagesDirectUsers(t *testing.T) {
 	var mu sync.Mutex
 	roleUserFirsts := []string{}
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/token":
 			writeJSON(t, w, map[string]any{"access_token": "token", "expires_in": 300})
@@ -131,10 +131,9 @@ func TestUsersByRealmRolePagesDirectUsers(t *testing.T) {
 		default:
 			http.NotFound(w, r)
 		}
-	}))
-	defer server.Close()
+	})
 
-	users, err := newTestClient(server.URL).UsersByRealmRole(context.Background(), "app_access", UsersByRealmRoleOptions{PageSize: 2})
+	users, err := newTestClient("http://keycloak.local", httputil.NewMockClient(handler)).UsersByRealmRole(context.Background(), "app_access", UsersByRealmRoleOptions{PageSize: 2})
 	if err != nil {
 		t.Fatalf("lookup failed: %v", err)
 	}
@@ -156,7 +155,7 @@ func TestUsersByRealmRoleCollectsRoleGroupsChildrenAndMembers(t *testing.T) {
 	var mu sync.Mutex
 	calls := make(map[string][]url.Values)
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
 		calls[r.URL.Path] = append(calls[r.URL.Path], r.URL.Query())
 		mu.Unlock()
@@ -239,10 +238,9 @@ func TestUsersByRealmRoleCollectsRoleGroupsChildrenAndMembers(t *testing.T) {
 		default:
 			http.NotFound(w, r)
 		}
-	}))
-	defer server.Close()
+	})
 
-	users, err := newTestClient(server.URL).UsersByRealmRole(context.Background(), "app_access", UsersByRealmRoleOptions{PageSize: 2})
+	users, err := newTestClient("http://keycloak.local", httputil.NewMockClient(handler)).UsersByRealmRole(context.Background(), "app_access", UsersByRealmRoleOptions{PageSize: 2})
 	if err != nil {
 		t.Fatalf("lookup failed: %v", err)
 	}
@@ -267,7 +265,7 @@ func TestUsersByRealmRoleCollectsRoleGroupsChildrenAndMembers(t *testing.T) {
 }
 
 func TestUsersByRealmRoleMapsRoleNotFound(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/token":
 			writeJSON(t, w, map[string]any{"access_token": "token", "expires_in": 300})
@@ -276,10 +274,9 @@ func TestUsersByRealmRoleMapsRoleNotFound(t *testing.T) {
 		default:
 			http.NotFound(w, r)
 		}
-	}))
-	defer server.Close()
+	})
 
-	_, err := newTestClient(server.URL).UsersByRealmRole(context.Background(), "missing", UsersByRealmRoleOptions{})
+	_, err := newTestClient("http://keycloak.local", httputil.NewMockClient(handler)).UsersByRealmRole(context.Background(), "missing", UsersByRealmRoleOptions{})
 	if !errors.Is(err, ErrRoleNotFound) {
 		t.Fatalf("expected ErrRoleNotFound, got %v", err)
 	}
@@ -294,7 +291,7 @@ func TestUsersByRealmRoleReturnsUpstreamErrors(t *testing.T) {
 		{name: "server error", status: http.StatusBadGateway},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch r.URL.Path {
 				case "/token":
 					writeJSON(t, w, map[string]any{"access_token": "token", "expires_in": 300})
@@ -303,10 +300,9 @@ func TestUsersByRealmRoleReturnsUpstreamErrors(t *testing.T) {
 				default:
 					http.NotFound(w, r)
 				}
-			}))
-			defer server.Close()
+			})
 
-			_, err := newTestClient(server.URL).UsersByRealmRole(context.Background(), "app_access", UsersByRealmRoleOptions{})
+			_, err := newTestClient("http://keycloak.local", httputil.NewMockClient(handler)).UsersByRealmRole(context.Background(), "app_access", UsersByRealmRoleOptions{})
 			var upstreamErr *UpstreamError
 			if !errors.As(err, &upstreamErr) {
 				t.Fatalf("expected UpstreamError, got %T %v", err, err)
@@ -319,16 +315,15 @@ func TestUsersByRealmRoleReturnsUpstreamErrors(t *testing.T) {
 }
 
 func TestTokenEndpointUpstreamError(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/token" {
 			http.Error(w, "token down", http.StatusServiceUnavailable)
 			return
 		}
 		http.NotFound(w, r)
-	}))
-	defer server.Close()
+	})
 
-	_, err := newTestClient(server.URL).UsersByRealmRole(context.Background(), "app_access", UsersByRealmRoleOptions{})
+	_, err := newTestClient("http://keycloak.local", httputil.NewMockClient(handler)).UsersByRealmRole(context.Background(), "app_access", UsersByRealmRoleOptions{})
 	var upstreamErr *UpstreamError
 	if !errors.As(err, &upstreamErr) {
 		t.Fatalf("expected token UpstreamError, got %T %v", err, err)
@@ -338,13 +333,14 @@ func TestTokenEndpointUpstreamError(t *testing.T) {
 	}
 }
 
-func newTestClient(baseURL string) *Client {
+func newTestClient(baseURL string, httpClient *http.Client) *Client {
 	return New(Config{
 		BaseURL:      baseURL,
 		Realm:        "test",
 		TokenURL:     baseURL + "/token",
 		ClientID:     "client",
 		ClientSecret: "secret",
+		HTTPClient:   httpClient,
 	})
 }
 

@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
 
 func TestDoRetriesUnauthorizedTwiceAndSucceeds(t *testing.T) {
@@ -18,7 +19,7 @@ func TestDoRetriesUnauthorizedTwiceAndSucceeds(t *testing.T) {
 	apiCalls := 0
 	authHeaders := []string{}
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/token":
 			mu.Lock()
@@ -47,15 +48,15 @@ func TestDoRetriesUnauthorizedTwiceAndSucceeds(t *testing.T) {
 		default:
 			http.NotFound(w, r)
 		}
-	}))
-	defer server.Close()
+	})
 
 	client := New(Config{
-		BaseURL:      server.URL,
-		TokenURL:     server.URL + "/token",
+		BaseURL:      "http://arak.local",
+		TokenURL:     "http://arak.local/token",
 		ClientID:     "budget-client",
 		ClientSecret: "budget-secret",
 	})
+	client.httpClient = httputil.NewMockClient(handler)
 
 	resp, err := client.Do(http.MethodGet, "/arak/budget/v1/group", "", nil)
 	if err != nil {
@@ -91,7 +92,7 @@ func TestDoStopsAfterTwoUnauthorizedRetries(t *testing.T) {
 	tokenCalls := 0
 	apiCalls := 0
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/token":
 			mu.Lock()
@@ -112,15 +113,15 @@ func TestDoStopsAfterTwoUnauthorizedRetries(t *testing.T) {
 		default:
 			http.NotFound(w, r)
 		}
-	}))
-	defer server.Close()
+	})
 
 	client := New(Config{
-		BaseURL:      server.URL,
-		TokenURL:     server.URL + "/token",
+		BaseURL:      "http://arak.local",
+		TokenURL:     "http://arak.local/token",
 		ClientID:     "budget-client",
 		ClientSecret: "budget-secret",
 	})
+	client.httpClient = httputil.NewMockClient(handler)
 
 	resp, err := client.Do(http.MethodPost, "/arak/budget/v1/report/unassigned-users", "", strings.NewReader(`{"enabled":true}`))
 	if err != nil {

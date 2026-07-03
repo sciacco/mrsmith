@@ -10,15 +10,20 @@ import (
 
 	"github.com/sciacco/mrsmith/internal/notifications"
 	"github.com/sciacco/mrsmith/internal/platform/arak"
+	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
 
 func TestSubmitCreatesApprovalNotificationOnlyAfterUpstreamSuccess(t *testing.T) {
 	upstream := &rdaNotificationArakState{}
-	server := httptest.NewServer(upstream)
-	t.Cleanup(server.Close)
 	notifier := &fakeRDANotifier{}
 	h := &Handler{
-		arak:           arak.New(arak.Config{BaseURL: server.URL, TokenURL: server.URL + "/token", ClientID: "client", ClientSecret: "secret"}),
+		arak: arak.New(arak.Config{
+			BaseURL:      "http://arak.local",
+			TokenURL:     "http://arak.local/token",
+			ClientID:     "client",
+			ClientSecret: "secret",
+			HTTPClient:   httputil.NewMockClient(upstream),
+		}),
 		logger:         slog.Default().With("component", component),
 		notifier:       notifier,
 		staticDir:      "/static",
@@ -56,11 +61,15 @@ func TestSubmitCreatesApprovalNotificationOnlyAfterUpstreamSuccess(t *testing.T)
 
 func TestSubmitFailureDoesNotCreateNotification(t *testing.T) {
 	upstream := &rdaNotificationArakState{failSubmit: true}
-	server := httptest.NewServer(upstream)
-	t.Cleanup(server.Close)
 	notifier := &fakeRDANotifier{}
 	h := &Handler{
-		arak:           arak.New(arak.Config{BaseURL: server.URL, TokenURL: server.URL + "/token", ClientID: "client", ClientSecret: "secret"}),
+		arak: arak.New(arak.Config{
+			BaseURL:      "http://arak.local",
+			TokenURL:     "http://arak.local/token",
+			ClientID:     "client",
+			ClientSecret: "secret",
+			HTTPClient:   httputil.NewMockClient(upstream),
+		}),
 		logger:         slog.Default().With("component", component),
 		notifier:       notifier,
 		quoteThreshold: 3000,

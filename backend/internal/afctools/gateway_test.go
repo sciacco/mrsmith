@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/sciacco/mrsmith/internal/platform/arak"
+	"github.com/sciacco/mrsmith/internal/platform/httputil"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
 )
 
@@ -105,7 +106,7 @@ func newGatewayOrderPDFRequest(t *testing.T, orderID string) *http.Request {
 func newGatewayTestArakClient(t *testing.T, orderStatus int, orderBody string) *arak.Client {
 	t.Helper()
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/token":
 			w.Header().Set("Content-Type", "application/json")
@@ -117,13 +118,13 @@ func newGatewayTestArakClient(t *testing.T, orderStatus int, orderBody string) *
 		default:
 			http.NotFound(w, r)
 		}
-	}))
-	t.Cleanup(server.Close)
+	})
 
 	return arak.New(arak.Config{
-		BaseURL:      server.URL,
-		TokenURL:     server.URL + "/token",
+		BaseURL:      "http://arak.local",
+		TokenURL:     "http://arak.local/token",
 		ClientID:     "afctools-client",
 		ClientSecret: "afctools-secret",
+		HTTPClient:   httputil.NewMockClient(handler),
 	})
 }

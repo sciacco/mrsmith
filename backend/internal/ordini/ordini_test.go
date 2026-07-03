@@ -21,6 +21,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/auth"
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/arak"
+	"github.com/sciacco/mrsmith/internal/platform/httputil"
 	"github.com/sciacco/mrsmith/internal/platform/hubspot"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
 )
@@ -531,6 +532,9 @@ func TestRevertConversionBlocksWrongStateBeforeExternalChecks(t *testing.T) {
 	}
 	mistraState := &ordiniTestDBState{
 		query: func(query string, args []driver.NamedValue) ([]string, [][]driver.Value, error) {
+			if strings.Contains(query, "erp_metodi_pagamento") {
+				return []string{"desc_pagamento"}, [][]driver.Value{{"Bonifico 30gg"}}, nil
+			}
 			t.Fatalf("mistra should not be queried after wrong state: %s", query)
 			return nil, nil, nil
 		},
@@ -1251,7 +1255,7 @@ type ordiniHubSpotDeleteState struct {
 func newOrdiniHubSpotDeleteServer(t *testing.T, fail bool) (*hubspot.Client, *ordiniHubSpotDeleteState) {
 	t.Helper()
 	state := &ordiniHubSpotDeleteState{}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodDelete {
 			t.Fatalf("unexpected HubSpot method/path: %s %s", r.Method, r.URL.Path)
 		}
@@ -1261,9 +1265,8 @@ func newOrdiniHubSpotDeleteServer(t *testing.T, fail bool) (*hubspot.Client, *or
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
-	}))
-	t.Cleanup(server.Close)
-	return hubspot.NewWithBaseURL("test-token", server.URL, server.Client()), state
+	})
+	return hubspot.NewWithBaseURL("test-token", "http://hubspot.local", httputil.NewMockClient(handler)), state
 }
 
 const ordiniTestDriverName = "ordini_test_driver"
@@ -1509,20 +1512,20 @@ type ordiniGateway struct {
 
 func newOrdiniGateway(t *testing.T, handler http.HandlerFunc) *ordiniGateway {
 	t.Helper()
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	wrappedHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/token" {
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"access_token":"test-token","expires_in":3600}`))
 			return
 		}
 		handler(w, r)
-	}))
-	t.Cleanup(server.Close)
+	})
 	return &ordiniGateway{client: arak.New(arak.Config{
-		BaseURL:      server.URL,
-		TokenURL:     server.URL + "/token",
+		BaseURL:      "http://arak.local",
+		TokenURL:     "http://arak.local/token",
 		ClientID:     "client",
 		ClientSecret: "secret",
+		HTTPClient:   httputil.NewMockClient(wrappedHandler),
 	})}
 }
 

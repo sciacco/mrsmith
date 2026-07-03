@@ -1,4 +1,4 @@
-package hubspot
+package httputil
 
 import (
 	"net/http"

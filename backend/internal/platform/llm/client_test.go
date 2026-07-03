@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"testing"
+
+	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
 
 func TestChatSupportsToolCalls(t *testing.T) {
 	var captured ChatRequest
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/chat/completions" {
 			t.Fatalf("path = %q, want /chat/completions", r.URL.Path)
 		}
@@ -40,10 +41,9 @@ func TestChatSupportsToolCalls(t *testing.T) {
 			},
 			"usage": map[string]any{"total_tokens": 12},
 		})
-	}))
-	defer server.Close()
+	})
 
-	client := NewWithBaseURL("test-key", server.URL, server.Client())
+	client := NewWithBaseURL("test-key", "http://llm.local", httputil.NewMockClient(handler))
 	response, err := client.Chat(context.Background(), ChatRequest{
 		Model: "test-model",
 		Messages: []Message{

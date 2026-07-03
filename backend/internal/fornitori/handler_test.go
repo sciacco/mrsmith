@@ -16,6 +16,7 @@ import (
 
 	"github.com/sciacco/mrsmith/internal/auth"
 	"github.com/sciacco/mrsmith/internal/platform/arak"
+	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
 
 func TestAccessRoleRequired(t *testing.T) {
@@ -48,14 +49,13 @@ func TestMissingArakReturnsServiceUnavailable(t *testing.T) {
 }
 
 func TestSkipQualificationRequiresRole(t *testing.T) {
-	arakSrv := fakeArakServer(t)
-	defer arakSrv.Close()
-
+	handler := fakeArakHandler(t)
 	client := arak.New(arak.Config{
-		BaseURL:      arakSrv.URL,
-		TokenURL:     arakSrv.URL + "/token",
+		BaseURL:      "http://arak.local",
+		TokenURL:     "http://arak.local/token",
 		ClientID:     "client",
 		ClientSecret: "secret",
+		HTTPClient:   httputil.NewMockClient(handler),
 	})
 	mux := http.NewServeMux()
 	RegisterRoutes(mux, client, nil, nil)
@@ -80,17 +80,18 @@ func TestSkipQualificationRequiresRole(t *testing.T) {
 func TestDevAdminCanSetSkipQualification(t *testing.T) {
 	var gotPath string
 	var gotBody string
-	arakSrv := fakeArakServer(t, func(r *http.Request, body []byte) {
+	handler := fakeArakHandler(t, func(r *http.Request, body []byte) {
 		gotPath = r.URL.Path
 		gotBody = string(body)
 	})
-	defer arakSrv.Close()
+	
 
 	client := arak.New(arak.Config{
-		BaseURL:      arakSrv.URL,
-		TokenURL:     arakSrv.URL + "/token",
+		BaseURL:      "http://arak.local",
+		TokenURL:     "http://arak.local" + "/token",
 		ClientID:     "client",
 		ClientSecret: "secret",
+		HTTPClient:   httputil.NewMockClient(handler),
 	})
 	mux := http.NewServeMux()
 	RegisterRoutes(mux, client, nil, nil)
@@ -119,17 +120,18 @@ func TestDevAdminCanSetSkipQualification(t *testing.T) {
 func TestProviderDraftCreateUsesDraftEndpoint(t *testing.T) {
 	var gotPath string
 	var gotBody string
-	arakSrv := fakeArakServer(t, func(r *http.Request, body []byte) {
+	handler := fakeArakHandler(t, func(r *http.Request, body []byte) {
 		gotPath = r.URL.Path
 		gotBody = string(body)
 	})
-	defer arakSrv.Close()
+	
 
 	client := arak.New(arak.Config{
-		BaseURL:      arakSrv.URL,
-		TokenURL:     arakSrv.URL + "/token",
+		BaseURL:      "http://arak.local",
+		TokenURL:     "http://arak.local" + "/token",
 		ClientID:     "client",
 		ClientSecret: "secret",
+		HTTPClient:   httputil.NewMockClient(handler),
 	})
 	mux := http.NewServeMux()
 	RegisterRoutes(mux, client, nil, nil)
@@ -184,21 +186,24 @@ func authedRequest(method, target string, body io.Reader, roles ...string) *http
 	return req.WithContext(context.WithValue(req.Context(), auth.ClaimsKey, claims))
 }
 
-func fakeArakServer(t *testing.T, inspect ...func(*http.Request, []byte)) *httptest.Server {
+func fakeArakHandler(t *testing.T, inspect ...func(*http.Request, []byte)) http.Handler {
 	t.Helper()
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/token" {
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"access_token":"arak-token","expires_in":3600}`))
 			return
 		}
-		body, _ := io.ReadAll(r.Body)
+		var body []byte
+		if r.Body != nil {
+			body, _ = io.ReadAll(r.Body)
+		}
 		if len(inspect) > 0 {
 			inspect[0](r, body)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.Copy(w, bytes.NewReader([]byte(`{"ok":true}`)))
-	}))
+	})
 }
 
 func openFornitoriTestDB(t *testing.T, mode string) *sql.DB {

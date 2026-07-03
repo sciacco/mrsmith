@@ -15,6 +15,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/sciacco/mrsmith/internal/platform/httputil"
 	"github.com/sciacco/mrsmith/internal/platform/hubspot"
 )
 
@@ -34,11 +35,10 @@ func TestHandlePublishRepublishUnlocksLockedHubSpotQuote(t *testing.T) {
 	resetPublishHandlerTracker("publish-republish")
 
 	serverState := newHubSpotQuoteServer(t, false)
-	defer serverState.server.Close()
 
 	h := &Handler{
 		db: openPublishHandlerTestDB(t, "publish-republish"),
-		hs: hubspot.NewWithBaseURL("test-token", serverState.server.URL, serverState.server.Client()),
+		hs: hubspot.NewWithBaseURL("test-token", "http://hubspot.local", httputil.NewMockClient(serverState.handler())),
 	}
 
 	req := httptest.NewRequest(http.MethodPost, "/quotes/v1/quotes/42/publish", nil)
@@ -101,11 +101,10 @@ func TestHandlePublishSyncsLineItemsDescriptionsAndComments(t *testing.T) {
 
 	serverState := newHubSpotQuoteServer(t, false)
 	serverState.lineItemIDs = []int64{9999}
-	defer serverState.server.Close()
 
 	h := &Handler{
 		db: openPublishHandlerTestDB(t, "publish-line-items"),
-		hs: hubspot.NewWithBaseURL("test-token", serverState.server.URL, serverState.server.Client()),
+		hs: hubspot.NewWithBaseURL("test-token", "http://hubspot.local", httputil.NewMockClient(serverState.handler())),
 	}
 
 	req := httptest.NewRequest(http.MethodPost, "/quotes/v1/quotes/42/publish", nil)
@@ -197,11 +196,10 @@ func TestHandlePublishFailsWhenLineItemSyncFails(t *testing.T) {
 
 	serverState := newHubSpotQuoteServer(t, false)
 	serverState.failLineItemCreate = true
-	defer serverState.server.Close()
 
 	h := &Handler{
 		db: openPublishHandlerTestDB(t, "publish-line-items-fail"),
-		hs: hubspot.NewWithBaseURL("test-token", serverState.server.URL, serverState.server.Client()),
+		hs: hubspot.NewWithBaseURL("test-token", "http://hubspot.local", httputil.NewMockClient(serverState.handler())),
 	}
 
 	req := httptest.NewRequest(http.MethodPost, "/quotes/v1/quotes/42/publish", nil)
@@ -250,11 +248,10 @@ func TestHandlePublishReturnsStepErrorWhenUnlockFails(t *testing.T) {
 	resetPublishHandlerTracker("publish-republish")
 
 	serverState := newHubSpotQuoteServer(t, true)
-	defer serverState.server.Close()
 
 	h := &Handler{
 		db: openPublishHandlerTestDB(t, "publish-republish"),
-		hs: hubspot.NewWithBaseURL("test-token", serverState.server.URL, serverState.server.Client()),
+		hs: hubspot.NewWithBaseURL("test-token", "http://hubspot.local", httputil.NewMockClient(serverState.handler())),
 	}
 
 	req := httptest.NewRequest(http.MethodPost, "/quotes/v1/quotes/42/publish", nil)
@@ -309,11 +306,10 @@ func TestHandlePublishReturnsStepErrorWhenUnlockFails(t *testing.T) {
 
 func TestHandleGetHSStatusReturnsLockedFlag(t *testing.T) {
 	serverState := newHubSpotQuoteServer(t, false)
-	defer serverState.server.Close()
 
 	h := &Handler{
 		db: openPublishHandlerTestDB(t, "publish-hs-status"),
-		hs: hubspot.NewWithBaseURL("test-token", serverState.server.URL, serverState.server.Client()),
+		hs: hubspot.NewWithBaseURL("test-token", "http://hubspot.local", httputil.NewMockClient(serverState.handler())),
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/quotes/v1/quotes/42/hs-status", nil)
@@ -527,7 +523,6 @@ type hubSpotRequest struct {
 }
 
 type hubSpotQuoteServerState struct {
-	server             *httptest.Server
 	mu                 sync.Mutex
 	reqs               []hubSpotRequest
 	failUnlock         bool
@@ -536,15 +531,8 @@ type hubSpotQuoteServerState struct {
 	failLineItemCreate bool
 }
 
-func newHubSpotQuoteServer(t *testing.T, failUnlock bool) *hubSpotQuoteServerState {
-	t.Helper()
-
-	state := &hubSpotQuoteServerState{
-		failUnlock:  failUnlock,
-		lineItemIDs: []int64{},
-		nextLineID:  8000,
-	}
-	state.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func (state *hubSpotQuoteServerState) handler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		req := hubSpotRequest{
 			Method:   r.Method,
 			Path:     r.URL.Path,
@@ -555,11 +543,11 @@ func newHubSpotQuoteServer(t *testing.T, failUnlock bool) *hubSpotQuoteServerSta
 			defer r.Body.Close()
 			bodyBytes, err := io.ReadAll(r.Body)
 			if err != nil {
-				t.Fatalf("failed to read request body: %v", err)
+				panic(err)
 			}
 			if len(bodyBytes) > 0 {
 				if err := json.Unmarshal(bodyBytes, &req.Body); err != nil {
-					t.Fatalf("failed to decode request body %q: %v", string(bodyBytes), err)
+					panic(err)
 				}
 			}
 		}
@@ -618,7 +606,7 @@ func newHubSpotQuoteServer(t *testing.T, failUnlock bool) *hubSpotQuoteServerSta
 		case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/crm/v3/objects/line_item/"):
 			id, err := strconv.ParseInt(strings.TrimPrefix(r.URL.Path, "/crm/v3/objects/line_item/"), 10, 64)
 			if err != nil {
-				t.Fatalf("invalid line item delete path: %s", r.URL.Path)
+				panic(err)
 			}
 			state.mu.Lock()
 			filtered := state.lineItemIDs[:0]
@@ -631,11 +619,18 @@ func newHubSpotQuoteServer(t *testing.T, failUnlock bool) *hubSpotQuoteServerSta
 			state.mu.Unlock()
 			w.WriteHeader(http.StatusNoContent)
 		default:
-			t.Fatalf("unexpected HubSpot request: %s %s?%s", r.Method, r.URL.Path, r.URL.RawQuery)
+			panic("unexpected HubSpot request: " + r.Method + " " + r.URL.Path)
 		}
-	}))
+	})
+}
 
-	return state
+func newHubSpotQuoteServer(t *testing.T, failUnlock bool) *hubSpotQuoteServerState {
+	t.Helper()
+	return &hubSpotQuoteServerState{
+		failUnlock:  failUnlock,
+		lineItemIDs: []int64{},
+		nextLineID:  8000,
+	}
 }
 
 func (s *hubSpotQuoteServerState) requests() []hubSpotRequest {
