@@ -17,6 +17,14 @@ export const dateFormat = new Intl.DateTimeFormat('it-IT', {
   year: 'numeric',
 });
 
+export const dateTimeFormat = new Intl.DateTimeFormat('it-IT', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
 export const defaultSearchLimit = 100;
 export const maxSearchLimit = 1000;
 
@@ -39,6 +47,13 @@ export function dateLabel(value?: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
   return dateFormat.format(date);
+}
+
+export function dateTimeLabel(value?: string): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return dateTimeFormat.format(date);
 }
 
 export function sessionStatusLabel(status: MASessionStatus): string {

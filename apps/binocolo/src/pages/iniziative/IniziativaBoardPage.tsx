@@ -12,7 +12,7 @@ import type {
   MASessionListResponse,
   MASessionSummary,
 } from '../../api/types';
-import { dateLabel, errorLabel } from '../ricerche/helpers';
+import { dateLabel, dateTimeLabel, errorLabel } from '../ricerche/helpers';
 import styles from './Iniziative.module.css';
 
 const STATES: Array<{ key: string; label: string }> = [
@@ -117,6 +117,16 @@ export function IniziativaBoardPage() {
   const [attaching, setAttaching] = useState<string | null>(null);
 
   const [selectedCard, setSelectedCard] = useState<MAInitiativeCardView | null>(null);
+
+  // Mantiene selectedCard sincronizzato con i dati freschi della board
+  // (es. dopo cambio stato, chiusura, riapertura nel drawer).
+  useEffect(() => {
+    if (!selectedCard || !board) return;
+    const updated = board.cards.find((c) => c.companyKey === selectedCard.companyKey);
+    if (updated && updated !== selectedCard) {
+      setSelectedCard(updated);
+    }
+  }, [board, selectedCard]);
   const [closeModalCard, setCloseModalCard] = useState<MAInitiativeCardView | null>(null);
   const [removeModalCard, setRemoveModalCard] = useState<MAInitiativeCardView | null>(null);
 
@@ -817,7 +827,7 @@ function CardDrawer({
             ))}
             <div className={styles.pipelineStep}>
               <button type="button" className={styles.stationBtn} onClick={() => onOpenCloseModal(card)}>
-                <Icon name="check-circle" size={14} />
+                <span className={styles.stepCircle}>6</span>
                 <span className={styles.stepLabel}>Chiudi…</span>
               </button>
             </div>
@@ -917,7 +927,7 @@ function CardDrawer({
                       <div className={styles.timelineDot} />
                       <div className={isNote ? styles.timelineNote : styles.timelineEvent}>{eventLabel(event)}</div>
                       <span className={styles.timelineWho}>
-                        {event.createdByEmail ?? 'Sistema'} · {dateLabel(event.createdAt)}
+                        {event.createdByEmail ?? 'Sistema'} · {dateTimeLabel(event.createdAt)}
                       </span>
                     </li>
                   );
