@@ -110,7 +110,10 @@ func NewWithBaseURL(apiKey, baseURL string, httpCli *http.Client) *Client {
 		baseURL = "https://openrouter.ai/api/v1"
 	}
 	if httpCli == nil {
-		httpCli = &http.Client{Timeout: 60 * time.Second}
+		// Tetto, non target: i reasoning model con budget token ampi impiegano
+		// minuti a produrre il body (non streamed); le chiamate interattive
+		// restano comunque limitate dal context del chiamante.
+		httpCli = &http.Client{Timeout: 300 * time.Second}
 	}
 	return &Client{
 		sdk: openai.NewClient(

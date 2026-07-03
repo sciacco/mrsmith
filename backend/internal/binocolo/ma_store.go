@@ -55,6 +55,7 @@ type maWorkspaceStore interface {
 	EnqueueMADeepAnalysis(ctx context.Context, companyKey, vatCode, taxCode, email string) error
 	ListMADeepReadyPayloads(ctx context.Context) ([]maDeepPayloadRow, error)
 	CountMADeepByStatus(ctx context.Context) (map[string]int, error)
+	CountMADeepBriefFormats(ctx context.Context) (map[string]int, []string, error)
 	CountMADeepVintage(ctx context.Context) (int, int, error)
 	UpdateMADeepScorecard(ctx context.Context, companyKey string, scorecard *MADeepScorecard) error
 	UpdateMADeepValuation(ctx context.Context, companyKey string, valuation *MADeepValuation) error
@@ -3590,6 +3591,44 @@ SELECT status, count(*) FROM binocolo.ma_deep_analysis GROUP BY status
 		return nil, fmt.Errorf("iterate ma deep status counts: %w", err)
 	}
 	return out, nil
+}
+
+// CountMADeepBriefFormats classifies the cached ready briefs by payload shape —
+// 'financialReading' (v3), 'legacy' (pre-v3), 'none' — and returns the company keys
+// still NOT on the current format, so a prompt rollout is verifiable senza rigenerare.
+func (s *SQLStore) CountMADeepBriefFormats(ctx context.Context) (map[string]int, []string, error) {
+	if s == nil || s.db == nil {
+		return nil, nil, errors.New("binocolo ma store not configured")
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT company_key,
+       CASE WHEN brief IS NULL OR brief = 'null'::jsonb THEN 'none'
+            WHEN brief ? 'financialReading' THEN 'financialReading'
+            ELSE 'legacy' END
+FROM binocolo.ma_deep_analysis
+WHERE status = 'ready'
+ORDER BY company_key
+`)
+	if err != nil {
+		return nil, nil, fmt.Errorf("count ma deep brief formats: %w", err)
+	}
+	defer rows.Close()
+	counts := map[string]int{}
+	stale := []string{}
+	for rows.Next() {
+		var companyKey, format string
+		if err := rows.Scan(&companyKey, &format); err != nil {
+			return nil, nil, fmt.Errorf("scan ma deep brief format: %w", err)
+		}
+		counts[format]++
+		if format != "financialReading" {
+			stale = append(stale, companyKey)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, fmt.Errorf("iterate ma deep brief formats: %w", err)
+	}
+	return counts, stale, nil
 }
 
 // CountMADeepVintage returns (rows, distinct companies) of the vintage archive.

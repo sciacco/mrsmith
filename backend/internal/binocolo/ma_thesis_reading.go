@@ -153,9 +153,11 @@ func (s *maService) generateCardThesisReading(ctx context.Context, initiativeID,
 	if err != nil {
 		return nil, err
 	}
+	// 5000 come per il brief: sui reasoning model il budget copre anche i token
+	// di ragionamento e un tetto stretto tronca il JSON.
 	reqParams := model.RawParams()
 	if _, ok := reqParams["max_tokens"]; !ok {
-		reqParams["max_tokens"] = 1800
+		reqParams["max_tokens"] = 5000
 	}
 	chatReq := llm.ChatRequest{
 		Model:          model.Model,

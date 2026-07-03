@@ -457,6 +457,34 @@ funnel.
 >    (scope,model)/(scope,name), azzera i residui e ripunta i FK a
 >    `mrsmith.llm_*`. → Attivazione richiede quindi anche mig 098, poi
 >    ri-lanciare regenerate-briefs.
+> 3. **Troncamenti/timeout LLM sul brief v3**: output più lungo del v2 →
+>    `max_tokens` fallback 2200→5000 (brief e thesis reading; vale solo se i
+>    params del registry lo omettono) e timeout client LLM piattaforma
+>    60s→300s (i reasoning model impiegano minuti; il caso reale è passato in
+>    79s, oltre il vecchio tetto).
+>
+> Il rollout è stato reso guidabile: regenerate-briefs accetta
+> `{"companyKey"}` (retry mirato un record per volta) e risponde con
+> `{regenerated, companies, skipped:[{companyKey,error}]}`; l'inspect espone
+> `briefFormats`/`briefStaleKeys` per verificare lo stato senza rigenerare.
+> **ESITO 2026-07-03: 10/10 brief a `financialReading`, zero stale** —
+> l'attivazione (a) è CHIUSA.
+> 4. **Trace FK sul POST thesis-reading**: il handler passava l'id
+>    dell'INIZIATIVA come session id della trace, ma
+>    `ma_operation_trace.session_id` ha FK verso `ma_session` → 500 immediato
+>    all'INSERT della trace. Fix: trace senza session id (ambito
+>    iniziativa+azienda negli attrs); stessa classe corretta anche su
+>    `ma_bm_family_ratify` (passava il companyKey, innocuo finché non-uuid ma
+>    concettualmente errato).
+>
+> **SMOKE (b) PASSATO 2026-07-03** su card KRAL (iniziativa smoke): 200 in
+> ~31s; tesi di sessione = "generico" → `fitLevel: non_valutabile` con
+> `notAddressed` esplicito (le regole ferree reggono: nessun fit inventato),
+> flag ri-pesate citando i fatti (PN −81.980 €, current ratio 0,148x),
+> sinergie tutte "da validare", evidenza web citata con la sua data
+> (2026-06-30, domain_unresolved → domanda DD dedicata), valuationStance
+> senza premi/sconti inventati. GET: persistenza + staleness ok.
+> **FASE 5 ATTIVATA E CHIUSA.**
 
 **Obiettivo:** il memo per (iniziativa, azienda), on-demand, ancorato alla
 sessione di provenienza.

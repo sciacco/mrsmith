@@ -24,7 +24,10 @@ type Service struct {
 // error, mirroring how the apps treat a missing AI dependency.
 func New(db *sql.DB) *Service {
 	return &Service{
-		db:   db,
-		http: &http.Client{Timeout: 60 * time.Second},
+		db: db,
+		// Tetto, non target: i reasoning model con budget token ampi impiegano
+		// minuti a produrre il body (non streamed); le chiamate interattive
+		// restano comunque limitate dal context del chiamante.
+		http: &http.Client{Timeout: 300 * time.Second},
 	}
 }

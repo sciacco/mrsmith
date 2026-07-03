@@ -2643,47 +2643,77 @@ func (s *maService) updateParameter(ctx context.Context, key, value, subject, em
 // and not charged. The projected incremental spend (chargeable x cost_full) gates
 // the batch unless the analyst acknowledges going over budget. The async worker
 // picks up the queued rows; the returned detail reflects the new statuses.
-// regenerateMADeepBriefs re-runs the LLM brief for every cached analysis from its stored
+// maBriefRegenReport itemizes a brief-regeneration run so the ops caller sees per-row
+// outcomes in the response instead of fishing them out of the server logs.
+type maBriefRegenReport struct {
+	Regenerated int                `json:"regenerated"`
+	Companies   []string           `json:"companies"`
+	Skipped     []maBriefRegenSkip `json:"skipped,omitempty"`
+}
+
+type maBriefRegenSkip struct {
+	CompanyKey string `json:"companyKey"`
+	Error      string `json:"error"`
+}
+
+// regenerateMADeepBriefs re-runs the LLM brief for cached analyses from their stored
 // payload + valuation (scorecard rebuilt deterministically). No IT-full call — used to
-// roll out a new brief prompt to already-analyzed companies. Per-row LLM failures are
-// skipped (best-effort), so one bad row never aborts the batch.
-func (s *maService) regenerateMADeepBriefs(ctx context.Context) (int, error) {
+// roll out a new brief prompt to already-analyzed companies. With companyKey the run is
+// scoped to that single row (retry mirato senza ri-spendere sul resto della cache).
+// Per-row LLM/parse failures are skipped and itemized; a store failure aborts (systemic).
+func (s *maService) regenerateMADeepBriefs(ctx context.Context, companyKey string) (maBriefRegenReport, error) {
+	report := maBriefRegenReport{Companies: []string{}}
 	if s.store == nil {
-		return 0, errMAStoreUnavailable
+		return report, errMAStoreUnavailable
 	}
 	if s.llmp == nil {
-		return 0, errMAOpenRouterUnavailable
+		return report, errMAOpenRouterUnavailable
 	}
 	model, err := s.llmp.ResolveModel(ctx, maModelScopeDeepBrief, "")
 	if err != nil {
-		return 0, err
+		return report, err
 	}
 	prompt, err := s.llmp.ResolvePrompt(ctx, maModelScopeDeepBrief, "")
 	if err != nil {
-		return 0, err
+		return report, err
 	}
 	rows, err := s.store.ListMADeepReadyForBrief(ctx)
 	if err != nil {
-		return 0, err
+		return report, err
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey != "" {
+		filtered := rows[:0]
+		for _, row := range rows {
+			if row.CompanyKey == companyKey {
+				filtered = append(filtered, row)
+			}
+		}
+		rows = filtered
+		if len(rows) == 0 {
+			return report, fmt.Errorf("%w: nessuna analisi pronta per %s", errMAStrategyInvalid, companyKey)
+		}
 	}
 	pricing := s.loadPricing(ctx)
-	regenerated := 0
 	for _, row := range rows {
 		scorecard, _, _, _ := computeMADeepScorecard(ctx, s.store, row.Payload, row.CompanyKey, "", "", pricing)
 		if scorecard == nil {
+			report.Skipped = append(report.Skipped, maBriefRegenSkip{CompanyKey: row.CompanyKey, Error: "scorecard non calcolabile dal payload"})
 			continue
 		}
 		brief, err := buildMADeepBriefLLM(ctx, s.llmp, model, prompt, row.Payload, scorecard, row.Valuation)
 		if err != nil {
 			logging.FromContext(ctx).Warn("binocolo brief regenerate failed", "component", "binocolo", "operation", "ma_deep_regenerate_briefs", "company_key", row.CompanyKey, "error", err)
+			report.Skipped = append(report.Skipped, maBriefRegenSkip{CompanyKey: row.CompanyKey, Error: err.Error()})
 			continue
 		}
 		if err := s.store.UpdateMADeepBrief(ctx, row.CompanyKey, brief, model.ID, prompt.ID); err != nil {
-			return regenerated, err
+			return report, err
 		}
-		regenerated++
+		report.Regenerated++
+		report.Companies = append(report.Companies, row.CompanyKey)
 	}
-	return regenerated, nil
+	return report, nil
 }
 
 // recomputeMADeepScorecards rebuilds the deterministic scorecard (+ quality flags,
@@ -2763,6 +2793,12 @@ func (s *maService) inspectMADeep(ctx context.Context) (MADeepInspectReport, err
 		return MADeepInspectReport{}, err
 	}
 	report.StatusCounts = counts
+	briefFormats, briefStale, err := s.store.CountMADeepBriefFormats(ctx)
+	if err != nil {
+		return MADeepInspectReport{}, err
+	}
+	report.BriefFormats = briefFormats
+	report.BriefStaleKeys = briefStale
 	// Vintage stats are best-effort: before migration 091 the table does not exist
 	// and the whole diagnostic must still work.
 	if vintageRows, vintageCompanies, err := s.store.CountMADeepVintage(ctx); err != nil {

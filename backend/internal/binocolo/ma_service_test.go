@@ -1540,6 +1540,10 @@ func (f *fakeMAWorkspaceStore) CountMADeepByStatus(context.Context) (map[string]
 	return map[string]int{}, nil
 }
 
+func (f *fakeMAWorkspaceStore) CountMADeepBriefFormats(context.Context) (map[string]int, []string, error) {
+	return map[string]int{}, nil, nil
+}
+
 func (f *fakeMAWorkspaceStore) UpdateMADeepValuation(context.Context, string, *MADeepValuation) error {
 	return nil
 }

@@ -1429,7 +1429,12 @@ type MADeepDiveRequest struct {
 // (code-family mix, debt granularity, delta/L2Y coverage, provisions treatment,
 // vendor-vs-CEE reconciliation) without any vendor call and without persisting.
 type MADeepInspectReport struct {
-	StatusCounts     map[string]int              `json:"statusCounts"`
+	StatusCounts map[string]int `json:"statusCounts"`
+	// BriefFormats/BriefStaleKeys classify the cached briefs by shape
+	// (financialReading | legacy | none): rollout di prompt verificabile
+	// dall'inspect senza rigenerare nulla.
+	BriefFormats     map[string]int              `json:"briefFormats"`
+	BriefStaleKeys   []string                    `json:"briefStaleKeys"`
 	PayloadsAnalyzed int                         `json:"payloadsAnalyzed"`
 	CodeFamilies     MADeepInspectFamilies       `json:"codeFamilies"`
 	Granularity      MADeepInspectGranularity    `json:"granularity"`

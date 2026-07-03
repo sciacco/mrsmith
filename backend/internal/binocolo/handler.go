@@ -627,7 +627,9 @@ func (h *Handler) handleGenerateCardThesisReading(w http.ResponseWriter, r *http
 	}
 	subject, email := companySearchRefreshActor(r.Context())
 	var traceOK bool
-	r, traceOK = h.startMATrace(w, r, "ma_thesis_reading_generate", id, nil, subject, email)
+	// Trace senza session id: la trace lo vincola con FK a ma_session, e qui
+	// l'ambito è (iniziativa, azienda) — gli id viaggiano nel log e negli attrs.
+	r, traceOK = h.startMATrace(w, r, "ma_thesis_reading_generate", "", nil, subject, email)
 	if !traceOK {
 		return
 	}
@@ -1109,11 +1111,16 @@ func (h *Handler) handleRecomputeMADeep(w http.ResponseWriter, r *http.Request) 
 	httputil.JSON(w, http.StatusOK, map[string]any{"recomputed": count, "valuation": body.Valuation})
 }
 
-// handleRegenerateMADeepBriefs re-runs the LLM brief for every cached analysis from its
+// handleRegenerateMADeepBriefs re-runs the LLM brief for cached analyses from their
 // stored payload (no IT-full call). Used to roll out a new brief prompt after a prompt
-// change. Gated by the standard binocolo access role.
+// change; body {"companyKey": "..."} scopes the run to a single row (retry mirato).
+// Gated by the standard binocolo access role.
 func (h *Handler) handleRegenerateMADeepBriefs(w http.ResponseWriter, r *http.Request) {
 	subject, email := companySearchRefreshActor(r.Context())
+	var body struct {
+		CompanyKey string `json:"companyKey"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
 	var ok bool
 	r, ok = h.startMATrace(w, r, "ma_deep_regenerate_briefs", "", nil, subject, email)
 	if !ok {
@@ -1130,13 +1137,13 @@ func (h *Handler) handleRegenerateMADeepBriefs(w http.ResponseWriter, r *http.Re
 	if err := rc.SetWriteDeadline(time.Time{}); err != nil {
 		logging.FromContext(r.Context()).Warn("binocolo regenerate briefs: clear write deadline", "component", "binocolo", "error", err)
 	}
-	count, err := h.ma.regenerateMADeepBriefs(r.Context())
+	report, err := h.ma.regenerateMADeepBriefs(r.Context(), body.CompanyKey)
 	if err != nil {
 		h.maFailure(w, r, "ma_deep_regenerate_briefs", err)
 		return
 	}
 	h.completeMATraceSuccess(r, http.StatusOK)
-	httputil.JSON(w, http.StatusOK, map[string]any{"regenerated": count})
+	httputil.JSON(w, http.StatusOK, report)
 }
 
 // handleInspectMADeep computes the Fase 0 read-only diagnostics over the cached deep
@@ -1170,7 +1177,8 @@ func (h *Handler) handleRatifyBMFamily(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var ok bool
-	r, ok = h.startMATrace(w, r, "ma_bm_family_ratify", companyKey, body, subject, email)
+	// Trace senza session id (FK a ma_session): il companyKey non è una sessione.
+	r, ok = h.startMATrace(w, r, "ma_bm_family_ratify", "", body, subject, email)
 	if !ok {
 		return
 	}

@@ -236,10 +236,12 @@ func buildMADeepBriefLLM(ctx context.Context, llmp maLLMProvider, model llm.Mode
 		return nil, err
 	}
 	// Sampling params are dynamic, from the model's DB config; the scope default
-	// max_tokens applies only when the config omits it.
+	// max_tokens applies only when the config omits it. 5000: sui reasoning model
+	// il budget copre anche i token di ragionamento — a 2200 il brief v3 usciva
+	// troncato (JSON invalido) sui casi densi.
 	reqParams := model.RawParams()
 	if _, ok := reqParams["max_tokens"]; !ok {
-		reqParams["max_tokens"] = 2200
+		reqParams["max_tokens"] = 5000
 	}
 	chatReq := llm.ChatRequest{
 		Model:          model.Model,
