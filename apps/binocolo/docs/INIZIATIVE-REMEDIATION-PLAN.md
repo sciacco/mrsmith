@@ -27,12 +27,12 @@ L'audit originale (§1–§9) è stato condotto a HEAD `996ce47` (2026-07-02 17:
 | **Q5** | ⚠️ PARZIALE — pill cliccabili fatte; restano valorizzazione (F1), highlight >0, contatore toggle | §4 |
 | **S2** | ⚠️ board riscritto da `8284248`; descrizione pre-rewrite, da riverificare visivamente | §2 |
 
-**Claim confermati intatti a `6217051` (verificati a codice):** F1, F4, F5, F6 (funzionali) · Q1, Q2, Q3, Q4, Q6 (pattern semantici). È la sostanza del remediation e regge.
+**Claim confermati intatti a `6217051` (verificati a codice):** F1, F4, F5 (funzionali) · Q1, Q2, Q3, Q4, Q6 (pattern semantici). È la sostanza del remediation e regge.
 
 **Perimetro attivo dopo il re-baseline:**
 
 - Pattern Q: **5 attivi** (Q1, Q2, Q3, Q4, Q6) · Q5 parziale · Q7 fatto.
-- Difetti F: **F1, F4, F5, F6** attivi · F3 parziale · F2 fatto · F7 igiene (SQL §8) · F8 da spot-check.
+- Difetti F: **F1, F4, F5** attivi · F3 parziale · F2 fatto · F7 igiene (SQL §8) · F8 da spot-check · F6 ritirata (falso problema, vedi D-D).
 
 ## 1. Verdetto
 
@@ -69,7 +69,7 @@ Filtri e colonne presenti ✓. Gap: «Ultima attività» = **data nuda** contro 
 |---|---|---|
 | Diario che racconta: «**Contattata** — telefonata col titolare…», «**Card creata** da MSP Lombardia · giu (★★★)» | «Stato aggiornato» nudo, «Card creata» nuda — senza da→a, senza nota inline, senza provenienza/stelle | Q4 |
 | Autore breve + data breve (`g.rossi · 30 giu 2026`) | Email intera cruda + data assoluta | Q4+Q3 |
-| Sezione PROVENIENZE sempre presente (righe: sessione · mese — ★★☆ score) | Sezione **omessa** quando vuota (e oggi è vuota perché la query legge solo le sessioni agganciate, non lo snapshot) | F6 |
+| Sezione PROVENIENZE sempre presente (righe: sessione · mese — ★★☆ score) | Sezione **omessa** quando vuota | ~~F6~~ ritirata (falso problema) |
 | Scheda azienda: fatti + «ultima nota d'azienda» citata con data | Solo «Nessun fatto registrato.» — la citazione dell'ultima nota non è implementata | Q4 |
 | Titolo compatto | Ragione sociale intera troncata a «K…» | Q2 |
 | Stato a pill, «Chiusa…» apre S5, rimozione, analisi a 3 stati | ✓ | — |
@@ -118,16 +118,16 @@ Motivo derivato verbatim («Identità non confermata sulle pagine lette», «Sit
 - **F3 — Ciclo di vita iniziative** · ⚠️ **PARZIALE al re-baseline**: la vista archivio è presente (link «Archivio (N)» + conteggio + empty state in `IniziativePage.tsx`), ma `IniziativaCard` espone solo `onOpen` — **nessuna azione archive/restore per-iniziativa**, e delete resta assente anche a backend (decisione D-A). Resta da fare: aggiungere l'azione di lifecycle (e decidere D-A sul delete).
 - **F4 — Dettaglio D2** · ✅ **decisione D-B ratificata (2026-07-02)**: il `TargetDetailModal` (`RicercaDetailPage.tsx:974`) ha un link `/azienda?vat=` che **accoppia il setaccio MA al tool standalone** (`CompanyDossierPage` è indipendente da MA). **Fix: rimuovere il link, non ripararlo.** Il modale resta magro nel ruolo di setaccio — razionale aderenza + contesto scoring + badge B5 inline (`registryFacts`, `inLavorazione`); il dossier profondo è azione di card (B6 → MA card-dossier). Verificato al re-baseline: il MA card-dossier è **già autosufficiente e disaccoppiato** (`GetMATargetByID` popola `target.Deep` dalla cache company-keyed via `ListMADeepAnalysis`) — niente riuso di sezioni, niente refinement da costruire. Lavoro: 1 riga (rimozione link) + badge B5 + fix wording PRD §7.
 - **F5 — Marker vs archiviazione**: `ListMAActiveCardsByCompany` (ma_store.go:2373) non esclude le iniziative archiviate.
-- **F6 — Provenienze robuste**: il drawer legge solo le sessioni agganciate; deve leggere lo snapshot (`created_from_session` + rating storici) così lo sgancio non cancella la storia (immagine 3 del tuo report).
+- **F6 — Provenienze robuste** · ❌ **RITIRATA (2026-07-02)**: stesso falso problema di D-D. Il rimedio (leggere dallo snapshot invece che dalle sessioni agganciate) servirebbe solo a rendere la card indipendente dalla sessione — ma non è il modello implementato (la card risolve i dettagli attraverso la sessione agganciata). Per le operazioni supportate (archive, purge soft) le provenienze **non** si perdono: la sessione resta con `initiative_id` intatto e le query filtrano solo per quello. Lo sgancio — l'unico caso che rompe — non è supportato. (Se in futuro si volesse supportarlo, servirebbe uno snapshot completo su card: decisione «cambia modello», non un task di remediation.)
 - **F7 — Igiene dati di prova**: SQL in §8 (include anche i 2 cambi di stato accidentali fatti oggi durante l'audit da click su riferimenti browser stantii — errore mio, registrato).
 - **F8 — Lotto minori**: gli 8 della v1 + flash dropdown D1 + ordine bottoni S5.
 
 ## 6. Piano di esecuzione proposto (dopo la tua ratifica)
 
 1. **Fase 0 — Ratifica**: decidi sulle aree (recupera/butta) e sulle decisioni D-A…D-D (§7).
-2. **Fase 1 — Igiene** (immediata): SQL §8 (tu); riga `.gitignore` per `**/.playwright-cli/` (residui già rimossi).
+2. **Fase 1 — Igiene** (immediata): riga `.gitignore` `**/.playwright-cli/` ✅ fatta (2026-07-02: consolidato `/.playwright-cli` + `/backend/.playwright-cli` nel pattern globale, verificato con `git check-ignore`); SQL §8 (tu, one-shot) — copre l'iniziativa audit `aac1ef5b…`; **verifica anche eventuali altri dati di prova** residui dai smoke test recenti (`79169e2` lifecycle, `8284248` board) prima di dichiarare la fase chiusa.
 3. **Fase 2 — Pattern Q1–Q7**: un intervento per pattern, trasversale alle pagine (non pagina-per-pagina: è così che si ricade nei rattoppi). Q1+Q4 condividono il lavoro sul log; Q5 dipende da F1.
-4. **Fase 3 — Funzionali F1–F6**.
+4. **Fase 3 — Funzionali F1, F3, F4, F5** (F2 fatto, F6 ritirata, F7 igiene).
 5. **Fase 4 — Riverifica di parità formale**: per OGNI stato dei due wireframe, screenshot fianco a fianco e checklist puntuale (inclusi gli stati oggi non verificabili: S6 registro renderizzato, D1 S2–S6 e S7 al primo run reale, badge/marker/collisioni con dati veri). **Questa checklist è il gate di accettazione: niente «fatto» senza il confronto visivo.** La eseguo io direttamente.
 
 Sequenza e granularità dei task esecutori le definiamo dopo la ratifica — non prima, per non ripetere l'errore di piani che promettono ciò che non specificano.

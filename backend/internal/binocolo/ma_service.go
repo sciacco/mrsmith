@@ -1848,6 +1848,10 @@ func (s *maService) getInitiativeBoard(ctx context.Context, initiativeID string)
 	if err != nil {
 		return MAInitiativeBoard{}, err
 	}
+	latestEvents, err := s.store.ListMALatestCardEvents(ctx, initiativeID, companyKeys)
+	if err != nil {
+		return MAInitiativeBoard{}, err
+	}
 
 	views := make([]MAInitiativeCardView, 0, len(cards))
 	for _, card := range cards {
@@ -1856,6 +1860,7 @@ func (s *maService) getInitiativeBoard(ctx context.Context, initiativeID string)
 			DossierStatus:    maCardDossierStatus(deep[card.CompanyKey]),
 			RegistryFacts:    registryFacts[card.CompanyKey],
 			Provenances:      provenances[card.CompanyKey],
+			LastEvent:        latestEvents[card.CompanyKey],
 		}
 		for _, other := range activeCards[card.CompanyKey] {
 			if other.InitiativeID == initiativeID {

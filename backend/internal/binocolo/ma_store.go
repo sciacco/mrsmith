@@ -95,6 +95,7 @@ type maWorkspaceStore interface {
 	ListMASessionsByInitiative(ctx context.Context, initiativeID string) ([]MASessionSummary, error)
 	ListMACardProvenances(ctx context.Context, initiativeID string, companyKeys []string) (map[string][]MACardProvenance, error)
 	ListMAInitiativeCardEvents(ctx context.Context, initiativeID string, sessionIDs []string, companyKey string) ([]MATargetOutcome, error)
+	ListMALatestCardEvents(ctx context.Context, initiativeID string, companyKeys []string) (map[string]string, error)
 	FindMALatestTargetForCard(ctx context.Context, initiativeID, companyKey string) (sessionID, targetID string, err error)
 }
 
@@ -318,7 +319,32 @@ SELECT
   initiative.archived_by_subject,
   initiative.archived_by_email,
   COALESCE((SELECT COUNT(*) FROM binocolo.ma_session session WHERE session.initiative_id = initiative.id), 0) AS session_count,
-  (SELECT MAX(session.updated_at) FROM binocolo.ma_session session WHERE session.initiative_id = initiative.id) AS last_activity_at
+  (SELECT MAX(session.updated_at) FROM binocolo.ma_session session WHERE session.initiative_id = initiative.id) AS last_activity_at,
+  (SELECT
+    CASE
+      WHEN o.event = 'nota' AND COALESCE(o.note, '') != '' THEN 'nota: ' || o.note
+      WHEN o.event = 'nota' THEN 'nota'
+      WHEN o.event = 'stato' AND COALESCE(o.note, '') != '' THEN 'Stato aggiornato: ' || o.note
+      WHEN o.event = 'stato' THEN 'Stato aggiornato'
+      WHEN o.event = 'card_creata' AND COALESCE(o.note, '') != '' THEN 'Card creata: ' || o.note
+      WHEN o.event = 'card_creata' THEN 'Card creata'
+      WHEN o.event = 'chiusura' AND COALESCE(o.note, '') != '' THEN 'Chiusura: ' || o.note
+      WHEN o.event = 'chiusura' THEN 'Chiusura'
+      WHEN o.event = 'contattato' AND COALESCE(o.note, '') != '' THEN 'Contattata: ' || o.note
+      WHEN o.event = 'contattato' THEN 'Contattata'
+      WHEN o.event = 'card_rimossa' THEN 'Card rimossa'
+      WHEN o.event = 'card_riaperta' THEN 'Card riaperta'
+      WHEN o.event = 'buon_lead' AND COALESCE(o.note, '') != '' THEN 'Buon lead: ' || o.note
+      WHEN o.event = 'buon_lead' THEN 'Buon lead'
+      WHEN o.event = 'no_go' AND COALESCE(o.note, '') != '' THEN 'No-go: ' || o.note
+      WHEN o.event = 'no_go' THEN 'No-go'
+      ELSE COALESCE(o.event, '') || CASE WHEN COALESCE(o.note, '') != '' THEN ': ' || o.note ELSE '' END
+    END
+    FROM binocolo.ma_target_outcome o
+    WHERE o.initiative_id = initiative.id
+    ORDER BY o.created_at DESC
+    LIMIT 1
+  ) AS last_activity_event
 FROM binocolo.ma_initiative initiative
 WHERE `+where+`
 ORDER BY initiative.updated_at DESC, initiative.created_at DESC
@@ -336,10 +362,11 @@ LIMIT 200
 		var archivedBySubject sql.NullString
 		var archivedByEmail sql.NullString
 		var lastActivityAt sql.NullTime
+		var lastActivityEvent sql.NullString
 		if err := rows.Scan(
 			&item.ID, &item.Title, &item.Description, &item.CreatedBySubject, &item.CreatedByEmail,
 			&item.CreatedAt, &item.UpdatedAt, &archivedAt, &archivedBySubject, &archivedByEmail,
-			&item.SessionCount, &lastActivityAt,
+			&item.SessionCount, &lastActivityAt, &lastActivityEvent,
 		); err != nil {
 			return nil, fmt.Errorf("scan ma initiative summary: %w", err)
 		}
@@ -350,6 +377,9 @@ LIMIT 200
 		item.ArchivedByEmail = archivedByEmail.String
 		if lastActivityAt.Valid {
 			item.LastActivityAt = &lastActivityAt.Time
+		}
+		if lastActivityEvent.Valid {
+			item.LastActivityEvent = lastActivityEvent.String
 		}
 		item.Counts = map[string]int{}
 		out = append(out, item)
@@ -2382,6 +2412,68 @@ ORDER BY updated_at DESC
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate ma initiative cards: %w", err)
+	}
+	return out, nil
+}
+
+// ListMALatestCardEvents returns the latest human-readable event label for
+// each card (companyKey) in the initiative. Used by Q1 (semantic last
+// activity) on the board table and drawer.
+func (s *SQLStore) ListMALatestCardEvents(ctx context.Context, initiativeID string, companyKeys []string) (map[string]string, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	out := map[string]string{}
+	if len(companyKeys) == 0 {
+		return out, nil
+	}
+	placeholders := make([]string, len(companyKeys))
+	args := make([]any, len(companyKeys)+1)
+	args[0] = initiativeID
+	for i, key := range companyKeys {
+		placeholders[i] = fmt.Sprintf("$%d", i+2)
+		args[i+1] = key
+	}
+	query := fmt.Sprintf(`
+SELECT DISTINCT ON (o.company_key) o.company_key,
+  CASE
+    WHEN o.event = 'nota' AND COALESCE(o.note, '') != '' THEN 'nota: ' || o.note
+    WHEN o.event = 'nota' THEN 'nota'
+    WHEN o.event = 'stato' AND COALESCE(o.note, '') != '' THEN 'Stato aggiornato: ' || o.note
+    WHEN o.event = 'stato' THEN 'Stato aggiornato'
+    WHEN o.event = 'card_creata' AND COALESCE(o.note, '') != '' THEN 'Card creata: ' || o.note
+    WHEN o.event = 'card_creata' THEN 'Card creata'
+    WHEN o.event = 'chiusura' AND COALESCE(o.note, '') != '' THEN 'Chiusura: ' || o.note
+    WHEN o.event = 'chiusura' THEN 'Chiusura'
+    WHEN o.event = 'contattato' AND COALESCE(o.note, '') != '' THEN 'Contattata: ' || o.note
+    WHEN o.event = 'contattato' THEN 'Contattata'
+    WHEN o.event = 'card_rimossa' THEN 'Card rimossa'
+    WHEN o.event = 'card_riaperta' THEN 'Card riaperta'
+    WHEN o.event = 'buon_lead' AND COALESCE(o.note, '') != '' THEN 'Buon lead: ' || o.note
+    WHEN o.event = 'buon_lead' THEN 'Buon lead'
+    WHEN o.event = 'no_go' AND COALESCE(o.note, '') != '' THEN 'No-go: ' || o.note
+    WHEN o.event = 'no_go' THEN 'No-go'
+    ELSE COALESCE(o.event, '') || CASE WHEN COALESCE(o.note, '') != '' THEN ': ' || o.note ELSE '' END
+  END AS event_label
+FROM binocolo.ma_target_outcome o
+WHERE o.initiative_id = $1::uuid
+  AND o.company_key IN (%s)
+ORDER BY o.company_key, o.created_at DESC
+`, strings.Join(placeholders, ", "))
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list ma latest card events: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var companyKey, label string
+		if err := rows.Scan(&companyKey, &label); err != nil {
+			return nil, fmt.Errorf("scan ma latest card event: %w", err)
+		}
+		out[companyKey] = label
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma latest card events: %w", err)
 	}
 	return out, nil
 }

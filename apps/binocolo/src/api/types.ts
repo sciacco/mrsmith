@@ -333,6 +333,7 @@ export interface MAInitiative {
 export interface MAInitiativeSummary extends MAInitiative {
   counts: Record<string, number>;
   lastActivityAt?: string;
+  lastActivityEvent?: string;
   sessionCount: number;
 }
 
@@ -383,6 +384,7 @@ export interface MAInitiativeCardView extends MAInitiativeCard {
   collisions?: MACardMarker[];
   registryFacts?: string[];
   provenances?: MACardProvenance[];
+  lastEvent?: string;
 }
 
 export interface MAInitiativeBoard {

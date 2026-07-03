@@ -221,10 +221,10 @@ function IniziativaCard({ item, onOpen }: { item: MAInitiativeSummary; onOpen: (
         <span>
           {item.sessionCount} {item.sessionCount === 1 ? 'ricerca agganciata' : 'ricerche agganciate'}
         </span>
-        {item.lastActivityAt ? (
+        {item.lastActivityEvent ? (
           <>
             <span>&middot;</span>
-            <span>Ultima attività: {item.lastActivityAt}</span>
+            <span>Ultima attività: {item.lastActivityEvent}</span>
           </>
         ) : null}
       </div>

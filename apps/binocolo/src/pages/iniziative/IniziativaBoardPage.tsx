@@ -45,6 +45,10 @@ const ESITI: Array<{ key: string; label: string; description: string; bridge: bo
   { key: 'rimandata', label: 'Rimandata', description: 'condizioni non mature, da riprendere', bridge: true },
 ];
 
+function stateDisplayLabel(key: string): string {
+  return STATES.find((s) => s.key === key)?.label ?? key;
+}
+
 const BRIDGE_KINDS: Array<{ key: string; label: string; hint: string }> = [
   { key: 'non_vende', label: 'Non vende', hint: 'il titolare non intende vendere' },
   { key: 'in_trattativa_altrui', label: 'In trattativa con altri', hint: '' },
@@ -561,7 +565,7 @@ export function IniziativaBoardPage() {
                     <td>
                       <span className={styles.dateCell}>
                         <Icon name="clock" size={12} style={{ marginRight: 6 }} />
-                        {dateLabel(card.updatedAt)}
+                        {card.lastEvent || dateLabel(card.updatedAt)}
                       </span>
                     </td>
                   </tr>
@@ -1127,17 +1131,28 @@ function RemoveCardModal({
 }
 
 function eventLabel(event: MACardEvent): string {
+  const p = event.payload as Record<string, unknown> | undefined;
   switch (event.event) {
-    case 'card_creata':
-      return `Card creata${event.note ? ` — ${event.note}` : ''}`;
+    case 'stato': {
+      const from = p && typeof p.from === 'string' ? stateDisplayLabel(p.from) : null;
+      const to = p && typeof p.to === 'string' ? stateDisplayLabel(p.to) : null;
+      if (from && to) return `${from} → ${to}`;
+      return `Stato aggiornato${event.note ? ` — ${event.note}` : ''}`;
+    }
+    case 'chiusura': {
+      const esito = p && typeof p.esito === 'string' ? (ESITO_LABELS[p.esito] ?? p.esito) : null;
+      const base = esito ? `Chiusura — ${esito}` : 'Chiusura';
+      return event.note ? `${base}: ${event.note}` : base;
+    }
+    case 'card_creata': {
+      const rating = p && typeof p.rating === 'number' ? p.rating : 0;
+      const stars = rating > 0 ? ' ★'.repeat(Math.min(rating, 3)) : '';
+      return `Card creata${stars}${event.note ? ` — ${event.note}` : ''}`;
+    }
     case 'card_riaperta':
       return 'Card riaperta';
     case 'card_rimossa':
       return 'Card rimossa';
-    case 'stato':
-      return `Stato aggiornato${event.note ? ` — ${event.note}` : ''}`;
-    case 'chiusura':
-      return `Chiusura${event.note ? ` — ${event.note}` : ''}`;
     case 'nota':
       return event.note ?? 'Nota';
     case 'contattato':

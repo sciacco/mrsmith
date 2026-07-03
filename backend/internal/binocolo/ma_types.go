@@ -492,6 +492,7 @@ type MAInitiativeCardView struct {
 	Collisions    []MACardMarker     `json:"collisions,omitempty"`
 	RegistryFacts []string           `json:"registryFacts,omitempty"`
 	Provenances   []MACardProvenance `json:"provenances,omitempty"`
+	LastEvent     string             `json:"lastEvent,omitempty"`
 }
 
 // MAInitiativeBoard is the response of GET .../initiatives/{id}: the
@@ -687,9 +688,10 @@ type MAInitiative struct {
 // per-state join; SessionCount/LastActivityAt are populated here in B1.
 type MAInitiativeSummary struct {
 	MAInitiative
-	Counts         map[string]int `json:"counts"`
-	LastActivityAt *time.Time     `json:"lastActivityAt,omitempty"`
-	SessionCount   int            `json:"sessionCount"`
+	Counts            map[string]int `json:"counts"`
+	LastActivityAt    *time.Time     `json:"lastActivityAt,omitempty"`
+	LastActivityEvent string         `json:"lastActivityEvent,omitempty"`
+	SessionCount      int            `json:"sessionCount"`
 }
 
 type MASessionDetail struct {
