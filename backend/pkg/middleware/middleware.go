@@ -161,6 +161,10 @@ type responseRecorder struct {
 	responseError string
 }
 
+// Unwrap exposes the underlying writer so http.NewResponseController can reach
+// the connection (per-request deadline overrides for long-running handlers).
+func (r *responseRecorder) Unwrap() http.ResponseWriter { return r.ResponseWriter }
+
 func (r *responseRecorder) WriteHeader(status int) {
 	r.status = status
 	r.ResponseWriter.WriteHeader(status)

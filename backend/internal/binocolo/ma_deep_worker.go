@@ -295,9 +295,15 @@ func parseMADeepBrief(content string) (*MADeepBrief, error) {
 	}
 	brief.Verdict = cleanText(brief.Verdict, 600)
 	brief.BusinessProfile = cleanText(brief.BusinessProfile, 800)
+	brief.FinancialReading = cleanText(brief.FinancialReading, 1000)
+	// Chiave legacy pre-v3 ("thesisReading" era un nome bugiardo: è la lettura
+	// finanziaria): le righe cached la riversano nel campo nuovo.
 	brief.ThesisReading = cleanText(brief.ThesisReading, 1000)
+	if brief.FinancialReading == "" && brief.ThesisReading != "" {
+		brief.FinancialReading = brief.ThesisReading
+		brief.ThesisReading = ""
+	}
 	brief.ValuationRationale = cleanText(brief.ValuationRationale, 600)
-	brief.ThesisFit = cleanText(brief.ThesisFit, 200)
 	brief.RAG = strings.ToLower(strings.TrimSpace(brief.RAG))
 	if len(brief.Strengths) > 6 {
 		brief.Strengths = brief.Strengths[:6]

@@ -1560,6 +1560,18 @@ func (f *fakeMAWorkspaceStore) RatifyMABMFamily(context.Context, string, string,
 	return nil
 }
 
+func (f *fakeMAWorkspaceStore) GetMACardThesisReading(context.Context, string, string) (*MACardThesisReading, error) {
+	return nil, nil
+}
+
+func (f *fakeMAWorkspaceStore) UpsertMACardThesisReading(context.Context, *MACardThesisReading, string, string, string) error {
+	return nil
+}
+
+func (f *fakeMAWorkspaceStore) GetMAWebValidationForCompany(context.Context, string, string) (*MAWebValidation, error) {
+	return nil, nil
+}
+
 func (f *fakeMAWorkspaceStore) CountMADeepVintage(context.Context) (int, int, error) {
 	return 0, 0, nil
 }

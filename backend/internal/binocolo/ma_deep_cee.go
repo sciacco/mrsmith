@@ -286,10 +286,13 @@ func maFormatEUR(v float64) string {
 	return s + " €"
 }
 
-// buildMADeepQualityFlags calcola i segnali deterministici di qualità (Fase 2):
-// annotazioni di confidenza sulla banda, MAI dentro la sua matematica né nel RAG.
-// Le soglie vengono da ma_parameter (mig 092). Ordine: warning prima di info.
-func buildMADeepQualityFlags(sc *MADeepScorecard, reading *maCEEReading, pricing maPricing) []MADeepQualityFlag {
+// buildMADeepQualityFlags calcola i segnali deterministici di qualità (Fase 2) e
+// le combinazioni di momentum (Fase 4): annotazioni di confidenza, MAI dentro la
+// matematica della banda né nel RAG. Le soglie vengono da ma_parameter (mig 092).
+// Ordine: warning prima di info. root serve ai delta YoY vendor (le combinazioni
+// usano solo i SEGNI dei delta: la scala di development.grossFinancialDebt è
+// l'unica ancora non verificata, il segno sì).
+func buildMADeepQualityFlags(root map[string]any, sc *MADeepScorecard, reading *maCEEReading, pricing maPricing) []MADeepQualityFlag {
 	if sc == nil {
 		return nil
 	}
@@ -377,6 +380,35 @@ func buildMADeepQualityFlags(sc *MADeepScorecard, reading *maCEEReading, pricing
 			Evidence:   fmt.Sprintf("Patrimonio netto = %s", maFormatEUR(*sc.NetWorth)),
 			DDQuestion: "Ricostruire l'evoluzione del patrimonio netto: perdite cumulate, versamenti/rinunce soci, piani di ricapitalizzazione.",
 		})
+	}
+
+	// Momentum (Fase 4): RAG su COMBINAZIONI di direzioni, mai su singoli delta.
+	// ΔEBITDA dagli assoluti L2Y (scala certa); per debito lordo e valore
+	// aggiunto si usa solo il segno del delta vendor (scale-invariant).
+	if root != nil {
+		ebitdaL2Y, okL2Y := maInspectNumber(root, "operatingResults.ebitdaL2Y")
+		vendorEBITDA, okEBITDA := maInspectNumber(root, "operatingResults.ebitda")
+		debtDelta, okDebt := maInspectNumber(root, "development.grossFinancialDebt")
+		if okL2Y && okEBITDA && okDebt && vendorEBITDA < ebitdaL2Y && debtDelta > 0 {
+			add("warning", MADeepQualityFlag{
+				Code:  "leva_in_peggioramento",
+				Label: "Leva in peggioramento",
+				Evidence: fmt.Sprintf("EBITDA in calo di %s sull'anno precedente con debito finanziario lordo in aumento",
+					maFormatEUR(ebitdaL2Y-vendorEBITDA)),
+				DDQuestion: "Ricostruire l'evoluzione del debito finanziario: nuove linee, utilizzi di fido, covenant e scadenze.",
+			})
+		}
+		trend, okTrend := maInspectNumber(root, "ecofin.turnoverTrend")
+		addedValueDelta, okVA := maInspectNumber(root, "development.addedValue")
+		if okTrend && okVA && trend > 0 && addedValueDelta < 0 {
+			add("info", MADeepQualityFlag{
+				Code:  "deriva_valore_aggiunto",
+				Label: "Crescita a valore aggiunto calante",
+				Evidence: fmt.Sprintf("Ricavi in crescita (+%.1f%%) con valore aggiunto in calo: possibile deriva verso rivendita/pass-through",
+					trend),
+				DDQuestion: "Scomporre la crescita per linea: quota rivendita/pass-through vs servizi propri e relativi margini.",
+			})
+		}
 	}
 	return append(warnings, infos...)
 }

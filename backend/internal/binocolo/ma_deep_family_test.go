@@ -194,6 +194,66 @@ func TestResolveMADeepValuationCaveats(t *testing.T) {
 	}
 }
 
+// TestMomentumMetricsRealPayloads (Fase 4): ΔEBITDA assoluto dagli L2Y (info,
+// RAG na) e assorbimento magazzino su EBITDA (core) sulle due fixture.
+func TestMomentumMetricsRealPayloads(t *testing.T) {
+	mft, _ := loadFixturePayload(t, "testdata/itfull_mft_2024.json")
+	sc := buildMADeepScorecard(mft, defaultMADeepThresholds())
+	if m := findDeepMetric(sc, "delta_ebitda"); m == nil || m.Value == nil || *m.Value != 17599 || m.RAG != maRAGNone {
+		t.Fatalf("mft delta_ebitda: %+v", m)
+	}
+	// B.11 = −115.701 su EBITDA 94.934 → 121,9%% assorbito → rosso.
+	if m := findDeepMetric(sc, "assorbimento_magazzino"); m == nil || m.Value == nil || *m.Value < 121 || *m.Value > 123 || m.RAG != maRAGRed {
+		t.Fatalf("mft assorbimento: %+v", m)
+	}
+
+	cdlan, _ := loadFixturePayload(t, "testdata/itfull_cdlan_2025.json")
+	sc = buildMADeepScorecard(cdlan, defaultMADeepThresholds())
+	if m := findDeepMetric(sc, "delta_ebitda"); m == nil || m.Value == nil || *m.Value != 466137 {
+		t.Fatalf("cdlan delta_ebitda: %+v", m)
+	}
+	if m := findDeepMetric(sc, "assorbimento_magazzino"); m == nil || m.Value == nil || *m.Value != 0 || m.RAG != maRAGGreen {
+		t.Fatalf("cdlan assorbimento: %+v", m)
+	}
+}
+
+// TestMomentumComboFlags (Fase 4): le combinazioni di direzioni generano flag —
+// mai i singoli delta. Solo segni per debito/VA (scala non verificata).
+func TestMomentumComboFlags(t *testing.T) {
+	payload := []byte(`{
+		"ecofin": {"turnover": 1000000, "turnoverTrend": 5.0, "netWorth": 100000},
+		"operatingResults": {"ebitda": 80000, "ebitdaL2Y": 100000},
+		"development": {"grossFinancialDebt": 0.5, "addedValue": -1.2}
+	}`)
+	object, _ := decodeVendorObject(payload)
+	root := deepFullRoot(object)
+	sc := buildMADeepScorecard(payload, defaultMADeepThresholds())
+	flags := buildMADeepQualityFlags(root, sc, nil, fase2Pricing())
+	if len(flags) != 2 {
+		t.Fatalf("flags: %+v", flags)
+	}
+	if flags[0].Code != "leva_in_peggioramento" || flags[0].Severity != "warning" || !containsStr(flags[0].Evidence, "20.000 €") {
+		t.Fatalf("leva flag: %+v", flags[0])
+	}
+	if flags[1].Code != "deriva_valore_aggiunto" || flags[1].Severity != "info" {
+		t.Fatalf("deriva flag: %+v", flags[1])
+	}
+
+	// EBITDA in crescita + debito in aumento: NESSUN flag (la combinazione rossa
+	// richiede entrambe le direzioni sfavorevoli).
+	payload = []byte(`{
+		"ecofin": {"turnover": 1000000, "turnoverTrend": -2.0, "netWorth": 100000},
+		"operatingResults": {"ebitda": 120000, "ebitdaL2Y": 100000},
+		"development": {"grossFinancialDebt": 0.5, "addedValue": 1.0}
+	}`)
+	object, _ = decodeVendorObject(payload)
+	root = deepFullRoot(object)
+	sc = buildMADeepScorecard(payload, defaultMADeepThresholds())
+	if flags := buildMADeepQualityFlags(root, sc, nil, fase2Pricing()); len(flags) != 0 {
+		t.Fatalf("flags attesi assenti: %+v", flags)
+	}
+}
+
 func containsStr(haystack, needle string) bool {
 	return len(needle) > 0 && len(haystack) >= len(needle) && indexStr(haystack, needle) >= 0
 }

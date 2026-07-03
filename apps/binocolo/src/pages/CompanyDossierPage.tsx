@@ -53,6 +53,7 @@ const RAG_LABEL: Record<string, string> = { green: 'Solido', amber: 'Intermedio'
 
 function metricDisplay(m: MADeepMetric): string {
   if (m.value == null) return '—';
+  if (m.unit === '€') return eur0.format(m.value);
   const v = m.unit === 'x' || m.unit === 'gg' ? num2.format(m.value) : num1.format(m.value);
   if (m.unit === 'gg') return `${v} gg`;
   if (m.unit === '%') return `${v}%`;
@@ -266,10 +267,10 @@ function BriefSection({ brief }: { brief?: MADeepBrief }) {
           <p>{brief.businessProfile}</p>
         </div>
       ) : null}
-      {brief.thesisReading ? (
+      {(brief.financialReading ?? brief.thesisReading) ? (
         <div className={styles.briefBlock}>
           <h3 className={styles.briefH}>Lettura finanziaria</h3>
-          <p>{brief.thesisReading}</p>
+          <p>{brief.financialReading ?? brief.thesisReading}</p>
         </div>
       ) : null}
       {brief.strengths && brief.strengths.length > 0 ? (
@@ -390,13 +391,13 @@ const FAMILY_LABEL: Record<string, string> = {
 // FamilySection — famiglia di business model (Fase 3): suggerimento del motore
 // con evidenza + ratifica/override dell'analista. La famiglia guida soglie RAG e
 // riga Damodaran; entra in vigore al prossimo ricalcolo dell'azienda.
-function FamilySection({ vatCode, bmFamily }: { vatCode: string; bmFamily?: MABMFamily }) {
+function FamilySection({ companyKey, bmFamily }: { companyKey: string; bmFamily?: MABMFamily }) {
   const api = useApiClient();
   const [current, setCurrent] = useState<MABMFamily | undefined>(bmFamily);
   const [selected, setSelected] = useState<string>(bmFamily?.family ?? '');
   const ratify = useMutation({
     mutationFn: (family: string) =>
-      api.put<MABMFamily>(`/binocolo/v1/ma/companies/${encodeURIComponent(vatCode)}/bm-family`, { family }),
+      api.put<MABMFamily>(`/binocolo/v1/ma/companies/${encodeURIComponent(companyKey)}/bm-family`, { family }),
     onSuccess: (data) => {
       setCurrent(data ?? undefined);
       setSelected(data?.family ?? '');
@@ -460,6 +461,7 @@ const GROUP_LABEL: Record<string, string> = {
   liquidita: 'Liquidità',
   efficienza: 'Efficienza',
   crescita: 'Crescita',
+  qualita_margine: 'Qualità del margine',
   contorno: 'Struttura finanziaria del venditore',
 };
 
@@ -707,7 +709,7 @@ function Dossier({ dossier }: { dossier: MACompanyDossier }) {
         <div className={styles.body}>
           <BriefSection brief={dossier.brief} />
           <ValuationSection valuation={dossier.valuation} brief={dossier.brief} flags={dossier.scorecard?.qualityFlags} />
-          <FamilySection vatCode={dossier.vatCode} bmFamily={dossier.bmFamily} />
+          <FamilySection companyKey={dossier.companyKey || dossier.vatCode} bmFamily={dossier.bmFamily} />
           <ScorecardSection scorecard={dossier.scorecard} />
           <BilancioSection itf={itf} />
           <SociSection itf={itf} />

@@ -2815,6 +2815,7 @@ function DeepAnalysisTab({ deep }: { deep?: MADeepAnalysis }) {
     { key: 'liquidita', label: 'Liquidità' },
     { key: 'efficienza', label: 'Efficienza' },
     { key: 'crescita', label: 'Crescita' },
+    { key: 'qualita_margine', label: 'Qualità del margine' },
   ];
   return (
     <div className={styles.deepTab}>
@@ -3030,9 +3031,9 @@ function DeepBriefBlock({ brief }: { brief: NonNullable<MADeepAnalysis['brief']>
           {formatPercentagesInText(brief.verdict)}
         </p>
       ) : null}
-      {brief.thesisReading ? (
+      {(brief.financialReading ?? brief.thesisReading) ? (
         <p className={styles.deepThesisReading}>
-          {formatPercentagesInText(brief.thesisReading)}
+          {formatPercentagesInText(brief.financialReading ?? brief.thesisReading ?? '')}
         </p>
       ) : null}
       {brief.redFlags && brief.redFlags.length > 0 ? (
@@ -3061,6 +3062,7 @@ function formatMetricValue(value: number, unit: string): string {
   if (unit === '%') return `${rounded}%`;
   if (unit === 'x') return `${rounded}×`;
   if (unit === 'gg') return `${Math.round(value)} gg`;
+  if (unit === '€') return moneyFormat.format(value);
   return String(rounded);
 }
 

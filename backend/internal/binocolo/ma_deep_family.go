@@ -169,7 +169,7 @@ func computeMADeepScorecard(ctx context.Context, store maDeepFamilyStore, payloa
 	}
 	scorecard := buildMADeepScorecard(payload, pricing.thresholdsForFamily(family))
 	if scorecard != nil {
-		scorecard.QualityFlags = buildMADeepQualityFlags(scorecard, reading, pricing)
+		scorecard.QualityFlags = buildMADeepQualityFlags(root, scorecard, reading, pricing)
 	}
 	return scorecard, reading, family, ratified
 }

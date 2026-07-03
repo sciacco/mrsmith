@@ -113,6 +113,7 @@ const (
 	maModelScopeStrategyAtecoHierarchy = "ma_strategy_ateco_hierarchy"
 	maModelScopeSectorClassification   = "ma_sector_classification"
 	maModelScopeDeepBrief              = "ma_deep_brief"
+	maModelScopeThesisReading          = "ma_thesis_reading"
 	maModelScopeWebSearchScorer        = "web_search_scorer"
 	maModelScopeCandidateMatchAnalyst  = "candidate_match_analyst"
 
@@ -1353,17 +1354,52 @@ type MADeepQualityFlag struct {
 	DDQuestion string `json:"ddQuestion,omitempty"`
 }
 
-// MADeepBrief is populated in Fase 5 (LLM narrative; numbers stay in scorecard/valuation).
+// MADeepBrief is the LLM narrative of the NEUTRAL dossier (numbers stay in
+// scorecard/valuation). FinancialReading è il nome corretto della lettura
+// finanziaria (prompt v3); ThesisReading è la chiave legacy delle righe cached
+// pre-v3 (parseMADeepBrief la riversa in FinancialReading) — la lettura di tesi
+// VERA è context-scoped sulla card (MACardThesisReading).
 type MADeepBrief struct {
 	Verdict            string            `json:"verdict,omitempty"`
 	RAG                string            `json:"rag,omitempty"`
 	BusinessProfile    string            `json:"businessProfile,omitempty"`
-	ThesisReading      string            `json:"thesisReading,omitempty"`
+	FinancialReading   string            `json:"financialReading,omitempty"`
+	ThesisReading      string            `json:"thesisReading,omitempty"` // legacy pre-v3
 	Strengths          []string          `json:"strengths,omitempty"`
 	RedFlags           []MADeepBriefFlag `json:"redFlags,omitempty"`
 	ValuationRationale string            `json:"valuationRationale,omitempty"`
 	DDQuestions        []string          `json:"ddQuestions,omitempty"`
-	ThesisFit          string            `json:"thesisFit,omitempty"`
+}
+
+// MAThesisReading è la lettura di tesi context-scoped (Fase 5): il "memo" che
+// applica la tesi della sessione di provenienza al dossier neutro. Fit che cita
+// i fatti, flag ri-pesate (mai nuove), DD di tesi additive, sinergie come
+// ipotesi, postura valutativa senza numeri nuovi.
+type MAThesisReading struct {
+	FitLevel          string   `json:"fitLevel,omitempty"` // alto | medio | basso | non_valutabile
+	Fit               string   `json:"fit,omitempty"`
+	BlockingFlags     []string `json:"blockingFlags,omitempty"`
+	TolerableFlags    []string `json:"tolerableFlags,omitempty"`
+	ThesisDDQuestions []string `json:"thesisDdQuestions,omitempty"`
+	SynergyHypotheses []string `json:"synergyHypotheses,omitempty"`
+	ValuationStance   string   `json:"valuationStance,omitempty"`
+	NotAddressed      []string `json:"notAddressed,omitempty"`
+}
+
+// MACardThesisReading è il record persistito per (iniziativa, azienda) con lo
+// snapshot della tesi usata (per la staleness) e la data dell'evidenza web.
+type MACardThesisReading struct {
+	InitiativeID     string           `json:"initiativeId"`
+	CompanyKey       string           `json:"companyKey"`
+	SessionID        string           `json:"sessionId,omitempty"`
+	ThesisSnapshot   string           `json:"thesisSnapshot,omitempty"`
+	Reading          *MAThesisReading `json:"reading,omitempty"`
+	WebEvidenceDate  *time.Time       `json:"webEvidenceDate,omitempty"`
+	GeneratedByEmail string           `json:"generatedByEmail,omitempty"`
+	UpdatedAt        *time.Time       `json:"updatedAt,omitempty"`
+	// StaleThesis è calcolato in lettura: lo snapshot non coincide più con la
+	// tesi corrente della sessione di provenienza (rigenerazione esplicita).
+	StaleThesis bool `json:"staleThesis,omitempty"`
 }
 
 type MADeepBriefFlag struct {
@@ -1448,16 +1484,19 @@ type MADeepInspectVintage struct {
 // (scorecard/valuation/brief) plus the raw IT-full payload for the facts layer.
 // Status drives the frontend: absent | cost_required | queued | running | ready | failed.
 type MACompanyDossier struct {
-	VATCode   string           `json:"vatCode"`
-	Status    string           `json:"status"`
-	Scorecard *MADeepScorecard `json:"scorecard,omitempty"`
-	Valuation *MADeepValuation `json:"valuation,omitempty"`
-	Brief     *MADeepBrief     `json:"brief,omitempty"`
-	BMFamily  *MABMFamily      `json:"bmFamily,omitempty"`
-	Raw       json.RawMessage  `json:"raw,omitempty"`
-	CostEUR   float64          `json:"costEur,omitempty"`
-	ErrorCode string           `json:"errorCode,omitempty"`
-	UpdatedAt *time.Time       `json:"updatedAt,omitempty"`
+	VATCode string `json:"vatCode"`
+	// CompanyKey è la chiave del record deep (il funnel chiave per vendor id, il
+	// lookup standalone per VAT): è la chiave giusta per famiglia BM e ratifica.
+	CompanyKey string           `json:"companyKey,omitempty"`
+	Status     string           `json:"status"`
+	Scorecard  *MADeepScorecard `json:"scorecard,omitempty"`
+	Valuation  *MADeepValuation `json:"valuation,omitempty"`
+	Brief      *MADeepBrief     `json:"brief,omitempty"`
+	BMFamily   *MABMFamily      `json:"bmFamily,omitempty"`
+	Raw        json.RawMessage  `json:"raw,omitempty"`
+	CostEUR    float64          `json:"costEur,omitempty"`
+	ErrorCode  string           `json:"errorCode,omitempty"`
+	UpdatedAt  *time.Time       `json:"updatedAt,omitempty"`
 }
 
 type maStrategyDraftEnvelope struct {

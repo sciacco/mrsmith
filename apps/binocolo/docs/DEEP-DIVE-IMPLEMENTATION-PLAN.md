@@ -297,9 +297,19 @@ distorsione misurata; nessun flag dentro la matematica.
 > 3 superfici; sezione "Business model" con ratifica sul dossier P.IVA.
 > Test: 6 nuovi (classificatore su fixture+sintetici, ordine risoluzione,
 > soglie famiglia, contorno, haircut tiers, caveat) tutti verdi; tsc pulito.
-> **Da fare per attivarla**: mig 093-095, poi recompute
-> `{"valuation": true}` (le famiglie vengono suggerite e applicate); ratifica
-> analista dal dossier.
+> **ATTIVATA 2026-07-03**: mig 093-095 applicate, recompute eseguito (10
+> righe). Verifica sui dossier reali: CDLAN → famiglia servizi_ricorrenti
+> suggerita (ateco), multiplo RESTA Telecom 7,19× (regola
+> famiglia-dopo-prefisso ✓), haircut 30 (tier2), margine/ciclo verdi, overall
+> green; MFT → multiplo Engineering/Construction 9,71× via riga famiglia
+> (43 = prefisso fuorviante ✓), haircut 35 (tier1), caveat "non ratificata",
+> margine/ciclo ambra con soglie progetto, overall red per ragioni core;
+> contorno su entrambe. **Fix post-verifica**: il lookup famiglia del dossier
+> usava la VAT normalizzata, ma il funnel chiave per vendor id (MFT =
+> 60D1B7CB…) → famiglia invisibile nel dossier; ora il lookup usa
+> `rec.CompanyKey` e il dossier espone `companyKey` così anche la ratifica
+> dalla UI colpisce la chiave giusta (richiede riavvio backend; i dati in DB
+> erano già corretti).
 
 **Obiettivo:** il semaforo risponde all'acquirente; una classificazione
 alimenta soglie e riga Damodaran; haircut graduato.
@@ -364,6 +374,26 @@ sotto 62 non è più prezzato a 20.85×.
 
 ## Fase 4 — Filone A livello 0: qualità del margine / momentum
 
+> **STATO 2026-07-03: IMPLEMENTATA** — nessuna migrazione. Gruppo scorecard
+> `qualita_margine`: `delta_ebitda` (Δ in € dagli assoluti L2Y del vendor,
+> informativo RAG na — il semaforo di trend vive già nel gruppo crescita) e
+> `assorbimento_magazzino` (quota di EBITDA mangiata dalla variazione
+> rimanenze B.11, metrica CORE con soglie 25/75 — MFT: 121,9% → rosso, la
+> cassa operativa che non c'è). Combinazioni di momentum come quality flag
+> (mai singoli delta, e SOLO SEGNI per debito/VA — la scala di
+> grossFinancialDebt resta non verificata, il segno sì):
+> `leva_in_peggioramento` (warning: EBITDA↓ + debito lordo↑, evidenza col
+> ΔEBITDA in €) e `deriva_valore_aggiunto` (info: ricavi↑ + VA↓ → possibile
+> deriva rivendita/pass-through). UI: gruppo "Qualità del margine" su tutte e
+> tre le superfici + unità € nei formatter. **Percentile di coorte: USCITO
+> dalla fase come previsto** — verificato che MATarget (Advanced) porta solo
+> fatturato/dipendenti, niente margini: un percentile su fatturato non dice
+> nulla sulla qualità del margine; resta evidence-gated per quando/se
+> l'Advanced esporrà KPI di margine. Test: 2 nuovi (metriche su fixture,
+> combinazioni su sintetici + negativo) verdi; suite verde; tsc pulito; smoke
+> retro-compat ok. **Da fare per attivarla**: riavvio backend + recompute
+> (anche senza `valuation: true`: i nuovi campi vivono nello scorecard).
+
 **Obiettivo:** i segnali già pagati entrano nel dossier (mai nel rank).
 
 **Backend (engine):**
@@ -391,6 +421,42 @@ funnel.
 ---
 
 ## Fase 5 — Filone E: lettura di tesi context-scoped
+
+> **STATO 2026-07-03: IMPLEMENTATA** — mig 096 (`ma_card_thesis_reading`, PK
+> iniziativa+azienda, thesis_snapshot per la staleness, web_evidence_date);
+> mig 097 su **mrsmith** (scope `ma_thesis_reading`: prompt v1 con le regole
+> ferree + binding modello copiato dalla riga live di ma_deep_brief via
+> INSERT..SELECT, come deciso; **più** brief dossier v3: rinomina
+> `thesisReading`→`financialReading`). Backend: `ma_thesis_reading.go` —
+> risoluzione tesi dalla provenienza col rating più recente (fallback
+> CreatedFromSession; card orfana → 409), richiede deep ready, input LLM =
+> scorecard+valuation+brief+evidenza web CURATA con data, audit CallAudit,
+> parse con cap e fitLevel vocabolario chiuso, staleness calcolata sul GET;
+> rotte GET/POST `.../cards/{companyKey}/thesis-reading` (404 = mai
+> generata). Brief: struct con FinancialReading + fallback legacy in parse,
+> ThesisFit RIMOSSO. UI: tab "Lettura di tesi" sulla card (empty state con
+> gate deep-ready, genera/rigenera espliciti, badge tesi-aggiornata, tesi
+> snapshot e data evidenza web in calce) + fallback financialReading??
+> thesisReading su tutte e tre le superfici brief. Build/vet/fmt/tsc verdi;
+> suite deterministica verde. **Da fare per attivarla**: mig 096-097, riavvio
+> backend, poi (a) `POST /ma/deep/regenerate-briefs` — la rigenerazione brief
+> rimandata, ora con prompt v3 — e (b) smoke della lettura di tesi su una
+> card con deep pronto (1 chiamata LLM, centesimi).
+>
+> **AGGIORNAMENTO ATTIVAZIONE 2026-07-03**: il primo run di regenerate-briefs
+> ha scoperto due bug, entrambi corretti:
+> 1. **WriteTimeout 60s del server** (`main.go`) chiudeva la connessione a
+>    metà batch (`curl: (52)`): il handler ora azzera le deadline di
+>    connessione via `http.NewResponseController` (+ `Unwrap()` sul
+>    `responseRecorder` dell'access-log) e risponde a batch concluso.
+> 2. **FK legacy sul registry LLM**: mig 047 ha copiato il registry in
+>    `mrsmith.*` senza preservare gli id, ma `ma_deep_analysis.model_id/
+>    prompt_id` (mig 037) puntano ancora a `binocolo.llm_*` → FK violato a
+>    ogni persistenza brief post-cutover (regenerate E worker su nuovi
+>    deep-dive). **Mig 098** rimappa la provenance storica old→new su
+>    (scope,model)/(scope,name), azzera i residui e ripunta i FK a
+>    `mrsmith.llm_*`. → Attivazione richiede quindi anche mig 098, poi
+>    ri-lanciare regenerate-briefs.
 
 **Obiettivo:** il memo per (iniziativa, azienda), on-demand, ancorato alla
 sessione di provenienza.

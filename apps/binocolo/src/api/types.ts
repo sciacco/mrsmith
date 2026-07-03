@@ -526,6 +526,29 @@ export interface MADeepMetric {
   tier?: string; // 'contorno' = struttura del capitale del venditore, fuori dall'overall RAG
 }
 
+export interface MAThesisReading {
+  fitLevel?: string; // alto | medio | basso | non_valutabile
+  fit?: string;
+  blockingFlags?: string[];
+  tolerableFlags?: string[];
+  thesisDdQuestions?: string[];
+  synergyHypotheses?: string[];
+  valuationStance?: string;
+  notAddressed?: string[];
+}
+
+export interface MACardThesisReading {
+  initiativeId: string;
+  companyKey: string;
+  sessionId?: string;
+  thesisSnapshot?: string;
+  reading?: MAThesisReading;
+  webEvidenceDate?: string;
+  generatedByEmail?: string;
+  updatedAt?: string;
+  staleThesis?: boolean;
+}
+
 export interface MABMFamily {
   companyKey: string;
   suggestedFamily?: string;
@@ -574,7 +597,9 @@ export interface MADeepBrief {
   verdict?: string;
   rag?: string;
   businessProfile?: string;
-  thesisReading?: string;
+  financialReading?: string; // v3: lettura finanziaria (era "thesisReading", nome bugiardo)
+  thesisReading?: string; // legacy pre-v3
+
   strengths?: string[];
   redFlags?: { severity: string; category?: string; claim: string; ddQuestion?: string }[];
   valuationRationale?: string;
@@ -585,6 +610,7 @@ export interface MADeepBrief {
 // Standalone P.IVA dossier: our elaborations plus the raw IT-full payload (facts layer).
 export interface MACompanyDossier {
   vatCode: string;
+  companyKey?: string; // chiave del record deep: usarla per famiglia BM e ratifica
   status: 'absent' | 'cost_required' | 'queued' | 'running' | 'ready' | 'failed';
   scorecard?: MADeepScorecard;
   valuation?: MADeepValuation;

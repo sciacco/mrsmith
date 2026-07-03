@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '@mrsmith/api-client';
-import { useQuery } from '@tanstack/react-query';
-import { Icon, Skeleton } from '@mrsmith/ui';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { Button, Icon, Skeleton } from '@mrsmith/ui';
 import { useApiClient } from '../../api/client';
 import type {
   MACardDossier,
+  MACardThesisReading,
   MADeepAnalysis,
   MADeepMetric,
   MADeepQualityFlag,
@@ -47,11 +48,12 @@ function errorLabel(error: unknown): string {
   return 'Richiesta non riuscita.';
 }
 
-type TabKey = 'overview' | 'deep' | 'financials' | 'shareholders' | 'registry' | 'web';
+type TabKey = 'overview' | 'deep' | 'tesi' | 'financials' | 'shareholders' | 'registry' | 'web';
 
 const TABS: { key: TabKey; label: string; icon: string }[] = [
   { key: 'overview', label: 'Panoramica', icon: 'external-link' },
   { key: 'deep', label: 'Analisi', icon: 'bar-chart-2' },
+  { key: 'tesi', label: 'Lettura di tesi', icon: 'target' },
   { key: 'financials', label: 'Finanziari', icon: 'circle-dollar-sign' },
   { key: 'shareholders', label: 'Soci', icon: 'user' },
   { key: 'registry', label: 'Registro camerale', icon: 'file-text' },
@@ -143,6 +145,13 @@ export function IniziativaCardDossierPage() {
 
         {activeTab === 'overview' && <OverviewTab target={target} />}
         {activeTab === 'deep' && <DeepAnalysisTab deep={target.deep} />}
+        {activeTab === 'tesi' && (
+          <ThesisReadingTab
+            initiativeId={id ?? ''}
+            companyKey={target.companyKey ?? companyKey ?? ''}
+            deepReady={target.deep?.status === 'ready'}
+          />
+        )}
         {activeTab === 'financials' && <FinancialsTab target={target} />}
         {activeTab === 'shareholders' && <ShareholdersTab target={target} />}
         {activeTab === 'registry' && <RegistryTab target={target} />}
@@ -151,6 +160,153 @@ export function IniziativaCardDossierPage() {
 
       <CompanyRegistrySection companyKey={target.companyKey ?? companyKey ?? ''} vatCode={target.vatCode} companyName={target.companyName} />
     </main>
+  );
+}
+
+const FIT_LEVEL_LABEL: Record<string, string> = {
+  alto: 'Fit alto',
+  medio: 'Fit medio',
+  basso: 'Fit basso',
+  non_valutabile: 'Fit non valutabile',
+};
+
+// ThesisReadingTab — lettura di tesi context-scoped (Fase 5): il memo che applica
+// la tesi della sessione di provenienza al dossier neutro. Generazione on-demand,
+// rigenerazione esplicita quando la tesi cambia (staleThesis).
+function ThesisReadingTab({
+  initiativeId,
+  companyKey,
+  deepReady,
+}: {
+  initiativeId: string;
+  companyKey: string;
+  deepReady: boolean;
+}) {
+  const api = useApiClient();
+  const query = useQuery({
+    queryKey: ['ma-thesis-reading', initiativeId, companyKey],
+    enabled: Boolean(initiativeId && companyKey),
+    queryFn: () =>
+      api.get<MACardThesisReading>(
+        `/binocolo/v1/ma/initiatives/${initiativeId}/cards/${encodeURIComponent(companyKey)}/thesis-reading`,
+      ),
+    retry: (failureCount, error) =>
+      !(error instanceof ApiError && error.status === 404) && failureCount < 2,
+  });
+  const generate = useMutation({
+    mutationFn: () =>
+      api.post<MACardThesisReading>(
+        `/binocolo/v1/ma/initiatives/${initiativeId}/cards/${encodeURIComponent(companyKey)}/thesis-reading`,
+        {},
+      ),
+    onSuccess: () => void query.refetch(),
+  });
+
+  if (query.isLoading) return <Skeleton rows={5} />;
+
+  const record = query.data;
+  const notGenerated = !record && query.isError && query.error instanceof ApiError && query.error.status === 404;
+
+  if (notGenerated || !record) {
+    return (
+      <div>
+        <EmptyState
+          icon="target"
+          title="Lettura di tesi non ancora generata"
+          text={
+            deepReady
+              ? 'Applica la tesi della ricerca di provenienza al dossier: fit, flag ri-pesate, domande DD di tesi e ipotesi di sinergia.'
+              : "Serve prima l'analisi approfondita: la lettura di tesi si appoggia ai fatti del dossier."
+          }
+        />
+        <Button onClick={() => generate.mutate()} loading={generate.isPending} disabled={!deepReady}>
+          Genera lettura di tesi
+        </Button>
+        {generate.isError ? <p>Generazione non riuscita: riprova.</p> : null}
+      </div>
+    );
+  }
+
+  const reading = record.reading;
+  return (
+    <div>
+      <div className={styles.headTop}>
+        <h3 className={styles.sectionTitle}>
+          {reading?.fitLevel ? FIT_LEVEL_LABEL[reading.fitLevel] ?? reading.fitLevel : 'Lettura di tesi'}
+        </h3>
+        {record.staleThesis ? <span className={styles.statePill}>tesi aggiornata dopo la generazione</span> : null}
+      </div>
+      {reading?.fit ? <p>{reading.fit}</p> : null}
+
+      {reading?.blockingFlags && reading.blockingFlags.length > 0 ? (
+        <div>
+          <h4>Bloccanti per questa tesi</h4>
+          <ul>
+            {reading.blockingFlags.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {reading?.tolerableFlags && reading.tolerableFlags.length > 0 ? (
+        <div>
+          <h4>Tollerabili per questa tesi</h4>
+          <ul>
+            {reading.tolerableFlags.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {reading?.thesisDdQuestions && reading.thesisDdQuestions.length > 0 ? (
+        <div>
+          <h4>Domande DD di tesi</h4>
+          <ul>
+            {reading.thesisDdQuestions.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {reading?.synergyHypotheses && reading.synergyHypotheses.length > 0 ? (
+        <div>
+          <h4>Ipotesi di sinergia (da validare)</h4>
+          <ul>
+            {reading.synergyHypotheses.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {reading?.valuationStance ? (
+        <div>
+          <h4>Postura sulla valutazione</h4>
+          <p>{reading.valuationStance}</p>
+        </div>
+      ) : null}
+      {reading?.notAddressed && reading.notAddressed.length > 0 ? (
+        <div>
+          <h4>La tesi non si esprime su</h4>
+          <ul>
+            {reading.notAddressed.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      <small>
+        Tesi di provenienza: “{record.thesisSnapshot}”
+        {record.webEvidenceDate ? ` · evidenza web del ${new Date(record.webEvidenceDate).toLocaleDateString('it-IT')}` : ''}
+        {record.updatedAt ? ` · generata il ${new Date(record.updatedAt).toLocaleDateString('it-IT')}` : ''}
+      </small>
+      <div>
+        <Button variant="secondary" onClick={() => generate.mutate()} loading={generate.isPending}>
+          Rigenera con la tesi corrente
+        </Button>
+        {generate.isError ? <p>Generazione non riuscita: riprova.</p> : null}
+      </div>
+    </div>
   );
 }
 
@@ -281,6 +437,7 @@ function formatMetricValue(value: number, unit: string): string {
   if (unit === '%') return `${rounded}%`;
   if (unit === 'x') return `${rounded}×`;
   if (unit === 'gg') return `${Math.round(value)} gg`;
+  if (unit === '€') return moneyFormat.format(value);
   return String(rounded);
 }
 
@@ -329,6 +486,7 @@ function DeepAnalysisTab({ deep }: { deep?: MADeepAnalysis }) {
     { key: 'liquidita', label: 'Liquidità' },
     { key: 'efficienza', label: 'Efficienza' },
     { key: 'crescita', label: 'Crescita' },
+    { key: 'qualita_margine', label: 'Qualità del margine' },
   ];
   return (
     <div>
@@ -503,7 +661,7 @@ function DeepBriefBlock({ brief }: { brief: NonNullable<MADeepAnalysis['brief']>
     <div>
       <h5>Brief analista</h5>
       {brief.verdict ? <p>{formatPercentagesInText(brief.verdict)}</p> : null}
-      {brief.thesisReading ? <p>{formatPercentagesInText(brief.thesisReading)}</p> : null}
+      {(brief.financialReading ?? brief.thesisReading) ? <p>{formatPercentagesInText(brief.financialReading ?? brief.thesisReading ?? "")}</p> : null}
       {brief.redFlags && brief.redFlags.length > 0 ? (
         <ul>
           {brief.redFlags.map((flag, index) => (

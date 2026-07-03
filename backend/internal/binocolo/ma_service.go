@@ -3004,8 +3004,13 @@ func (s *maService) getCompanyDossier(ctx context.Context, vat string) (MACompan
 	}
 	dossier := mapMACompanyDossier(vat, rec)
 	// Famiglia di business model (Fase 3): best-effort, il dossier vive anche
-	// senza classificazione.
-	if bmFamily, err := s.store.GetMABMFamily(ctx, normalizeMACompanyKey(vat)); err == nil {
+	// senza classificazione. La chiave è quella del record deep (il funnel può
+	// chiavare per vendor id, non per VAT), con fallback sulla VAT normalizzata.
+	familyKey := normalizeMACompanyKey(vat)
+	if rec != nil && rec.CompanyKey != "" {
+		familyKey = rec.CompanyKey
+	}
+	if bmFamily, err := s.store.GetMABMFamily(ctx, familyKey); err == nil {
 		dossier.BMFamily = bmFamily
 	}
 	return dossier, nil
@@ -3016,14 +3021,15 @@ func mapMACompanyDossier(vat string, rec *maDeepVATRecord) MACompanyDossier {
 		return MACompanyDossier{VATCode: vat, Status: "absent"}
 	}
 	dossier := MACompanyDossier{
-		VATCode:   vat,
-		Status:    rec.Status,
-		Scorecard: rec.Scorecard,
-		Valuation: rec.Valuation,
-		Brief:     rec.Brief,
-		Raw:       rec.Payload,
-		CostEUR:   rec.CostEUR,
-		ErrorCode: rec.ErrorCode,
+		VATCode:    vat,
+		CompanyKey: rec.CompanyKey,
+		Status:     rec.Status,
+		Scorecard:  rec.Scorecard,
+		Valuation:  rec.Valuation,
+		Brief:      rec.Brief,
+		Raw:        rec.Payload,
+		CostEUR:    rec.CostEUR,
+		ErrorCode:  rec.ErrorCode,
 	}
 	if !rec.UpdatedAt.IsZero() {
 		ts := rec.UpdatedAt

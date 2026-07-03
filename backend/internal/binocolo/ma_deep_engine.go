@@ -122,6 +122,30 @@ func buildMADeepScorecard(payload json.RawMessage, th maDeepThresholds) *MADeepS
 	add("crescita", "turnover_trend", "Trend fatturato", "ecofin.turnoverTrend", "%", 1, ragHigher(0, 8))
 	add("crescita", "ebit_variation", "Variazione EBIT", "development.ebitVariation", "%", 100, ragHigher(0, 8))
 
+	// Qualità del margine (Fase 4): quanto è "vero" l'EBITDA contabile.
+	// ΔEBITDA in euro dagli assoluti prior-year del vendor (informativo, RAG na:
+	// il semaforo di trend vive già nel gruppo crescita); assorbimento magazzino
+	// = quota di EBITDA mangiata dalla variazione rimanenze B.11 (metrica CORE:
+	// margine che non diventa cassa — soglie euristiche 25/75, come le altre).
+	reading := maCEEReadingFromRoot(root)
+	if ebitdaL2Y, ok := maInspectNumber(root, "operatingResults.ebitdaL2Y"); ok && sc.Ebitda != nil {
+		delta := *sc.Ebitda - ebitdaL2Y
+		sc.Metrics = append(sc.Metrics, MADeepMetric{
+			Group: "qualita_margine", Key: "delta_ebitda", Label: "Δ EBITDA vs anno precedente", Unit: "€",
+			Value: &delta, RAG: maRAGNone,
+		})
+	}
+	if reading != nil && sc.Ebitda != nil && *sc.Ebitda > 0 {
+		absorption := 0.0
+		if reading.InventoryVariation < 0 {
+			absorption = -reading.InventoryVariation / *sc.Ebitda * 100
+		}
+		sc.Metrics = append(sc.Metrics, MADeepMetric{
+			Group: "qualita_margine", Key: "assorbimento_magazzino", Label: "EBITDA assorbito da magazzino", Unit: "%",
+			Value: &absorption, RAG: ragLower(25, 75)(absorption),
+		})
+	}
+
 	// Equity-denominated ratios invert sign when equity is eroded: leverage
 	// (attivo/PN) goes negative with PN<=0 and ragLower would read it as healthy.
 	// Force red so an insolvent capital structure never shows green.
@@ -149,7 +173,6 @@ func buildMADeepScorecard(payload json.RawMessage, th maDeepThresholds) *MADeepS
 	// derivazione pfnEbitda×EBITDA resta solo come fallback per i payload senza
 	// CEE. Gli scarti di riconciliazione viaggiano nello scorecard; il semaforo
 	// continua a usare i ratio vendor (riconciliati su n=10).
-	reading := maCEEReadingFromRoot(root)
 	if reading != nil && reading.PFN != nil {
 		v := reading.PFN.Value
 		sc.PFN = &v

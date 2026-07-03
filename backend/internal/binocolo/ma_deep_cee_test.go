@@ -367,16 +367,16 @@ func TestValuationBridgeCDLAN(t *testing.T) {
 // TestQualityFlagsRealPayloads: MFT → solo a5_altri_ricavi (33% dell'EBITDA);
 // CDLAN → perimetro_standalone (warning, prima) + b8_beni_terzi (info, dopo).
 func TestQualityFlagsRealPayloads(t *testing.T) {
-	mft, _ := loadFixturePayload(t, "testdata/itfull_mft_2024.json")
+	mft, mftRoot := loadFixturePayload(t, "testdata/itfull_mft_2024.json")
 	sc := buildMADeepScorecard(mft, defaultMADeepThresholds())
-	flags := buildMADeepQualityFlags(sc, maCEEReadingFromPayload(mft), fase2Pricing())
+	flags := buildMADeepQualityFlags(mftRoot, sc, maCEEReadingFromPayload(mft), fase2Pricing())
 	if len(flags) != 1 || flags[0].Code != "a5_altri_ricavi" || flags[0].Severity != "warning" {
 		t.Fatalf("mft flags: %+v", flags)
 	}
 
-	cdlan, _ := loadFixturePayload(t, "testdata/itfull_cdlan_2025.json")
+	cdlan, cdlanRoot := loadFixturePayload(t, "testdata/itfull_cdlan_2025.json")
 	sc = buildMADeepScorecard(cdlan, defaultMADeepThresholds())
-	flags = buildMADeepQualityFlags(sc, maCEEReadingFromPayload(cdlan), fase2Pricing())
+	flags = buildMADeepQualityFlags(cdlanRoot, sc, maCEEReadingFromPayload(cdlan), fase2Pricing())
 	if len(flags) != 2 {
 		t.Fatalf("cdlan flags: %+v", flags)
 	}

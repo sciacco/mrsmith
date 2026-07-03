@@ -62,6 +62,9 @@ type maWorkspaceStore interface {
 	UpsertMABMFamilySuggestion(ctx context.Context, companyKey, vatCode, taxCode, companyName string, suggestion maBMFamilySuggestion) error
 	GetMABMFamily(ctx context.Context, companyKey string) (*MABMFamily, error)
 	RatifyMABMFamily(ctx context.Context, companyKey, family, subject, email string) error
+	GetMACardThesisReading(ctx context.Context, initiativeID, companyKey string) (*MACardThesisReading, error)
+	UpsertMACardThesisReading(ctx context.Context, reading *MACardThesisReading, modelID, promptID, subject string) error
+	GetMAWebValidationForCompany(ctx context.Context, sessionID, companyKey string) (*MAWebValidation, error)
 	GetMADeepByVAT(ctx context.Context, vat string) (*maDeepVATRecord, error)
 	ListMADeepReadyForBrief(ctx context.Context) ([]maDeepBriefRow, error)
 	UpdateMADeepBrief(ctx context.Context, companyKey string, brief *MADeepBrief, modelID, promptID string) error
@@ -3909,6 +3912,94 @@ WHERE company_key = $1
 		out.RatifiedAt = &ts
 	}
 	return &out, nil
+}
+
+// GetMAWebValidationForCompany esposizione read-only della web validation per
+// (sessione, azienda): la lettura di tesi (Fase 5) la usa come evidenza
+// qualitativa, con la sua data dichiarata.
+func (s *SQLStore) GetMAWebValidationForCompany(ctx context.Context, sessionID, companyKey string) (*MAWebValidation, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	return s.loadMAWebValidationForCompany(ctx, sessionID, companyKey)
+}
+
+// GetMACardThesisReading ritorna la lettura di tesi persistita (nil se assente).
+func (s *SQLStore) GetMACardThesisReading(ctx context.Context, initiativeID, companyKey string) (*MACardThesisReading, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	var out MACardThesisReading
+	var sessionID sql.NullString
+	var webDate sql.NullTime
+	var readingRaw []byte
+	var updatedAt time.Time
+	err := s.db.QueryRowContext(ctx, `
+SELECT initiative_id, company_key, COALESCE(session_id::text, ''), thesis_snapshot, reading,
+       web_evidence_date, generated_by_email, updated_at
+FROM binocolo.ma_card_thesis_reading
+WHERE initiative_id = $1 AND company_key = $2
+`, initiativeID, companyKey).Scan(&out.InitiativeID, &out.CompanyKey, &sessionID, &out.ThesisSnapshot,
+		&readingRaw, &webDate, &out.GeneratedByEmail, &updatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get ma card thesis reading: %w", err)
+	}
+	out.SessionID = sessionID.String
+	if webDate.Valid {
+		ts := webDate.Time
+		out.WebEvidenceDate = &ts
+	}
+	out.UpdatedAt = &updatedAt
+	if len(readingRaw) > 0 {
+		var reading MAThesisReading
+		if err := json.Unmarshal(readingRaw, &reading); err == nil {
+			out.Reading = &reading
+		}
+	}
+	return &out, nil
+}
+
+// UpsertMACardThesisReading persiste la lettura generata (rigenerazione =
+// sovrascrittura consapevole: l'azione è esplicita dell'analista).
+func (s *SQLStore) UpsertMACardThesisReading(ctx context.Context, reading *MACardThesisReading, modelID, promptID, subject string) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	if reading == nil || reading.Reading == nil {
+		return errors.New("ma card thesis reading: missing reading")
+	}
+	raw, err := json.Marshal(reading.Reading)
+	if err != nil {
+		return fmt.Errorf("marshal ma thesis reading: %w", err)
+	}
+	var webDate sql.NullTime
+	if reading.WebEvidenceDate != nil {
+		webDate = sql.NullTime{Time: *reading.WebEvidenceDate, Valid: true}
+	}
+	_, err = s.db.ExecContext(ctx, `
+INSERT INTO binocolo.ma_card_thesis_reading
+  (initiative_id, company_key, session_id, thesis_snapshot, reading, web_evidence_date,
+   model_id, prompt_id, generated_by_subject, generated_by_email)
+VALUES ($1, $2, NULLIF($3, '')::uuid, $4, $5::jsonb, $6, NULLIF($7, '')::uuid, NULLIF($8, '')::uuid, $9, $10)
+ON CONFLICT (initiative_id, company_key) DO UPDATE SET
+  session_id = EXCLUDED.session_id,
+  thesis_snapshot = EXCLUDED.thesis_snapshot,
+  reading = EXCLUDED.reading,
+  web_evidence_date = EXCLUDED.web_evidence_date,
+  model_id = EXCLUDED.model_id,
+  prompt_id = EXCLUDED.prompt_id,
+  generated_by_subject = EXCLUDED.generated_by_subject,
+  generated_by_email = EXCLUDED.generated_by_email,
+  updated_at = now()
+`, reading.InitiativeID, reading.CompanyKey, reading.SessionID, reading.ThesisSnapshot, raw, webDate,
+		modelID, promptID, subject, reading.GeneratedByEmail)
+	if err != nil {
+		return fmt.Errorf("upsert ma card thesis reading: %w", err)
+	}
+	return nil
 }
 
 // RatifyMABMFamily registra la ratifica/override dell'analista; family vuota =

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/sciacco/mrsmith/internal/acl"
@@ -129,6 +130,8 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/reopen", h.handleReopenMACard)
 	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/note", h.handleAddMACardNote)
 	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/deep-dive", h.handleDeepDiveMACard)
+	handle("GET /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/thesis-reading", h.handleGetCardThesisReading)
+	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/thesis-reading", h.handleGenerateCardThesisReading)
 	handle("GET /binocolo/v1/ma/companies/{companyKey}/registry", h.handleGetMACompanyRegistry)
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/registry/facts", h.handleCreateMACompanyFact)
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/registry/facts/{factId}/revoke", h.handleRevokeMACompanyFact)
@@ -585,6 +588,56 @@ func (h *Handler) handleDeepDiveMACard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httputil.JSON(w, http.StatusOK, result)
+}
+
+// handleGetCardThesisReading ritorna la lettura di tesi persistita della card
+// (404 se mai generata) con la staleness rispetto alla tesi corrente. Read-only.
+func (h *Handler) handleGetCardThesisReading(w http.ResponseWriter, r *http.Request) {
+	id, ok := maInitiativeID(w, r)
+	if !ok {
+		return
+	}
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	reading, err := h.ma.getCardThesisReading(r.Context(), id, companyKey)
+	if err != nil {
+		h.maFailure(w, r, "ma_thesis_reading_get", err, "initiative_id", id, "company_key", companyKey)
+		return
+	}
+	if reading == nil {
+		httputil.Error(w, http.StatusNotFound, "thesis_reading_not_generated")
+		return
+	}
+	httputil.JSON(w, http.StatusOK, reading)
+}
+
+// handleGenerateCardThesisReading genera (o rigenera, azione esplicita) la
+// lettura di tesi della card: LLM sui soli artefatti già calcolati + tesi della
+// sessione di provenienza. Costo in centesimi, nessun cancello di spesa.
+func (h *Handler) handleGenerateCardThesisReading(w http.ResponseWriter, r *http.Request) {
+	id, ok := maInitiativeID(w, r)
+	if !ok {
+		return
+	}
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	var traceOK bool
+	r, traceOK = h.startMATrace(w, r, "ma_thesis_reading_generate", id, nil, subject, email)
+	if !traceOK {
+		return
+	}
+	reading, err := h.ma.generateCardThesisReading(r.Context(), id, companyKey, subject, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_thesis_reading_generate", err, "initiative_id", id, "company_key", companyKey)
+		return
+	}
+	h.completeMATraceSuccess(r, http.StatusOK)
+	httputil.JSON(w, http.StatusOK, reading)
 }
 
 // maCompanyKeyPath extracts and normalizes the {companyKey} path segment
@@ -1065,6 +1118,17 @@ func (h *Handler) handleRegenerateMADeepBriefs(w http.ResponseWriter, r *http.Re
 	r, ok = h.startMATrace(w, r, "ma_deep_regenerate_briefs", "", nil, subject, email)
 	if !ok {
 		return
+	}
+	// Una chiamata LLM per azienda cached: il batch supera il WriteTimeout del
+	// server, che chiuderebbe la connessione (empty reply) troncando la
+	// rigenerazione. Endpoint ops invocato a mano: si azzerano le deadline di
+	// connessione per questa sola richiesta e si risponde a batch concluso.
+	rc := http.NewResponseController(w)
+	if err := rc.SetReadDeadline(time.Time{}); err != nil {
+		logging.FromContext(r.Context()).Warn("binocolo regenerate briefs: clear read deadline", "component", "binocolo", "error", err)
+	}
+	if err := rc.SetWriteDeadline(time.Time{}); err != nil {
+		logging.FromContext(r.Context()).Warn("binocolo regenerate briefs: clear write deadline", "component", "binocolo", "error", err)
 	}
 	count, err := h.ma.regenerateMADeepBriefs(r.Context())
 	if err != nil {

@@ -862,6 +862,15 @@ Alyante ERP ID
 
 ## Legacy Data Model Constraints
 
+### LLM Registry Cutover Did Not Preserve IDs; Legacy FKs to binocolo.llm_* Break on Write
+
+- Context: any Anisetta table persisting LLM provenance (`model_id`/`prompt_id`) resolved at runtime from the shared registry.
+- Discovery: migration 047 copied `binocolo.llm_model`/`llm_prompt` into `mrsmith.llm_model`/`llm_prompt` without preserving row ids (`gen_random_uuid()` on insert), and the Go resolver (`backend/internal/platform/llm/resolver.go`) reads only `mrsmith.*`. Tables that kept FKs to the legacy `binocolo.llm_*` (e.g. `ma_deep_analysis`, mig 037) violate the FK on every post-cutover write; the failure stayed latent until 2026-07-03 because no new deep analysis had been persisted since the cutover (`POST /binocolo/v1/ma/deep/regenerate-briefs` returned a generic 500 at the first successfully generated brief).
+- Practical rule: provenance columns must FK to `mrsmith.llm_model(id)`/`mrsmith.llm_prompt(id)` (or carry no FK); never to `binocolo.llm_*`. When repointing an existing table, first remap historical values old→new via the preserved natural keys — models on `(app='binocolo', scope, model)`, prompts on `(app='binocolo', scope, name)`, both unique on mrsmith — and NULL what no longer matches (out-of-band registry edits).
+- Evidence: `deploy/migrations/047_anisetta_mrsmith_llm_registry.sql` (INSERT..SELECT without `id`), `deploy/migrations/037_binocolo_ma_deep_analysis.sql` (legacy FKs), fix in `deploy/migrations/098_binocolo_ma_deep_llm_registry_fk.sql`; dormant `binocolo.ma_model_audit` (mig 026) has the same legacy FKs but no remaining Go writer (audit goes to `mrsmith.llm_call_audit`).
+- Used by: `backend/internal/binocolo` deep-dive worker and brief regeneration; template for any future repoint.
+- Open questions: none.
+
 ### Aenad Document Totals Are Database-Owned First-Tranche Calculations
 
 - Context: Aenad document rows and headers in Mistra schema `aenad`.
