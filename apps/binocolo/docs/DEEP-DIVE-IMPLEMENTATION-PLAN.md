@@ -122,6 +122,21 @@ documento decisioni hanno un canale di risposta.
 
 ## Fase 1 — Strato di lettura CEE (fondazione)
 
+> **STATO 2026-07-03: IMPLEMENTATA** — `ma_deep_cee.go` (lettura con
+> provenienza, catena dettaglio→totale→ratio vendor, PFN con derivati passivi,
+> prudenziale, risultato con semantica 177/178/179) + `ma_deep_cee_labels.go`
+> (279 etichette GENERATE dalla legend, refusi normalizzati 231/232/351) +
+> `MADeepReconciliation` sullo scorecard (EBITDA/PFN in % relativo, ROE in
+> punti; attaccata da `buildMADeepScorecard`, la UI la ignora) + parametro
+> `vendor_cee_tolerance_pct` in maPricing (default compilato 1.0, seed
+> esplicito in mig 092) + inspect rifattorizzato sulla lettura unica (fonte
+> singola, niente doppia definizione PFN). Golden test approvati verdi sulle
+> due fixture + fallback (totals-only→cee_total, famiglia IPL, vendor_ratio,
+> payload senza CEE→nil); build/vet/gofmt ok; suite deterministica del
+> pacchetto verde (httptest non eseguibili in sandbox, pre-esistente).
+> Rollout sulla cache: `POST /ma/deep/recompute` quando si vuole (la
+> riconciliazione appare sulle righe cached; nessun effetto UI fino a Fase 2).
+
 **Obiettivo:** un modulo che legge gli array CEE con entrambe le famiglie di
 codici e catena di fallback con provenienza. Zero costo, nessun cambio UI.
 

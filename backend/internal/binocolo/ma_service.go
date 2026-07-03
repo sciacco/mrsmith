@@ -634,6 +634,7 @@ type maPricing struct {
 	BudgetDefault              float64
 	SMEHaircutPct              float64
 	EBITDAFallbackPct          float64
+	VendorCEETolerancePct      float64
 	ThesisFitHoldingHaircutPct float64
 	// Gated-search pipeline levers (migration 074): CostAddress = per-company gate
 	// enrichment, CostScrapePage/CostSearch = fastcrw unit costs, SurvivorRate =
@@ -688,6 +689,7 @@ func maPricingFromParameters(params []MAParameter) maPricing {
 		BudgetDefault:              maDefaultBudgetEUR,
 		SMEHaircutPct:              maSMEHaircutPctDefault,
 		EBITDAFallbackPct:          maEBITDAFallbackPctDefault,
+		VendorCEETolerancePct:      maVendorCEETolerancePctDefault,
 		ThesisFitHoldingHaircutPct: maThesisFitHoldingHaircutPctDefault,
 		CostAddress:                maCostPerAddressEUR,
 		CostScrapePage:             maCostPerScrapePageEUR,
@@ -720,6 +722,9 @@ func maPricingFromParameters(params []MAParameter) maPricing {
 	}
 	if v, ok := paramFloat(values, "ebitda_fallback_threshold"); ok {
 		pricing.EBITDAFallbackPct = v
+	}
+	if v, ok := paramFloat(values, "vendor_cee_tolerance_pct"); ok {
+		pricing.VendorCEETolerancePct = v
 	}
 	if v, ok := paramFloat(values, "thesis_fit_holding_haircut_pct"); ok && v < 100 {
 		pricing.ThesisFitHoldingHaircutPct = v
@@ -2635,13 +2640,16 @@ func (s *maService) inspectMADeep(ctx context.Context) (MADeepInspectReport, err
 			continue
 		}
 		root := deepFullRoot(object)
-		codes := maInspectCodeValues(root)
+		rawCodes := maInspectCodeValues(root)
+		ceeCodes := maCEECodesFromRoot(root)
+		reading := maCEEReadingFromRoot(root)
 		report.PayloadsAnalyzed++
 
-		// Famiglie di codici. IPL231/IPL232/IICC351 sono refusi della legend del
-		// vendor emessi verbatim dall'API: non contano come divisione PL.
+		// Famiglie di codici (sui codici GREZZI). IPL231/IPL232/IICC351 sono refusi
+		// della legend del vendor emessi verbatim dall'API: non contano come
+		// divisione PL.
 		hasIIC, hasOtherIPL, hasTypo := false, false, false
-		for code := range codes {
+		for code := range rawCodes {
 			switch {
 			case code == "IPL231" || code == "IPL232" || code == "IICC351":
 				hasTypo = true
@@ -2660,26 +2668,16 @@ func (s *maService) inspectMADeep(ctx context.Context) (MADeepInspectReport, err
 			report.CodeFamilies.KnownLegendTypos++
 		}
 
-		codeVal := func(num string) (float64, bool) {
-			if v, ok := codes["IIC"+num]; ok {
-				return v, true
-			}
-			if v, ok := codes["IPL"+num]; ok {
-				return v, true
-			}
-			return 0, false
-		}
-
 		// Granularità debiti: dettaglio con split entro/oltre vs soli totali per voce.
 		splitPresent, totalPresent := false, false
 		for _, num := range maInspectDebtSplitCodes {
-			if _, ok := codeVal(num); ok {
+			if _, ok := ceeCodes[num]; ok {
 				splitPresent = true
 				break
 			}
 		}
 		for _, num := range maInspectDebtTotalCodes {
-			if _, ok := codeVal(num); ok {
+			if _, ok := ceeCodes[num]; ok {
 				totalPresent = true
 				break
 			}
@@ -2701,50 +2699,28 @@ func (s *maService) inspectMADeep(ctx context.Context) (MADeepInspectReport, err
 		}
 
 		// Accantonamenti B.12/B.13: dove sono valorizzati, discriminano la
-		// definizione EBITDA del vendor (aperta: zero in entrambe le fixture).
-		if b12, _ := codeVal("146"); b12 != 0 {
-			report.ProvisionsB12B13++
-		} else if b13, _ := codeVal("147"); b13 != 0 {
+		// definizione EBITDA del vendor (aperta: zero su tutta la cache a n=10).
+		if ceeCodes["146"] != 0 || ceeCodes["147"] != 0 {
 			report.ProvisionsB12B13++
 		}
 
-		// Riconciliazione EBITDA: A(130) − B(149) + B.10(144) vs vendor.
-		vendorEBITDA, okVendorEBITDA := maInspectNumber(root, "operatingResults.ebitda")
-		a, okA := codeVal("130")
-		b, okB := codeVal("149")
-		dep, okDep := codeVal("144")
-		if okVendorEBITDA && vendorEBITDA != 0 && okA && okB && okDep {
-			cee := a - b + dep
-			pct := (cee - vendorEBITDA) / math.Abs(vendorEBITDA) * 100
-			ebitdaDevs = append(ebitdaDevs, maInspectDeviation{companyKey: row.CompanyKey, vendor: vendorEBITDA, cee: cee, pct: pct})
-		}
-
-		// Riconciliazione PFN: (D.1..D.5 + derivati passivi 219 − cassa − titoli)
-		// vs pfnEbitda×EBITDA. Il denominatore ha un pavimento di 1000€ perché su
-		// PFN prossime allo zero la percentuale esploderebbe senza significato.
-		voce := func(base, twin, total string) float64 {
-			if v, ok := codeVal(total); ok {
-				return v
+		// Riconciliazioni vendor-vs-CEE: stessa lettura del motore (ma_deep_cee.go,
+		// fonte unica), qui in forma distribuzionale. La PFN entra SOLO quando la
+		// rilettura è davvero CEE (il fallback vendor_ratio coinciderebbe sempre).
+		if reading != nil {
+			vendorEBITDA, okVendorEBITDA := maInspectNumber(root, "operatingResults.ebitda")
+			if okVendorEBITDA && vendorEBITDA != 0 && reading.EBITDACEE != nil {
+				pct := (*reading.EBITDACEE - vendorEBITDA) / math.Abs(vendorEBITDA) * 100
+				ebitdaDevs = append(ebitdaDevs, maInspectDeviation{companyKey: row.CompanyKey, vendor: vendorEBITDA, cee: *reading.EBITDACEE, pct: pct})
 			}
-			v1, ok1 := codeVal(base)
-			v2, ok2 := codeVal(twin)
-			if ok1 || ok2 {
-				return v1 + v2
+			if reading.PFN != nil && reading.PFN.Provenance != maCEEProvVendorRatio && okVendorEBITDA {
+				if ratio, ok := maInspectNumber(root, "leverageRatios.pfnEbitda"); ok {
+					vendorPFN := ratio * vendorEBITDA
+					denom := math.Max(math.Abs(vendorPFN), 1000)
+					pct := (reading.PFN.Value - vendorPFN) / denom * 100
+					pfnDevs = append(pfnDevs, maInspectDeviation{companyKey: row.CompanyKey, vendor: vendorPFN, cee: reading.PFN.Value, pct: pct})
+				}
 			}
-			return 0
-		}
-		cash, okCash := codeVal("070")
-		ratio, okRatio := maInspectNumber(root, "leverageRatios.pfnEbitda")
-		if okCash && okRatio && okVendorEBITDA {
-			gross := voce("090", "091", "329") + voce("092", "093", "330") + voce("184", "185", "331") +
-				voce("094", "095", "332") + voce("096", "097", "333")
-			derivati, _ := codeVal("219")
-			securities, _ := codeVal("065")
-			cee := gross + derivati - cash - securities
-			vendorPFN := ratio * vendorEBITDA
-			denom := math.Max(math.Abs(vendorPFN), 1000)
-			pct := (cee - vendorPFN) / denom * 100
-			pfnDevs = append(pfnDevs, maInspectDeviation{companyKey: row.CompanyKey, vendor: vendorPFN, cee: cee, pct: pct})
 		}
 	}
 	report.Reconciliation.EBITDA = maInspectSummarize(ebitdaDevs)

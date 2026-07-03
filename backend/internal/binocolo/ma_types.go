@@ -213,6 +213,13 @@ const (
 	maSMEHaircutPctDefault     = 30.0
 	maEBITDAFallbackPctDefault = 5.0
 
+	// maVendorCEETolerancePctDefault è la soglia di allerta sugli scarti di
+	// riconciliazione vendor-vs-CEE (override: ma_parameter vendor_cee_tolerance_pct).
+	// Calibrata dall'inspect di Fase 0 su n=10: rumore massimo osservato 0,03%
+	// (rounding dei ratio) — l'1% dà 30× di margine e cattura solo mismatch
+	// definitori veri. Consumata dai quality flag di Fase 2.
+	maVendorCEETolerancePctDefault = 1.0
+
 	// maDefaultBudgetEUR caps the projected enrichment spend of a single run
 	// unless the analyst explicitly acknowledges a higher cost.
 	maDefaultBudgetEUR = 50.0
@@ -1207,6 +1214,21 @@ type MADeepScorecard struct {
 	NetWorth     *float64       `json:"netWorth,omitempty"`
 	PFN          *float64       `json:"pfn,omitempty"`
 	AtecoCode    string         `json:"atecoCode,omitempty"`
+	// Reconciliation è il sanity check vendor-vs-CEE (Fase 1): assente quando il
+	// payload non porta voci CEE. La UI lo ignora fino ai quality flag di Fase 2.
+	Reconciliation *MADeepReconciliation `json:"reconciliation,omitempty"`
+}
+
+// MADeepReconciliation — scarti tra i numeri pre-calcolati dal vendor e le stesse
+// grandezze rilette dalle voci CEE depositate. EBITDA e PFN sono scarti relativi in
+// % (PFN con pavimento 1000€ al denominatore); ROE è in PUNTI percentuali. La PFN
+// riporta anche la provenienza della rilettura (cee_detail | cee_total). Consumata
+// dai quality flag di Fase 2 contro vendor_cee_tolerance_pct (default 1%).
+type MADeepReconciliation struct {
+	EBITDAPct     *float64 `json:"ebitdaPct,omitempty"`
+	PFNPct        *float64 `json:"pfnPct,omitempty"`
+	PFNProvenance string   `json:"pfnProvenance,omitempty"`
+	ROEPointsDiff *float64 `json:"roePointsDiff,omitempty"`
 }
 
 type MADeepMetric struct {

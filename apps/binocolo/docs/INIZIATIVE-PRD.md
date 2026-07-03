@@ -26,7 +26,7 @@ Due **piani di fatti**, con superfici di scrittura separate (ratificato dopo obi
 | Piano | Fatti | Dove si scrive | Storage |
 |---|---|---|---|
 | **Lavoro** (contesto iniziativa) | fit, stelle, stato del deal, diario | solo dalla card | log unico eventi (§5) |
-| **Entità** (azienda, globale) | fatti tipizzati, note di caratterizzazione, dominio, deep-dive | solo da dossier `/azienda` / registro | registro azienda (§6) + registri esistenti |
+| **Entità** (azienda, globale) | fatti tipizzati, note di caratterizzazione, dominio, deep-dive | solo dal **MA card-dossier** (sezione registro) | registro azienda (§6) + registri esistenti |
 
 La nota di diario ("richiamare lunedì") e la nota d'azienda ("fondatore 70enne, figli fuori dal business") sono **generi diversi, non scope diversi**: nessun meccanismo le trasforma l'una nell'altra.
 
@@ -89,7 +89,7 @@ Tabella company-level dedicata (pattern `ma_company_domain`), il piano dell'enti
 
 - **Fatti tipizzati, set chiuso** **[DECISO, inclusi i positivi]**: `non_vende`, `in_trattativa_altrui`, `da_evitare` (badge warning) + `gia_cliente`, `partner` (badge informativi). Ogni fatto: nota, autore, data; **revocabile** da un intervento successivo (la storia si conserva).
 - **Note libere di caratterizzazione** **[DECISO]**: append-only, autore+data — l'espressività che il set chiuso non dà. Sono **contenuto del registro**, non eventi del log.
-- **Superfici di scrittura** **[DECISO]**: SOLO dossier `/azienda` e sezione registro. La card mostra la **scheda azienda in sola lettura** (badge fatti, ultima nota, link al dossier). Niente toggle.
+- **Superfici di scrittura** **[DECISO]**: SOLO dal **MA card-dossier** (`/iniziative/:id/dossier/:companyKey`, sezione registro). La card mostra la **scheda azienda in sola lettura** (badge fatti, ultima nota) con «Gestione dal dossier ↗» che apre il card-dossier. Niente toggle. Il tool standalone `/azienda` è indipendente da MA e **non è una superficie di scrittura** del registro (migrato 2026-07-02, remediation S6).
 - **Ponte tipizzato** **[DECISO]**: la chiusura `no_go` può proporre "registra anche: non vende / in trattativa con altri" — due scritture ben tipizzate (evento di chiusura nel diario + fatto nel registro), mai una nota che cambia natura.
 - **Effetti = SOLO presentazione** **[DECISO]**: badge nelle tabelle risultati di ogni sessione (veicolo naturale: la proiezione `MATargetRow` del piano proiezione), marker sulla card, scheda nel dossier. **MAI** effetti su gate UC2, routing v3, scoring.
 - **[DECISO 2026-07-02]** `gia_cliente` **dichiarato manualmente in v1**: la derivazione automatica dalla base clienti Mistra/Grappa (match P.IVA, mapping documentato in `docs/IMPLEMENTATION-KNOWLEDGE.md`) richiederebbe un'integrazione che aggiunge complessità non necessaria ora. Resta un'evoluzione possibile — il fatto è già nel set tipizzato, la derivazione futura non cambierebbe il modello.
@@ -102,7 +102,7 @@ Derivato dalle card (nessun dato nuovo): la card mostra "In lavorazione anche in
 Oggi il deep-dive ("Approfondisci preferiti (N)", TargetPage) accoda le **≥1★ della sessione** per l'analisi IT-full — cioè, in D3, esattamente **la popolazione delle card**: l'azione era già concettualmente di lavorazione. L'artefatto (`MADeepAnalysis`) è già company-keyed e in cache globale cross-sessione.
 
 - Azione **per-card**: avvia l'analisi della singola azienda; se già analizzata, il brief è disponibile subito senza spesa (comportamento cache esistente). Serve la variante per-azienda dell'endpoint (oggi session-scoped); worker, cache e gate di spesa si riusano interi.
-- Il brief (scorecard, valutazione, testo) si consulta dal drawer della card e dal dossier `/azienda` (che già condivide la cache).
+- Il brief (scorecard, valutazione, testo) si consulta dal drawer della card e dal **MA card-dossier** (`/iniziative/:id/dossier/:companyKey`), che il drawer apre con «Apri dossier» e che legge la cache deep company-keyed. Il tool standalone `/azienda` è indipendente da MA e **non è accoppiato** al flusso (ratifica D-B, 2026-07-02).
 - **Collisione di nomi [DECISO che va sciolta]**: lo stato "Approfondimento" (fase del deal) e l'azione oggi chiamata "Approfondisci" significherebbero cose diverse nella stessa pagina. **[DECISO 2026-07-02]** azione e artefatto hanno nomi distinti: l'**azione è un verbo** — l'attivazione innesca due cose (recupero dati completi IT-full + analisi LLM) sotto un'unica intenzione — l'**artefatto è il "dossier"**. Ciclo di vita del bottone sulla card:
   `Avvia analisi completa` → `Analisi in corso…` → `Apri dossier`.
   Il caso cache (azienda già analizzata altrove) nasce direttamente in "Apri dossier", zero spesa: il comportamento esistente diventa visibile da solo. L'etichetta legacy "Approfondisci preferiti" muore con la TargetPage.

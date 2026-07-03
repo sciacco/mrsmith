@@ -103,6 +103,12 @@ func buildMADeepScorecard(payload json.RawMessage) *MADeepScorecard {
 		}
 	}
 
+	// Sanity check vendor-vs-CEE (Fase 1): rilettura delle grandezze da prezzo
+	// dalle voci CEE depositate, con scarti trasportati nello scorecard. Il
+	// semaforo continua a usare i ratio vendor (riconciliati su n=10); i quality
+	// flag di Fase 2 consumeranno gli scarti contro vendor_cee_tolerance_pct.
+	sc.Reconciliation = buildMADeepReconciliation(root, maCEEReadingFromRoot(root))
+
 	sc.OverallRAG = deepOverallRAG(sc.Metrics)
 	return sc
 }

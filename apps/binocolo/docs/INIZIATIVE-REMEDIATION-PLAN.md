@@ -42,7 +42,7 @@ Il costruito si divide in tre fasce nette:
 - **Sotto lo standard approvato (il grosso del danno)**: non sono feature mancanti ma **pattern di qualità mai implementati** — il wireframe prescriveva superfici che *raccontano il lavoro* (eventi semantici, conteggi azionabili, funnel che collassa) e il prodotto mostra scheletri (timestamp ISO, "Stato aggiornato" nudo, pannelloni di avanzamento perenni). Sono 7 pattern trasversali (§4), non 30 difetti sparsi: si rimediano per pattern, non per pagina.
 - **Mancante**: ciclo di vita iniziative (le ricerche sono ora coperte — F2 risolto al re-baseline), contatori, parità del dettaglio D2 (§5).
 
-**Raccomandazione: si recupera.** Nulla di ciò che è sotto standard richiede rifacimenti: il modello dati e i flussi reggono (smoke end-to-end), i gap sono di resa e di completamento. Butterei solo il `TargetDetailModal` di D2 (si sostituisce col riuso delle sezioni della pagina card-dossier, non si ripara).
+**Raccomandazione: si recupera.** Nulla di ciò che è sotto standard richiede rifacimenti: il modello dati e i flussi reggono (smoke end-to-end), i gap sono di resa e di completamento. Butterei solo il `TargetDetailModal` di D2 — non per ricostruirlo, ma per **togliere il link `/azienda`** (accoppiamento col tool standalone) e tenerlo nel ruolo di setaccio (razionale + badge B5); il dossier profondo resta azione di card sul MA card-dossier, già autosufficiente (D-B ratificata).
 
 ## 2. Audit per schermata — Iniziative (wireframe S1–S7)
 
@@ -116,7 +116,7 @@ Motivo derivato verbatim («Identità non confermata sulle pagine lette», «Sit
 - **F1 — Contatori iniziative**: aggregazione card per stato in `ListMAInitiatives` (il passo è caduto tra B1 e B2 del piano). Prerequisito di Q5.
 - **F2 — Ciclo di vita ricerche in /ricerche** · ✅ **RISOLTO al re-baseline** (commit `79169e2`, 2026-07-02): `RicerchePage.tsx` ha ora archivia/cestino/purge/ripristino + filtri di visibilità (Attive/Archiviate/Cestino) + modali di conferma. **Fuori perimetro.** (L'audit a `996ce47` lo rilevava ancora aperto: era il gap reale a quel HEAD, chiuso nelle ore successive.)
 - **F3 — Ciclo di vita iniziative** · ⚠️ **PARZIALE al re-baseline**: la vista archivio è presente (link «Archivio (N)» + conteggio + empty state in `IniziativePage.tsx`), ma `IniziativaCard` espone solo `onOpen` — **nessuna azione archive/restore per-iniziativa**, e delete resta assente anche a backend (decisione D-A). Resta da fare: aggiungere l'azione di lifecycle (e decidere D-A sul delete).
-- **F4 — Dettaglio D2**: `TargetDetailModal` (RicercaDetailPage.tsx:923) è 6 campi + link a `/azienda?vat=` che oggi atterra su un form vuoto (regressione introdotta dal task correttivo dossier). Da sostituire col riuso delle sezioni della pagina card-dossier (decisione D-B) e link corretto.
+- **F4 — Dettaglio D2** · ✅ **decisione D-B ratificata (2026-07-02)**: il `TargetDetailModal` (`RicercaDetailPage.tsx:974`) ha un link `/azienda?vat=` che **accoppia il setaccio MA al tool standalone** (`CompanyDossierPage` è indipendente da MA). **Fix: rimuovere il link, non ripararlo.** Il modale resta magro nel ruolo di setaccio — razionale aderenza + contesto scoring + badge B5 inline (`registryFacts`, `inLavorazione`); il dossier profondo è azione di card (B6 → MA card-dossier). Verificato al re-baseline: il MA card-dossier è **già autosufficiente e disaccoppiato** (`GetMATargetByID` popola `target.Deep` dalla cache company-keyed via `ListMADeepAnalysis`) — niente riuso di sezioni, niente refinement da costruire. Lavoro: 1 riga (rimozione link) + badge B5 + fix wording PRD §7.
 - **F5 — Marker vs archiviazione**: `ListMAActiveCardsByCompany` (ma_store.go:2373) non esclude le iniziative archiviate.
 - **F6 — Provenienze robuste**: il drawer legge solo le sessioni agganciate; deve leggere lo snapshot (`created_from_session` + rating storici) così lo sgancio non cancella la storia (immagine 3 del tuo report).
 - **F7 — Igiene dati di prova**: SQL in §8 (include anche i 2 cambi di stato accidentali fatti oggi durante l'audit da click su riferimenti browser stantii — errore mio, registrato).
@@ -134,8 +134,10 @@ Sequenza e granularità dei task esecutori le definiamo dopo la ratifica — non
 
 ## 7. Decisioni richieste
 
-- **D-A** — Delete vero delle iniziative (nuova rotta; lo schema già cascade-a le card) o basta archiviare?
-- **D-B** — Dettaglio D2: riuso delle sezioni card-dossier nel modale (proposta) o pagina di dettaglio dedicata?
+> **Stato (2026-07-02)**: D-A e D-B ✅ ratificate · D-C e D-D ⏳ aperte.
+
+- **D-A** · ✅ **RATIFICATA (2026-07-02)**: **archive + restore, nessuna rotta delete/purge**. Lo schema rende l'hard-delete incoerente (`ma_initiative_card` CASCADE ma `ma_target_outcome.initiative_id` SET NULL → diario orfano); archive è l'uscita disegnata (S1 nota 3), restore l'undo. Pulizia dati di prova = SQL one-shot (§8), non meccanismo di prodotto. Ortogonale a F3 (che cabla l'azione archive/restore in UI).
+- **D-B** · ✅ **RATIFICATA (2026-07-02)**: nessuna delle due. Si **rimuove il link `/azienda`** dal modale D2 (`RicercaDetailPage.tsx:974`) — `CompanyDossierPage` è tool standalone, non va accoppiato a MA. Il modale resta magro nel ruolo di setaccio (razionale + badge B5); il dossier profondo resta azione di card sul MA card-dossier, **già autosufficiente** (`GetMATargetByID` → cache company-keyed). Lavoro minimo: vedi F4. Revisiona PRD §7 («dal dossier `/azienda`» → «dal MA card-dossier»).
 - **D-C** — Web enrichment manuale (c'era in TargetPage:609): riportarlo in /ricerche o dichiararlo assorbito dal gate?
 - **D-D** — Sgancio ricerca: basta F6 (provenienze da snapshot) o vuoi anche l'avviso esplicito allo sgancio?
 
