@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"math"
+	"time"
 )
 
 // Deterministic financial engine for the veryshort deep-dive (Fase 3).
@@ -222,6 +223,27 @@ func deepPayloadReady(data json.RawMessage) bool {
 		}
 	}
 	return false
+}
+
+// deepVintageKey extracts the payload's vintage key: the balance-sheet closing date
+// (as YYYY-MM-DD) plus the turnover year. The date is taken LITERALLY from the vendor
+// string — no timezone parsing, because "2025-12-31T00:00:00+01:00" read as an instant
+// and rendered in UTC would shift the closing date to Dec 30.
+func deepVintageKey(payload json.RawMessage) (string, *int, bool) {
+	object, err := decodeVendorObject(payload)
+	if err != nil || object == nil {
+		return "", nil, false
+	}
+	root := deepFullRoot(object)
+	raw := firstVendorString(root, "ecofin.balanceSheetDate")
+	if len(raw) < 10 {
+		return "", nil, false
+	}
+	date := raw[:10]
+	if _, err := time.Parse("2006-01-02", date); err != nil {
+		return "", nil, false
+	}
+	return date, deepIntPtr(root, "ecofin.turnoverYear"), true
 }
 
 // buildMADeepValuation derives an EV/equity range from the scorecard and a sector

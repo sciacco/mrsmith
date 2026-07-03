@@ -1536,6 +1536,14 @@ func (f *fakeMAWorkspaceStore) ListMADeepReadyPayloads(context.Context) ([]maDee
 	return nil, nil
 }
 
+func (f *fakeMAWorkspaceStore) CountMADeepByStatus(context.Context) (map[string]int, error) {
+	return map[string]int{}, nil
+}
+
+func (f *fakeMAWorkspaceStore) CountMADeepVintage(context.Context) (int, int, error) {
+	return 0, 0, nil
+}
+
 func (f *fakeMAWorkspaceStore) UpdateMADeepScorecard(context.Context, string, *MADeepScorecard) error {
 	return nil
 }

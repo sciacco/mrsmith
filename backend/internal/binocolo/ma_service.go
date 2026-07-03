@@ -2601,6 +2601,252 @@ func (s *maService) recomputeMADeepScorecards(ctx context.Context) (int, error) 
 	return recomputed, nil
 }
 
+// inspectMADeep computes the Fase 0 read-only diagnostics over the cached deep
+// payloads (DEEP-DIVE-DECISIONS.md §1/§8): code-family mix, debt granularity,
+// coverage of the still-unused vendor deltas and L2Y absolutes, provisions usage,
+// and the vendor-vs-CEE reconciliation distribution that will calibrate
+// vendor_cee_tolerance_pct. No vendor call, nothing persisted.
+func (s *maService) inspectMADeep(ctx context.Context) (MADeepInspectReport, error) {
+	if s.store == nil {
+		return MADeepInspectReport{}, errMAStoreUnavailable
+	}
+	report := MADeepInspectReport{Coverage: map[string]int{}}
+	counts, err := s.store.CountMADeepByStatus(ctx)
+	if err != nil {
+		return MADeepInspectReport{}, err
+	}
+	report.StatusCounts = counts
+	// Vintage stats are best-effort: before migration 091 the table does not exist
+	// and the whole diagnostic must still work.
+	if vintageRows, vintageCompanies, err := s.store.CountMADeepVintage(ctx); err != nil {
+		report.Vintage.Error = err.Error()
+	} else {
+		report.Vintage.Rows = vintageRows
+		report.Vintage.Companies = vintageCompanies
+	}
+	rows, err := s.store.ListMADeepReadyPayloads(ctx)
+	if err != nil {
+		return MADeepInspectReport{}, err
+	}
+	var ebitdaDevs, pfnDevs []maInspectDeviation
+	for _, row := range rows {
+		object, err := decodeVendorObject(row.Payload)
+		if err != nil || object == nil {
+			continue
+		}
+		root := deepFullRoot(object)
+		codes := maInspectCodeValues(root)
+		report.PayloadsAnalyzed++
+
+		// Famiglie di codici. IPL231/IPL232/IICC351 sono refusi della legend del
+		// vendor emessi verbatim dall'API: non contano come divisione PL.
+		hasIIC, hasOtherIPL, hasTypo := false, false, false
+		for code := range codes {
+			switch {
+			case code == "IPL231" || code == "IPL232" || code == "IICC351":
+				hasTypo = true
+			case strings.HasPrefix(code, "IPL"):
+				hasOtherIPL = true
+			case strings.HasPrefix(code, "IIC"):
+				hasIIC = true
+			}
+		}
+		if hasOtherIPL {
+			report.CodeFamilies.WithIPL++
+		} else if hasIIC {
+			report.CodeFamilies.IICOnly++
+		}
+		if hasTypo {
+			report.CodeFamilies.KnownLegendTypos++
+		}
+
+		codeVal := func(num string) (float64, bool) {
+			if v, ok := codes["IIC"+num]; ok {
+				return v, true
+			}
+			if v, ok := codes["IPL"+num]; ok {
+				return v, true
+			}
+			return 0, false
+		}
+
+		// Granularità debiti: dettaglio con split entro/oltre vs soli totali per voce.
+		splitPresent, totalPresent := false, false
+		for _, num := range maInspectDebtSplitCodes {
+			if _, ok := codeVal(num); ok {
+				splitPresent = true
+				break
+			}
+		}
+		for _, num := range maInspectDebtTotalCodes {
+			if _, ok := codeVal(num); ok {
+				totalPresent = true
+				break
+			}
+		}
+		switch {
+		case splitPresent:
+			report.Granularity.DebtDetail++
+		case totalPresent:
+			report.Granularity.TotalsOnly++
+		default:
+			report.Granularity.NoDebts++
+		}
+
+		// Copertura dei campi vendor oggi inutilizzati (delta YoY + assoluti L2Y).
+		for label, path := range maInspectCoveragePaths {
+			if _, ok := maInspectNumber(root, path); ok {
+				report.Coverage[label]++
+			}
+		}
+
+		// Accantonamenti B.12/B.13: dove sono valorizzati, discriminano la
+		// definizione EBITDA del vendor (aperta: zero in entrambe le fixture).
+		if b12, _ := codeVal("146"); b12 != 0 {
+			report.ProvisionsB12B13++
+		} else if b13, _ := codeVal("147"); b13 != 0 {
+			report.ProvisionsB12B13++
+		}
+
+		// Riconciliazione EBITDA: A(130) − B(149) + B.10(144) vs vendor.
+		vendorEBITDA, okVendorEBITDA := maInspectNumber(root, "operatingResults.ebitda")
+		a, okA := codeVal("130")
+		b, okB := codeVal("149")
+		dep, okDep := codeVal("144")
+		if okVendorEBITDA && vendorEBITDA != 0 && okA && okB && okDep {
+			cee := a - b + dep
+			pct := (cee - vendorEBITDA) / math.Abs(vendorEBITDA) * 100
+			ebitdaDevs = append(ebitdaDevs, maInspectDeviation{companyKey: row.CompanyKey, vendor: vendorEBITDA, cee: cee, pct: pct})
+		}
+
+		// Riconciliazione PFN: (D.1..D.5 + derivati passivi 219 − cassa − titoli)
+		// vs pfnEbitda×EBITDA. Il denominatore ha un pavimento di 1000€ perché su
+		// PFN prossime allo zero la percentuale esploderebbe senza significato.
+		voce := func(base, twin, total string) float64 {
+			if v, ok := codeVal(total); ok {
+				return v
+			}
+			v1, ok1 := codeVal(base)
+			v2, ok2 := codeVal(twin)
+			if ok1 || ok2 {
+				return v1 + v2
+			}
+			return 0
+		}
+		cash, okCash := codeVal("070")
+		ratio, okRatio := maInspectNumber(root, "leverageRatios.pfnEbitda")
+		if okCash && okRatio && okVendorEBITDA {
+			gross := voce("090", "091", "329") + voce("092", "093", "330") + voce("184", "185", "331") +
+				voce("094", "095", "332") + voce("096", "097", "333")
+			derivati, _ := codeVal("219")
+			securities, _ := codeVal("065")
+			cee := gross + derivati - cash - securities
+			vendorPFN := ratio * vendorEBITDA
+			denom := math.Max(math.Abs(vendorPFN), 1000)
+			pct := (cee - vendorPFN) / denom * 100
+			pfnDevs = append(pfnDevs, maInspectDeviation{companyKey: row.CompanyKey, vendor: vendorPFN, cee: cee, pct: pct})
+		}
+	}
+	report.Reconciliation.EBITDA = maInspectSummarize(ebitdaDevs)
+	report.Reconciliation.PFN = maInspectSummarize(pfnDevs)
+	return report, nil
+}
+
+// Voci D con split entro/oltre (codici base+gemello) e totali per voce: la presenza
+// dell'uno o dell'altro classifica la granularità del deposito.
+var maInspectDebtSplitCodes = []string{
+	"090", "091", "092", "093", "184", "185", "094", "095", "096", "097",
+	"098", "099", "100", "101", "102", "103", "104", "105", "106", "107",
+	"108", "109", "220", "221", "110", "111", "112", "113", "114", "115",
+}
+
+var maInspectDebtTotalCodes = []string{
+	"329", "330", "331", "332", "333", "334", "335", "336", "337", "338",
+	"339", "340", "341", "342", "343",
+}
+
+var maInspectCoveragePaths = map[string]string{
+	"grossFinancialDebt": "development.grossFinancialDebt",
+	"totalAssets":        "development.totalAssets",
+	"addedValue":         "development.addedValue",
+	"employeeTrend":      "employees.employeeTrend",
+	"ebitdaL2Y":          "operatingResults.ebitdaL2Y",
+	"ebitL2Y":            "operatingResults.ebitL2Y",
+	"cashFlowL2Y":        "operatingResults.cashFlowL2Y",
+}
+
+type maInspectDeviation struct {
+	companyKey string
+	vendor     float64
+	cee        float64
+	pct        float64
+}
+
+// maInspectCodeValues flattens every {code,value} array of the payload (debts,
+// credits, productionCosts, ...) into a single code→value map.
+func maInspectCodeValues(root map[string]any) map[string]float64 {
+	out := map[string]float64{}
+	for _, value := range root {
+		list, ok := value.([]any)
+		if !ok {
+			continue
+		}
+		for _, item := range list {
+			entry, ok := item.(map[string]any)
+			if !ok {
+				continue
+			}
+			code, _ := entry["code"].(string)
+			if code == "" {
+				continue
+			}
+			if n, ok := vendorNumber(entry["value"]); ok {
+				out[code] = n
+			}
+		}
+	}
+	return out
+}
+
+func maInspectNumber(root map[string]any, path string) (float64, bool) {
+	value, ok := vendorPath(root, path)
+	if !ok {
+		return 0, false
+	}
+	return vendorNumber(value)
+}
+
+// maInspectSummarize condenses the deviations: max/median of |pct|, count over 1%,
+// and the 10 worst offenders (the rows to eyeball before fixing the tolerance).
+func maInspectSummarize(devs []maInspectDeviation) MADeepInspectDeviation {
+	out := MADeepInspectDeviation{Computable: len(devs)}
+	if len(devs) == 0 {
+		return out
+	}
+	sort.Slice(devs, func(i, j int) bool { return math.Abs(devs[i].pct) > math.Abs(devs[j].pct) })
+	round2 := func(v float64) float64 { return math.Round(v*100) / 100 }
+	out.MaxAbsPct = round2(math.Abs(devs[0].pct))
+	out.P50AbsPct = round2(math.Abs(devs[len(devs)/2].pct))
+	for _, dev := range devs {
+		if math.Abs(dev.pct) > 1 {
+			out.Over1Pct++
+		}
+	}
+	limit := 10
+	if len(devs) < limit {
+		limit = len(devs)
+	}
+	for _, dev := range devs[:limit] {
+		out.Worst = append(out.Worst, MADeepInspectOffender{
+			CompanyKey:   dev.companyKey,
+			VendorValue:  math.Round(dev.vendor),
+			CEEValue:     math.Round(dev.cee),
+			DeviationPct: round2(dev.pct),
+		})
+	}
+	return out
+}
+
 // companyDossier is the standalone P.IVA lookup (POST). Cache-first by vat_code: a
 // ready or in-flight analysis is served as-is (no charge, no enqueue). A miss or a
 // previously failed row needs an explicit cost acknowledgement before a fresh IT-full

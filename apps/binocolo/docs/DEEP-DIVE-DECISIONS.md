@@ -84,11 +84,16 @@ CDLAN SPA, media/TLC-DC, bilancio 2025 — n=2):
   contributi = IIC129; B.8 = IIC133; goodwill = IIC007; variazione rimanenze
   B.11 = IIC145.
 
-**Da validare sui payload in cache prima di implementare** (via query utente o
-endpoint di ispezione read-only — mai connessione diretta al DB condiviso):
-mix divisioni IC/PL, granularità ordinario/abbreviato/micro sui target reali,
-copertura campi delta e L2Y, trattamento B.12/13 nell'EBITDA vendor, scala di
-`development.grossFinancialDebt`.
+**Validazione sulla cache ESEGUITA (inspect Fase 0, 2026-07-03, n=10):**
+divisione PL mai osservata (10/10 IIC, refusi legend in tutti); granularità:
+8 con dettaglio split, 0 solo-totali, **2 senza array debiti** (la catena di
+fallback con provenienza serve davvero); riconciliazione EBITDA 10/10 a 0,00%
+e PFN 6/6 entro 0,03% incluse PFN negative → soglia `vendor_cee_tolerance_pct`
+fissata a **1%**; L2Y assoluti 10/10, employeeTrend 8/10, grossFinancialDebt
+7/10; B.12/13 sempre zero (questione definitoria aperta ma immateriale — la
+sentinella automatica è il flag di riconciliazione). Resta non verificata solo
+la **scala** di `development.grossFinancialDebt` (frazione vs percento):
+decidibile solo con un bilancio precedente in mano, arriverà con le vintage.
 
 ## 2. Filone B — EBITDA da deal, PFN vera, equity bridge
 

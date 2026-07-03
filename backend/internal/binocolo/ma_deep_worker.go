@@ -21,6 +21,7 @@ type maDeepWorkerStore interface {
 	AcquireMADeepLease(ctx context.Context, companyKey, workerID string, leaseSeconds int) (bool, error)
 	ClaimMADeepQueued(ctx context.Context, companyKey string) (bool, error)
 	SetMADeepVendorRequest(ctx context.Context, companyKey, vendorRequestID string) error
+	InsertMADeepVintage(ctx context.Context, companyKey, balanceSheetDate string, turnoverYear *int, payload json.RawMessage) error
 	ResolveSectorMultiple(ctx context.Context, ateco string) (*sectorMultiple, error)
 	SaveMADeepReady(ctx context.Context, companyKey string, result maDeepResult) error
 	MarkMADeepFailed(ctx context.Context, companyKey, errorCode string) error
@@ -142,6 +143,17 @@ func (w *maDeepWorker) process(ctx context.Context, job maDeepJob) {
 		if !deepPayloadReady(resp.Data) {
 			w.retryOrFail(ctx, job, "poll_timeout")
 			return
+		}
+		// Archive the vintage FIRST: the payload is paid, and ma_deep_analysis keeps
+		// only the latest one per company (a future refresh overwrites it). Best-effort:
+		// a vintage failure (e.g. migration 091 not applied yet) must not block the
+		// analysis; ON CONFLICT makes re-polls of the same filing a no-op.
+		if date, year, ok := deepVintageKey(resp.Data); ok {
+			if err := w.store.InsertMADeepVintage(ctx, job.CompanyKey, date, year, resp.Data); err != nil {
+				logging.FromContext(ctx).Warn("binocolo deep worker vintage insert failed", "component", "binocolo", "company_key", job.CompanyKey, "error", err)
+			}
+		} else {
+			logging.FromContext(ctx).Warn("binocolo deep worker vintage key unreadable", "component", "binocolo", "company_key", job.CompanyKey)
 		}
 		scorecard := buildMADeepScorecard(resp.Data)
 		if scorecard == nil || (scorecard.Turnover == nil && scorecard.Ebitda == nil && !scorecardHasMetric(scorecard)) {

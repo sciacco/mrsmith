@@ -70,6 +70,20 @@ Fase 6 (F: IRL)                 ← dopo 2/3/5 per le fonti (degrada bene con un
 
 ## Fase 0 — Versioning payload + endpoint di ispezione
 
+> **STATO 2026-07-03: IMPLEMENTATA, ATTIVATA E CHIUSA** — build/vet/gofmt
+> verdi; smoke fixture verde; mig 091 applicata dall'utente; inspect eseguito
+> su n=10: 10/10 IIC-only (divisione PL mai osservata, refusi legend in tutti),
+> granularità 8 dettaglio / 2 SENZA array debiti (→ la catena di fallback con
+> provenienza è necessaria, non teorica), riconciliazione EBITDA 10/10 a 0,00%
+> e PFN 6/6 entro 0,03% (regge anche su PFN negative), L2Y assoluti 10/10,
+> employeeTrend 8/10, grossFinancialDebt 7/10, B.12/13 sempre zero (questione
+> definitoria immateriale; sentinella = flag di riconciliazione), vintage
+> backfill 10 righe/10 aziende.
+> Nota implementativa: l'archivio vintage è scritto dal worker PRIMA della
+> pipeline di analisi (best-effort, ON CONFLICT DO NOTHING), non dentro
+> `SaveMADeepReady` come da bozza — così una vintage fallita (es. migrazione
+> non applicata) non blocca mai il salvataggio dell'analisi pagata.
+
 **Obiettivo:** fermare la perdita delle vintage (oggi `SaveMADeepReady`
 sovrascrive `itfull_payload`) e rendere possibile la validazione empirica di
 §1/§8 del documento decisioni senza toccare il DB a mano.
@@ -164,7 +178,8 @@ banda ancorata all'EBITDA prudenziale, flag di confidenza fuori da banda e RAG.
 `ma_parameter` (ON CONFLICT DO NOTHING): `tfr_bridge_pct=100`,
 `a5_ebitda_flag_pct=20`, `b8_revenue_flag_pct=8`,
 `participation_assets_flag_pct=25`, `participation_income_flag_pct=20`,
-`vendor_cee_tolerance_pct=<da inspect Fase 0>`.
+`vendor_cee_tolerance_pct=1` (inspect Fase 0 su n=10: rumore max 0,03% da
+rounding del ratio; un mismatch definitorio vero è in scala percentuale).
 
 **Backend:**
 - Tipi (`ma_types.go`): `MADeepBridge` (righe: EV low/high, −PFN [provenienza],
@@ -414,5 +429,6 @@ bianco.
 - **(c) Valori Damodaran famiglia — CONFERMATA**: i due XLS in `docs/` sono la
   vintage 2026-01-05 della mig 039; Computer Services ed
   Engineering/Construction si estraggono da lì in Fase 3.
-- **(d) Soglia `vendor_cee_tolerance_pct`**: si fissa solo dopo l'inspect di
-  Fase 0 (evidence-gated). Primo dato: scarto < 0,01% su entrambe le fixture.
+- **(d) Soglia `vendor_cee_tolerance_pct` — RISOLTA (inspect 2026-07-03,
+  n=10)**: EBITDA 10/10 a scarto 0,00%, PFN 6/6 entro 0,03% (rounding, regge
+  anche su PFN negative) → soglia **1%** (30× il rumore osservato).

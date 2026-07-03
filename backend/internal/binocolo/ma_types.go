@@ -1270,6 +1270,62 @@ type MADeepDiveRequest struct {
 	AcknowledgeCost bool `json:"acknowledgeCost,omitempty"`
 }
 
+// MADeepInspectReport — read-only aggregates over the cached deep payloads (Fase 0,
+// DEEP-DIVE-IMPLEMENTATION-PLAN.md): answers the empirical unknowns of the redesign
+// (code-family mix, debt granularity, delta/L2Y coverage, provisions treatment,
+// vendor-vs-CEE reconciliation) without any vendor call and without persisting.
+type MADeepInspectReport struct {
+	StatusCounts     map[string]int              `json:"statusCounts"`
+	PayloadsAnalyzed int                         `json:"payloadsAnalyzed"`
+	CodeFamilies     MADeepInspectFamilies       `json:"codeFamilies"`
+	Granularity      MADeepInspectGranularity    `json:"granularity"`
+	Coverage         map[string]int              `json:"coverage"`
+	ProvisionsB12B13 int                         `json:"provisionsB12B13NonZero"`
+	Reconciliation   MADeepInspectReconciliation `json:"reconciliation"`
+	Vintage          MADeepInspectVintage        `json:"vintage"`
+}
+
+type MADeepInspectFamilies struct {
+	IICOnly int `json:"iicOnly"`
+	// WithIPL counts payloads carrying IPL codes OTHER than the two legend typos
+	// (IPL231/IPL232 are canonical: the vendor's legend misprints them in the IIC
+	// column and the API emits them verbatim in IIC-division payloads).
+	WithIPL          int `json:"withIpl"`
+	KnownLegendTypos int `json:"knownLegendTypos"`
+}
+
+type MADeepInspectGranularity struct {
+	DebtDetail int `json:"debtDetail"` // per-voce split entro/oltre presente
+	TotalsOnly int `json:"totalsOnly"` // solo totali per voce (IIC329-343)
+	NoDebts    int `json:"noDebts"`
+}
+
+type MADeepInspectReconciliation struct {
+	EBITDA MADeepInspectDeviation `json:"ebitda"`
+	PFN    MADeepInspectDeviation `json:"pfn"`
+}
+
+type MADeepInspectDeviation struct {
+	Computable int                     `json:"computable"`
+	MaxAbsPct  float64                 `json:"maxAbsPct"`
+	P50AbsPct  float64                 `json:"p50AbsPct"`
+	Over1Pct   int                     `json:"over1pct"`
+	Worst      []MADeepInspectOffender `json:"worst,omitempty"`
+}
+
+type MADeepInspectOffender struct {
+	CompanyKey   string  `json:"companyKey"`
+	VendorValue  float64 `json:"vendorValue"`
+	CEEValue     float64 `json:"ceeValue"`
+	DeviationPct float64 `json:"deviationPct"`
+}
+
+type MADeepInspectVintage struct {
+	Rows      int    `json:"rows"`
+	Companies int    `json:"companies"`
+	Error     string `json:"error,omitempty"` // es. migrazione 091 non ancora applicata
+}
+
 // MACompanyDossier is the standalone P.IVA lookup response: our elaborations
 // (scorecard/valuation/brief) plus the raw IT-full payload for the facts layer.
 // Status drives the frontend: absent | cost_required | queued | running | ready | failed.

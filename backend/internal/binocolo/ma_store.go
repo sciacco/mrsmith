@@ -54,6 +54,8 @@ type maWorkspaceStore interface {
 	ListMADeepAnalysis(ctx context.Context, companyKeys []string) (map[string]MADeepAnalysis, error)
 	EnqueueMADeepAnalysis(ctx context.Context, companyKey, vatCode, taxCode, email string) error
 	ListMADeepReadyPayloads(ctx context.Context) ([]maDeepPayloadRow, error)
+	CountMADeepByStatus(ctx context.Context) (map[string]int, error)
+	CountMADeepVintage(ctx context.Context) (int, int, error)
 	UpdateMADeepScorecard(ctx context.Context, companyKey string, scorecard *MADeepScorecard) error
 	GetMADeepByVAT(ctx context.Context, vat string) (*maDeepVATRecord, error)
 	ListMADeepReadyForBrief(ctx context.Context) ([]maDeepBriefRow, error)
@@ -3530,6 +3532,70 @@ RETURNING attempts
 		return 0, fmt.Errorf("bump ma deep attempt: %w", err)
 	}
 	return attempts, nil
+}
+
+// InsertMADeepVintage archives one (company, balance-sheet date) payload vintage
+// (migration 091). ON CONFLICT DO NOTHING: re-fetching the same filing is not a new
+// vintage; a new filing is a new row. Called best-effort by the worker BEFORE the
+// analysis pipeline, so a vintage failure (e.g. migration not yet applied on the
+// shared DB) never loses the paid payload processing.
+func (s *SQLStore) InsertMADeepVintage(ctx context.Context, companyKey, balanceSheetDate string, turnoverYear *int, payload json.RawMessage) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	if strings.TrimSpace(companyKey) == "" || strings.TrimSpace(balanceSheetDate) == "" || len(payload) == 0 {
+		return errors.New("ma deep vintage: missing key or payload")
+	}
+	_, err := s.db.ExecContext(ctx, `
+INSERT INTO binocolo.ma_deep_payload_vintage (company_key, balance_sheet_date, turnover_year, payload)
+VALUES ($1, $2::date, $3, $4::jsonb)
+ON CONFLICT (company_key, balance_sheet_date) DO NOTHING
+`, companyKey, balanceSheetDate, nullInt(turnoverYear), []byte(payload))
+	if err != nil {
+		return fmt.Errorf("insert ma deep vintage: %w", err)
+	}
+	return nil
+}
+
+// CountMADeepByStatus returns the row count of ma_deep_analysis per status (inspect).
+func (s *SQLStore) CountMADeepByStatus(ctx context.Context) (map[string]int, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT status, count(*) FROM binocolo.ma_deep_analysis GROUP BY status
+`)
+	if err != nil {
+		return nil, fmt.Errorf("count ma deep by status: %w", err)
+	}
+	defer rows.Close()
+	out := map[string]int{}
+	for rows.Next() {
+		var status string
+		var count int
+		if err := rows.Scan(&status, &count); err != nil {
+			return nil, fmt.Errorf("scan ma deep status count: %w", err)
+		}
+		out[status] = count
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma deep status counts: %w", err)
+	}
+	return out, nil
+}
+
+// CountMADeepVintage returns (rows, distinct companies) of the vintage archive.
+func (s *SQLStore) CountMADeepVintage(ctx context.Context) (int, int, error) {
+	if s == nil || s.db == nil {
+		return 0, 0, errors.New("binocolo ma store not configured")
+	}
+	var rows, companies int
+	if err := s.db.QueryRowContext(ctx, `
+SELECT count(*), count(DISTINCT company_key) FROM binocolo.ma_deep_payload_vintage
+`).Scan(&rows, &companies); err != nil {
+		return 0, 0, fmt.Errorf("count ma deep vintage: %w", err)
+	}
+	return rows, companies, nil
 }
 
 type maDeepPayloadRow struct {

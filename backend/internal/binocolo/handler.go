@@ -161,6 +161,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/sessions/{id}/export", h.handleExportMASession)
 	handle("POST /binocolo/v1/ma/deep/recompute", h.handleRecomputeMADeep)
 	handle("POST /binocolo/v1/ma/deep/regenerate-briefs", h.handleRegenerateMADeepBriefs)
+	handle("GET /binocolo/v1/ma/deep/inspect", h.handleInspectMADeep)
 	handle("GET /binocolo/v1/companies/{vat}/dossier", h.handleGetCompanyDossier)
 	handle("POST /binocolo/v1/companies/{vat}/dossier", h.handleCreateCompanyDossier)
 	handle("POST /binocolo/v1/test/gated-search", h.handleTestGatedSearch)
@@ -1066,6 +1067,25 @@ func (h *Handler) handleRegenerateMADeepBriefs(w http.ResponseWriter, r *http.Re
 	}
 	h.completeMATraceSuccess(r, http.StatusOK)
 	httputil.JSON(w, http.StatusOK, map[string]any{"regenerated": count})
+}
+
+// handleInspectMADeep computes the Fase 0 read-only diagnostics over the cached deep
+// payloads (division mix, granularity, delta coverage, vendor-vs-CEE reconciliation).
+// No vendor call, nothing persisted. Gated by the standard binocolo access role.
+func (h *Handler) handleInspectMADeep(w http.ResponseWriter, r *http.Request) {
+	subject, email := companySearchRefreshActor(r.Context())
+	var ok bool
+	r, ok = h.startMATrace(w, r, "ma_deep_inspect", "", nil, subject, email)
+	if !ok {
+		return
+	}
+	report, err := h.ma.inspectMADeep(r.Context())
+	if err != nil {
+		h.maFailure(w, r, "ma_deep_inspect", err)
+		return
+	}
+	h.completeMATraceSuccess(r, http.StatusOK)
+	httputil.JSON(w, http.StatusOK, report)
 }
 
 // handleGetCompanyDossier returns the cached dossier state for a P.IVA (poll target);
