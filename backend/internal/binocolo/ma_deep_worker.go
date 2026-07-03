@@ -305,7 +305,7 @@ func parseMADeepBrief(content string) (*MADeepBrief, error) {
 		brief.FinancialReading = brief.ThesisReading
 		brief.ThesisReading = ""
 	}
-	brief.ValuationRationale = cleanText(brief.ValuationRationale, 600)
+	brief.ValuationRationale = cleanText(brief.ValuationRationale, 800)
 	brief.RAG = strings.ToLower(strings.TrimSpace(brief.RAG))
 	if len(brief.Strengths) > 6 {
 		brief.Strengths = brief.Strengths[:6]
