@@ -1544,6 +1544,38 @@ func (f *fakeMAWorkspaceStore) CountMADeepBriefFormats(context.Context) (map[str
 	return map[string]int{}, nil, nil
 }
 
+func (f *fakeMAWorkspaceStore) ListMACardIRLItems(context.Context, string, string) ([]MACardIRLItem, error) {
+	return nil, nil
+}
+
+func (f *fakeMAWorkspaceStore) MaxMACardIRLPosition(context.Context, string, string) (int, error) {
+	return 0, nil
+}
+
+func (f *fakeMAWorkspaceStore) InsertMACardIRLSeed(context.Context, []MACardIRLItem) (int, map[string]int, error) {
+	return 0, map[string]int{}, nil
+}
+
+func (f *fakeMAWorkspaceStore) InsertMACardIRLItem(context.Context, MACardIRLItem) (*MACardIRLItem, error) {
+	return nil, nil
+}
+
+func (f *fakeMAWorkspaceStore) UpdateMACardIRLItem(context.Context, string, string, string, MAIRLItemPatch) (*MACardIRLItem, error) {
+	return nil, nil
+}
+
+func (f *fakeMAWorkspaceStore) DeleteMACardIRLItem(context.Context, string, string, string) (bool, error) {
+	return false, nil
+}
+
+func (f *fakeMAWorkspaceStore) ReorderMACardIRLItems(context.Context, string, string, []string) error {
+	return nil
+}
+
+func (f *fakeMAWorkspaceStore) ListMAIRLTemplates(context.Context, string) ([]MAIRLTemplate, error) {
+	return nil, nil
+}
+
 func (f *fakeMAWorkspaceStore) UpdateMADeepValuation(context.Context, string, *MADeepValuation) error {
 	return nil
 }

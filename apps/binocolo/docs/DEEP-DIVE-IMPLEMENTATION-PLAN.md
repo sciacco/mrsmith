@@ -533,9 +533,55 @@ dossier neutro resta intatto.
 
 ## Fase 6 — Filone F: Information Request List
 
+> **STATO 2026-07-03: IMPLEMENTATA** — mig **099** (il numero 098 è andato al
+> fix FK del registry): `ma_card_irl_item` (source CHECK a 5 valori, status a
+> 4, indice UNIQUE parziale su (initiative, company, source, source_ref) WHERE
+> source_ref <> '' = il lucchetto del re-seed additivo; FK solo verso
+> l'iniziativa, MAI verso la card) + `ma_irl_template` seminata con 42 voci
+> (11 servizi_ricorrenti, 10 progetto_integrazione, 10 rivendita_var, 11
+> software_prodotto; UNIQUE(family, question)). Backend `ma_irl.go`: seed a 4
+> fonti (flag→DDQuestion con ref=codice; brief→DDQuestions con ref=hash
+> testo normalizzato; tesi→ThesisDDQuestions con ref=hash; template della
+> famiglia EFFETTIVA con ref=id template; deep non richiesto — senza, seminano
+> le fonti restanti), insert ON CONFLICT DO NOTHING per-riga in tx con
+> conteggio inserite/proposte per fonte; CRUD (add analyst, PATCH parziale
+> categoria/domanda/stato con vocabolario chiuso, DELETE, reorder passo 10);
+> export XLSX via `buildMAXLSX` (Categoria/Domanda/Stato/Fonte/Aggiornata),
+> GET ed export senza gate operativo (l'IRL sopravvive all'archiviazione),
+> mutazioni con `requireOperationalInitiativeCard`; trace con session id
+> VUOTO (lezione del bug 5 di Fase 5). Rotte `.../cards/{companyKey}/irl` +
+> `/seed` `/items` `/items/{itemId}` `/reorder` `/export`. UI: tab "IRL"
+> (clipboard-check) sulla card dossier — lista raggruppata per categoria,
+> chip stato ciclabile (aperta→chiesta→risposta→na, na barrata), edit inline
+> della domanda (click, Enter/Esc), delete per voce, form aggiunta con
+> categoria opzionale, "Semina dalle fonti" con esito "N nuove su M proposte",
+> "Export XLSX" con download. Build/vet/gofmt verdi, suite deterministica
+> verde, tsc pulito sui file toccati (restano i soliti errori pre-esistenti di
+> IniziativaBoardPage/RicerchePage). **Da fare per attivarla**: mig 099 +
+> riavvio backend, poi smoke: seed su card con deep+tesi (KRAL), curatela
+> (stato/edit/delete), re-seed additivo, export in Excel.
+>
+> **ATTIVATA E CHIUSA 2026-07-03** — smoke completo su KRAL: seed 27/27 con
+> tutte e 4 le fonti (flag 2, brief 8, tesi 6, template 11 servizi_ricorrenti);
+> curatela (stato→chiesta, edit domanda, delete, voce analista) e **re-seed
+> additivo esatto**: 27 proposte → 1 inserita (solo la cancellata), curatela
+> intatta; export XLSX valido (29 righe, colonne e fonti giuste,
+> Content-Disposition ok); UI verificata in browser (gruppi, chip ciclabile,
+> edit inline, console pulita). Due note dall'attivazione: (1) il 404 del
+> card-dossier sulla smoke initiative era la sessione SGANCIATA
+> (riagganciata via POST /ma/sessions/{id}/initiative — comportamento noto,
+> non regressione; con dossier 404 il tab IRL non è raggiungibile da UI,
+> gap v1 accettato); (2) **fix regressione Fase 5**: l'icona `target` del tab
+> Lettura di tesi non era nel registry di `@mrsmith/ui` Icon → crash
+> dell'intera pagina card-dossier appena il dossier risolveva (mai visto
+> prima perché il tab-bar non veniva renderizzato sui 404) — aggiunta
+> `Target` al registry.
+>
+> **IL PIANO È COMPLETO: tutte le 7 fasi (0-6) implementate e attivate.**
+
 **Obiettivo:** flag e domande diventano l'artefatto che esce dal tool.
 
-**Migrazione 098** `098_binocolo_ma_card_irl.sql`:
+**Migrazione 099** `099_binocolo_ma_card_irl.sql`:
 - `binocolo.ma_card_irl_item` — `id uuid PK`, `(initiative_id, company_key)`
   idx, `category text`, `question text`, `source text CHECK IN
   ('flag','brief','thesis','template','analyst')`, `source_ref text` (per il

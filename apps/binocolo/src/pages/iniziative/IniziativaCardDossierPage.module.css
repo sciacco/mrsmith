@@ -343,3 +343,123 @@
   background: var(--color-accent);
   border-radius: var(--radius-full);
 }
+
+/* IRL — Information Request List (Fase 6) */
+.irlToolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+
+.irlSeedNote {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
+.irlGroup {
+  margin-bottom: var(--space-4);
+}
+
+.irlGroupTitle {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-2);
+}
+
+.irlRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.irlRow:last-child {
+  border-bottom: none;
+}
+
+.irlQuestion {
+  flex: 1;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  cursor: text;
+}
+
+.irlQuestionNa {
+  color: var(--color-text-secondary);
+  text-decoration: line-through;
+}
+
+.irlSource {
+  font-size: 0.6875rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  padding-top: 2px;
+}
+
+.irlStatusChip {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: 2px 10px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.irlStatusChiesta {
+  border-color: var(--color-warning, #b45309);
+  color: var(--color-warning, #b45309);
+}
+
+.irlStatusRisposta {
+  border-color: var(--color-success, #15803d);
+  color: var(--color-success, #15803d);
+}
+
+.irlDelete {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.irlEditInput,
+.irlAddInput {
+  width: 100%;
+  font: inherit;
+  font-size: 0.875rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm, 4px);
+  background: var(--color-surface);
+  color: inherit;
+}
+
+.irlAddForm {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  align-items: center;
+}
+
+.irlAddCategory {
+  width: 160px;
+  flex: none;
+  font: inherit;
+  font-size: 0.875rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm, 4px);
+  background: var(--color-surface);
+  color: inherit;
+}

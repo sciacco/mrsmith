@@ -132,6 +132,13 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/deep-dive", h.handleDeepDiveMACard)
 	handle("GET /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/thesis-reading", h.handleGetCardThesisReading)
 	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/thesis-reading", h.handleGenerateCardThesisReading)
+	handle("GET /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/irl", h.handleGetCardIRL)
+	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/irl/seed", h.handleSeedCardIRL)
+	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/irl/items", h.handleAddCardIRLItem)
+	handle("PATCH /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/irl/items/{itemId}", h.handleUpdateCardIRLItem)
+	handle("DELETE /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/irl/items/{itemId}", h.handleDeleteCardIRLItem)
+	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/irl/reorder", h.handleReorderCardIRL)
+	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/irl/export", h.handleExportCardIRL)
 	handle("GET /binocolo/v1/ma/companies/{companyKey}/registry", h.handleGetMACompanyRegistry)
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/registry/facts", h.handleCreateMACompanyFact)
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/registry/facts/{factId}/revoke", h.handleRevokeMACompanyFact)
@@ -640,6 +647,198 @@ func (h *Handler) handleGenerateCardThesisReading(w http.ResponseWriter, r *http
 	}
 	h.completeMATraceSuccess(r, http.StatusOK)
 	httputil.JSON(w, http.StatusOK, reading)
+}
+
+// handleGetCardIRL lista le voci IRL della card. Read-only, nessun gate
+// operativo: l'IRL sopravvive all'archiviazione.
+func (h *Handler) handleGetCardIRL(w http.ResponseWriter, r *http.Request) {
+	id, ok := maInitiativeID(w, r)
+	if !ok {
+		return
+	}
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	items, err := h.ma.getCardIRL(r.Context(), id, companyKey)
+	if err != nil {
+		h.maFailure(w, r, "ma_irl_get", err, "initiative_id", id, "company_key", companyKey)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+// handleSeedCardIRL assembla le proposte dalle 4 fonti e inserisce solo i
+// source_ref nuovi (re-seed additivo, la curatela non si tocca).
+func (h *Handler) handleSeedCardIRL(w http.ResponseWriter, r *http.Request) {
+	id, ok := maInitiativeID(w, r)
+	if !ok {
+		return
+	}
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	var traceOK bool
+	r, traceOK = h.startMATrace(w, r, "ma_irl_seed", "", nil, subject, email)
+	if !traceOK {
+		return
+	}
+	report, err := h.ma.seedCardIRL(r.Context(), id, companyKey, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_irl_seed", err, "initiative_id", id, "company_key", companyKey)
+		return
+	}
+	h.completeMATraceSuccess(r, http.StatusOK)
+	httputil.JSON(w, http.StatusOK, report)
+}
+
+// handleAddCardIRLItem aggiunge una voce dell'analista.
+func (h *Handler) handleAddCardIRLItem(w http.ResponseWriter, r *http.Request) {
+	id, ok := maInitiativeID(w, r)
+	if !ok {
+		return
+	}
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	var body struct {
+		Category string `json:"category"`
+		Question string `json:"question"`
+	}
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	var traceOK bool
+	r, traceOK = h.startMATrace(w, r, "ma_irl_item_add", "", body, subject, email)
+	if !traceOK {
+		return
+	}
+	item, err := h.ma.addCardIRLItem(r.Context(), id, companyKey, body.Category, body.Question, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_irl_item_add", err, "initiative_id", id, "company_key", companyKey)
+		return
+	}
+	h.completeMATraceSuccess(r, http.StatusCreated)
+	httputil.JSON(w, http.StatusCreated, item)
+}
+
+// handleUpdateCardIRLItem applica la patch parziale (categoria/domanda/stato).
+func (h *Handler) handleUpdateCardIRLItem(w http.ResponseWriter, r *http.Request) {
+	id, ok := maInitiativeID(w, r)
+	if !ok {
+		return
+	}
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	itemID := strings.TrimSpace(r.PathValue("itemId"))
+	var body MAIRLItemPatch
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	var traceOK bool
+	r, traceOK = h.startMATrace(w, r, "ma_irl_item_update", "", body, subject, email)
+	if !traceOK {
+		return
+	}
+	item, err := h.ma.updateCardIRLItem(r.Context(), id, companyKey, itemID, body)
+	if err != nil {
+		h.maFailure(w, r, "ma_irl_item_update", err, "initiative_id", id, "company_key", companyKey, "item_id", itemID)
+		return
+	}
+	h.completeMATraceSuccess(r, http.StatusOK)
+	httputil.JSON(w, http.StatusOK, item)
+}
+
+func (h *Handler) handleDeleteCardIRLItem(w http.ResponseWriter, r *http.Request) {
+	id, ok := maInitiativeID(w, r)
+	if !ok {
+		return
+	}
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	itemID := strings.TrimSpace(r.PathValue("itemId"))
+	subject, email := companySearchRefreshActor(r.Context())
+	var traceOK bool
+	r, traceOK = h.startMATrace(w, r, "ma_irl_item_delete", "", nil, subject, email)
+	if !traceOK {
+		return
+	}
+	if err := h.ma.deleteCardIRLItem(r.Context(), id, companyKey, itemID); err != nil {
+		h.maFailure(w, r, "ma_irl_item_delete", err, "initiative_id", id, "company_key", companyKey, "item_id", itemID)
+		return
+	}
+	h.completeMATraceSuccess(r, http.StatusOK)
+	httputil.JSON(w, http.StatusOK, map[string]any{"deleted": true})
+}
+
+// handleReorderCardIRL riassegna le posizioni secondo l'ordine dell'array.
+func (h *Handler) handleReorderCardIRL(w http.ResponseWriter, r *http.Request) {
+	id, ok := maInitiativeID(w, r)
+	if !ok {
+		return
+	}
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	var body struct {
+		ItemIDs []string `json:"itemIds"`
+	}
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	var traceOK bool
+	r, traceOK = h.startMATrace(w, r, "ma_irl_reorder", "", body, subject, email)
+	if !traceOK {
+		return
+	}
+	if err := h.ma.reorderCardIRL(r.Context(), id, companyKey, body.ItemIDs); err != nil {
+		h.maFailure(w, r, "ma_irl_reorder", err, "initiative_id", id, "company_key", companyKey)
+		return
+	}
+	h.completeMATraceSuccess(r, http.StatusOK)
+	httputil.JSON(w, http.StatusOK, map[string]any{"reordered": len(body.ItemIDs)})
+}
+
+// handleExportCardIRL scarica l'XLSX del kick-off DD (pattern export sessione).
+func (h *Handler) handleExportCardIRL(w http.ResponseWriter, r *http.Request) {
+	id, ok := maInitiativeID(w, r)
+	if !ok {
+		return
+	}
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	var traceOK bool
+	r, traceOK = h.startMATrace(w, r, "ma_irl_export", "", nil, subject, email)
+	if !traceOK {
+		return
+	}
+	content, filename, contentType, err := h.ma.exportCardIRL(r.Context(), id, companyKey, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_irl_export", err, "initiative_id", id, "company_key", companyKey)
+		return
+	}
+	h.completeMATraceSuccess(r, http.StatusOK)
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(content)
 }
 
 // maCompanyKeyPath extracts and normalizes the {companyKey} path segment

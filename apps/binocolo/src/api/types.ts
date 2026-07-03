@@ -559,6 +559,32 @@ export interface MABMFamily {
   ratifiedAt?: string;
 }
 
+export type MAIRLStatus = 'aperta' | 'chiesta' | 'risposta' | 'na';
+export type MAIRLSource = 'flag' | 'brief' | 'thesis' | 'template' | 'analyst';
+
+// Voce della Information Request List della card (Fase 6): domanda DD con
+// provenienza e tracking leggero; sopravvive all'archiviazione della card.
+export interface MACardIRLItem {
+  id: string;
+  initiativeId: string;
+  companyKey: string;
+  category: string;
+  question: string;
+  source: MAIRLSource;
+  sourceRef?: string;
+  status: MAIRLStatus;
+  position: number;
+  createdByEmail?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MAIRLSeedReport {
+  proposed: number;
+  inserted: number;
+  bySource?: Record<string, number>;
+}
+
 export interface MADeepValuation {
   method: string;
   multiple: number;

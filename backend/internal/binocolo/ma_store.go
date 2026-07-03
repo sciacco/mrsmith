@@ -66,6 +66,14 @@ type maWorkspaceStore interface {
 	GetMACardThesisReading(ctx context.Context, initiativeID, companyKey string) (*MACardThesisReading, error)
 	UpsertMACardThesisReading(ctx context.Context, reading *MACardThesisReading, modelID, promptID, subject string) error
 	GetMAWebValidationForCompany(ctx context.Context, sessionID, companyKey string) (*MAWebValidation, error)
+	ListMACardIRLItems(ctx context.Context, initiativeID, companyKey string) ([]MACardIRLItem, error)
+	MaxMACardIRLPosition(ctx context.Context, initiativeID, companyKey string) (int, error)
+	InsertMACardIRLSeed(ctx context.Context, items []MACardIRLItem) (int, map[string]int, error)
+	InsertMACardIRLItem(ctx context.Context, item MACardIRLItem) (*MACardIRLItem, error)
+	UpdateMACardIRLItem(ctx context.Context, initiativeID, companyKey, itemID string, patch MAIRLItemPatch) (*MACardIRLItem, error)
+	DeleteMACardIRLItem(ctx context.Context, initiativeID, companyKey, itemID string) (bool, error)
+	ReorderMACardIRLItems(ctx context.Context, initiativeID, companyKey string, itemIDs []string) error
+	ListMAIRLTemplates(ctx context.Context, family string) ([]MAIRLTemplate, error)
 	GetMADeepByVAT(ctx context.Context, vat string) (*maDeepVATRecord, error)
 	ListMADeepReadyForBrief(ctx context.Context) ([]maDeepBriefRow, error)
 	UpdateMADeepBrief(ctx context.Context, companyKey string, brief *MADeepBrief, modelID, promptID string) error
@@ -4118,4 +4126,225 @@ func nullIntValue(value int) sql.NullInt64 {
 		return sql.NullInt64{}
 	}
 	return sql.NullInt64{Int64: int64(value), Valid: true}
+}
+
+const maCardIRLItemColumns = `id::text, initiative_id::text, company_key, category, question, source, source_ref, status, position, created_by_email, created_at, updated_at`
+
+func scanMACardIRLItem(scanner interface{ Scan(...any) error }) (MACardIRLItem, error) {
+	var item MACardIRLItem
+	err := scanner.Scan(
+		&item.ID,
+		&item.InitiativeID,
+		&item.CompanyKey,
+		&item.Category,
+		&item.Question,
+		&item.Source,
+		&item.SourceRef,
+		&item.Status,
+		&item.Position,
+		&item.CreatedByEmail,
+		&item.CreatedAt,
+		&item.UpdatedAt,
+	)
+	return item, err
+}
+
+// ListMACardIRLItems lista le voci IRL della card in ordine di posizione.
+func (s *SQLStore) ListMACardIRLItems(ctx context.Context, initiativeID, companyKey string) ([]MACardIRLItem, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT `+maCardIRLItemColumns+`
+FROM binocolo.ma_card_irl_item
+WHERE initiative_id = $1::uuid AND company_key = $2
+ORDER BY position, created_at
+`, initiativeID, companyKey)
+	if err != nil {
+		return nil, fmt.Errorf("list ma card irl items: %w", err)
+	}
+	defer rows.Close()
+	out := []MACardIRLItem{}
+	for rows.Next() {
+		item, err := scanMACardIRLItem(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan ma card irl item: %w", err)
+		}
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma card irl items: %w", err)
+	}
+	return out, nil
+}
+
+func (s *SQLStore) MaxMACardIRLPosition(ctx context.Context, initiativeID, companyKey string) (int, error) {
+	if s == nil || s.db == nil {
+		return 0, errors.New("binocolo ma store not configured")
+	}
+	var max int
+	if err := s.db.QueryRowContext(ctx, `
+SELECT COALESCE(MAX(position), 0) FROM binocolo.ma_card_irl_item
+WHERE initiative_id = $1::uuid AND company_key = $2
+`, initiativeID, companyKey).Scan(&max); err != nil {
+		return 0, fmt.Errorf("max ma card irl position: %w", err)
+	}
+	return max, nil
+}
+
+// InsertMACardIRLSeed inserisce le proposte del seed SALTANDO i source_ref già
+// presenti (indice parziale ma_card_irl_item_seed_unique): è il lucchetto del
+// re-seed additivo — la curatela esistente non viene mai toccata. Ritorna il
+// totale inserito e lo spaccato per fonte.
+func (s *SQLStore) InsertMACardIRLSeed(ctx context.Context, items []MACardIRLItem) (int, map[string]int, error) {
+	bySource := map[string]int{}
+	if s == nil || s.db == nil {
+		return 0, bySource, errors.New("binocolo ma store not configured")
+	}
+	if len(items) == 0 {
+		return 0, bySource, nil
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, bySource, fmt.Errorf("begin ma card irl seed: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	inserted := 0
+	for _, item := range items {
+		var id string
+		err := tx.QueryRowContext(ctx, `
+INSERT INTO binocolo.ma_card_irl_item (initiative_id, company_key, category, question, source, source_ref, status, position, created_by_email)
+VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9)
+ON CONFLICT (initiative_id, company_key, source, source_ref) WHERE source_ref <> '' DO NOTHING
+RETURNING id::text
+`, item.InitiativeID, item.CompanyKey, item.Category, item.Question, item.Source, item.SourceRef, item.Status, item.Position, item.CreatedByEmail).Scan(&id)
+		if errors.Is(err, sql.ErrNoRows) {
+			continue // source_ref già presente: voce curata, non si tocca
+		}
+		if err != nil {
+			return 0, bySource, fmt.Errorf("insert ma card irl seed item: %w", err)
+		}
+		inserted++
+		bySource[item.Source]++
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, bySource, fmt.Errorf("commit ma card irl seed: %w", err)
+	}
+	return inserted, bySource, nil
+}
+
+func (s *SQLStore) InsertMACardIRLItem(ctx context.Context, item MACardIRLItem) (*MACardIRLItem, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	saved, err := scanMACardIRLItem(s.db.QueryRowContext(ctx, `
+INSERT INTO binocolo.ma_card_irl_item (initiative_id, company_key, category, question, source, source_ref, status, position, created_by_email)
+VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING `+maCardIRLItemColumns+`
+`, item.InitiativeID, item.CompanyKey, item.Category, item.Question, item.Source, item.SourceRef, item.Status, item.Position, item.CreatedByEmail))
+	if err != nil {
+		return nil, fmt.Errorf("insert ma card irl item: %w", err)
+	}
+	return &saved, nil
+}
+
+// UpdateMACardIRLItem applica la patch parziale (campi nil invariati). Nil
+// senza errore quando la voce non appartiene alla card.
+func (s *SQLStore) UpdateMACardIRLItem(ctx context.Context, initiativeID, companyKey, itemID string, patch MAIRLItemPatch) (*MACardIRLItem, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	item, err := scanMACardIRLItem(s.db.QueryRowContext(ctx, `
+UPDATE binocolo.ma_card_irl_item
+SET category   = COALESCE($4, category),
+    question   = COALESCE($5, question),
+    status     = COALESCE($6, status),
+    updated_at = now()
+WHERE id = $3::uuid AND initiative_id = $1::uuid AND company_key = $2
+RETURNING `+maCardIRLItemColumns+`
+`, initiativeID, companyKey, itemID, nullStringPtr(patch.Category), nullStringPtr(patch.Question), nullStringPtr(patch.Status)))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("update ma card irl item: %w", err)
+	}
+	return &item, nil
+}
+
+func (s *SQLStore) DeleteMACardIRLItem(ctx context.Context, initiativeID, companyKey, itemID string) (bool, error) {
+	if s == nil || s.db == nil {
+		return false, errors.New("binocolo ma store not configured")
+	}
+	res, err := s.db.ExecContext(ctx, `
+DELETE FROM binocolo.ma_card_irl_item
+WHERE id = $3::uuid AND initiative_id = $1::uuid AND company_key = $2
+`, initiativeID, companyKey, itemID)
+	if err != nil {
+		return false, fmt.Errorf("delete ma card irl item: %w", err)
+	}
+	affected, _ := res.RowsAffected()
+	return affected > 0, nil
+}
+
+// ReorderMACardIRLItems riassegna le posizioni secondo l'ordine dell'array
+// (passo 10); voci non elencate mantengono la posizione corrente.
+func (s *SQLStore) ReorderMACardIRLItems(ctx context.Context, initiativeID, companyKey string, itemIDs []string) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin ma card irl reorder: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	for index, itemID := range itemIDs {
+		if _, err := tx.ExecContext(ctx, `
+UPDATE binocolo.ma_card_irl_item
+SET position = $4, updated_at = now()
+WHERE id = $3::uuid AND initiative_id = $1::uuid AND company_key = $2
+`, initiativeID, companyKey, itemID, (index+1)*10); err != nil {
+			return fmt.Errorf("reorder ma card irl item: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit ma card irl reorder: %w", err)
+	}
+	return nil
+}
+
+func (s *SQLStore) ListMAIRLTemplates(ctx context.Context, family string) ([]MAIRLTemplate, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT id::text, family, category, question, position
+FROM binocolo.ma_irl_template
+WHERE family = $1
+ORDER BY position, question
+`, family)
+	if err != nil {
+		return nil, fmt.Errorf("list ma irl templates: %w", err)
+	}
+	defer rows.Close()
+	out := []MAIRLTemplate{}
+	for rows.Next() {
+		var t MAIRLTemplate
+		if err := rows.Scan(&t.ID, &t.Family, &t.Category, &t.Question, &t.Position); err != nil {
+			return nil, fmt.Errorf("scan ma irl template: %w", err)
+		}
+		out = append(out, t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma irl templates: %w", err)
+	}
+	return out, nil
+}
+
+// nullStringPtr: NULL quando il puntatore è nil (patch parziale).
+func nullStringPtr(value *string) sql.NullString {
+	if value == nil {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: *value, Valid: true}
 }

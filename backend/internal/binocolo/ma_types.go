@@ -1402,6 +1402,42 @@ type MACardThesisReading struct {
 	StaleThesis bool `json:"staleThesis,omitempty"`
 }
 
+// MACardIRLItem è una voce della Information Request List della card (Fase 6):
+// domanda DD con provenienza (source/sourceRef, chiave del re-seed additivo) e
+// tracking leggero dello stato. Sopravvive all'archiviazione della card.
+type MACardIRLItem struct {
+	ID             string    `json:"id"`
+	InitiativeID   string    `json:"initiativeId"`
+	CompanyKey     string    `json:"companyKey"`
+	Category       string    `json:"category"`
+	Question       string    `json:"question"`
+	Source         string    `json:"source"` // flag | brief | thesis | template | analyst
+	SourceRef      string    `json:"sourceRef,omitempty"`
+	Status         string    `json:"status"` // aperta | chiesta | risposta | na
+	Position       int       `json:"position"`
+	CreatedByEmail string    `json:"createdByEmail,omitempty"`
+	CreatedAt      time.Time `json:"createdAt"`
+	UpdatedAt      time.Time `json:"updatedAt"`
+}
+
+// MAIRLTemplate è una voce standard per famiglia di business model: la
+// componente di completezza del seed (le fonti generate sono le anomalie).
+type MAIRLTemplate struct {
+	ID       string
+	Family   string
+	Category string
+	Question string
+	Position int
+}
+
+// MAIRLSeedReport riassume un seed: proposte assemblate dalle fonti vs voci
+// davvero inserite (il re-seed additivo salta i source_ref già presenti).
+type MAIRLSeedReport struct {
+	Proposed int            `json:"proposed"`
+	Inserted int            `json:"inserted"`
+	BySource map[string]int `json:"bySource,omitempty"`
+}
+
 type MADeepBriefFlag struct {
 	Severity   string `json:"severity"`
 	Category   string `json:"category,omitempty"`
