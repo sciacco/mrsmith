@@ -9,10 +9,11 @@ import type {
   MACardRemoveResponse,
   MAInitiativeBoard,
   MAInitiativeCardView,
+  MACompanyRegistry,
   MASessionListResponse,
   MASessionSummary,
 } from '../../api/types';
-import { dateLabel, dateTimeLabel, errorLabel } from '../ricerche/helpers';
+import { dateLabel, relativeDate, shortAuthor, errorLabel } from '../ricerche/helpers';
 import styles from './Iniziative.module.css';
 
 const STATES: Array<{ key: string; label: string }> = [
@@ -316,7 +317,7 @@ export function IniziativaBoardPage() {
 
       <div className={styles.boardHead}>
         <div className={styles.titleRow}>
-          <h1>{board.initiative.title}</h1>
+          <h1>{board.initiative.title} <span className={styles.hint}>({board.cards.length})</span></h1>
           <div className={styles.viewToggle} role="tablist" aria-label="Vista">
             <button
               type="button"
@@ -417,7 +418,7 @@ export function IniziativaBoardPage() {
                         className={`${styles.kcard} ${styles.kcardCompact}`}
                         onClick={() => setSelectedCard(card)}
                       >
-                        <span className={styles.kcardName}>{card.companyName}</span>
+                        <span className={styles.kcardName} title={card.companyName}>{card.companyName}</span>
                         {card.esito ? (
                           <span className={`${styles.badge} ${styles.badgeEsito}`}>{ESITO_LABELS[card.esito] ?? card.esito}</span>
                         ) : null}
@@ -431,7 +432,7 @@ export function IniziativaBoardPage() {
                         onClick={() => setSelectedCard(card)}
                       >
                         <div className={styles.kcardHead}>
-                          <span className={styles.kcardName}>{card.companyName}</span>
+                          <span className={styles.kcardName} title={card.companyName}>{card.companyName}</span>
                           <Icon name="more-vertical" size={14} className={styles.hint} />
                         </div>
                         <div className={styles.kcardMeta}>
@@ -521,7 +522,7 @@ export function IniziativaBoardPage() {
                 filteredTableCards.map((card) => (
                   <tr key={card.companyKey} className={styles.tableRow} onClick={() => setSelectedCard(card)}>
                     <td className={styles.cellMain}>
-                      <span className={styles.companyNameText}>{card.companyName}</span>
+                      <span className={styles.companyNameText} title={card.companyName}>{card.companyName}</span>
                     </td>
                     <td>
                       <span className={styles.provinceBadge}>{card.province}</span>
@@ -605,6 +606,7 @@ export function IniziativaBoardPage() {
         <CardDrawer
           initiativeId={id ?? ''}
           card={selectedCard}
+          sessions={board.sessions}
           onClose={() => setSelectedCard(null)}
           onChanged={() => void load()}
           onSetState={setCardState}
@@ -730,6 +732,7 @@ function CardDrawer({
   onOpenCloseModal,
   onOpenRemoveModal,
   onReopen,
+  sessions,
 }: {
   initiativeId: string;
   card: MAInitiativeCardView;
@@ -741,6 +744,7 @@ function CardDrawer({
   onOpenCloseModal: (card: MAInitiativeCardView) => void;
   onOpenRemoveModal: (card: MAInitiativeCardView) => void;
   onReopen: (companyKey: string) => Promise<void>;
+  sessions: MASessionSummary[];
 }) {
   const api = useApiClient();
   const { toast } = useToast();
@@ -785,6 +789,20 @@ function CardDrawer({
       setSavingNote(false);
     }
   };
+
+  const sessionMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const s of sessions) m.set(s.id, s.title);
+    return m;
+  }, [sessions]);
+
+  const [registry, setRegistry] = useState<MACompanyRegistry | null>(null);
+  useEffect(() => {
+    api
+      .get<MACompanyRegistry>(`/binocolo/v1/ma/companies/${encodeURIComponent(card.companyKey)}/registry`)
+      .then(setRegistry)
+      .catch(() => setRegistry(null));
+  }, [api, card.companyKey]);
 
   const activeStates = STATES.filter((s) => s.key !== 'chiusa');
 
@@ -880,6 +898,15 @@ function CardDrawer({
               ) : (
                 <p className={styles.hint}>Nessun fatto registrato.</p>
               )}
+              {(() => {
+                const lastNote = registry?.notes?.[0];
+                if (!lastNote) return null;
+                return (
+                  <p className={styles.hint} style={{ marginTop: 8 }}>
+                    Ultima nota: &ldquo;{lastNote.body}&rdquo; · {shortAuthor(lastNote.createdByEmail)} &middot; {relativeDate(lastNote.createdAt)}
+                  </p>
+                );
+              })()}
             </div>
 
             <div className={styles.drawerSec}>
@@ -929,9 +956,9 @@ function CardDrawer({
                   return (
                     <li key={event.id} className={styles.timelineItem}>
                       <div className={styles.timelineDot} />
-                      <div className={isNote ? styles.timelineNote : styles.timelineEvent}>{eventLabel(event)}</div>
+                      <div className={isNote ? styles.timelineNote : styles.timelineEvent}>{eventLabel(event, sessionMap)}</div>
                       <span className={styles.timelineWho}>
-                        {event.createdByEmail ?? 'Sistema'} · {dateTimeLabel(event.createdAt)}
+                        {shortAuthor(event.createdByEmail)} · {relativeDate(event.createdAt)}
                       </span>
                     </li>
                   );
@@ -1130,7 +1157,7 @@ function RemoveCardModal({
   );
 }
 
-function eventLabel(event: MACardEvent): string {
+function eventLabel(event: MACardEvent, sessionMap?: Map<string, string>): string {
   const p = event.payload as Record<string, unknown> | undefined;
   switch (event.event) {
     case 'stato': {
@@ -1147,7 +1174,10 @@ function eventLabel(event: MACardEvent): string {
     case 'card_creata': {
       const rating = p && typeof p.rating === 'number' ? p.rating : 0;
       const stars = rating > 0 ? ' ★'.repeat(Math.min(rating, 3)) : '';
-      return `Card creata${stars}${event.note ? ` — ${event.note}` : ''}`;
+      const sessionId = p && typeof p.sessionId === 'string' ? p.sessionId : null;
+      const sessionTitle = sessionId && sessionMap ? (sessionMap.get(sessionId) ?? null) : null;
+      const provenance = sessionTitle ? ` da ${sessionTitle}` : '';
+      return `Card creata${provenance}${stars}${event.note ? ` — ${event.note}` : ''}`;
     }
     case 'card_riaperta':
       return 'Card riaperta';

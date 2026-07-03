@@ -56,6 +56,28 @@ export function dateTimeLabel(value?: string): string {
   return dateTimeFormat.format(date);
 }
 
+export function relativeDate(value?: string): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMin = Math.round(diffMs / 60000);
+  const diffHour = Math.round(diffMs / 3600000);
+  const diffDay = Math.round(diffMs / 86400000);
+  if (diffMin < 1) return 'adesso';
+  if (diffMin < 60) return `${diffMin} min fa`;
+  if (diffHour < 24) return `${diffHour} h fa`;
+  if (diffDay === 1) return 'ieri';
+  if (diffDay < 31) return `${diffDay} g fa`;
+  return date.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' });
+}
+
+export function shortAuthor(email?: string): string {
+  if (!email) return 'Sistema';
+  return email.split('@')[0] ?? email;
+}
+
 export function sessionStatusLabel(status: MASessionStatus): string {
   switch (status) {
     case 'draft':

@@ -414,7 +414,7 @@ export function RicercaDetailPage() {
                 <div className={styles.summaryStrip}>
                   <span>Superficie <b>{numberFormat.format(progress?.surface.fetched || progress?.surface.expected || rows.length)}</b></span>
                   <span>→</span>
-                  <span>oltre il gate <b>{numberFormat.format(progress?.enrich.survivors ?? buckets.keep + buckets.forse + buckets.review)}</b></span>
+                  <span>valutate <b>{numberFormat.format(progress?.enrich.survivors ?? buckets.keep + buckets.forse + buckets.review)}</b></span>
                   <span>→</span>
                   <span>analizzate <b>{numberFormat.format(progress?.enrich.enriched ?? 0)}</b></span>
                   <span>·</span>
@@ -545,19 +545,43 @@ function ProgressPanel({
 }) {
   const buckets = gatedBucketCounts(progress);
   const total = Math.max(1, buckets.total);
+  const done = progress.stage === 'ready' || progress.stage === 'failed';
+  const [collapsed, setCollapsed] = useState(done);
+
+  useEffect(() => {
+    if (done) setCollapsed(true);
+  }, [done]);
+
   return (
     <section className={styles.panel} aria-labelledby="progress-title">
-      <div className={styles.panelHeader}>
+      <div
+        className={styles.panelHeader}
+        onClick={() => { if (done) setCollapsed(!collapsed); }}
+        style={done ? { cursor: 'pointer' } : undefined}
+      >
         <div>
-          <h2 id="progress-title">Avanzamento</h2>
-          <p className={styles.hint}>La valutazione richiede tempo. La pagina si aggiorna da sola.</p>
+          <h2 id="progress-title">{collapsed ? 'Esecuzione completata' : 'Avanzamento'}</h2>
+          {collapsed ? (
+            <p className={styles.hint}>
+              Superficie <b>{numberFormat.format(progress.surface.fetched || progress.surface.expected)}</b>
+              {' · '}Valutate <b>{numberFormat.format(buckets.keep + buckets.forse)}</b>
+              {' · '}Analizzate <b>{numberFormat.format(progress.enrich.enriched)}</b>
+              {' · '}Fuori tesi <b>{numberFormat.format(buckets.reject)}</b>
+            </p>
+          ) : (
+            <p className={styles.hint}>La valutazione richiede tempo. La pagina si aggiorna da sola.</p>
+          )}
         </div>
-        <span className={statusPillClass(status, running, failed)}>
-          {running ? <span className={styles.pulse} /> : null}
-          {running ? 'Ricerca in corso' : failed ? 'Ricerca interrotta' : sessionStatusLabel(status)}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {collapsed && done ? <Icon name="chevron-down" size={14} className={styles.hint} /> : null}
+          <span className={statusPillClass(status, running, failed)}>
+            {running ? <span className={styles.pulse} /> : null}
+            {running ? 'Ricerca in corso' : failed ? 'Ricerca interrotta' : sessionStatusLabel(status)}
+          </span>
+        </div>
       </div>
-      <div className={styles.panelBody}>
+      {!collapsed ? (
+        <div className={styles.panelBody}>
         {failed ? (
           <div className={styles.stack}>
             <div className={styles.danger}>
@@ -602,7 +626,7 @@ function ProgressPanel({
             <div className={styles.buckets}>
               <BucketLegend
                 className={styles.funnelKeep ?? ''}
-                label="In tesi"
+                label="Azionabile"
                 count={buckets.keep}
                 hint="Attività giudicata aderente agli ambiti descritti nella richiesta: prosegue nell’analisi completa."
               />
@@ -620,14 +644,15 @@ function ProgressPanel({
               />
               <BucketLegend
                 className={styles.funnelReject ?? ''}
-                label="Fuori tesi"
+                label="Soppresso"
                 count={buckets.reject}
-                hint="Attività giudicata fuori dagli ambiti descritti: esclusa dall’analisi completa, consultabile con il motivo dello scarto."
+                hint="Società cessata, dormiente o fuori dagli ambiti descritti: esclusa dall’analisi."
               />
             </div>
           </>
         )}
-      </div>
+        </div>
+      ) : null}
     </section>
   );
 }

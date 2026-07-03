@@ -1,9 +1,9 @@
-import { Button, Icon, Modal, Skeleton } from '@mrsmith/ui';
+import { Button, Icon, Modal, Skeleton, useToast } from '@mrsmith/ui';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApiClient } from '../../api/client';
 import type { MAInitiative, MAInitiativeListResponse, MAInitiativeSummary } from '../../api/types';
-import { dateLabel, errorLabel } from '../ricerche/helpers';
+import { relativeDate, errorLabel } from '../ricerche/helpers';
 import styles from './Iniziative.module.css';
 
 const STATE_ORDER: Array<{ key: string; label: string }> = [
@@ -18,6 +18,7 @@ const STATE_ORDER: Array<{ key: string; label: string }> = [
 export function IniziativePage() {
   const api = useApiClient();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [items, setItems] = useState<MAInitiativeSummary[]>([]);
   const [showArchived, setShowArchived] = useState(false);
   const [archivedCount, setArchivedCount] = useState<number | null>(null);
@@ -28,6 +29,7 @@ export function IniziativePage() {
   const [description, setDescription] = useState('');
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [lifecycleBusy, setLifecycleBusy] = useState<string | null>(null);
 
   const load = useCallback(
     async (archived: boolean) => {
@@ -132,7 +134,36 @@ export function IniziativePage() {
       ) : (
         <div className={styles.list}>
           {items.map((item) => (
-            <IniziativaCard key={item.id} item={item} onOpen={() => navigate(`/iniziative/${item.id}`)} />
+            <IniziativaCard
+              key={item.id}
+              item={item}
+              onOpen={() => navigate(`/iniziative/${item.id}`)}
+              onArchive={item.archivedAt ? undefined : async () => {
+                setLifecycleBusy(item.id);
+                try {
+                  await api.post(`/binocolo/v1/ma/initiatives/${item.id}/archive`, {});
+                  toast('Iniziativa archiviata.', 'success');
+                  await load(showArchived);
+                } catch (err) {
+                  toast(errorLabel(err), 'error');
+                } finally {
+                  setLifecycleBusy(null);
+                }
+              }}
+              onRestore={item.archivedAt ? async () => {
+                setLifecycleBusy(item.id);
+                try {
+                  await api.post(`/binocolo/v1/ma/initiatives/${item.id}/restore`, {});
+                  toast('Iniziativa ripristinata.', 'success');
+                  await load(showArchived);
+                } catch (err) {
+                  toast(errorLabel(err), 'error');
+                } finally {
+                  setLifecycleBusy(null);
+                }
+              } : undefined}
+              busy={lifecycleBusy === item.id}
+            />
           ))}
         </div>
       )}
@@ -194,28 +225,32 @@ export function IniziativePage() {
   );
 }
 
-function IniziativaCard({ item, onOpen }: { item: MAInitiativeSummary; onOpen: () => void }) {
+function IniziativaCard({ item, onOpen, onArchive, onRestore, busy }: { item: MAInitiativeSummary; onOpen: () => void; onArchive?: () => void; onRestore?: () => void; busy?: boolean }) {
+  const isArchived = !!item.archivedAt;
   return (
     <div className={styles.card}>
       <div className={styles.cardTop}>
         <button type="button" className={styles.cardTitle} onClick={onOpen}>
           {item.title}
         </button>
-        <span className={styles.hint}>aggiornata {dateLabel(item.updatedAt)}</span>
+        <span className={styles.hint}>aggiornata {relativeDate(item.updatedAt)}</span>
       </div>
       {item.description ? <p className={styles.cardDesc}>{item.description}</p> : null}
       <div className={styles.stateLine}>
-        {STATE_ORDER.map((state) => (
-          <button
-            key={state.key}
-            type="button"
-            className={styles.statePill}
-            onClick={onOpen}
-            title={`Vai al board filtrato su ${state.label}`}
-          >
-            {state.label} <b>{item.counts[state.key] ?? 0}</b>
-          </button>
-        ))}
+        {STATE_ORDER.map((state) => {
+          const count = item.counts[state.key] ?? 0;
+          return (
+            <button
+              key={state.key}
+              type="button"
+              className={`${styles.statePill}${count > 0 ? ` ${styles.statePillActive}` : ''}`}
+              onClick={onOpen}
+              title={`Vai al board filtrato su ${state.label}`}
+            >
+              {state.label} <b>{count}</b>
+            </button>
+          );
+        })}
       </div>
       <div className={styles.cardFoot}>
         <span>
@@ -225,6 +260,22 @@ function IniziativaCard({ item, onOpen }: { item: MAInitiativeSummary; onOpen: (
           <>
             <span>&middot;</span>
             <span>Ultima attività: {item.lastActivityEvent}</span>
+          </>
+        ) : null}
+        {isArchived && onRestore ? (
+          <>
+            <span className={styles.hint}>&middot;</span>
+            <Button variant="secondary" size="sm" onClick={onRestore} loading={busy}>
+              Ripristina
+            </Button>
+          </>
+        ) : null}
+        {!isArchived && onArchive ? (
+          <>
+            <span className={styles.hint}>&middot;</span>
+            <Button variant="secondary" size="sm" onClick={onArchive} loading={busy}>
+              Archivia
+            </Button>
           </>
         ) : null}
       </div>

@@ -295,9 +295,9 @@ WHERE id = $1::uuid
 }
 
 // ListMAInitiatives returns the index rows (wireframe S1): active by default,
-// archived when includeArchived is true. Counts stays empty here (B2 wires
-// the per-state join once ma_initiative_card exists); SessionCount and
-// LastActivityAt are computed from anchored sessions.
+// archived when includeArchived is true. Counts are aggregated from
+// ma_initiative_card (B2 join); SessionCount and LastActivityAt are computed
+// from anchored sessions.
 func (s *SQLStore) ListMAInitiatives(ctx context.Context, includeArchived bool) ([]MAInitiativeSummary, error) {
 	if s == nil || s.db == nil {
 		return nil, errors.New("binocolo ma store not configured")
@@ -344,7 +344,15 @@ SELECT
     WHERE o.initiative_id = initiative.id
     ORDER BY o.created_at DESC
     LIMIT 1
-  ) AS last_activity_event
+  ) AS last_activity_event,
+  COALESCE(
+    (SELECT jsonb_object_agg(c.state, c.cnt)
+     FROM (SELECT state, COUNT(*) AS cnt
+           FROM binocolo.ma_initiative_card
+           WHERE initiative_id = initiative.id
+           GROUP BY state) c),
+    '{}'::jsonb
+  ) AS counts
 FROM binocolo.ma_initiative initiative
 WHERE `+where+`
 ORDER BY initiative.updated_at DESC, initiative.created_at DESC
@@ -363,10 +371,11 @@ LIMIT 200
 		var archivedByEmail sql.NullString
 		var lastActivityAt sql.NullTime
 		var lastActivityEvent sql.NullString
+		var countsJSON json.RawMessage
 		if err := rows.Scan(
 			&item.ID, &item.Title, &item.Description, &item.CreatedBySubject, &item.CreatedByEmail,
 			&item.CreatedAt, &item.UpdatedAt, &archivedAt, &archivedBySubject, &archivedByEmail,
-			&item.SessionCount, &lastActivityAt, &lastActivityEvent,
+			&item.SessionCount, &lastActivityAt, &lastActivityEvent, &countsJSON,
 		); err != nil {
 			return nil, fmt.Errorf("scan ma initiative summary: %w", err)
 		}
@@ -382,6 +391,11 @@ LIMIT 200
 			item.LastActivityEvent = lastActivityEvent.String
 		}
 		item.Counts = map[string]int{}
+		if len(countsJSON) > 0 {
+			if err := json.Unmarshal(countsJSON, &item.Counts); err != nil {
+				return nil, fmt.Errorf("unmarshal initiative counts: %w", err)
+			}
+		}
 		out = append(out, item)
 	}
 	if err := rows.Err(); err != nil {
