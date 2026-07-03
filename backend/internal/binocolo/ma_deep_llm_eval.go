@@ -1013,7 +1013,7 @@ func redFlagsHaveQuestions(flags []MADeepBriefFlag) bool {
 	return false
 }
 
-var maEvalNumberRE = regexp.MustCompile(`(?i)(?:€\s*)?[-+]?\d+(?:\.\d{3})*(?:[,.]\d+)?\s*(?:%|x|×|k|mln|milioni|mila)?`)
+var maEvalNumberRE = regexp.MustCompile(`(?i)(?:€\s*)?[-+]?(?:\d{1,3}(?:[., \x{00a0}\x{202f}]\d{3})+|\d+)(?:[,.]\d+)?\s*(?:%|x|×|k|mln|milioni|mila)?`)
 
 type maEvalNumberMention struct {
 	Raw     string
@@ -1084,6 +1084,8 @@ func parseEvalNumberMention(raw string) (maEvalNumberMention, bool) {
 	}
 	trimmed = strings.ReplaceAll(trimmed, "€", "")
 	trimmed = strings.ReplaceAll(trimmed, " ", "")
+	trimmed = strings.ReplaceAll(trimmed, "\u00a0", "")
+	trimmed = strings.ReplaceAll(trimmed, "\u202f", "")
 	if trimmed == "" || trimmed == "+" || trimmed == "-" {
 		return maEvalNumberMention{}, false
 	}

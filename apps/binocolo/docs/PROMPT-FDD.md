@@ -382,13 +382,102 @@ Un output v4.1 è migliore della v3 se:
 - Mappa frontend slug → label per categorie red flag (`qualita_ebitda`, `debt_like`, ecc.).
 - Aggiungere `redFlags[].ddQuestion` come quinta fonte del seed IRL.
 
-## 12. Decisione proposta
+## 12. Addendum implementativo — eval v4.1 e correzione v4.2
 
-Procedere con la **v4.1 FDD**, GPT-5.5 invariato, dopo le condizioni bloccanti:
+La migration `100_anisetta_mrsmith_binocolo_ma_deep_brief_prompt_v4_1.sql` è stata applicata ed è stato eseguito l'eval GPT-5.5 sul manifest baseline:
 
-1. cap `valuationRationale` a 800;
-2. migration prompt-only su `mrsmith.llm_prompt`;
-3. eval comparativo v3 vs v4.1;
-4. review manuale cieca.
+```text
+artifacts/llm-evals/ma-deep-brief/20260703T161931Z-9a8f4a62-openai-gpt-5-5/
+```
 
-La qualità misurata del modello è già sufficiente. Il miglioramento atteso non viene da un nuovo LLM, ma da un prompt più vincolato a una postura FDD senior e più onesto sui limiti dei dati disponibili.
+Esito: **v4.1 non accettata per rollout**.
+
+Motivi:
+
+- JSON fail: 2/100 (`unexpected end of JSON input`);
+- cause osservate: output troncati a `completion_tokens = 5000`;
+- warning `output molto prolisso`: 97/100, peggiora rispetto al baseline v3 (33/100);
+- `caveat_coverage` e `dd_questions` restano a soffitto, quindi il problema non è la copertura FDD ma la verbosità.
+
+La direzione FDD resta corretta, ma il prompt v4.1 concede troppe liste lunghe:
+
+- strengths quasi sempre a 5/5;
+- red flags spesso a 6-7;
+- ddQuestions sempre a 8/8.
+
+Correzione: introdurre una **v4.2 FDD concisa**, sempre prompt-only, con:
+
+- output totale target ~4200 caratteri;
+- strengths max 4;
+- red flags max 5;
+- ddQuestions max 6;
+- `valuationRationale` max 3 frasi / 550 caratteri;
+- claim red flag max 28 parole;
+- ddQuestion red flag max 24 parole.
+
+Migration prevista:
+
+```text
+deploy/migrations/101_anisetta_mrsmith_binocolo_ma_deep_brief_prompt_v4_2.sql
+```
+
+## 13. Addendum implementativo — eval v4.2
+
+La migration `101_anisetta_mrsmith_binocolo_ma_deep_brief_prompt_v4_2.sql` è stata applicata ed è stato eseguito l'eval GPT-5.5 sullo stesso manifest baseline:
+
+```text
+artifacts/llm-evals/ma-deep-brief/20260703T163730Z-9a8f4a62-openai-gpt-5-5/
+```
+
+Esito automatico: **v4.2 accettata per review manuale**.
+
+Confronto sintetico:
+
+| Metrica | Baseline v3 | v4.1 | v4.2 |
+|---|---:|---:|---:|
+| Avg score | 99,67 | 97,03 | 100,00 |
+| JSON fail | 0/100 | 2/100 | 0/100 |
+| RAG flip | 0/100 | 0/100 | 0/100 |
+| Numeri sospetti | 0/100 | 0/100 | 0/100 |
+| `caveat_coverage` | 15/15 | 15/15 | 15/15 |
+| `dd_questions` | 10/10 | 10/10 | 10/10 |
+| `output molto prolisso` | 33/100 | 97/100 | 0/100 |
+| Lunghezza mediana raw output | ~5.520 char | ~6.791 char | ~4.429 char |
+| ValuationRationale mediana | ~531 char | ~569 char | ~302 char |
+
+La v4.2 risolve il problema della v4.1: preserva coverage FDD e validità numerica, ma rimuove troncamenti e prolissità.
+
+## 14. Decisione proposta aggiornata
+
+Procedere con la **v4.2 FDD concisa**, GPT-5.5 invariato:
+
+1. cap `valuationRationale` a 800 — già implementato nel parser;
+2. default `max_tokens` backend a 8000 quando il registry non lo specifica — headroom contro spike di reasoning, mentre il prompt limita già l'output;
+3. migration `100` v4.1 — applicata ma non accettata per rollout;
+4. migration `101` v4.2 concisa — applicata e promossa alla review manuale;
+5. review manuale cieca v3 vs v4.2 sugli stessi 10 casi;
+6. se la review manuale conferma, rigenerazione cache dei brief.
+
+La qualità misurata del modello è già sufficiente. Il miglioramento atteso non viene da un nuovo LLM, ma da un prompt FDD più vincolato, più onesto sui limiti dei dati e abbastanza conciso da non rischiare troncamenti.
+
+## 15. Addendum modello alternativo — Cerebras gpt-oss-120b su v4.2
+
+Su richiesta è stato rieseguito un ciclo completo con Cerebras `gpt-oss-120b`, usando lo stesso prompt v4.2 e lo stesso manifest baseline:
+
+```text
+artifacts/llm-evals/ma-deep-brief/20260703T170348Z-82386b4b-gpt-oss-120b/
+```
+
+Durante l'analisi è stato corretto lo scorer per non marcare come sospetti i numeri validi formattati con separatori migliaia inglesi o spazi/narrow no-break space (es. `€1,186,388`, `209 916`). Dopo rescore:
+
+| Metrica | GPT-5.5 v4.2 | gpt-oss-120b v4.2 |
+|---|---:|---:|
+| Avg score | 100,00 | 96,98 |
+| JSON fail | 0/100 | 0/100 |
+| RAG flip | 0/100 | 0/100 |
+| Hallucination candidate | 0/100 | 12/100 |
+| Run < 90 | 0/100 | 14/100 |
+| `output molto prolisso` | 0/100 | 0/100 |
+| Latenza media | ~51,9s | ~2,5s |
+
+Lettura: v4.2 rende `gpt-oss-120b` stabile sul formato e molto veloce, ma non elimina il problema già osservato sui numeri/unità. Restano casi in cui il modello usa `mln`, `k` o scale ambigue su EV/equity, e alcuni caveat deterministici non vengono citati. Per questo resta non production-safe per il brief finale FDD, pur essendo un possibile candidato futuro per preview interna veloce.
