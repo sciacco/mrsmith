@@ -1568,6 +1568,52 @@
   color: var(--color-text-muted);
   font-size: 0.75rem;
 }
+.bridgeTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+.bridgeTable td {
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.bridgeTable td:last-child {
+  text-align: right;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+.bridgeSubRow td {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  padding-left: var(--space-3);
+}
+.bridgeTotalRow td {
+  font-weight: 700;
+  border-bottom: none;
+}
+.qualityFlags {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.qualityFlagWarning,
+.qualityFlagInfo {
+  font-size: 0.75rem;
+  line-height: 1.45;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border-left: 3px solid #b45309;
+  background: rgba(180, 83, 9, 0.08);
+  color: var(--color-text-secondary);
+}
+.qualityFlagInfo {
+  border-left-color: var(--color-border);
+  background: var(--color-bg-elevated);
+}
+.qualityFlagDD {
+  color: var(--color-text-muted);
+}
 .deepBrief p,
 .deepBrief li {
   font-size: 0.8125rem;

@@ -134,11 +134,11 @@ Sequenza e granularità dei task esecutori le definiamo dopo la ratifica — non
 
 ## 7. Decisioni richieste
 
-> **Stato (2026-07-02)**: D-A e D-B ✅ ratificate · D-C e D-D ⏳ aperte.
+> **Stato (2026-07-02)**: D-A, D-B, D-C ✅ ratificate · D-D ⏳ aperta.
 
 - **D-A** · ✅ **RATIFICATA (2026-07-02)**: **archive + restore, nessuna rotta delete/purge**. Lo schema rende l'hard-delete incoerente (`ma_initiative_card` CASCADE ma `ma_target_outcome.initiative_id` SET NULL → diario orfano); archive è l'uscita disegnata (S1 nota 3), restore l'undo. Pulizia dati di prova = SQL one-shot (§8), non meccanismo di prodotto. Ortogonale a F3 (che cabla l'azione archive/restore in UI).
 - **D-B** · ✅ **RATIFICATA (2026-07-02)**: nessuna delle due. Si **rimuove il link `/azienda`** dal modale D2 (`RicercaDetailPage.tsx:974`) — `CompanyDossierPage` è tool standalone, non va accoppiato a MA. Il modale resta magro nel ruolo di setaccio (razionale + badge B5); il dossier profondo resta azione di card sul MA card-dossier, **già autosufficiente** (`GetMATargetByID` → cache company-keyed). Lavoro minimo: vedi F4. Revisiona PRD §7 («dal dossier `/azienda`» → «dal MA card-dossier»).
-- **D-C** — Web enrichment manuale (c'era in TargetPage:609): riportarlo in /ricerche o dichiararlo assorbito dal gate?
+- **D-C** · ✅ **RATIFICATA (2026-07-02)**: **assorbito dal gate**. Il vecchio bottone manuale (`TargetPage:609` → `web-validation/enrich`) chiamava lo stesso endpoint del gate; il nuovo `/ricerche` non lo re-espone. La web-validation è una preoccupazione **gate-time** (alimenta il bucketing), fatta in automatico dallo stage `enrich` della pipeline + resume-on-failure; la correzione per-target sta nella coda di verifica S9 + `PUT web-validation`. L'endpoint resta (lo usa la pipeline). **Nessuna azione**: non si re-aggiunge il bottone. (Unica perdita: re-enrich bulk di una ricerca già completata — caso di nicchia, v2 se emerge.)
 - **D-D** — Sgancio ricerca: basta F6 (provenienze da snapshot) o vuoi anche l'avviso esplicito allo sgancio?
 
 ## 8. SQL di pulizia dati di prova (esegui tu, in transazione)

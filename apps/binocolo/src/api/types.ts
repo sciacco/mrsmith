@@ -497,6 +497,23 @@ export interface MADeepScorecard {
   netWorth?: number;
   pfn?: number;
   atecoCode?: string;
+  reconciliation?: MADeepReconciliation;
+  qualityFlags?: MADeepQualityFlag[];
+}
+
+export interface MADeepReconciliation {
+  ebitdaPct?: number;
+  pfnPct?: number;
+  pfnProvenance?: string;
+  roePointsDiff?: number;
+}
+
+export interface MADeepQualityFlag {
+  code: string;
+  severity: string; // warning | info
+  label: string;
+  evidence: string;
+  ddQuestion?: string;
 }
 
 export interface MADeepMetric {
@@ -522,6 +539,24 @@ export interface MADeepValuation {
   source?: string;
   sourceDate?: string;
   caveat?: string;
+  prudentialEbitda?: number;
+  lowMethod?: string; // metodo dell'estremo basso, se diverso da method
+  bridge?: MADeepBridge;
+}
+
+export interface MADeepBridge {
+  pfn?: MADeepBridgeRow;
+  tfr?: MADeepBridgeRow;
+  taxFund?: MADeepBridgeRow;
+  shareholderLoans?: MADeepBridgeRow;
+  equityLow?: number;
+  equityHigh?: number;
+}
+
+export interface MADeepBridgeRow {
+  value: number;
+  provenance?: string; // cee_detail | cee_total | vendor_ratio
+  note?: string;
 }
 
 export interface MADeepBrief {

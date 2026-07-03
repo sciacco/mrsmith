@@ -220,6 +220,16 @@ const (
 	// definitori veri. Consumata dai quality flag di Fase 2.
 	maVendorCEETolerancePctDefault = 1.0
 
+	// Leve del bridge EV→equity e soglie dei flag di qualità (Fase 2, mig 092).
+	// TFR al 100% = screening prudente (prassi deal 80-100). I flag A.5 si pesano
+	// sull'EBITDA (2,5% dei ricavi può essere un terzo del margine), B.8 sui ricavi,
+	// il perimetro standalone su attivo ed EBITDA.
+	maTFRBridgePctDefault               = 100.0
+	maA5EBITDAFlagPctDefault            = 20.0
+	maB8RevenueFlagPctDefault           = 8.0
+	maParticipationAssetsFlagPctDefault = 25.0
+	maParticipationIncomeFlagPctDefault = 20.0
+
 	// maDefaultBudgetEUR caps the projected enrichment spend of a single run
 	// unless the analyst explicitly acknowledges a higher cost.
 	maDefaultBudgetEUR = 50.0
@@ -1215,8 +1225,12 @@ type MADeepScorecard struct {
 	PFN          *float64       `json:"pfn,omitempty"`
 	AtecoCode    string         `json:"atecoCode,omitempty"`
 	// Reconciliation è il sanity check vendor-vs-CEE (Fase 1): assente quando il
-	// payload non porta voci CEE. La UI lo ignora fino ai quality flag di Fase 2.
+	// payload non porta voci CEE.
 	Reconciliation *MADeepReconciliation `json:"reconciliation,omitempty"`
+	// QualityFlags (Fase 2): annotazioni deterministiche di confidenza sulla banda,
+	// calcolate da buildMADeepQualityFlags con le soglie di ma_parameter. Mai nella
+	// matematica della banda, mai nel RAG.
+	QualityFlags []MADeepQualityFlag `json:"qualityFlags,omitempty"`
 }
 
 // MADeepReconciliation — scarti tra i numeri pre-calcolati dal vendor e le stesse
@@ -1240,7 +1254,11 @@ type MADeepMetric struct {
 	RAG   string   `json:"rag"`
 }
 
-// MADeepValuation is populated in Fase 4 (Damodaran sector multiples).
+// MADeepValuation is populated in Fase 4 (Damodaran sector multiples). Dal redesign
+// (Fase 2) la banda è ASIMMETRICA: estremo alto su EBITDA reported, estremo basso su
+// EBITDA prudenziale (al netto di A.4 capitalizzazioni e contributi) — si allarga in
+// proporzione alla distorsione misurata, senza costanti arbitrarie. L'equity esce dal
+// bridge esplicito (EV − PFN − TFR − fondo imposte), non più da EV − PFN secca.
 type MADeepValuation struct {
 	Method     string   `json:"method"`
 	Multiple   float64  `json:"multiple"`
@@ -1255,6 +1273,41 @@ type MADeepValuation struct {
 	Source     string   `json:"source,omitempty"`
 	SourceDate string   `json:"sourceDate,omitempty"`
 	Caveat     string   `json:"caveat,omitempty"`
+	// Fase 2: trasparenza della banda asimmetrica e ponte EV→equity.
+	PrudentialEbitda *float64      `json:"prudentialEbitda,omitempty"`
+	LowMethod        string        `json:"lowMethod,omitempty"` // metodo dell'estremo basso, se diverso da Method
+	Bridge           *MADeepBridge `json:"bridge,omitempty"`
+}
+
+// MADeepBridge è il ponte esplicito EV→equity (Fase 2): ogni riga è autoportante
+// (le caveat viaggiano dentro il numero, anche nell'export). I finanziamenti soci
+// sono GIÀ dentro la PFN: la loro riga è informativa/negoziale (al closing vengono
+// spesso rinunciati o convertiti), non un'ulteriore deduzione.
+type MADeepBridge struct {
+	PFN              *MADeepBridgeRow `json:"pfn,omitempty"`
+	TFR              *MADeepBridgeRow `json:"tfr,omitempty"`
+	TaxFund          *MADeepBridgeRow `json:"taxFund,omitempty"`
+	ShareholderLoans *MADeepBridgeRow `json:"shareholderLoans,omitempty"`
+	EquityLow        *float64         `json:"equityLow,omitempty"`
+	EquityHigh       *float64         `json:"equityHigh,omitempty"`
+}
+
+type MADeepBridgeRow struct {
+	Value      float64 `json:"value"`
+	Provenance string  `json:"provenance,omitempty"` // cee_detail | cee_total | vendor_ratio
+	Note       string  `json:"note,omitempty"`
+}
+
+// MADeepQualityFlag è un segnale deterministico di qualità del dato/margine (Fase 2):
+// annota la confidenza della banda SENZA entrare nella sua matematica né nel RAG.
+// Ogni flag porta l'evidenza numerica precomposta e la domanda DD standard (il seme
+// dell'information request list, Fase 6).
+type MADeepQualityFlag struct {
+	Code       string `json:"code"`
+	Severity   string `json:"severity"` // warning | info
+	Label      string `json:"label"`
+	Evidence   string `json:"evidence"`
+	DDQuestion string `json:"ddQuestion,omitempty"`
 }
 
 // MADeepBrief is populated in Fase 5 (LLM narrative; numbers stay in scorecard/valuation).

@@ -186,6 +186,28 @@ definizioni vendor sono pinnate da riconciliazioni esatte su due fixture.
 
 ## Fase 2 — Filone B: equity bridge + banda asimmetrica + flag qualità
 
+> **STATO 2026-07-03: IMPLEMENTATA** — mig 092 (6 parametri: tfr_bridge,
+> soglie flag A.5/B.8/partecipazioni, tolleranza vendor-CEE=1%);
+> `buildMADeepValuation` v2 (banda asimmetrica su prudenziale con fallback
+> EV/Sales sull'estremo basso + clamp, `LowMethod`/`PrudentialEbitda`
+> trasparenti) + `buildMADeepBridge` (PFN con provenienza, TFR pesato, fondo
+> imposte, soci come riga negoziale informativa) + `buildMADeepQualityFlags`
+> (6 flag deterministici con evidenza e domanda DD, warning prima di info);
+> PFN canonica dello scorecard = lettura CEE (fallback vendor per payload
+> senza CEE); worker e `recompute` estesi (body `{"valuation": true}` →
+> ricostruisce anche la valuation, `UpdateMADeepValuation`); export con
+> colonne PFN/TFR; UI su TUTTE e tre le superfici (modal sessione con tabella
+> bridge + flag stilizzati, card dossier in parità, dossier P.IVA con righe
+> bridge nel valGrid + flag). Test: 7 nuovi golden verdi (degenerazione MFT,
+> proporzionalità sintetica, fallback EV/Sales, EBITDA≤0, bridge CDLAN al
+> centesimo, flag su entrambe le fixture) + suite deterministica verde; tsc
+> pulito sui file toccati (errori pre-esistenti solo in
+> IniziativaBoardPage/RicerchePage, estranei); smoke UI su dev server attivo
+> (dossier CDLAN, valuation vecchio formato → ramo fallback ok, console
+> pulita). **Da fare per attivarla**: mig 092 su ANISETTA_DSN, poi
+> `POST /ma/deep/recompute {"valuation": true}` per propagare bridge/banda/
+> flag alle 10 righe in cache — e verifica visiva del bridge nuovo.
+
 **Obiettivo:** il numero che l'IC guarda diventa onesto: bridge esplicito,
 banda ancorata all'EBITDA prudenziale, flag di confidenza fuori da banda e RAG.
 

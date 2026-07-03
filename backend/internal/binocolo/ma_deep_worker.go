@@ -162,13 +162,15 @@ func (w *maDeepWorker) process(ctx context.Context, job maDeepJob) {
 			logging.FromContext(ctx).Warn("binocolo deep worker empty scorecard", "component", "binocolo", "company_key", job.CompanyKey)
 		}
 		pricing := w.pricing(ctx)
+		reading := maCEEReadingFromPayload(resp.Data)
 		var valuation *MADeepValuation
 		if scorecard != nil {
+			scorecard.QualityFlags = buildMADeepQualityFlags(scorecard, reading, pricing)
 			multiple, err := w.store.ResolveSectorMultiple(ctx, scorecard.AtecoCode)
 			if err != nil {
 				logging.FromContext(ctx).Warn("binocolo deep worker sector multiple failed", "component", "binocolo", "company_key", job.CompanyKey, "error", err)
 			} else {
-				valuation = buildMADeepValuation(scorecard, multiple, pricing)
+				valuation = buildMADeepValuation(scorecard, reading, multiple, pricing)
 			}
 		}
 		result := maDeepResult{Payload: resp.Data, Scorecard: scorecard, Valuation: valuation, CostEUR: pricing.CostFull}

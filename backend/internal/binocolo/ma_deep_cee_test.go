@@ -220,6 +220,174 @@ func TestMADeepScorecardReconciliation(t *testing.T) {
 	}
 }
 
+func fase2Pricing() maPricing {
+	return maPricing{
+		SMEHaircutPct: 30, EBITDAFallbackPct: 5, TFRBridgePct: 100,
+		A5EBITDAFlagPct: 20, B8RevenueFlagPct: 8,
+		ParticipationAssetsFlagPct: 25, ParticipationIncomeFlagPct: 20,
+		VendorCEETolerancePct: 1,
+	}
+}
+
+// TestValuationBandDegeneratesSymmetric: con A.4 e contributi a zero (MFT) il
+// prudenziale coincide col reported e la banda resta il ±15% classico; il bridge
+// porta PFN CEE, TFR pieno e la riga soci informativa.
+func TestValuationBandDegeneratesSymmetric(t *testing.T) {
+	payload, _ := loadFixturePayload(t, "testdata/itfull_mft_2024.json")
+	sc := buildMADeepScorecard(payload)
+	reading := maCEEReadingFromPayload(payload)
+	evEbitda := 8.0
+	multiple := &sectorMultiple{Industry: "Engineering/Construction", EVEbitda: &evEbitda, NFirms: 100}
+	val := buildMADeepValuation(sc, reading, multiple, fase2Pricing())
+	if val == nil || val.Method != "ev_ebitda" || val.LowMethod != "" {
+		t.Fatalf("method: %+v", val)
+	}
+	// La PFN canonica dello scorecard è ora quella CEE (14.682, non 14.686 vendor).
+	if sc.PFN == nil || *sc.PFN != 14682 {
+		t.Fatalf("scorecard PFN: %v", sc.PFN)
+	}
+	// base = 94.934×8×0.7 = 531.630,4 → banda simmetrica ±15%.
+	if val.EVLow != 451886 || val.EVHigh != 611375 {
+		t.Fatalf("EV band: %v - %v", val.EVLow, val.EVHigh)
+	}
+	bridge := val.Bridge
+	if bridge == nil || bridge.PFN == nil || bridge.PFN.Value != 14682 || bridge.PFN.Provenance != maCEEProvDetail {
+		t.Fatalf("bridge pfn: %+v", bridge)
+	}
+	if bridge.TFR == nil || bridge.TFR.Value != 100573 {
+		t.Fatalf("bridge tfr: %+v", bridge.TFR)
+	}
+	if bridge.TaxFund != nil {
+		t.Fatalf("tax fund atteso assente (0): %+v", bridge.TaxFund)
+	}
+	if bridge.ShareholderLoans == nil || bridge.ShareholderLoans.Value != 10000 {
+		t.Fatalf("soci: %+v", bridge.ShareholderLoans)
+	}
+	// equity = EV − PFN − TFR (soci informativi, già in PFN).
+	if bridge.EquityLow == nil || *bridge.EquityLow != 336631 || *bridge.EquityHigh != 496120 {
+		t.Fatalf("equity: %v - %v", bridge.EquityLow, bridge.EquityHigh)
+	}
+	if val.EquityLow == nil || *val.EquityLow != 336631 {
+		t.Fatalf("valuation equityLow non allineato al bridge: %v", val.EquityLow)
+	}
+}
+
+// TestValuationBandAsymmetricProportional: la banda si allarga esattamente della
+// distorsione misurata (A.4+contributi), estremo alto su reported.
+func TestValuationBandAsymmetricProportional(t *testing.T) {
+	turnover, ebitda := 1000000.0, 200000.0
+	sc := &MADeepScorecard{Turnover: &turnover, Ebitda: &ebitda}
+	prudential := 120000.0
+	reading := &maCEEReading{EBITDAPrudential: &prudential}
+	evEbitda := 10.0
+	multiple := &sectorMultiple{Industry: "X", EVEbitda: &evEbitda, NFirms: 50}
+	pricing := fase2Pricing()
+	pricing.SMEHaircutPct = 0
+	val := buildMADeepValuation(sc, reading, multiple, pricing)
+	if val == nil || val.Method != "ev_ebitda" || val.LowMethod != "" {
+		t.Fatalf("method: %+v", val)
+	}
+	if val.EVHigh != 2300000 { // 200.000×10×1.15
+		t.Fatalf("EVHigh: %v", val.EVHigh)
+	}
+	if val.EVLow != 1020000 { // 120.000×10×0.85
+		t.Fatalf("EVLow: %v", val.EVLow)
+	}
+	if val.PrudentialEbitda == nil || *val.PrudentialEbitda != 120000 {
+		t.Fatalf("prudential: %v", val.PrudentialEbitda)
+	}
+}
+
+// TestValuationLowEndFallsBackToEVSales: prudenziale non positivo → estremo basso
+// su EV/Sales (dichiarato in LowMethod), mai sopra l'estremo basso reported.
+func TestValuationLowEndFallsBackToEVSales(t *testing.T) {
+	turnover, ebitda := 2000000.0, 300000.0
+	sc := &MADeepScorecard{Turnover: &turnover, Ebitda: &ebitda}
+	prudential := -10000.0
+	reading := &maCEEReading{EBITDAPrudential: &prudential}
+	evEbitda, evSales := 10.0, 1.0
+	multiple := &sectorMultiple{Industry: "X", EVEbitda: &evEbitda, EVSales: &evSales, NFirms: 50}
+	pricing := fase2Pricing()
+	pricing.SMEHaircutPct = 0
+	val := buildMADeepValuation(sc, reading, multiple, pricing)
+	if val == nil || val.Method != "ev_ebitda" || val.LowMethod != "ev_sales" {
+		t.Fatalf("method/low: %+v", val)
+	}
+	if val.EVHigh != 3450000 { // reported 300.000×10×1.15
+		t.Fatalf("EVHigh: %v", val.EVHigh)
+	}
+	if val.EVLow != 1700000 { // 2.000.000×1.0×0.85
+		t.Fatalf("EVLow: %v", val.EVLow)
+	}
+}
+
+// TestValuationNegativeEBITDAStaysSymmetricSales: EBITDA reported ≤ 0 → percorso
+// EV/Sales con banda simmetrica (la distorsione prudenziale non tocca i ricavi).
+func TestValuationNegativeEBITDAStaysSymmetricSales(t *testing.T) {
+	turnover, ebitda := 1000000.0, -50000.0
+	sc := &MADeepScorecard{Turnover: &turnover, Ebitda: &ebitda}
+	evSales := 1.5
+	multiple := &sectorMultiple{Industry: "X", EVSales: &evSales, NFirms: 50}
+	val := buildMADeepValuation(sc, nil, multiple, fase2Pricing())
+	if val == nil || val.Method != "ev_sales" || val.LowMethod != "" {
+		t.Fatalf("method: %+v", val)
+	}
+	if val.EVLow != 892500 || val.EVHigh != 1207500 { // 1.050.000 ±15%
+		t.Fatalf("band: %v - %v", val.EVLow, val.EVHigh)
+	}
+}
+
+// TestValuationBridgeCDLAN: banda asimmetrica reale (contributi 29.375) + bridge
+// completo sulla fixture CDLAN.
+func TestValuationBridgeCDLAN(t *testing.T) {
+	payload, _ := loadFixturePayload(t, "testdata/itfull_cdlan_2025.json")
+	sc := buildMADeepScorecard(payload)
+	reading := maCEEReadingFromPayload(payload)
+	if sc.PFN == nil || *sc.PFN != 1666053 { // PFN CEE, non più ratio vendor
+		t.Fatalf("scorecard PFN: %v", sc.PFN)
+	}
+	evEbitda := 8.0
+	multiple := &sectorMultiple{Industry: "Telecom", EVEbitda: &evEbitda, NFirms: 60}
+	val := buildMADeepValuation(sc, reading, multiple, fase2Pricing())
+	if val == nil || val.Method != "ev_ebitda" || val.LowMethod != "" {
+		t.Fatalf("method: %+v", val)
+	}
+	if val.EVHigh != 16286013 || val.EVLow != 11897663 { // alto su 2.528.884, basso su 2.499.509
+		t.Fatalf("band: %v - %v", val.EVLow, val.EVHigh)
+	}
+	bridge := val.Bridge
+	if bridge == nil || bridge.PFN.Value != 1666053 || bridge.TFR.Value != 294528 {
+		t.Fatalf("bridge: %+v", bridge)
+	}
+	if bridge.EquityLow == nil || *bridge.EquityLow != 9937082 || *bridge.EquityHigh != 14325432 {
+		t.Fatalf("equity: %v - %v", bridge.EquityLow, bridge.EquityHigh)
+	}
+}
+
+// TestQualityFlagsRealPayloads: MFT → solo a5_altri_ricavi (33% dell'EBITDA);
+// CDLAN → perimetro_standalone (warning, prima) + b8_beni_terzi (info, dopo).
+func TestQualityFlagsRealPayloads(t *testing.T) {
+	mft, _ := loadFixturePayload(t, "testdata/itfull_mft_2024.json")
+	sc := buildMADeepScorecard(mft)
+	flags := buildMADeepQualityFlags(sc, maCEEReadingFromPayload(mft), fase2Pricing())
+	if len(flags) != 1 || flags[0].Code != "a5_altri_ricavi" || flags[0].Severity != "warning" {
+		t.Fatalf("mft flags: %+v", flags)
+	}
+
+	cdlan, _ := loadFixturePayload(t, "testdata/itfull_cdlan_2025.json")
+	sc = buildMADeepScorecard(cdlan)
+	flags = buildMADeepQualityFlags(sc, maCEEReadingFromPayload(cdlan), fase2Pricing())
+	if len(flags) != 2 {
+		t.Fatalf("cdlan flags: %+v", flags)
+	}
+	if flags[0].Code != "perimetro_standalone" || flags[0].Severity != "warning" {
+		t.Fatalf("primo flag: %+v", flags[0])
+	}
+	if flags[1].Code != "b8_beni_terzi" || flags[1].Severity != "info" {
+		t.Fatalf("secondo flag: %+v", flags[1])
+	}
+}
+
 // TestMACEELabels verifica che la mappa generata dalla legend copra i codici usati
 // dal motore e i tre refusi normalizzati.
 func TestMACEELabels(t *testing.T) {

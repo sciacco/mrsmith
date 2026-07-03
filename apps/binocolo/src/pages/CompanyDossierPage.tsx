@@ -7,6 +7,7 @@ import type {
   MACompanyDossier,
   MADeepBrief,
   MADeepMetric,
+  MADeepQualityFlag,
   MADeepScorecard,
   MADeepValuation,
 } from '../api/types';
@@ -312,9 +313,18 @@ function BriefSection({ brief }: { brief?: MADeepBrief }) {
   );
 }
 
-function ValuationSection({ valuation, brief }: { valuation?: MADeepValuation; brief?: MADeepBrief }) {
+function ValuationSection({
+  valuation,
+  brief,
+  flags,
+}: {
+  valuation?: MADeepValuation;
+  brief?: MADeepBrief;
+  flags?: MADeepQualityFlag[];
+}) {
   if (!valuation) return null;
   const v = valuation;
+  const bridge = v.bridge;
   return (
     <section className={styles.section}>
       <SectionHead id="valutazione" title="Valutazione" prov="elab" />
@@ -323,13 +333,32 @@ function ValuationSection({ valuation, brief }: { valuation?: MADeepValuation; b
         <ValItem label="Multiplo" value={`${num2.format(v.multiple)}×`} />
         <ValItem label="Haircut PMI" value={`${num1.format(v.haircutPct)}%`} />
         <ValItem label="Enterprise Value" value={`${eurCompact(v.evLow)} – ${eurCompact(v.evHigh)}`} />
+        {bridge?.pfn ? <ValItem label="− PFN" value={eurCompact(bridge.pfn.value)} /> : null}
+        {bridge?.tfr ? <ValItem label="− TFR" value={eurCompact(bridge.tfr.value)} /> : null}
+        {bridge?.taxFund ? <ValItem label="− Fondo imposte" value={eurCompact(bridge.taxFund.value)} /> : null}
         {v.equityLow != null ? (
           <ValItem label="Equity" value={`${eurCompact(v.equityLow)} – ${eurCompact(v.equityHigh)}`} strong />
         ) : (
           <ValItem label="Equity" value="non calcolabile (PFN assente)" />
         )}
+        {bridge?.shareholderLoans ? (
+          <ValItem label="di cui finanz. soci (negoziale)" value={eurCompact(bridge.shareholderLoans.value)} />
+        ) : null}
         {v.sector ? <ValItem label="Settore" value={`${v.sector}${v.nFirms ? ` · ${v.nFirms} comp.` : ''}`} /> : null}
       </div>
+      {v.lowMethod === 'ev_sales' ? (
+        <p className={styles.valSource}>Estremo basso su EV/Sales: EBITDA prudenziale sotto soglia.</p>
+      ) : null}
+      {flags && flags.length > 0 ? (
+        <ul className={styles.valFlags}>
+          {flags.map((flag) => (
+            <li key={flag.code}>
+              <strong>{flag.label}</strong> — {flag.evidence}
+              {flag.ddQuestion ? <span> · DD: {flag.ddQuestion}</span> : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {brief?.valuationRationale ? <p className={styles.valRationale}>{brief.valuationRationale}</p> : null}
       <p className={styles.valSource}>
         {v.source}
@@ -590,7 +619,7 @@ function Dossier({ dossier }: { dossier: MACompanyDossier }) {
         </nav>
         <div className={styles.body}>
           <BriefSection brief={dossier.brief} />
-          <ValuationSection valuation={dossier.valuation} brief={dossier.brief} />
+          <ValuationSection valuation={dossier.valuation} brief={dossier.brief} flags={dossier.scorecard?.qualityFlags} />
           <ScorecardSection scorecard={dossier.scorecard} />
           <BilancioSection itf={itf} />
           <SociSection itf={itf} />

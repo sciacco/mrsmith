@@ -102,17 +102,21 @@ func TestBuildMADeepValuationEVEbitda(t *testing.T) {
 	evEbitda := 10.0
 	multiple := &sectorMultiple{Industry: "Software", EVEbitda: &evEbitda, NFirms: 290, Source: "Damodaran", SourceDate: "2026-01-05"}
 	pricing := maPricing{SMEHaircutPct: 30, EBITDAFallbackPct: 5}
-	val := buildMADeepValuation(sc, multiple, pricing)
+	val := buildMADeepValuation(sc, nil, multiple, pricing)
 	if val == nil || val.Method != "ev_ebitda" {
 		t.Fatalf("expected ev_ebitda: %+v", val)
 	}
+	// Senza lettura CEE il prudenziale coincide col reported: banda simmetrica.
 	// EV center = 750000 * 10 * 0.7 = 5,250,000; band +/-15%.
 	if val.EVLow != 4462500 || val.EVHigh != 6037500 {
 		t.Fatalf("EV band: %v - %v", val.EVLow, val.EVHigh)
 	}
-	// equity = EV - PFN(1,000,000).
+	// equity = EV - PFN(1,000,000): bridge degradato alla sola PFN (vendor_ratio).
 	if val.EquityLow == nil || *val.EquityLow != 3462500 {
 		t.Fatalf("equityLow: %v", val.EquityLow)
+	}
+	if val.Bridge == nil || val.Bridge.PFN == nil || val.Bridge.PFN.Provenance != maCEEProvVendorRatio {
+		t.Fatalf("bridge pfn: %+v", val.Bridge)
 	}
 }
 
@@ -122,7 +126,7 @@ func TestBuildMADeepValuationFallbackEVSales(t *testing.T) {
 	evEbitda, evSales := 10.0, 1.5
 	multiple := &sectorMultiple{Industry: "X", EVEbitda: &evEbitda, EVSales: &evSales, NFirms: 50}
 	pricing := maPricing{SMEHaircutPct: 30, EBITDAFallbackPct: 5}
-	val := buildMADeepValuation(sc, multiple, pricing)
+	val := buildMADeepValuation(sc, nil, multiple, pricing)
 	if val == nil || val.Method != "ev_sales" {
 		t.Fatalf("expected ev_sales: %+v", val)
 	}

@@ -875,6 +875,8 @@ func maExportRows(targets []MATarget) [][]any {
 		"Analisi",
 		"EV stimato",
 		"Equity stimato",
+		"PFN",
+		"TFR",
 		"Multiplo",
 		"Margine EBITDA",
 		"PFN/EBITDA",
@@ -905,6 +907,8 @@ func maExportRows(targets []MATarget) [][]any {
 			deep.analysis,
 			deep.ev,
 			deep.equity,
+			deep.pfn,
+			deep.tfr,
 			deep.multiple,
 			deep.ebitdaMargin,
 			deep.pfnEbitda,
@@ -932,7 +936,7 @@ func maRatingExportLabel(rating *int) string {
 }
 
 type maDeepExportRow struct {
-	analysis, ev, equity, multiple, ebitdaMargin, pfnEbitda, rag, verdict string
+	analysis, ev, equity, pfn, tfr, multiple, ebitdaMargin, pfnEbitda, rag, verdict string
 }
 
 // maDeepExportFields flattens the deep analysis into export cells, populated only
@@ -959,6 +963,15 @@ func maDeepExportFields(deep *MADeepAnalysis) maDeepExportRow {
 		out.ev = fmt.Sprintf("%.0f - %.0f", deep.Valuation.EVLow, deep.Valuation.EVHigh)
 		if deep.Valuation.EquityLow != nil && deep.Valuation.EquityHigh != nil {
 			out.equity = fmt.Sprintf("%.0f - %.0f", *deep.Valuation.EquityLow, *deep.Valuation.EquityHigh)
+		}
+		// Le righe del bridge viaggiano nell'export: le caveat dentro il numero.
+		if bridge := deep.Valuation.Bridge; bridge != nil {
+			if bridge.PFN != nil {
+				out.pfn = fmt.Sprintf("%.0f", bridge.PFN.Value)
+			}
+			if bridge.TFR != nil {
+				out.tfr = fmt.Sprintf("%.0f", bridge.TFR.Value)
+			}
 		}
 		method := "EV/EBITDA"
 		if deep.Valuation.Method == "ev_sales" {

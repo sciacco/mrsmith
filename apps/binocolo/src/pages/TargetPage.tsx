@@ -17,6 +17,7 @@ import type {
   MAStrategyType,
   MADeepAnalysis,
   MADeepMetric,
+  MADeepQualityFlag,
   MADeepValuation,
   MAScoringPlan,
   MATarget,
@@ -2849,7 +2850,9 @@ function DeepAnalysisTab({ deep }: { deep?: MADeepAnalysis }) {
         </div>
 
         <div className={styles.deepRightCol}>
-          {deep.valuation ? <DeepValuation valuation={deep.valuation} /> : null}
+          {deep.valuation ? (
+            <DeepValuation valuation={deep.valuation} flags={scorecard.qualityFlags} ebitda={scorecard.ebitda} />
+          ) : null}
           
           <div className={styles.deepMetricsStack}>
             {groups.map((group) => {
@@ -2883,23 +2886,98 @@ function DeepMetricRow({ metric }: { metric: MADeepMetric }) {
   );
 }
 
-function DeepValuation({ valuation }: { valuation: MADeepValuation }) {
+function bridgeProvenanceLabel(provenance?: string): string {
+  if (provenance === 'cee_total') return ' (da totali di bilancio)';
+  if (provenance === 'vendor_ratio') return ' (stimata da ratio)';
+  return '';
+}
+
+function DeepValuation({
+  valuation,
+  flags,
+  ebitda,
+}: {
+  valuation: MADeepValuation;
+  flags?: MADeepQualityFlag[];
+  ebitda?: number;
+}) {
+  const bridge = valuation.bridge;
+  const prudentialNarrower =
+    valuation.prudentialEbitda != null && ebitda != null && valuation.prudentialEbitda < ebitda;
   return (
     <div className={styles.deepValuation}>
       <h5>Inquadramento di valore</h5>
-      <div className={styles.deepValBand}>
-        <span>Enterprise Value stimato</span>
-        <strong>
-          {moneyFormat.format(valuation.evLow)} – {moneyFormat.format(valuation.evHigh)}
-        </strong>
-      </div>
-      {valuation.equityLow != null && valuation.equityHigh != null ? (
-        <div className={styles.deepValBand}>
-          <span>Equity implicito (EV − PFN)</span>
-          <strong>
-            {moneyFormat.format(valuation.equityLow)} – {moneyFormat.format(valuation.equityHigh)}
-          </strong>
-        </div>
+      {bridge ? (
+        <table className={styles.bridgeTable}>
+          <tbody>
+            <tr>
+              <td>Enterprise Value</td>
+              <td>
+                {moneyFormat.format(valuation.evLow)} – {moneyFormat.format(valuation.evHigh)}
+              </td>
+            </tr>
+            {bridge.pfn ? (
+              <tr>
+                <td>− PFN{bridgeProvenanceLabel(bridge.pfn.provenance)}</td>
+                <td>−{moneyFormat.format(bridge.pfn.value)}</td>
+              </tr>
+            ) : null}
+            {bridge.shareholderLoans ? (
+              <tr className={styles.bridgeSubRow}>
+                <td>di cui finanziamenti soci — riga negoziale</td>
+                <td>{moneyFormat.format(bridge.shareholderLoans.value)}</td>
+              </tr>
+            ) : null}
+            {bridge.tfr ? (
+              <tr>
+                <td>− TFR{bridge.tfr.note ? ` (${bridge.tfr.note})` : ''}</td>
+                <td>−{moneyFormat.format(bridge.tfr.value)}</td>
+              </tr>
+            ) : null}
+            {bridge.taxFund ? (
+              <tr>
+                <td>− Fondo imposte</td>
+                <td>−{moneyFormat.format(bridge.taxFund.value)}</td>
+              </tr>
+            ) : null}
+            {bridge.equityLow != null && bridge.equityHigh != null ? (
+              <tr className={styles.bridgeTotalRow}>
+                <td>Equity implicito</td>
+                <td>
+                  {moneyFormat.format(bridge.equityLow)} – {moneyFormat.format(bridge.equityHigh)}
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      ) : (
+        <>
+          <div className={styles.deepValBand}>
+            <span>Enterprise Value stimato</span>
+            <strong>
+              {moneyFormat.format(valuation.evLow)} – {moneyFormat.format(valuation.evHigh)}
+            </strong>
+          </div>
+          {valuation.equityLow != null && valuation.equityHigh != null ? (
+            <div className={styles.deepValBand}>
+              <span>Equity implicito (EV − PFN)</span>
+              <strong>
+                {moneyFormat.format(valuation.equityLow)} – {moneyFormat.format(valuation.equityHigh)}
+              </strong>
+            </div>
+          ) : null}
+        </>
+      )}
+      {prudentialNarrower && !valuation.lowMethod ? (
+        <small className={styles.deepValCaveat}>
+          Estremo basso su EBITDA prudenziale {moneyFormat.format(valuation.prudentialEbitda as number)} (al netto di
+          capitalizzazioni e contributi).
+        </small>
+      ) : null}
+      {valuation.lowMethod === 'ev_sales' ? (
+        <small className={styles.deepValCaveat}>
+          Estremo basso su EV/Sales: EBITDA prudenziale sotto soglia.
+        </small>
       ) : null}
       <small className={styles.deepValSource}>
         {valuation.method === 'ev_sales' ? 'EV/Sales' : 'EV/EBITDA'} {valuation.multiple}× · sconto PMI {valuation.haircutPct}%
@@ -2909,6 +2987,19 @@ function DeepValuation({ valuation }: { valuation: MADeepValuation }) {
         {valuation.nFirms ? ` · ${valuation.nFirms} soc.` : ''}
       </small>
       {valuation.caveat ? <small className={styles.deepValCaveat}>{valuation.caveat}</small> : null}
+      {flags && flags.length > 0 ? (
+        <div className={styles.qualityFlags}>
+          {flags.map((flag) => (
+            <div
+              key={flag.code}
+              className={flag.severity === 'warning' ? styles.qualityFlagWarning : styles.qualityFlagInfo}
+            >
+              <strong>{flag.label}</strong> — {flag.evidence}
+              {flag.ddQuestion ? <span className={styles.qualityFlagDD}> · DD: {flag.ddQuestion}</span> : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

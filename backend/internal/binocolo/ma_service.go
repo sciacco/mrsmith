@@ -635,6 +635,11 @@ type maPricing struct {
 	SMEHaircutPct              float64
 	EBITDAFallbackPct          float64
 	VendorCEETolerancePct      float64
+	TFRBridgePct               float64
+	A5EBITDAFlagPct            float64
+	B8RevenueFlagPct           float64
+	ParticipationAssetsFlagPct float64
+	ParticipationIncomeFlagPct float64
 	ThesisFitHoldingHaircutPct float64
 	// Gated-search pipeline levers (migration 074): CostAddress = per-company gate
 	// enrichment, CostScrapePage/CostSearch = fastcrw unit costs, SurvivorRate =
@@ -690,6 +695,11 @@ func maPricingFromParameters(params []MAParameter) maPricing {
 		SMEHaircutPct:              maSMEHaircutPctDefault,
 		EBITDAFallbackPct:          maEBITDAFallbackPctDefault,
 		VendorCEETolerancePct:      maVendorCEETolerancePctDefault,
+		TFRBridgePct:               maTFRBridgePctDefault,
+		A5EBITDAFlagPct:            maA5EBITDAFlagPctDefault,
+		B8RevenueFlagPct:           maB8RevenueFlagPctDefault,
+		ParticipationAssetsFlagPct: maParticipationAssetsFlagPctDefault,
+		ParticipationIncomeFlagPct: maParticipationIncomeFlagPctDefault,
 		ThesisFitHoldingHaircutPct: maThesisFitHoldingHaircutPctDefault,
 		CostAddress:                maCostPerAddressEUR,
 		CostScrapePage:             maCostPerScrapePageEUR,
@@ -725,6 +735,21 @@ func maPricingFromParameters(params []MAParameter) maPricing {
 	}
 	if v, ok := paramFloat(values, "vendor_cee_tolerance_pct"); ok {
 		pricing.VendorCEETolerancePct = v
+	}
+	if v, ok := paramFloat(values, "tfr_bridge_pct"); ok && v <= 100 {
+		pricing.TFRBridgePct = v
+	}
+	if v, ok := paramFloat(values, "a5_ebitda_flag_pct"); ok {
+		pricing.A5EBITDAFlagPct = v
+	}
+	if v, ok := paramFloat(values, "b8_revenue_flag_pct"); ok {
+		pricing.B8RevenueFlagPct = v
+	}
+	if v, ok := paramFloat(values, "participation_assets_flag_pct"); ok {
+		pricing.ParticipationAssetsFlagPct = v
+	}
+	if v, ok := paramFloat(values, "participation_income_flag_pct"); ok {
+		pricing.ParticipationIncomeFlagPct = v
 	}
 	if v, ok := paramFloat(values, "thesis_fit_holding_haircut_pct"); ok && v < 100 {
 		pricing.ThesisFitHoldingHaircutPct = v
@@ -2536,12 +2561,6 @@ func (s *maService) updateParameter(ctx context.Context, key, value, subject, em
 // and not charged. The projected incremental spend (chargeable x cost_full) gates
 // the batch unless the analyst acknowledges going over budget. The async worker
 // picks up the queued rows; the returned detail reflects the new statuses.
-// recomputeMADeepScorecards rebuilds the deterministic scorecard for every cached
-// deep analysis straight from its stored IT-full payload — no vendor call, no LLM,
-// no charge. It rolls out an engine calibration to already-analyzed companies (the
-// funnel and the dossier share this global cache). Valuation is intentionally left
-// as-is: it derives from ebitda/turnover/PFN/sector-multiple, which the scorecard
-// fixes do not touch. The brief is regenerated separately (it needs the LLM).
 // regenerateMADeepBriefs re-runs the LLM brief for every cached analysis from its stored
 // payload + valuation (scorecard rebuilt deterministically). No IT-full call — used to
 // roll out a new brief prompt to already-analyzed companies. Per-row LLM failures are
@@ -2584,7 +2603,14 @@ func (s *maService) regenerateMADeepBriefs(ctx context.Context) (int, error) {
 	return regenerated, nil
 }
 
-func (s *maService) recomputeMADeepScorecards(ctx context.Context) (int, error) {
+// recomputeMADeepScorecards rebuilds the deterministic scorecard (+ quality flags,
+// Fase 2) for every cached deep analysis straight from its stored IT-full payload —
+// no vendor call, no LLM, no charge. It rolls out an engine calibration to
+// already-analyzed companies (the funnel and the dossier share this global cache).
+// With withValuation the valuation is rebuilt too (bridge + banda asimmetrica: dal
+// redesign Fase 2 la semantica della valuation cambia e il refresh è voluto). The
+// brief is regenerated separately (it needs the LLM).
+func (s *maService) recomputeMADeepScorecards(ctx context.Context, withValuation bool) (int, error) {
 	if s.store == nil {
 		return 0, errMAStoreUnavailable
 	}
@@ -2592,14 +2618,27 @@ func (s *maService) recomputeMADeepScorecards(ctx context.Context) (int, error) 
 	if err != nil {
 		return 0, err
 	}
+	pricing := s.loadPricing(ctx)
 	recomputed := 0
 	for _, row := range rows {
 		scorecard := buildMADeepScorecard(row.Payload)
 		if scorecard == nil {
 			continue
 		}
+		reading := maCEEReadingFromPayload(row.Payload)
+		scorecard.QualityFlags = buildMADeepQualityFlags(scorecard, reading, pricing)
 		if err := s.store.UpdateMADeepScorecard(ctx, row.CompanyKey, scorecard); err != nil {
 			return recomputed, err
+		}
+		if withValuation {
+			multiple, err := s.store.ResolveSectorMultiple(ctx, scorecard.AtecoCode)
+			if err != nil {
+				logging.FromContext(ctx).Warn("binocolo recompute sector multiple failed", "component", "binocolo", "company_key", row.CompanyKey, "error", err)
+			} else if valuation := buildMADeepValuation(scorecard, reading, multiple, pricing); valuation != nil {
+				if err := s.store.UpdateMADeepValuation(ctx, row.CompanyKey, valuation); err != nil {
+					return recomputed, err
+				}
+			}
 		}
 		recomputed++
 	}

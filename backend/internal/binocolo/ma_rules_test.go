@@ -250,11 +250,12 @@ func TestMAExportRows(t *testing.T) {
 	if rows[1][11] != "" {
 		t.Fatalf("preferito = %#v, want empty (no rating)", rows[1][11])
 	}
-	// Deep-analysis columns (12..18) are blank without a deep record.
+	// Deep-analysis columns (12..20, incl. PFN/TFR del bridge) are blank without
+	// a deep record.
 	if rows[1][12] != "" {
 		t.Fatalf("analisi = %#v, want empty (no deep)", rows[1][12])
 	}
-	if rows[1][19] != "eta soci" {
-		t.Fatalf("missing criteria = %#v, want eta soci", rows[1][19])
+	if rows[1][21] != "eta soci" {
+		t.Fatalf("missing criteria = %#v, want eta soci", rows[1][21])
 	}
 }

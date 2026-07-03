@@ -1031,23 +1031,28 @@ func (h *Handler) handleDeepDiveMASession(w http.ResponseWriter, r *http.Request
 	httputil.JSON(w, http.StatusOK, detail)
 }
 
-// handleRecomputeMADeep rebuilds the deterministic scorecard for every cached deep
-// analysis from its stored IT-full payload (no vendor call, no charge). Used to roll
-// out engine calibration fixes. Gated by the standard binocolo access role.
+// handleRecomputeMADeep rebuilds the deterministic scorecard (+ quality flags) for
+// every cached deep analysis from its stored IT-full payload (no vendor call, no
+// charge). Body opzionale {"valuation": true} ricostruisce anche la valuation
+// (bridge + banda asimmetrica). Gated by the standard binocolo access role.
 func (h *Handler) handleRecomputeMADeep(w http.ResponseWriter, r *http.Request) {
 	subject, email := companySearchRefreshActor(r.Context())
+	var body struct {
+		Valuation bool `json:"valuation"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body) // body assente = solo scorecard
 	var ok bool
-	r, ok = h.startMATrace(w, r, "ma_deep_recompute", "", nil, subject, email)
+	r, ok = h.startMATrace(w, r, "ma_deep_recompute", "", body, subject, email)
 	if !ok {
 		return
 	}
-	count, err := h.ma.recomputeMADeepScorecards(r.Context())
+	count, err := h.ma.recomputeMADeepScorecards(r.Context(), body.Valuation)
 	if err != nil {
 		h.maFailure(w, r, "ma_deep_recompute", err)
 		return
 	}
 	h.completeMATraceSuccess(r, http.StatusOK)
-	httputil.JSON(w, http.StatusOK, map[string]any{"recomputed": count})
+	httputil.JSON(w, http.StatusOK, map[string]any{"recomputed": count, "valuation": body.Valuation})
 }
 
 // handleRegenerateMADeepBriefs re-runs the LLM brief for every cached analysis from its

@@ -8,6 +8,7 @@ import type {
   MACardDossier,
   MADeepAnalysis,
   MADeepMetric,
+  MADeepQualityFlag,
   MADeepValuation,
   MATarget,
   MATargetAdjustment,
@@ -356,7 +357,7 @@ function DeepAnalysisTab({ deep }: { deep?: MADeepAnalysis }) {
       </div>
 
       {deep.brief ? <DeepBriefBlock brief={deep.brief} /> : null}
-      {deep.valuation ? <DeepValuation valuation={deep.valuation} /> : null}
+      {deep.valuation ? <DeepValuation valuation={deep.valuation} flags={deep.scorecard?.qualityFlags} /> : null}
 
       {groups.map((group) => {
         const metrics = scorecard.metrics.filter((metric) => metric.group === group.key);
@@ -383,23 +384,84 @@ function DeepMetricRow({ metric }: { metric: MADeepMetric }) {
   );
 }
 
-function DeepValuation({ valuation }: { valuation: MADeepValuation }) {
+function bridgeProvenanceLabel(provenance?: string): string {
+  if (provenance === 'cee_total') return ' (da totali di bilancio)';
+  if (provenance === 'vendor_ratio') return ' (stimata da ratio)';
+  return '';
+}
+
+function DeepValuation({ valuation, flags }: { valuation: MADeepValuation; flags?: MADeepQualityFlag[] }) {
+  const bridge = valuation.bridge;
   return (
     <div>
       <h5>Inquadramento di valore</h5>
-      <div>
-        <span>Enterprise Value stimato</span>
-        <strong>
-          {moneyFormat.format(valuation.evLow)} – {moneyFormat.format(valuation.evHigh)}
-        </strong>
-      </div>
-      {valuation.equityLow != null && valuation.equityHigh != null ? (
-        <div>
-          <span>Equity implicito (EV − PFN)</span>
-          <strong>
-            {moneyFormat.format(valuation.equityLow)} – {moneyFormat.format(valuation.equityHigh)}
-          </strong>
-        </div>
+      {bridge ? (
+        <table>
+          <tbody>
+            <tr>
+              <td>Enterprise Value</td>
+              <td>
+                {moneyFormat.format(valuation.evLow)} – {moneyFormat.format(valuation.evHigh)}
+              </td>
+            </tr>
+            {bridge.pfn ? (
+              <tr>
+                <td>− PFN{bridgeProvenanceLabel(bridge.pfn.provenance)}</td>
+                <td>−{moneyFormat.format(bridge.pfn.value)}</td>
+              </tr>
+            ) : null}
+            {bridge.shareholderLoans ? (
+              <tr>
+                <td>di cui finanziamenti soci — riga negoziale</td>
+                <td>{moneyFormat.format(bridge.shareholderLoans.value)}</td>
+              </tr>
+            ) : null}
+            {bridge.tfr ? (
+              <tr>
+                <td>− TFR{bridge.tfr.note ? ` (${bridge.tfr.note})` : ''}</td>
+                <td>−{moneyFormat.format(bridge.tfr.value)}</td>
+              </tr>
+            ) : null}
+            {bridge.taxFund ? (
+              <tr>
+                <td>− Fondo imposte</td>
+                <td>−{moneyFormat.format(bridge.taxFund.value)}</td>
+              </tr>
+            ) : null}
+            {bridge.equityLow != null && bridge.equityHigh != null ? (
+              <tr>
+                <td>
+                  <strong>Equity implicito</strong>
+                </td>
+                <td>
+                  <strong>
+                    {moneyFormat.format(bridge.equityLow)} – {moneyFormat.format(bridge.equityHigh)}
+                  </strong>
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      ) : (
+        <>
+          <div>
+            <span>Enterprise Value stimato</span>
+            <strong>
+              {moneyFormat.format(valuation.evLow)} – {moneyFormat.format(valuation.evHigh)}
+            </strong>
+          </div>
+          {valuation.equityLow != null && valuation.equityHigh != null ? (
+            <div>
+              <span>Equity implicito (EV − PFN)</span>
+              <strong>
+                {moneyFormat.format(valuation.equityLow)} – {moneyFormat.format(valuation.equityHigh)}
+              </strong>
+            </div>
+          ) : null}
+        </>
+      )}
+      {valuation.lowMethod === 'ev_sales' ? (
+        <small>Estremo basso su EV/Sales: EBITDA prudenziale sotto soglia.</small>
       ) : null}
       <small>
         {valuation.method === 'ev_sales' ? 'EV/Sales' : 'EV/EBITDA'} {valuation.multiple}× · sconto PMI {valuation.haircutPct}%
@@ -409,6 +471,16 @@ function DeepValuation({ valuation }: { valuation: MADeepValuation }) {
         {valuation.nFirms ? ` · ${valuation.nFirms} soc.` : ''}
       </small>
       {valuation.caveat ? <small>{valuation.caveat}</small> : null}
+      {flags && flags.length > 0 ? (
+        <ul>
+          {flags.map((flag) => (
+            <li key={flag.code}>
+              <strong>{flag.label}</strong> — {flag.evidence}
+              {flag.ddQuestion ? <span> · DD: {flag.ddQuestion}</span> : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }

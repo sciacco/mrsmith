@@ -57,6 +57,8 @@ type maWorkspaceStore interface {
 	CountMADeepByStatus(ctx context.Context) (map[string]int, error)
 	CountMADeepVintage(ctx context.Context) (int, int, error)
 	UpdateMADeepScorecard(ctx context.Context, companyKey string, scorecard *MADeepScorecard) error
+	UpdateMADeepValuation(ctx context.Context, companyKey string, valuation *MADeepValuation) error
+	ResolveSectorMultiple(ctx context.Context, ateco string) (*sectorMultiple, error)
 	GetMADeepByVAT(ctx context.Context, vat string) (*maDeepVATRecord, error)
 	ListMADeepReadyForBrief(ctx context.Context) ([]maDeepBriefRow, error)
 	UpdateMADeepBrief(ctx context.Context, companyKey string, brief *MADeepBrief, modelID, promptID string) error
@@ -3656,6 +3658,31 @@ SET scorecard = $2::jsonb, updated_at = now()
 WHERE company_key = $1
 `, companyKey, []byte(raw)); err != nil {
 		return fmt.Errorf("update ma deep scorecard: %w", err)
+	}
+	return nil
+}
+
+// UpdateMADeepValuation overwrites only the valuation column (recompute con
+// {"valuation": true}, Fase 2: bridge e banda asimmetrica cambiano la semantica
+// della valuation e il refresh sulle righe cached è voluto).
+func (s *SQLStore) UpdateMADeepValuation(ctx context.Context, companyKey string, valuation *MADeepValuation) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	raw := json.RawMessage("null")
+	if valuation != nil {
+		b, err := json.Marshal(valuation)
+		if err != nil {
+			return fmt.Errorf("marshal ma deep valuation: %w", err)
+		}
+		raw = b
+	}
+	if _, err := s.db.ExecContext(ctx, `
+UPDATE binocolo.ma_deep_analysis
+SET valuation = $2::jsonb, updated_at = now()
+WHERE company_key = $1
+`, companyKey, []byte(raw)); err != nil {
+		return fmt.Errorf("update ma deep valuation: %w", err)
 	}
 	return nil
 }

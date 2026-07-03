@@ -19,6 +19,8 @@ package binocolo
 //   - annualResult: 177 = ante imposte, 178 = IMPOSTE, 179 = utile netto.
 
 import (
+	"encoding/json"
+	"fmt"
 	"math"
 	"strings"
 )
@@ -247,6 +249,131 @@ func maCEEReadingFromRoot(root map[string]any) *maCEEReading {
 	reading.Taxes = optional("178")
 	reading.NetProfit = optional("179")
 	return reading
+}
+
+// maCEEReadingFromPayload è la comodità payload→lettura (decodifica + de-envelope).
+func maCEEReadingFromPayload(payload json.RawMessage) *maCEEReading {
+	object, err := decodeVendorObject(payload)
+	if err != nil || object == nil {
+		return nil
+	}
+	return maCEEReadingFromRoot(deepFullRoot(object))
+}
+
+// maFormatEUR formatta un importo con separatore migliaia a punto ("1.666.053 €"):
+// le evidenze dei flag arrivano in UI ed export come stringhe già composte.
+func maFormatEUR(v float64) string {
+	n := int64(math.Round(math.Abs(v)))
+	s := fmt.Sprintf("%d", n)
+	for i := len(s) - 3; i > 0; i -= 3 {
+		s = s[:i] + "." + s[i:]
+	}
+	if v < 0 {
+		s = "-" + s
+	}
+	return s + " €"
+}
+
+// buildMADeepQualityFlags calcola i segnali deterministici di qualità (Fase 2):
+// annotazioni di confidenza sulla banda, MAI dentro la sua matematica né nel RAG.
+// Le soglie vengono da ma_parameter (mig 092). Ordine: warning prima di info.
+func buildMADeepQualityFlags(sc *MADeepScorecard, reading *maCEEReading, pricing maPricing) []MADeepQualityFlag {
+	if sc == nil {
+		return nil
+	}
+	var warnings, infos []MADeepQualityFlag
+	add := func(severity string, flag MADeepQualityFlag) {
+		flag.Severity = severity
+		if severity == "warning" {
+			warnings = append(warnings, flag)
+		} else {
+			infos = append(infos, flag)
+		}
+	}
+	ebitda := 0.0
+	if sc.Ebitda != nil {
+		ebitda = *sc.Ebitda
+	}
+
+	if reading != nil {
+		if reading.Capitalizations > 0 && ebitda > 0 {
+			add("warning", MADeepQualityFlag{
+				Code:  "a4_capitalizzazioni",
+				Label: "EBITDA con costi capitalizzati",
+				Evidence: fmt.Sprintf("A.4 incrementi per lavori interni = %s (%.0f%% dell'EBITDA): l'estremo basso della banda li esclude",
+					maFormatEUR(reading.Capitalizations), reading.Capitalizations/ebitda*100),
+				DDQuestion: "Dettagliare natura e ricorrenza dei costi capitalizzati (A.4) e la quota che sopravvivrebbe a una normalizzazione dell'EBITDA.",
+			})
+		}
+		if ebitda > 0 && reading.OtherRevenuesA5/ebitda*100 > pricing.A5EBITDAFlagPct {
+			add("warning", MADeepQualityFlag{
+				Code:  "a5_altri_ricavi",
+				Label: "Altri ricavi rilevanti sull'EBITDA",
+				Evidence: fmt.Sprintf("A.5 altri ricavi = %s = %.0f%% dell'EBITDA (di cui contributi %s)",
+					maFormatEUR(reading.OtherRevenuesA5), reading.OtherRevenuesA5/ebitda*100, maFormatEUR(reading.OperatingGrants)),
+				DDQuestion: "Chiarire la composizione degli altri ricavi (A.5): quota ricorrente vs una tantum (sopravvenienze, plusvalenze, rimborsi).",
+			})
+		}
+		if reading.Revenues != nil && *reading.Revenues > 0 && reading.LeaseCosts/(*reading.Revenues)*100 > pricing.B8RevenueFlagPct {
+			add("info", MADeepQualityFlag{
+				Code:  "b8_beni_terzi",
+				Label: "Struttura in godimento di terzi",
+				Evidence: fmt.Sprintf("B.8 godimento beni di terzi = %s = %.0f%% dei ricavi: impegni che il compratore eredita",
+					maFormatEUR(reading.LeaseCosts), reading.LeaseCosts/(*reading.Revenues)*100),
+				DDQuestion: "Elencare i contratti di godimento beni di terzi (affitti, noleggi, leasing): durate residue, canoni e controparti (parti correlate?).",
+			})
+		}
+		assetsShare, incomeShare := 0.0, 0.0
+		if reading.ParticipationsTotal != nil && reading.TotalAssets != nil && *reading.TotalAssets > 0 {
+			assetsShare = *reading.ParticipationsTotal / *reading.TotalAssets * 100
+		}
+		if ebitda > 0 {
+			incomeShare = reading.ParticipationIncome / ebitda * 100
+		}
+		if assetsShare > pricing.ParticipationAssetsFlagPct || incomeShare > pricing.ParticipationIncomeFlagPct {
+			add("warning", MADeepQualityFlag{
+				Code:  "perimetro_standalone",
+				Label: "Controllate fuori dal perimetro valutato",
+				Evidence: fmt.Sprintf("Partecipazioni = %s (%.0f%% dell'attivo); proventi da partecipazioni = %s (%.0f%% dell'EBITDA): la banda valuta il solo standalone",
+					maFormatEUR(maZeroPtr(reading.ParticipationsTotal)), assetsShare, maFormatEUR(reading.ParticipationIncome), incomeShare),
+				DDQuestion: "Acquisire il bilancio consolidato (o i bilanci delle controllate) e valutare la somma delle parti.",
+			})
+		}
+	}
+	if rec := sc.Reconciliation; rec != nil {
+		over := func(pct *float64) bool { return pct != nil && math.Abs(*pct) > pricing.VendorCEETolerancePct }
+		if over(rec.EBITDAPct) || over(rec.PFNPct) {
+			evidence := "Scarto vendor-vs-CEE oltre soglia:"
+			if over(rec.EBITDAPct) {
+				evidence += fmt.Sprintf(" EBITDA %.1f%%", *rec.EBITDAPct)
+			}
+			if over(rec.PFNPct) {
+				evidence += fmt.Sprintf(" PFN %.1f%%", *rec.PFNPct)
+			}
+			add("warning", MADeepQualityFlag{
+				Code:       "scarto_vendor_cee",
+				Label:      "Dati da riconciliare",
+				Evidence:   fmt.Sprintf("%s (tolleranza %.1f%%)", evidence, pricing.VendorCEETolerancePct),
+				DDQuestion: "Riconciliare le fonti: quale bilancio/vintage usa il provider per i KPI pre-calcolati?",
+			})
+		}
+	}
+	if sc.NetWorth != nil && *sc.NetWorth <= 0 {
+		add("warning", MADeepQualityFlag{
+			Code:       "patrimonio_eroso",
+			Label:      "Patrimonio netto eroso",
+			Evidence:   fmt.Sprintf("Patrimonio netto = %s", maFormatEUR(*sc.NetWorth)),
+			DDQuestion: "Ricostruire l'evoluzione del patrimonio netto: perdite cumulate, versamenti/rinunce soci, piani di ricapitalizzazione.",
+		})
+	}
+	return append(warnings, infos...)
+}
+
+func maZeroPtr(v *float64) float64 {
+	if v == nil {
+		return 0
+	}
+	return *v
 }
 
 // maCEELabel ritorna l'etichetta ufficiale della legend per un codice o numero voce.

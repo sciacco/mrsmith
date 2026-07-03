@@ -1540,6 +1540,14 @@ func (f *fakeMAWorkspaceStore) CountMADeepByStatus(context.Context) (map[string]
 	return map[string]int{}, nil
 }
 
+func (f *fakeMAWorkspaceStore) UpdateMADeepValuation(context.Context, string, *MADeepValuation) error {
+	return nil
+}
+
+func (f *fakeMAWorkspaceStore) ResolveSectorMultiple(context.Context, string) (*sectorMultiple, error) {
+	return nil, nil
+}
+
 func (f *fakeMAWorkspaceStore) CountMADeepVintage(context.Context) (int, int, error) {
 	return 0, 0, nil
 }
