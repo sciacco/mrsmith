@@ -54,12 +54,12 @@ Riscontro puntuale del codice a HEAD `24bbdf3` (working tree pulito). **Tre comm
 | **F1** | ✅ RISOLTO (`9704883`) — `counts` aggregati e renderizzati | §5 |
 | **F3** | ✅ RISOLTO (`9704883`) — archive/restore per-iniziativa + endpoint; delete assente (corretto per D-A) | §5 |
 | **F4** | ✅ COMMITTATO (`24bbdf3`) — non più working tree | §5 |
-| **F5** | ⚠️ APERTO confermato — `ListMAActiveCardsByCompany` non joina `ma_initiative` per escludere archiviate | §5 |
+| **F5** | ✅ RISOLTO (working tree, 2026-07-04) — join `ma_initiative` + `archived_at IS NULL` | §5 |
 
 **Perimetro attivo reale dopo il re-baseline 2:**
 
 - Pattern Q: **Q6** attivo (nomenclatura duplice + numeri funnel) · **Q5** quasi fatto (2 residui: contatore toggle, filtraggio stato dal click pill) · Q1, Q2, Q3, Q4, Q7 fatti.
-- Difetti F: **F5** attivo · F7 igiene (SQL §8) · F8 da spot-check · F1, F2, F3, F4 fatti · F6 ritirata.
+- Difetti F: **F8** da spot-check · F1, F2, F3, F4, F5, F7 fatti · F6 ritirata.
 
 **Impatto sulla Fase 4 (riverifica di parità):** Q1–Q4 erano dichiarati "attivi" sulla base di `6217051` ma sono ora implementati — vanno **verificati visivamente** (non più implementati) nella Fase 4, insieme agli stati non ancora visti (S6 registro renderizzato, D1 S2–S6, D2 S7, badge/marker/collisioni con dati veri).
 
@@ -69,7 +69,7 @@ Il costruito si divide in tre fasce nette (aggiornato al re-baseline 2, HEAD `24
 
 - **A standard (da preservare)**: D1 stato iniziale, modali di chiusura/rimozione, coda di verifica D2, impianto kanban (colonne flessibili/rail), backend dei flussi card e schema 087–090.
 - **Sotto lo standard approvato (rimediato quasi tutto)**: i pattern di qualità Q1–Q4 sono ora **implementati** (`a627066`/`9704883`): eventi semantici, conteggi valorizzati e evidenziati, date relative, diario che racconta, troncamento ragioni sociali. **Restano sotto standard**: Q6 (nomenclatura bucket duplice nella legenda funnel vs tabella) e i 2 residui di Q5 (contatore toggle, filtraggio stato dal click pill). Il danno residuo è piccolo e puntuale, non più «il grosso».
-- **Mancante**: F5 (marker ignora iniziative archiviate), Q6 nomenclatura, Q5 residui; igiene dati di prova (F7, SQL tua); spot-check minori (F8). Il ciclo di vita iniziative (F3) e i contatori (F1) sono ora **fatti**.
+- **Mancante**: Q6 nomenclatura, Q5 residui; spot-check minori (F8). Il ciclo di vita iniziative (F3), i contatori (F1) e i marker vs archiviate (F5) sono ora **fatti**.
 
 **Raccomandazione: si recupera, e in buona parte è già recuperato.** Il modello dati e i flussi reggono (smoke end-to-end); i gap residui sono di resa puntuale (Q6 nomenclatura, Q5 toggle) e di un fix di query (F5 join su `ma_initiative`). Il `TargetDetailModal` di D2 è già disaccoppiato (F4 committato `24bbdf3`): link `/azienda` rimosso, badge B5 inline, dossier profondo resta azione di card sul MA card-dossier autosufficiente (D-B ratificata).
 
@@ -110,7 +110,7 @@ Copy dei 5 esiti verbatim ✓, ponte registro solo su No-go/Rimandata (verificat
 Il registro è migrato (correttamente, dopo la ratifica del 2026-07-02) dalla pagina `/azienda` alla pagina card-dossier. Ma la pagina card-dossier oggi renderizza solo l'empty state (le card di prova hanno la sessione sganciata) → la parità S6 (badge, revoca con conferma, storico dietro toggle, composer nota) **non è mai stata vista renderizzata**. Va coperta nella riverifica di parità con dati reali.
 
 ### S7 · Superfici esistenti — PARZIALE
-D1: card «Iniziativa (opzionale)» presente con hint verbatim ✓ (flash di caricamento del dropdown al primo render → F8). Indice ricerche: «Aggancia a iniziativa…» ✓, chip su agganciate ✓. D2: badge registro e marker «In lavorazione · titolo» ✓ (verificati nello smoke) — ma il marker ignora le iniziative archiviate → F5.
+D1: card «Iniziativa (opzionale)» presente con hint verbatim ✓ (flash di caricamento del dropdown al primo render → F8). Indice ricerche: «Aggancia a iniziativa…» ✓, chip su agganciate ✓. D2: badge registro e marker «In lavorazione · titolo» ✓ (verificati nello smoke) — ✅ F5 risolto: il marker ora esclude le iniziative archiviate (join `ma_initiative` + `archived_at IS NULL`).
 
 ## 3. Audit per schermata — Gated D1/D2 (wireframe S1–S10)
 
@@ -146,7 +146,7 @@ Motivo derivato verbatim («Identità non confermata sulle pagine lette», «Sit
 - **F2 — Ciclo di vita ricerche in /ricerche** · ✅ **RISOLTO al re-baseline** (commit `79169e2`, 2026-07-02): `RicerchePage.tsx` ha ora archivia/cestino/purge/ripristino + filtri di visibilità (Attive/Archiviate/Cestino) + modali di conferma. **Fuori perimetro.** (L'audit a `996ce47` lo rilevava ancora aperto: era il gap reale a quel HEAD, chiuso nelle ore successive.)
 - **F3 — Ciclo di vita iniziative** · ✅ **RISOLTO** (`9704883`): `IniziativaCard` espone `onArchive`/`onRestore` con bottoni «Archivia»/«Ripristina» per-iniziativa; endpoint backend `POST .../archive` + `.../restore` (`handler.go:121-122`); vista archivio con link «Archivio (N)» + conteggio + empty state. Delete assente (corretto per D-A: archive + restore, no delete/purge).
 - **F4 — Dettaglio D2** · ✅ **COMMITTATO** (`24bbdf3`, 2026-07-04): il `TargetDetailModal` (`RicercaDetailPage.tsx`) non ha più il link `/azienda?vat=` — sostituito dai badge B5 inline (`registryFacts` + `inLavorazione`), riusando il pattern già presente nella tabella risultati (`cellBadges` + `registryFactLabels` + `badgeWarn`/`badgeInfo`/`badgeLav`). Il modale resta magro nel ruolo di setaccio (razionale aderenza + contesto scoring + badge B5); il dossier profondo resta azione di card sul MA card-dossier, già autosufficiente e disaccoppiato (`GetMATargetByID` → cache company-keyed via `ListMADeepAnalysis`). Wording PRD §7 aggiornato in committed code (`INIZIATIVE-PRD.md:105`: «Il tool standalone `/azienda` è indipendente da MA e non è accoppiato al flusso (ratifica D-B)»). **Fuori perimetro.**
-- **F5 — Marker vs archiviazione** · ⚠️ **APERTO confermato (re-baseline 2)**: `ListMAActiveCardsByCompany` (`ma_store.go`) filtra `state NOT IN ('chiusa','rimossa')` ma **non joina `ma_initiative`** per escludere le iniziative archiviate → le card di iniziative archiviate ancora appaiono come marker di collisione. Fix: join su `ma_initiative` con `archived_at IS NULL`.
+- **F5 — Marker vs archiviazione** · ✅ **RISOLTO (working tree, 2026-07-04)**: `ListMAActiveCardsByCompany` (`ma_store.go`) ora joina `ma_initiative` con `archived_at IS NULL` → le card di iniziative archiviate non surfacciano più come marker di collisione (board drawer) né come `InLavorazione` (tabella D2). Fix in un solo punto, chiude entrambi i path (board + D2).
 - **F6 — Provenienze robuste** · ❌ **RITIRATA (2026-07-02)**: stesso falso problema di D-D. Il rimedio (leggere dallo snapshot invece che dalle sessioni agganciate) servirebbe solo a rendere la card indipendente dalla sessione — ma non è il modello implementato (la card risolve i dettagli attraverso la sessione agganciata). Per le operazioni supportate (archive, purge soft) le provenienze **non** si perdono: la sessione resta con `initiative_id` intatto e le query filtrano solo per quello. Lo sgancio — l'unico caso che rompe — non è supportato. (Se in futuro si volesse supportarlo, servirebbe uno snapshot completo su card: decisione «cambia modello», non un task di remediation.)
 - **F7 — Igiene dati di prova**: SQL in §8 (include anche i 2 cambi di stato accidentali fatti oggi durante l'audit da click su riferimenti browser stantii — errore mio, registrato).
 - **F8 — Lotto minori**: gli 8 della v1 + flash dropdown D1 + ordine bottoni S5.
@@ -154,9 +154,9 @@ Motivo derivato verbatim («Identità non confermata sulle pagine lette», «Sit
 ## 6. Piano di esecuzione proposto (aggiornato al re-baseline 2, HEAD `24bbdf3`)
 
 1. **Fase 0 — Ratifica**: ✅ chiusa (D-A, D-B, D-C ratificate; D-D ritirata).
-2. **Fase 1 — Igiene** (immediata): riga `.gitignore` `**/.playwright-cli/` ✅ fatta (2026-07-02); SQL §8 (tu, one-shot) — copre l'iniziativa audit `aac1ef5b…`; **verifica anche eventuali altri dati di prova** residui dai smoke test recenti prima di dichiarare la fase chiusa.
+2. **Fase 1 — Igiene** · ✅ **CHIUSA (2026-07-04)**: riga `.gitignore` `**/.playwright-cli/` ✅; SQL §8 eseguito (iniziativa audit `aac1ef5b…` + scritture accidentali pulite); verifica residui smoke test completata.
 3. **Fase 2 — Pattern Q residui**: **Q6** (unificare nomenclatura bucket: legenda funnel «Da approfondire» → «Da verificare», allineare «In tesi»/«Fuori tesi»; numeri funnel che quadrano) + **Q5 residui** (contatore sul toggle Kanban/Tabella; click pill → board filtrato per stato). Q1, Q2, Q3, Q4, Q7 ✅ fatti (da verificare visivamente in Fase 4, non più da implementare).
-4. **Fase 3 — Funzionali residui**: **F5** (join `ma_initiative` in `ListMAActiveCardsByCompany` per escludere archiviate). F1, F2, F3, F4 ✅ fatti · F6 ritirata · F7 = igiene Fase 1.
+4. **Fase 3 — Funzionale residuo** · ✅ **CHIUSA (2026-07-04)**: F5 implementato (join `ma_initiative` in `ListMAActiveCardsByCompany` per escludere archiviate). F1, F2, F3, F4 ✅ fatti · F6 ritirata · F7 = igiene Fase 1.
 5. **Fase 4 — Riverifica di parità formale**: per OGNI stato dei due wireframe, screenshot fianco a fianco e checklist puntuale. **Inclusi i pattern Q1–Q4 ora implementati** (verifica visiva, non più implementazione) e gli stati oggi non verificabili: S6 registro renderizzato, D1 S2–S6 e S7 al primo run reale, badge/marker/collisioni con dati veri, rendering del board riscritto da `8284248`. **Questa checklist è il gate di accettazione: niente «fatto» senza il confronto visivo.** La eseguo io direttamente.
 
 Sequenza e granularità dei task esecutori le definiamo dopo la ratifica — non prima, per non ripetere l'errore di piani che promettono ciò che non specificano.

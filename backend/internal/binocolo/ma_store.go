@@ -2494,7 +2494,8 @@ ORDER BY o.company_key, o.created_at DESC
 
 // ListMAActiveCardsByCompany batches the collision/badge lookup (PRD §6.1,
 // B5): for each company key, every ACTIVE card (state NOT IN chiusa/rimossa)
-// across all initiatives.
+// across all NON-ARCHIVED initiatives (archived initiatives are out of the
+// working scene — their cards must not surface as collision markers).
 func (s *SQLStore) ListMAActiveCardsByCompany(ctx context.Context, companyKeys []string) (map[string][]MAInitiativeCard, error) {
 	if s == nil || s.db == nil {
 		return nil, errors.New("binocolo ma store not configured")
@@ -2510,12 +2511,14 @@ func (s *SQLStore) ListMAActiveCardsByCompany(ctx context.Context, companyKeys [
 		args[i] = key
 	}
 	query := fmt.Sprintf(`
-SELECT initiative_id::text, company_key, company_name, vat_code, tax_code, province,
-       state, COALESCE(esito, ''), COALESCE(created_from_session::text, ''),
-       created_at, updated_at, closed_at
-FROM binocolo.ma_initiative_card
-WHERE company_key IN (%s)
-  AND state NOT IN ('chiusa', 'rimossa')
+SELECT c.initiative_id::text, c.company_key, c.company_name, c.vat_code, c.tax_code, c.province,
+       c.state, COALESCE(c.esito, ''), COALESCE(c.created_from_session::text, ''),
+       c.created_at, c.updated_at, c.closed_at
+FROM binocolo.ma_initiative_card c
+JOIN binocolo.ma_initiative i ON i.id = c.initiative_id
+WHERE c.company_key IN (%s)
+  AND c.state NOT IN ('chiusa', 'rimossa')
+  AND i.archived_at IS NULL
 `, strings.Join(placeholders, ", "))
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
