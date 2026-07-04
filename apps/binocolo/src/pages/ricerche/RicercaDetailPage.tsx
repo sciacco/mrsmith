@@ -70,6 +70,8 @@ export function RicercaDetailPage() {
   const [associateDomain, setAssociateDomain] = useState('');
   const [noWebsiteItem, setNoWebsiteItem] = useState<MAVerificationQueueItem | null>(null);
   const [reprocessingKeys, setReprocessingKeys] = useState<Set<string>>(() => new Set());
+  const [excludeCandidate, setExcludeCandidate] = useState<MATargetRow | null>(null);
+  const [excludeReason, setExcludeReason] = useState('');
   const rowsTerminalKey = useRef('');
 
   const loadStatus = useCallback(async () => {
@@ -261,22 +263,35 @@ export function RicercaDetailPage() {
 
   async function rateTarget(target: MATargetRow, rating: number) {
     if (!detail?.session.id) return;
+    if (rating === -1) {
+      // L'esclusione chiede il motivo (ground truth per la calibrazione futura):
+      // la chiamata parte dal modal di conferma.
+      setExcludeReason('');
+      setExcludeCandidate(target);
+      return;
+    }
     const nextRating = target.rating === rating ? 0 : rating;
+    await submitRating(target, nextRating, '');
+  }
+
+  async function submitRating(target: MATargetRow, rating: number, reason: string) {
+    if (!detail?.session.id) return;
     const sessionId = detail.session.id;
     const previousRows = rows;
     setRows((current) =>
-      current.map((item) => (targetKey(item) === targetKey(target) ? { ...item, rating: nextRating === 0 ? undefined : nextRating } : item)),
+      current.map((item) => (targetKey(item) === targetKey(target) ? { ...item, rating: rating === 0 ? undefined : rating } : item)),
     );
     setTargetCache((current) => {
       const cached = current[target.id];
       if (!cached) return current;
-      return { ...current, [target.id]: { ...cached, rating: nextRating === 0 ? undefined : nextRating } };
+      return { ...current, [target.id]: { ...cached, rating: rating === 0 ? undefined : rating } };
     });
     try {
       await api.post<void>(`/binocolo/v1/ma/sessions/${sessionId}/rating`, {
         companyKey: targetKey(target),
-        rating: nextRating,
-        ...(nextRating > 0 ? { scoreAtRating: target.score, confidenceAtRating: target.confidence } : {}),
+        rating,
+        ...(rating > 0 ? { scoreAtRating: target.score, confidenceAtRating: target.confidence } : {}),
+        ...(reason ? { reason } : {}),
       });
     } catch (err) {
       toast(errorLabel(err), 'error');
@@ -536,6 +551,56 @@ export function RicercaDetailPage() {
           </div>
         </div>
       </Modal>
+
+      <Modal
+        open={excludeCandidate !== null}
+        onClose={() => setExcludeCandidate(null)}
+        title="Escludi target"
+        size="sm"
+      >
+        <div className={styles.excludeModalBody}>
+          <p>
+            &ldquo;{excludeCandidate?.companyName ?? ''}&rdquo; esce dalla shortlist. Il motivo alimenta la
+            calibrazione futura del punteggio.
+          </p>
+          <div className={styles.excludeReasons}>
+            {['Fuori settore', 'Troppo piccola', 'Distress', 'Non in vendita'].map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                className={`${styles.excludeChip} ${excludeReason === preset ? styles.excludeChipActive : ''}`}
+                onClick={() => setExcludeReason(preset)}
+              >
+                {preset}
+              </button>
+            ))}
+          </div>
+          <input
+            type="text"
+            className={styles.excludeReasonInput}
+            placeholder="Motivo libero (opzionale)"
+            value={excludeReason}
+            onChange={(event) => setExcludeReason(event.target.value)}
+            maxLength={300}
+          />
+          <div className={styles.modalActions} style={{ justifyContent: 'flex-end' }}>
+            <Button variant="secondary" onClick={() => setExcludeCandidate(null)}>
+              Annulla
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                const target = excludeCandidate;
+                setExcludeCandidate(null);
+                if (target) void submitRating(target, -1, excludeReason.trim());
+              }}
+              leftIcon={<Icon name="x-circle" size={16} />}
+            >
+              Escludi
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </main>
   );
 }
@@ -786,19 +851,31 @@ function ResultsTable({
 }
 
 function RatingStars({ rating, onRate }: { rating: number; onRate: (rating: number) => void }) {
+  const excluded = rating === -1;
   return (
-    <span className={styles.stars} onClick={(event) => event.stopPropagation()}>
-      {[1, 2, 3].map((value) => (
-        <button
-          key={value}
-          type="button"
-          className={`${styles.starButton} ${rating >= value ? styles.starOn : ''}`}
-          onClick={() => onRate(value)}
-          aria-label={`${value} stelle`}
-        >
-          ★
-        </button>
-      ))}
+    <span className={styles.ratingControl} onClick={(event) => event.stopPropagation()}>
+      <span className={styles.stars}>
+        {[1, 2, 3].map((value) => (
+          <button
+            key={value}
+            type="button"
+            className={`${styles.starButton} ${!excluded && rating >= value ? styles.starOn : ''}`}
+            onClick={() => onRate(value)}
+            aria-label={`${value} stelle`}
+          >
+            ★
+          </button>
+        ))}
+      </span>
+      <button
+        type="button"
+        className={`${styles.excludeButton} ${excluded ? styles.excludeOn : ''}`}
+        onClick={() => onRate(excluded ? 0 : -1)}
+        title={excluded ? 'Rimuovi esclusione' : 'Escludi'}
+        aria-label="Escludi"
+      >
+        <Icon name="x-circle" size={15} />
+      </button>
     </span>
   );
 }

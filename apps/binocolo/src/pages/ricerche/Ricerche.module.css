@@ -807,6 +807,12 @@
   color: var(--color-text-muted);
 }
 
+.ratingControl {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .stars {
   display: inline-flex;
   gap: 1px;
@@ -818,10 +824,82 @@
   color: var(--color-text-faint);
   cursor: pointer;
   font-size: 1rem;
+  line-height: 1;
+}
+
+.starButton:hover {
+  color: var(--color-accent-muted);
 }
 
 .starOn {
   color: var(--color-warning);
+}
+
+.excludeButton {
+  display: inline-flex;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  padding: 2px;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.excludeButton:hover,
+.excludeOn {
+  color: var(--color-danger, #e5484d);
+}
+
+/* Esclusione con motivo */
+.excludeModalBody {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.excludeModalBody p {
+  color: var(--color-text-secondary);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.excludeReasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.excludeChip {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  background: transparent;
+  border-radius: var(--radius-full);
+  font-size: 0.8125rem;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  transition: border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.excludeChip:hover {
+  border-color: var(--color-accent-muted);
+}
+
+.excludeChipActive {
+  border-color: var(--color-accent);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.excludeReasonInput {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  font-size: 0.8125rem;
 }
 
 .queueRows {
