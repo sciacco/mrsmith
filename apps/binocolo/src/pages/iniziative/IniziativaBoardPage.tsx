@@ -75,7 +75,17 @@ const STATE_COLORS: Record<string, string> = {
   approfondimento: styles.statusPurple ?? '',
   offerta: styles.statusOrange ?? '',
   chiusa: styles.statusGreen ?? '',
+  rimossa: styles.statusMuted ?? '',
 };
+
+// Etichetta di stato per la vista tabella. `rimossa` non è una colonna kanban
+// (STATES) ma compare tra le righe: gli serve un'etichetta leggibile e una
+// pill distinta ("non più in lavorazione"), coerente col wireframe S3 che
+// prescrive pill di stato colorate anche per le card uscite di scena.
+function stateTableLabel(key: string): string {
+  if (key === 'rimossa') return 'Rimossa';
+  return STATES.find((s) => s.key === key)?.label ?? key;
+}
 
 function stateBadgeClass(state: string) {
   return `${styles.statusBadge} ${STATE_COLORS[state] ?? styles.statusGrey ?? ''}`;
@@ -531,7 +541,7 @@ export function IniziativaBoardPage() {
                     <td>
                       <div className={styles.statusCell}>
                         <span className={stateBadgeClass(card.state)}>
-                          {STATES.find((s) => s.key === card.state)?.label ?? card.state}
+                          {stateTableLabel(card.state)}
                         </span>
                         {card.esito ? (
                           <span className={`${styles.badge} ${styles.badgeEsito}`}>

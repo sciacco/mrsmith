@@ -6,7 +6,9 @@
 >
 > **Re-baseline (2026-07-02, sera)**: l'audit originale è stato condotto a `996ce47`; tre commit successivi nella stessa giornata hanno spostato il codice. Il documento è ora re-baselinato a HEAD `6217051` — vedi §0 per il diff e i claim corretti inline (F2 e Q7 risolti, F3 e Q5 precisati, S2 marcato pre-rewrite). **La tesi centrale (pattern semantici Q) sopravvive intatta.**
 >
-> **Re-baseline 2 (2026-07-04)**: riscontro codice a HEAD `24bbdf3` (§0.1). Tre commit successivi a `6217051` hanno **chiuso la maggior parte del perimetro attivo**: Q1, Q2, Q3, Q4 ✅ risolti; F1, F3 ✅ risolti; F4 ✅ committato; Q5 quasi completo (2 residui); Q6 parziale (collasso fatto, nomenclatura da unificare). **Implementazione completata 2026-07-04**: Q6 nomenclatura implementata (alternativa D); F5 implementato; Q5 residui ritirati (falso problema). **Perimetro attivo reale ridotto a: F8 (spot-check) + Fase 4 (riverifica visiva).** La tesi centrale è confermata; il remediation di implementazione è esaurito.
+> **Re-baseline 2 (2026-07-04)**: riscontro codice a HEAD `24bbdf3` (§0.1). Tre commit successivi a `6217051` hanno **chiuso la maggior parte del perimetro attivo**: Q1, Q2, Q3, Q4 ✅ risolti; F1, F3 ✅ risolti; F4 ✅ committato; Q5 quasi completo (2 residui); Q6 parziale (collasso fatto, nomenclatura da unificare). **Implementazione completata 2026-07-04**: Q6 nomenclatura implementata (alternativa D); F5 implementato; Q5 residui ritirati (falso problema); F8(1,2,4) risolti (stato «rimossa» pill, filtri compatti, flash dropdown). **Perimetro attivo reale ridotto a: F8(3) ordine bottoni S5 (→ Fase 4) + Fase 4 (riverifica visiva).** La tesi centrale è confermata; il remediation di implementazione è esaurito.
+>
+> **🔒 CHIUSURA (2026-07-04, decisione utente)**: il piano è dichiarato **chiuso**. L'implementazione del remediation è esaurita (Q1–Q7, F1–F5, F8(1,2,4)). La **Fase 4 (riverifica visiva formale)** è **saltata per decisione utente** — gli stati non ancora visti renderizzati (S6 registro, D1 S2–S6, D2 S7 con dati reali, board riscritto da `8284248`, Q6 catena numerica) restano **non verificati visivamente** e si copriranno operativamente all'uso reale. **F8(3)** (ordine bottoni S5 — allinearsi al wireframe o tenere primary-a-destra) resta **decisione UX aperta**, da prendere se/quando emerge. Il documento resta come record: nessuna ulteriore azione di remediation pianificata.
 
 ## 0. Re-baseline vs HEAD `6217051` (2026-07-02, sera)
 
@@ -59,7 +61,7 @@ Riscontro puntuale del codice a HEAD `24bbdf3` (working tree pulito). **Tre comm
 **Perimetro attivo reale dopo il re-baseline 2:**
 
 - Pattern Q: **tutti fatti** (Q1, Q2, Q3, Q4, Q5, Q6 nomenclatura, Q7) · Q5 residui ritirati (falso problema) · Q6 catena numerica → Fase 4.
-- Difetti F: **F8** da spot-check · F1, F2, F3, F4, F5, F7 fatti · F6 ritirata.
+- Difetti F: F8(3) residuo (ordine bottoni S5, → Fase 4) · F1, F2, F3, F4, F5, F7, F8(1,2,4) fatti · F6 ritirata.
 
 **Impatto sulla Fase 4 (riverifica di parità):** Q1–Q4 erano dichiarati "attivi" sulla base di `6217051` ma sono ora implementati — vanno **verificati visivamente** (non più implementati) nella Fase 4, insieme agli stati non ancora visti (S6 registro renderizzato, D1 S2–S6, D2 S7, badge/marker/collisioni con dati veri).
 
@@ -69,9 +71,9 @@ Il costruito si divide in tre fasce nette (aggiornato al re-baseline 2, HEAD `24
 
 - **A standard (da preservare)**: D1 stato iniziale, modali di chiusura/rimozione, coda di verifica D2, impianto kanban (colonne flessibili/rail), backend dei flussi card e schema 087–090.
 - **Sotto lo standard approvato (rimediato quasi tutto)**: i pattern di qualità Q1–Q6 sono ora **implementati** (`a627066`/`9704883` + Q6 nomenclatura 2026-07-04): eventi semantici, conteggi valorizzati e evidenziati, date relative, diario che racconta, troncamento ragioni sociali, nomenclatura funnel unificata. Il danno residuo è pressoché nullo in implementazione — resta solo la **riverifica visiva** (Fase 4).
-- **Mancante**: spot-check minori (F8) + riverifica visiva (Fase 4). Il ciclo di vita iniziative (F3), i contatori (F1), i marker vs archiviate (F5) e i pattern Q1–Q6 sono ora **fatti**.
+- **Mancante**: F8(3) ordine bottoni S5 (decisione UX → Fase 4) + riverifica visiva (Fase 4). Il ciclo di vita iniziative (F3), i contatori (F1), i marker vs archiviate (F5), i pattern Q1–Q6 e i minori F8(1,2,4) sono ora **fatti**.
 
-**Raccomandazione: si recupera, ed è quasi tutto recuperato.** Il modello dati e i flussi reggono (smoke end-to-end); i gap di implementazione sono chiusi (Q1–Q6, F1–F5). Resta la **riverifica visiva formale** (Fase 4) con dati reali e il spot-check minori (F8). Il `TargetDetailModal` di D2 è già disaccoppiato (F4 committato `24bbdf3`): link `/azienda` rimosso, badge B5 inline, dossier profondo resta azione di card sul MA card-dossier autosufficiente (D-B ratificata).
+**Raccomandazione: si recupera, ed è quasi tutto recuperato.** Il modello dati e i flussi reggono (smoke end-to-end); i gap di implementazione sono chiusi (Q1–Q6, F1–F5, F8(1,2,4)). Resta la **riverifica visiva formale** (Fase 4) con dati reali e l'unica decisione di resa pendente F8(3) (ordine bottoni S5). Il `TargetDetailModal` di D2 è già disaccoppiato (F4 committato `24bbdf3`): link `/azienda` rimosso, badge B5 inline, dossier profondo resta azione di card sul MA card-dossier autosufficiente (D-B ratificata).
 
 ## 2. Audit per schermata — Iniziative (wireframe S1–S7)
 
@@ -90,8 +92,8 @@ Il costruito si divide in tre fasce nette (aggiornato al re-baseline 2, HEAD `24
 
 _(Audit a `996ce47`, pre-rewrite):_ Colonne flessibili, rail, contatori colonna, collasso ricordato: ✓ conformi. Gap storico: ragioni sociali mai troncate (la card KRAL era un francobollo verticale) → **Q2 ora risolto**.
 
-### S3 · Board tabella — ✅ Q1/Q2/Q3 RISOLTI (re-baseline 2); residui minori
-Filtri e colonne presenti ✓. ✅ «Ultima attività» = `card.lastEvent || dateLabel(card.updatedAt)` (semantica + relativa) → Q1+Q3 risolti; ✅ ragioni sociali troncate (`.companyNameText` ellipsis) → Q2 risolto; colonna Dossier: ✅ `<DossierButton>` 3-state (Q7). **Residui**: stato «rimossa» in minuscolo, senza pill esito (wireframe: «Chiusa ~Non idonea~» rossa, «Rimandata» ambra); layout filtri (cerca full-width su riga separata) più sciatto del compatto approvato → F8.
+### S3 · Board tabella — ✅ Q1/Q2/Q3 RISOLTI; residuo F8(3) allineamento filtri fatto
+Filtri e colonne presenti ✓. ✅ «Ultima attività» = `card.lastEvent || dateLabel(card.updatedAt)` (semantica + relativa) → Q1+Q3 risolti; ✅ ragioni sociali troncate (`.companyNameText` ellipsis) → Q2 risolto; colonna Dossier: ✅ `<DossierButton>` 3-state (Q7). ✅ **F8(1)**: stato «rimossa» ora renderizza pill «Rimossa» (`.statusMuted`) invece del grezzo minuscolo. ✅ **F8(2)**: layout filtri compattato (`.filters` inline gap `--space-2`, search `min-width:200px`). **Residuo F8(3)**: stato «rimossa» in minuscolo risolto; resta ordine bottoni S5 (vedi §5 F8).
 
 ### S4 · Drawer card — ✅ Q4/Q3/Q2 RISOLTI (re-baseline 2)
 | Wireframe | Live (`24bbdf3`) | Gap |
@@ -110,7 +112,7 @@ Copy dei 5 esiti verbatim ✓, ponte registro solo su No-go/Rimandata (verificat
 Il registro è migrato (correttamente, dopo la ratifica del 2026-07-02) dalla pagina `/azienda` alla pagina card-dossier. Ma la pagina card-dossier oggi renderizza solo l'empty state (le card di prova hanno la sessione sganciata) → la parità S6 (badge, revoca con conferma, storico dietro toggle, composer nota) **non è mai stata vista renderizzata**. Va coperta nella riverifica di parità con dati reali.
 
 ### S7 · Superfici esistenti — PARZIALE
-D1: card «Iniziativa (opzionale)» presente con hint verbatim ✓ (flash di caricamento del dropdown al primo render → F8). Indice ricerche: «Aggancia a iniziativa…» ✓, chip su agganciate ✓. D2: badge registro e marker «In lavorazione · titolo» ✓ (verificati nello smoke) — ✅ F5 risolto: il marker ora esclude le iniziative archiviate (join `ma_initiative` + `archived_at IS NULL`).
+D1: card «Iniziativa (opzionale)» presente con hint verbatim ✓ (✅ **F8(4) risolto**: flash dropdown eliminato — `initiativesLoading` + `disabled` + option «Caricamento…» in `NuovaRicercaPage`). Indice ricerche: «Aggancia a iniziativa…» ✓, chip su agganciate ✓. D2: badge registro e marker «In lavorazione · titolo» ✓ (verificati nello smoke) — ✅ F5 risolto: il marker ora esclude le iniziative archiviate (join `ma_initiative` + `archived_at IS NULL`).
 
 ## 3. Audit per schermata — Gated D1/D2 (wireframe S1–S10)
 
@@ -149,7 +151,7 @@ Motivo derivato verbatim («Identità non confermata sulle pagine lette», «Sit
 - **F5 — Marker vs archiviazione** · ✅ **RISOLTO (working tree, 2026-07-04)**: `ListMAActiveCardsByCompany` (`ma_store.go`) ora joina `ma_initiative` con `archived_at IS NULL` → le card di iniziative archiviate non surfacciano più come marker di collisione (board drawer) né come `InLavorazione` (tabella D2). Fix in un solo punto, chiude entrambi i path (board + D2).
 - **F6 — Provenienze robuste** · ❌ **RITIRATA (2026-07-02)**: stesso falso problema di D-D. Il rimedio (leggere dallo snapshot invece che dalle sessioni agganciate) servirebbe solo a rendere la card indipendente dalla sessione — ma non è il modello implementato (la card risolve i dettagli attraverso la sessione agganciata). Per le operazioni supportate (archive, purge soft) le provenienze **non** si perdono: la sessione resta con `initiative_id` intatto e le query filtrano solo per quello. Lo sgancio — l'unico caso che rompe — non è supportato. (Se in futuro si volesse supportarlo, servirebbe uno snapshot completo su card: decisione «cambia modello», non un task di remediation.)
 - **F7 — Igiene dati di prova**: SQL in §8 (include anche i 2 cambi di stato accidentali fatti oggi durante l'audit da click su riferimenti browser stantii — errore mio, registrato).
-- **F8 — Lotto minori**: gli 8 della v1 + flash dropdown D1 + ordine bottoni S5.
+- **F8 — Lotto minori**: degli 8 della v1 (non ricostruibili, v1 sostituita) + flash dropdown D1 + ordine bottoni S5, identificati e risolti 3 residui inline (working tree, 2026-07-04): (1) S3 stato «rimossa» → aggiunta `stateTableLabel` + `.statusMuted` (pill «Rimossa» grigia tenue, coerente col wireframe S3); (2) S3 layout filtri → CSS `.filters`/`.searchWrapper` resi compatti inline (gap `--space-2`, search `min-width:200px` `flex:1 1 200px`) allineati al wireframe; (4) flash dropdown D1 → `initiativesLoading` + `disabled` + option «Caricamento…» in `NuovaRicercaPage`. **Residuo**: (3) ordine bottoni S5 (modale chiusura/rimozione: «Annulla» prima di «Chiudi card»/«Rimuovi» — wireframe li vuole invertiti) → Fase 4 (decisione di convenzione UX: allinearsi al wireframe o tenere primary-a-destra).
 
 ## 6. Piano di esecuzione proposto (aggiornato al re-baseline 2, HEAD `24bbdf3`)
 
@@ -157,7 +159,7 @@ Motivo derivato verbatim («Identità non confermata sulle pagine lette», «Sit
 2. **Fase 1 — Igiene** · ✅ **CHIUSA (2026-07-04)**: riga `.gitignore` `**/.playwright-cli/` ✅; SQL §8 eseguito (iniziativa audit `aac1ef5b…` + scritture accidentali pulite); verifica residui smoke test completata.
 3. **Fase 2 — Pattern Q residui** · ✅ **CHIUSA (2026-07-04)**: Q6 nomenclatura implementata (alternativa D: legenda gate con etichette distinte + nota, riga collessata routing); residuo Q6 catena numerica → Fase 4. Q5 residui (contatore toggle, filtro da pill) ritirati come falso problema. Q1, Q2, Q3, Q4, Q5, Q6, Q7 ✅ tutti fatti.
 4. **Fase 3 — Funzionale residuo** · ✅ **CHIUSA (2026-07-04)**: F5 implementato (join `ma_initiative` in `ListMAActiveCardsByCompany` per escludere archiviate). F1, F2, F3, F4 ✅ fatti · F6 ritirata · F7 = igiene Fase 1.
-5. **Fase 4 — Riverifica di parità formale**: per OGNI stato dei due wireframe, screenshot fianco a fianco e checklist puntuale. **Inclusi i pattern Q1–Q4 ora implementati** (verifica visiva, non più implementazione) e gli stati oggi non verificabili: S6 registro renderizzato, D1 S2–S6 e S7 al primo run reale, badge/marker/collisioni con dati veri, rendering del board riscritto da `8284248`. **Questa checklist è il gate di accettazione: niente «fatto» senza il confronto visivo.** La eseguo io direttamente.
+5. **Fase 4 — Riverifica di parità formale** · ⏭️ **SALTATA (2026-07-04, decisione utente)**: la riverifica visiva formale non viene eseguita. Gli stati non ancora visti renderizzati (S6 registro, D1 S2–S6, D2 S7 con dati reali, board riscritto da `8284248`, Q6 catena numerica) restano **non verificati visivamente** e si copriranno operativamente all'uso reale. La checklist di parità (screenshot fianco a fianco per ogni stato dei wireframe) resta come riferimento in questo documento ma non è un gate bloccante. **F8(3)** (ordine bottoni S5) resta decisione UX aperta, da prendere se/quando emerge.
 
 Sequenza e granularità dei task esecutori le definiamo dopo la ratifica — non prima, per non ripetere l'errore di piani che promettono ciò che non specificano.
 

@@ -58,6 +58,7 @@ export function NuovaRicercaPage() {
   const [busy, setBusy] = useState<BusyState>(null);
   const [error, setError] = useState<string | null>(null);
   const [initiatives, setInitiatives] = useState<MAInitiativeSummary[]>([]);
+  const [initiativesLoading, setInitiativesLoading] = useState(false);
   const [initiativeId, setInitiativeId] = useState('');
   const [newInitiativeOpen, setNewInitiativeOpen] = useState(false);
   const [newInitiativeTitle, setNewInitiativeTitle] = useState('');
@@ -65,11 +66,14 @@ export function NuovaRicercaPage() {
   const [initiativeBusy, setInitiativeBusy] = useState(false);
 
   const loadInitiatives = useCallback(async () => {
+    setInitiativesLoading(true);
     try {
       const data = await api.get<MAInitiativeListResponse>('/binocolo/v1/ma/initiatives');
       setInitiatives(data.items);
     } catch (err) {
       setError(errorLabel(err));
+    } finally {
+      setInitiativesLoading(false);
     }
   }, [api]);
 
@@ -272,8 +276,9 @@ export function NuovaRicercaPage() {
                   className={styles.select}
                   value={initiativeId}
                   onChange={(event) => setInitiativeId(event.target.value)}
+                  disabled={initiativesLoading}
                 >
-                  <option value="">Nessuna iniziativa</option>
+                  <option value="">{initiativesLoading ? 'Caricamento…' : 'Nessuna iniziativa'}</option>
                   {initiatives.map((item) => (
                     <option key={item.id} value={item.id}>{item.title}</option>
                   ))}

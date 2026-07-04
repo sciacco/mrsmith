@@ -593,8 +593,7 @@
 .filters {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--space-2);
   flex-wrap: wrap;
   padding-bottom: var(--space-2);
 }
@@ -629,8 +628,9 @@
 
 .searchWrapper {
   position: relative;
-  flex: 1;
-  max-width: 320px;
+  min-width: 200px;
+  max-width: 280px;
+  flex: 1 1 200px;
 }
 
 .searchIcon {
@@ -717,6 +717,7 @@
 }
 
 .statusGrey { background: #f1f5f9; color: #475569; }
+.statusMuted { background: #f8fafc; color: #94a3b8; font-style: italic; }
 .statusBlue { background: #eff6ff; color: #2563eb; }
 .statusIndigo { background: #eef2ff; color: #4f46e5; }
 .statusPurple { background: #faf5ff; color: #9333ea; }
