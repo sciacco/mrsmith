@@ -708,6 +708,116 @@ func cleanText(value string, maxRunes int) string {
 	return string(runes[:maxRunes])
 }
 
+// normalizeNumbers rounds machine-style long decimals that some LLMs leak into
+// the brief text (e.g. "12.708502847843775%", "37.0277") so the output respects
+// the prompt's rounding rules: percentuali max 1 decimale, multipli/ratio max 2.
+// It is deliberately conservative to never corrupt thousands-separated integers
+// (1.376.000, 31.669) or already-short values (1.31x, 0.82): it touches only
+// single-separator tokens, and bare decimals only when the fractional part has
+// >=4 digits (a thousands group is always exactly 3) or the integer part is a
+// bare "0" (which can never be a thousands lead).
+func normalizeNumbers(text string) string {
+	if text == "" {
+		return text
+	}
+	runes := []rune(text)
+	n := len(runes)
+	var b strings.Builder
+	b.Grow(len(text))
+	for i := 0; i < n; {
+		if !unicode.IsDigit(runes[i]) {
+			b.WriteRune(runes[i])
+			i++
+			continue
+		}
+		start := i
+		for i < n && (unicode.IsDigit(runes[i]) || runes[i] == '.' || runes[i] == ',') {
+			i++
+		}
+		// A numeric token must end on a digit; hand back any trailing separators.
+		end := i
+		for end > start && (runes[end-1] == '.' || runes[end-1] == ',') {
+			end--
+		}
+		token := string(runes[start:end])
+		if normalized, ok := normalizeDecimalToken(token, numberSuffixCategory(runes, end)); ok {
+			b.WriteString(normalized)
+		} else {
+			b.WriteString(token)
+		}
+		b.WriteString(string(runes[end:i]))
+	}
+	return b.String()
+}
+
+// numberSuffixCategory peeks past an optional single space at the rune following
+// a numeric token and classifies it as a percentage or multiple marker.
+func numberSuffixCategory(runes []rune, end int) string {
+	j := end
+	if j < len(runes) && runes[j] == ' ' {
+		j++
+	}
+	if j >= len(runes) {
+		return ""
+	}
+	switch runes[j] {
+	case '%':
+		return "pct"
+	case 'x', 'X', '×':
+		return "mult"
+	}
+	return ""
+}
+
+func normalizeDecimalToken(token, suffix string) (string, bool) {
+	dot := strings.Count(token, ".")
+	comma := strings.Count(token, ",")
+	// Exactly one separator = unambiguous decimal point. Zero (integers, years,
+	// ATECO) or two+ (thousands-formatted) are left untouched.
+	if dot+comma != 1 {
+		return "", false
+	}
+	sep := "."
+	if comma == 1 {
+		sep = ","
+	}
+	parts := strings.SplitN(token, sep, 2)
+	intPart, fracPart := parts[0], parts[1]
+	if len(fracPart) == 0 {
+		return "", false
+	}
+
+	var decimals int
+	switch suffix {
+	case "pct":
+		if len(fracPart) < 2 {
+			return "", false
+		}
+		decimals = 1
+	case "mult":
+		if len(fracPart) < 3 {
+			return "", false
+		}
+		decimals = 2
+	default:
+		// Bare decimal: only safe to touch when it cannot be a thousands group.
+		if !(len(fracPart) >= 4 || intPart == "0" && len(fracPart) >= 3) {
+			return "", false
+		}
+		decimals = 2
+	}
+
+	value, err := strconv.ParseFloat(intPart+"."+fracPart, 64)
+	if err != nil {
+		return "", false
+	}
+	out := strconv.FormatFloat(value, 'f', decimals, 64)
+	if sep == "," {
+		out = strings.Replace(out, ".", ",", 1)
+	}
+	return out, true
+}
+
 func cleanStringList(values []string, maxItems int, maxRunes int) []string {
 	out := make([]string, 0, len(values))
 	seen := map[string]struct{}{}

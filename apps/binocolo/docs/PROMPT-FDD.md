@@ -481,3 +481,82 @@ Durante l'analisi è stato corretto lo scorer per non marcare come sospetti i nu
 | Latenza media | ~51,9s | ~2,5s |
 
 Lettura: v4.2 rende `gpt-oss-120b` stabile sul formato e molto veloce, ma non elimina il problema già osservato sui numeri/unità. Restano casi in cui il modello usa `mln`, `k` o scale ambigue su EV/equity, e alcuni caveat deterministici non vengono citati. Per questo resta non production-safe per il brief finale FDD, pur essendo un possibile candidato futuro per preview interna veloce.
+
+## 16. Addendum modelli OpenAI aggiuntivi — gpt-5.2 e gpt-5.4-mini su v4.2
+
+Su richiesta sono stati testati altri due modelli OpenAI con lo stesso prompt v4.2 (`ee32cc73…`, sha `5693d40ea259`) e lo stesso manifest/10 aziende della run GPT-5.5:
+
+```text
+artifacts/llm-evals/ma-deep-brief/20260704T135252Z-6132e68d-openai-gpt-5-2/
+artifacts/llm-evals/ma-deep-brief/20260704T135342Z-deed65be-openai-gpt-5-4-mini/
+```
+
+Le metriche automatiche non separano i tre modelli (tutti 99-100): la rubrica è cieca su ciò che conta per il brief FDD. Sono state quindi verificate a mano le anomalie e misurate due dimensioni non pesate dalla rubrica — **disciplina di arrotondamento** (il prompt impone percentuali max 1 decimale, ratio max 2) e **ancoraggio numerico** delle red flag.
+
+| Metrica | GPT-5.5 v4.2 | gpt-5.2 v4.2 | gpt-5.4-mini v4.2 |
+|---|---:|---:|---:|
+| Avg score | 100,0 | 99,8 | 99,0 |
+| JSON/schema fail | 0/100 | 0/100 | 1/100 (schema) |
+| Allucinazioni numeriche reali | 0 | 0 | 0 |
+| Arrotondamento non rispettato | 2/100 | 47/100 | 67/99 |
+| Red flag ancorate a un numero | 74% | 83% | 52% |
+| Numeri medi in `financialReading` | 10,6 | 10,1 | 2,8 |
+| Latenza media/azienda | ~51,9s | ~24,8s | ~11,6s |
+| Token/azienda | ~7.046 | ~6.154 | ~5.619 |
+
+Verifiche manuali:
+- **gpt-5.2**: i 3 warning "numeri sospetti" sono tutti falsi positivi dell'euristica (sottostringhe di numeri veri `851142`/`145930`, tokenizzazione di `A.5 31.669 €`). Zero allucinazioni reali, zero fail, sostanza FDD equivalente o superiore a GPT-5.5 (più ancorato). Unico difetto: arrotondamento sciatto in ~metà dei brief.
+- **gpt-5.4-mini**: l'unico fail è una violazione di schema reale (`strengths` come array di oggetti `{"point": …}` invece di stringhe), non un troncamento. Qualitativamente il più debole: metà delle red flag non cita dati e la lettura finanziaria è generica (2,8 numeri vs 10+), oltre all'arrotondamento peggiore (67%).
+
+Decisione:
+- **GPT-5.5 resta il modello di produzione** — unico con disciplina numerica pulita, ancoraggio forte, zero fail.
+- **gpt-5.2 è il rimpiazzo credibile se serve dimezzare la latenza** (25s vs 52s) a costo simile. L'unico prezzo, l'arrotondamento, è chiudibile lato codice con una normalizzazione numerica in post-processing nel parser (`ma_deep_worker.go`), senza un nuovo giro di prompt.
+- **gpt-5.4-mini scartato** per il brief finale: veloce ed economico ma qualitativamente povero su una decisione da IC.
+
+## 17. Addendum modelli GLM — glm-5p2-fast (Fireworks) e zai-glm-4.7
+
+Stesso prompt v4.2 e stesso manifest:
+
+```text
+artifacts/llm-evals/ma-deep-brief/20260704T140841Z-878bff7e-accounts-fireworks-routers-glm-5p2-fast/
+artifacts/llm-evals/ma-deep-brief/20260704T141059Z-54826725-zai-glm-4-7/
+```
+
+| Metrica | GPT-5.5 v4.2 | glm-5p2-fast | zai-glm-4.7 |
+|---|---:|---:|---:|
+| Avg score (grezzo) | 100,0 | 80,8 | 93,8 |
+| Fail reali (esclusa infra) | 0 | 0 | 4 vuoti/incompleti + 1 RAG flip |
+| Allucinazioni numeriche reali | 0 | 0 | 0 |
+| Arrotondamento non rispettato | 2/100 | 71/81 | 27/96 |
+| Red flag ancorate a un numero | 74% | 94% | 85% |
+| Numeri medi in `financialReading` | 10,6 | 13,3 | 5,9 |
+| Latenza media/azienda | ~51,9s | ~12,4s | ~8,3s |
+
+Verifiche manuali:
+- **glm-5p2-fast**: nella prima run il crollo di score era un **artefatto d'infrastruttura** — tutti e 19 i "JSON fail" erano HTTP 429 (rate-limit del router Fireworks) a `concurrency=10`, non errori del modello. **Re-run a `concurrency=3`** (`20260704T141921Z-878bff7e-…`): **0 fail, score 99,8 (min 95)**, conferma che i 429 erano solo infra. È il **più ancorato ai numeri di tutti** (94%) e il più ricco (12,5 numeri/financialReading), veloce (~14s). Zero allucinazioni secche; un solo numero soft (MONITORO "attivo 1.376.000 € circa" stimato, non in input). L'unico vero blocco è l'**arrotondamento peggiore in assoluto** (85/100).
+- **zai-glm-4.7**: 0 fail infra ma **problemi di affidabilità reali del modello** — 4 output vuoti/incompleti e 1 RAG flip (CDLAN atteso green → amber). Arrotondamento moderato (28%, migliore dei GLM ma comunque 14× peggio di GPT-5.5) e uso di **abbreviazioni `k€` vietate dal prompt**. Ancoraggio 85% ma lettura finanziaria più magra (5,9 numeri). Zero allucinazioni reali (i flag sono banda EV in k€, "360 giorni", art. 2445 c.c.).
+
+Decisione: **GPT-5.5 confermato in produzione.** zai-glm-4.7 fuori per wobble di affidabilità (vuoti, RAG flip) non accettabili per una decisione da IC. **glm-5p2-fast è il challenger più forte emerso**: a concurrency bassa è affidabile, veloce e con l'ancoraggio numerico più alto di tutti; l'unico gap è la disciplina di arrotondamento, chiudibile con la stessa normalizzazione numerica in post-processing nel parser (`ma_deep_worker.go`) già ipotizzata per gpt-5.2. Con quel fix, glm-5p2-fast e gpt-5.2 diventano le due alternative concrete a GPT-5.5 sul fronte latenza/costo.
+
+## 18. Normalizzazione numerica nel parser (implementata)
+
+Per chiudere il gap di arrotondamento senza dipendere dal modello, è stata aggiunta una normalizzazione deterministica in post-processing: `normalizeNumbers` in `backend/internal/binocolo/ma_rules.go`, applicata a tutti i campi testuali del brief in `parseMADeepBrief` (`ma_deep_worker.go`) subito dopo `cleanText`.
+
+Regola, volutamente conservativa per non corrompere i separatori di migliaia italiani:
+- agisce solo su token con **un solo separatore** (`.` o `,`); zero separatori (interi, anni, ATECO, P.IVA, artt. c.c.) o due+ (migliaia `1.376.000`) sono lasciati intatti;
+- suffisso `%` → 1 decimale; suffisso `x`/`×` (multiplo) → 2 decimali;
+- decimale "nudo" → 2 decimali **solo se** la parte frazionaria ha ≥4 cifre, oppure la parte intera è `0` (casi che non possono essere gruppi di migliaia, sempre esattamente 3 cifre).
+
+Nota di misura importante: `glm-5p2-fast` scrive gli euro con separatore di migliaia (`209.916 euro`, `851.142 euro`), che **il prompt non vieta** (vieta solo `k`/`M`/`mln`). Un conteggio grezzo `\d+\.\d{3,}` li scambia per violazioni: la metrica corretta è "quanti token il normalizzatore cambia davvero".
+
+Effetto verificato applicando la funzione ai brief reali già generati (violazioni reali di arrotondamento, prima → dopo; migliaia corrotte):
+
+| Modello | Prima | Dopo | Migliaia corrotte |
+|---|---:|---:|---:|
+| GPT-5.5 | 2/100 | 0 | 0 |
+| gpt-5.2 | 67/100 | 0 | 0 |
+| gpt-5.4-mini | 84/100 | 0 | 0 |
+| glm-5p2-fast | 82/100 | 0 | 0 |
+| zai-glm-4.7 | 37/100 | 0 | 0 |
+
+La normalizzazione azzera le violazioni reali su tutti i modelli preservando le migliaie, quindi vale anche per GPT-5.5. Con questo fix in produzione, la disciplina di arrotondamento smette di essere un discriminante tra modelli: `gpt-5.2` e `glm-5p2-fast` restano le due alternative concrete a GPT-5.5 su latenza/costo, e la scelta si riduce ad ancoraggio numerico (glm-5p2-fast in testa) vs affidabilità/ecosistema.

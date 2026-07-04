@@ -295,29 +295,29 @@ func parseMADeepBrief(content string) (*MADeepBrief, error) {
 	if err := json.Unmarshal([]byte(trimmed), &brief); err != nil {
 		return nil, fmt.Errorf("decode deep brief: %w", err)
 	}
-	brief.Verdict = cleanText(brief.Verdict, 600)
-	brief.BusinessProfile = cleanText(brief.BusinessProfile, 800)
-	brief.FinancialReading = cleanText(brief.FinancialReading, 1000)
+	brief.Verdict = normalizeNumbers(cleanText(brief.Verdict, 600))
+	brief.BusinessProfile = normalizeNumbers(cleanText(brief.BusinessProfile, 800))
+	brief.FinancialReading = normalizeNumbers(cleanText(brief.FinancialReading, 1000))
 	// Chiave legacy pre-v3 ("thesisReading" era un nome bugiardo: è la lettura
 	// finanziaria): le righe cached la riversano nel campo nuovo.
-	brief.ThesisReading = cleanText(brief.ThesisReading, 1000)
+	brief.ThesisReading = normalizeNumbers(cleanText(brief.ThesisReading, 1000))
 	if brief.FinancialReading == "" && brief.ThesisReading != "" {
 		brief.FinancialReading = brief.ThesisReading
 		brief.ThesisReading = ""
 	}
-	brief.ValuationRationale = cleanText(brief.ValuationRationale, 800)
+	brief.ValuationRationale = normalizeNumbers(cleanText(brief.ValuationRationale, 800))
 	brief.RAG = strings.ToLower(strings.TrimSpace(brief.RAG))
 	if len(brief.Strengths) > 6 {
 		brief.Strengths = brief.Strengths[:6]
 	}
 	for i := range brief.Strengths {
-		brief.Strengths[i] = cleanText(brief.Strengths[i], 300)
+		brief.Strengths[i] = normalizeNumbers(cleanText(brief.Strengths[i], 300))
 	}
 	if len(brief.DDQuestions) > 8 {
 		brief.DDQuestions = brief.DDQuestions[:8]
 	}
 	for i := range brief.DDQuestions {
-		brief.DDQuestions[i] = cleanText(brief.DDQuestions[i], 300)
+		brief.DDQuestions[i] = normalizeNumbers(cleanText(brief.DDQuestions[i], 300))
 	}
 	if len(brief.RedFlags) > 8 {
 		brief.RedFlags = brief.RedFlags[:8]
@@ -325,8 +325,8 @@ func parseMADeepBrief(content string) (*MADeepBrief, error) {
 	for i := range brief.RedFlags {
 		brief.RedFlags[i].Severity = strings.ToLower(strings.TrimSpace(brief.RedFlags[i].Severity))
 		brief.RedFlags[i].Category = strings.ToLower(strings.TrimSpace(brief.RedFlags[i].Category))
-		brief.RedFlags[i].Claim = cleanText(brief.RedFlags[i].Claim, 300)
-		brief.RedFlags[i].DDQuestion = cleanText(brief.RedFlags[i].DDQuestion, 300)
+		brief.RedFlags[i].Claim = normalizeNumbers(cleanText(brief.RedFlags[i].Claim, 300))
+		brief.RedFlags[i].DDQuestion = normalizeNumbers(cleanText(brief.RedFlags[i].DDQuestion, 300))
 	}
 	return &brief, nil
 }
