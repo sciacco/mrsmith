@@ -6,7 +6,7 @@
 >
 > **Re-baseline (2026-07-02, sera)**: l'audit originale è stato condotto a `996ce47`; tre commit successivi nella stessa giornata hanno spostato il codice. Il documento è ora re-baselinato a HEAD `6217051` — vedi §0 per il diff e i claim corretti inline (F2 e Q7 risolti, F3 e Q5 precisati, S2 marcato pre-rewrite). **La tesi centrale (pattern semantici Q) sopravvive intatta.**
 >
-> **Re-baseline 2 (2026-07-04)**: riscontro codice a HEAD `24bbdf3` (§0.1). Tre commit successivi a `6217051` hanno **chiuso la maggior parte del perimetro attivo**: Q1, Q2, Q3, Q4 ✅ risolti; F1, F3 ✅ risolti; F4 ✅ committato; Q5 quasi completo (2 residui); Q6 parziale (collasso fatto, nomenclatura da unificare). **Perimetro attivo reale ridotto a: Q5 residuo, Q6, F5, F7, F8.** La tesi centrale è confermata ma il remediation residuo è molto più piccolo di quanto il documento §1–§5 dica inline; le sezioni sono aggiornate con marker `✅ risolto (re-baseline 2)`.
+> **Re-baseline 2 (2026-07-04)**: riscontro codice a HEAD `24bbdf3` (§0.1). Tre commit successivi a `6217051` hanno **chiuso la maggior parte del perimetro attivo**: Q1, Q2, Q3, Q4 ✅ risolti; F1, F3 ✅ risolti; F4 ✅ committato; Q5 quasi completo (2 residui); Q6 parziale (collasso fatto, nomenclatura da unificare). **Implementazione completata 2026-07-04**: Q6 nomenclatura implementata (alternativa D); F5 implementato; Q5 residui ritirati (falso problema). **Perimetro attivo reale ridotto a: F8 (spot-check) + Fase 4 (riverifica visiva).** La tesi centrale è confermata; il remediation di implementazione è esaurito.
 
 ## 0. Re-baseline vs HEAD `6217051` (2026-07-02, sera)
 
@@ -49,8 +49,8 @@ Riscontro puntuale del codice a HEAD `24bbdf3` (working tree pulito). **Tre comm
 | **Q2** | ✅ RISOLTO (`9704883`) — `ellipsis` + `title` su `.kcardName`/`.companyNameText` | §4 |
 | **Q3** | ✅ RISOLTO (`9704883`) — `relativeDate()` + `shortAuthor()` | §4 |
 | **Q4** | ✅ RISOLTO (`9704883`) — `eventLabel()` completo + citazione ultima nota | §4 |
-| **Q5** | ⚠️ QUASI COMPLETO — pill cliccabili ✓, valorizzate ✓ (F1), highlight >0 ✓ (`statePillActive`); **restano**: contatore sul toggle Kanban/Tabella, e click pill → `onOpen` apre il board **non filtrato** per stato (title dice "filtrato" ma l'azione non filtra) | §4 |
-| **Q6** | ⚠️ PARZIALE — collasso ✓ (`collapsed`, header cliccabile, riga-riepilogo); **nomenclatura ancora duplice**: legenda funnel "Da approfondire" vs tabella/chip "Da verificare"; "In tesi"/"Fuori tesi" per principale/reject; numeri funnel da verificare | §4 |
+| **Q5** | ✅ RISOLTO — pill cliccabili ✓, valorizzate ✓ (F1), highlight >0 ✓; residui (contatore toggle, filtro da pill) ritirati (falso problema, vedi §4) | §4 |
+| **Q6** | ✅ NOMENCLATURA RISOLTA (working tree, 2026-07-04, alternativa D) — etichette gate distinte in legenda + riga collassata routing; residuo catena numerica → Fase 4 | §4 |
 | **F1** | ✅ RISOLTO (`9704883`) — `counts` aggregati e renderizzati | §5 |
 | **F3** | ✅ RISOLTO (`9704883`) — archive/restore per-iniziativa + endpoint; delete assente (corretto per D-A) | §5 |
 | **F4** | ✅ COMMITTATO (`24bbdf3`) — non più working tree | §5 |
@@ -58,7 +58,7 @@ Riscontro puntuale del codice a HEAD `24bbdf3` (working tree pulito). **Tre comm
 
 **Perimetro attivo reale dopo il re-baseline 2:**
 
-- Pattern Q: **Q6** attivo (nomenclatura duplice + numeri funnel) · **Q5** quasi fatto (2 residui: contatore toggle, filtraggio stato dal click pill) · Q1, Q2, Q3, Q4, Q7 fatti.
+- Pattern Q: **tutti fatti** (Q1, Q2, Q3, Q4, Q5, Q6 nomenclatura, Q7) · Q5 residui ritirati (falso problema) · Q6 catena numerica → Fase 4.
 - Difetti F: **F8** da spot-check · F1, F2, F3, F4, F5, F7 fatti · F6 ritirata.
 
 **Impatto sulla Fase 4 (riverifica di parità):** Q1–Q4 erano dichiarati "attivi" sulla base di `6217051` ma sono ora implementati — vanno **verificati visivamente** (non più implementati) nella Fase 4, insieme agli stati non ancora visti (S6 registro renderizzato, D1 S2–S6, D2 S7, badge/marker/collisioni con dati veri).
@@ -68,10 +68,10 @@ Riscontro puntuale del codice a HEAD `24bbdf3` (working tree pulito). **Tre comm
 Il costruito si divide in tre fasce nette (aggiornato al re-baseline 2, HEAD `24bbdf3`):
 
 - **A standard (da preservare)**: D1 stato iniziale, modali di chiusura/rimozione, coda di verifica D2, impianto kanban (colonne flessibili/rail), backend dei flussi card e schema 087–090.
-- **Sotto lo standard approvato (rimediato quasi tutto)**: i pattern di qualità Q1–Q4 sono ora **implementati** (`a627066`/`9704883`): eventi semantici, conteggi valorizzati e evidenziati, date relative, diario che racconta, troncamento ragioni sociali. **Restano sotto standard**: Q6 (nomenclatura bucket duplice nella legenda funnel vs tabella) e i 2 residui di Q5 (contatore toggle, filtraggio stato dal click pill). Il danno residuo è piccolo e puntuale, non più «il grosso».
-- **Mancante**: Q6 nomenclatura, Q5 residui; spot-check minori (F8). Il ciclo di vita iniziative (F3), i contatori (F1) e i marker vs archiviate (F5) sono ora **fatti**.
+- **Sotto lo standard approvato (rimediato quasi tutto)**: i pattern di qualità Q1–Q6 sono ora **implementati** (`a627066`/`9704883` + Q6 nomenclatura 2026-07-04): eventi semantici, conteggi valorizzati e evidenziati, date relative, diario che racconta, troncamento ragioni sociali, nomenclatura funnel unificata. Il danno residuo è pressoché nullo in implementazione — resta solo la **riverifica visiva** (Fase 4).
+- **Mancante**: spot-check minori (F8) + riverifica visiva (Fase 4). Il ciclo di vita iniziative (F3), i contatori (F1), i marker vs archiviate (F5) e i pattern Q1–Q6 sono ora **fatti**.
 
-**Raccomandazione: si recupera, e in buona parte è già recuperato.** Il modello dati e i flussi reggono (smoke end-to-end); i gap residui sono di resa puntuale (Q6 nomenclatura, Q5 toggle) e di un fix di query (F5 join su `ma_initiative`). Il `TargetDetailModal` di D2 è già disaccoppiato (F4 committato `24bbdf3`): link `/azienda` rimosso, badge B5 inline, dossier profondo resta azione di card sul MA card-dossier autosufficiente (D-B ratificata).
+**Raccomandazione: si recupera, ed è quasi tutto recuperato.** Il modello dati e i flussi reggono (smoke end-to-end); i gap di implementazione sono chiusi (Q1–Q6, F1–F5). Resta la **riverifica visiva formale** (Fase 4) con dati reali e il spot-check minori (F8). Il `TargetDetailModal` di D2 è già disaccoppiato (F4 committato `24bbdf3`): link `/azienda` rimosso, badge B5 inline, dossier profondo resta azione di card sul MA card-dossier autosufficiente (D-B ratificata).
 
 ## 2. Audit per schermata — Iniziative (wireframe S1–S7)
 
@@ -79,14 +79,14 @@ Il costruito si divide in tre fasce nette (aggiornato al re-baseline 2, HEAD `24
 | Wireframe (approvato) | Live (`24bbdf3`) | Gap |
 |---|---|---|
 | Conteggi per stato valorizzati, pill dello stato attivo evidenziata | ✅ Conteggi valorizzati (`item.counts[state.key]`), pill `statePillActive` quando >0 | F1 ✅, Q5 highlight ✅ |
-| Pill **cliccabili → board filtrato** («non contatori decorativi», nota 2) | ⚠️ Cliccabili (`onClick={onOpen}`) ma aprono il board **non filtrato** per stato (title dice «filtrato») | Q5 residuo |
+| Pill **cliccabili → board filtrato** («non contatori decorativi», nota 2) | ✅ Cliccabili (`onClick={onOpen}`) → navigano al board. Il salto «filtrato per stato» ritirato (falso problema: il board default è kanban, il filtro stato vive solo nella vista tabella → pre-set incoerente; le pill già navigano, non sono decorative) | Q5 ✅ (residuo ritirato) |
 | «Ultima attività: **nota su Nexa Systems S.r.l.**» — semantica | ✅ `Ultima attività: {item.lastActivityEvent}` (backend CASE → etichetta umana) | Q1 ✅ |
 | «aggiornata 2 g fa» (relativa) | ✅ `aggiornata {relativeDate(item.updatedAt)}` | Q3 ✅ |
 | Archiviazione come uscita di scena (nota 3) | ✅ Bottoni Archivia/Ripristina per-iniziativa + endpoint | F3 ✅ |
 | Empty state e modal Nuova iniziativa | Verbatim ✓ | — |
 
 ### S2 · Board kanban — ✅ Q2 RISOLTO (re-baseline 2); board da riverificare visivamente in Fase 4
-> ⚠️ **Re-baseline 2**: a `24bbdf3` la truncation Q2 è **implementata** (`.kcardName`/`.companyNameText`: `text-overflow: ellipsis; white-space: nowrap; overflow: hidden; max-width: 100%` + `title={companyName}`). Contatori colonna ✓ (`kcolCount`), collasso ✓, DnD ✓. **Contatore sul toggle Kanban/Tabella ancora assente** → Q5 residuo confermato. Badge registro, marker collisione, rendering visivo del board riscritto da `8284248`: da riverificare in Fase 4 con dati reali.
+> ⚠️ **Re-baseline 2**: a `24bbdf3` la truncation Q2 è **implementata** (`.kcardName`/`.companyNameText`: `text-overflow: ellipsis; white-space: nowrap; overflow: hidden; max-width: 100%` + `title={companyName}`). Contatori colonna ✓ (`kcolCount`), collasso ✓, DnD ✓. Contatore sul toggle Kanban/Tabella: **ritirato** (falso problema — il totale card è già nell'h1 `({board.cards.length})`, duplicarlo sul toggle è rumore senza informazione). Badge registro, marker collisione, rendering visivo del board riscritto da `8284248`: da riverificare in Fase 4 con dati reali.
 
 _(Audit a `996ce47`, pre-rewrite):_ Colonne flessibili, rail, contatori colonna, collasso ricordato: ✓ conformi. Gap storico: ragioni sociali mai troncate (la card KRAL era un francobollo verticale) → **Q2 ora risolto**.
 
@@ -122,8 +122,8 @@ Non catturabili senza lanciare stime/run. Copy dei componenti presente a codice;
 
 ### S7 · Run in corso — NON CATTURABILE (idem sopra)
 
-### S8 · Run completato · Risultati — ⚠️ PARZIALE (re-baseline 2): collasso fatto, nomenclatura duplice resta
-Il wireframe prescrive: «il funnel **collassa a riepilogo** [riga compatta ri-espandibile]; il lavoro diventa protagonista». ✅ **Collasso implementato** (`collapsed`, header cliccabile, «Esecuzione completata» vs «Avanzamento», riga-riepilogo compatta con Superficie/Valutate/Analizzate/Fuori tesi). **Residuo Q6**: la legenda della progress usa ancora una nomenclatura duplice — «Da approfondire» in `BucketLegend` (~riga 637) vs «Da verificare» in tabella/chip (`bucketLabel`/`bucketChipLabel` in `helpers.ts`); e «In tesi»/«Fuori tesi» per principale/reject. Due vocabolari nella stessa schermata → da unificare su quello ratificato (azionabile/da verificare/soppresso). E la riga funnel mostra «oltre il gate 1 → analizzate 5»: **i numeri non quadrano per costruzione**, contro la nota 1 del wireframe → da spiegare o correggere (Q6).
+### S8 · Run completato · Risultati — ✅ NOMENCLATURA RISOLTA (re-baseline 2, alternativa D)
+Il wireframe prescrive: «il funnel **collassa a riepilogo** [riga compatta ri-espandibile]; il lavoro diventa protagonista». ✅ **Collasso implementato**. ✅ **Nomenclatura unificata (alternativa D)**: la legenda espansa usa etichette gate distinte («In tesi»/«Da approfondire»/«Da verificare»/«Soppresso») con nota che le collega al vocabolario della tabella; la riga di riepilogo a run completato usa il vocabolario routing della tabella sottostante («In tesi N (di cui analizzate M) · Da verificare N · Soppresso K»). I due vocabolari non convivono mai nella stessa vista. **Residuo (→ Fase 4)**: verifica della catena numerica — riconciliazione `routingCounts` vs `progress.surface.fetched`/`rows.length` (target deduplicati/identity-only potrebbero far slittare i totali).
 
 ### S9 · Coda di verifica — FEDELE
 Motivo derivato verbatim («Identità non confermata sulle pagine lette», «Sito irraggiungibile…») ✓, rimedi Associa dominio / Nessun sito ✓. Non verificati visivamente (nessun caso nei dati): «Conferma sito di gruppo» quando c'è l'hint, «Riprova analisi», stato re-processo per-riga → checklist fase 4.
@@ -136,8 +136,8 @@ Motivo derivato verbatim («Identità non confermata sulle pagine lette», «Sit
 - **Q2 — Ragioni sociali** · ✅ **RISOLTO** (`9704883`): `.kcardName`/`.companyNameText` con `text-overflow: ellipsis; white-space: nowrap; overflow: hidden; max-width: 100%` + `title={companyName}` tooltip ovunque (kanban, tabella, titoli).
 - **Q3 — Date** · ✅ **RISOLTO** (`9704883`): `relativeDate()` («adesso»/«min fa»/«h fa»/«ieri»/«g fa»/data breve) + `shortAuthor()` (email→nome.cognome, default «Sistema») in `helpers.ts`; usati in S1, diario, drawer.
 - **Q4 — Diario che racconta** · ✅ **RISOLTO** (`9704883`): `eventLabel()` (`IniziativaBoardPage.tsx:1160`) gestisce stato da→a, chiusura esito+nota, card_creata sessione+stelle+nota, nota inline, contattato/buon_lead/no_go; scheda azienda cita «Ultima nota: “…” · {shortAuthor} · {relativeDate}».
-- **Q5 — Conteggi azionabili** · ⚠️ **QUASI COMPLETO (re-baseline 2)**: pill cliccabili ✓ (`onClick`), pill **valorizzate** ✓ (F1 risolto), **evidenziate quando >0** ✓ (`statePillActive`). **Restano 2 residui**: (a) **contatore sul toggle Kanban/Tabella** (il toggle mostra solo «Kanban»/«Tabella», nessun numero); (b) **click pill → board filtrato per stato** — oggi `onClick={onOpen}` apre il board **non filtrato** (il `title` dice «Vai al board filtrato su X» ma l'azione non passa lo stato).
-- **Q6 — Funnel S8** · ⚠️ **PARZIALE (re-baseline 2)**: ✅ collasso a riga-riepilogo a run completato (ri-espandibile, header cliccabile); **residui**: UNA nomenclatura bucket — la legenda funnel usa ancora «Da approfondire» vs «Da verificare» in tabella/chip (e «In tesi»/«Fuori tesi» per principale/reject) → da unificare su quella ratificata (azionabile/da verificare/soppresso); numeri del funnel che quadrano o spiegano lo scarto.
+- **Q5 — Conteggi azionabili** · ✅ **RISOLTO (re-baseline 2)**: pill cliccabili ✓ (`onClick`), pill **valorizzate** ✓ (F1 risolto), **evidenziate quando >0** ✓ (`statePillActive`). I 2 residui del re-baseline 2 sono **ritirati (falso problema)**: (a) contatore sul toggle Kanban/Tabella — il totale card è già nell'h1 `({board.cards.length})`, duplicarlo sul toggle è ridondante; (b) click pill → board filtrato per stato — il board default è kanban (il filtro stato vive solo nella vista tabella), quindi pre-impostare `stato` sarebbe incoerente con la vista di apertura; le pill già navigano al board (non sono decorative, soddisfacendo la nota 2 del wireframe).
+- **Q6 — Funnel S8** · ✅ **NOMENCLATURA RISOLTA (working tree, 2026-07-04)**: alternativa D implementata — la legenda espansa usa etichette gate distinte (`keep`→«In tesi», `forse`→«Da approfondire», `manualReview`→«Da verificare», `reject`→«Soppresso») con nota di mapping che le collega al vocabolario della tabella; la riga di riepilogo a run completato (collassata) usa il vocabolario routing coerente con la tabella sottostante: «In tesi N (di cui analizzate M) · Da verificare N · Soppresso K». I due vocabolari non convivono mai nella stessa vista. **Residuo**: verifica della catena numerica (riconciliazione `routingCounts` vs `progress.surface.fetched`/`rows.length`) → Fase 4.
 - **Q7 — Azioni contestuali in tabella** · ✅ **RISOLTO al re-baseline**: la vista tabella usa `<DossierButton>` con il ciclo a 3 stati. **Fuori perimetro.**
 
 ## 5. Difetti funzionali (dalla v1, verificati a codice)
@@ -155,7 +155,7 @@ Motivo derivato verbatim («Identità non confermata sulle pagine lette», «Sit
 
 1. **Fase 0 — Ratifica**: ✅ chiusa (D-A, D-B, D-C ratificate; D-D ritirata).
 2. **Fase 1 — Igiene** · ✅ **CHIUSA (2026-07-04)**: riga `.gitignore` `**/.playwright-cli/` ✅; SQL §8 eseguito (iniziativa audit `aac1ef5b…` + scritture accidentali pulite); verifica residui smoke test completata.
-3. **Fase 2 — Pattern Q residui**: **Q6** (unificare nomenclatura bucket: legenda funnel «Da approfondire» → «Da verificare», allineare «In tesi»/«Fuori tesi»; numeri funnel che quadrano) + **Q5 residui** (contatore sul toggle Kanban/Tabella; click pill → board filtrato per stato). Q1, Q2, Q3, Q4, Q7 ✅ fatti (da verificare visivamente in Fase 4, non più da implementare).
+3. **Fase 2 — Pattern Q residui** · ✅ **CHIUSA (2026-07-04)**: Q6 nomenclatura implementata (alternativa D: legenda gate con etichette distinte + nota, riga collessata routing); residuo Q6 catena numerica → Fase 4. Q5 residui (contatore toggle, filtro da pill) ritirati come falso problema. Q1, Q2, Q3, Q4, Q5, Q6, Q7 ✅ tutti fatti.
 4. **Fase 3 — Funzionale residuo** · ✅ **CHIUSA (2026-07-04)**: F5 implementato (join `ma_initiative` in `ListMAActiveCardsByCompany` per escludere archiviate). F1, F2, F3, F4 ✅ fatti · F6 ritirata · F7 = igiene Fase 1.
 5. **Fase 4 — Riverifica di parità formale**: per OGNI stato dei due wireframe, screenshot fianco a fianco e checklist puntuale. **Inclusi i pattern Q1–Q4 ora implementati** (verifica visiva, non più implementazione) e gli stati oggi non verificabili: S6 registro renderizzato, D1 S2–S6 e S7 al primo run reale, badge/marker/collisioni con dati veri, rendering del board riscritto da `8284248`. **Questa checklist è il gate di accettazione: niente «fatto» senza il confronto visivo.** La eseguo io direttamente.
 

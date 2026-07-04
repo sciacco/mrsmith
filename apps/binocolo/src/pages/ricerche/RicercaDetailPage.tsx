@@ -187,6 +187,19 @@ export function RicercaDetailPage() {
     [rows],
   );
   const buckets = gatedBucketCounts(progress);
+  const routingCounts = useMemo(
+    () => {
+      const c = { principale: 0, daVerificare: 0, azionabile: 0, soppresso: 0 };
+      for (const r of rows) {
+        if (r.bucket === 'principale') c.principale++;
+        else if (r.bucket === 'da_verificare') c.daVerificare++;
+        else if (r.bucket === 'azionabile') c.azionabile++;
+        else if (r.bucket === 'soppresso') c.soppresso++;
+      }
+      return c;
+    },
+    [rows],
+  );
   const isRunning = detail?.session.status === 'running' || progress?.stage === 'address' || progress?.stage === 'gate' || progress?.stage === 'enrich';
   const isFailed = detail?.session.status === 'failed' || progress?.stage === 'failed';
 
@@ -364,6 +377,7 @@ export function RicercaDetailPage() {
               progress={progress}
               status={detail.session.status}
               queueCount={queue.length}
+              routingCounts={routingCounts}
               running={isRunning}
               failed={isFailed}
               onResume={() => void resumeSearch()}
@@ -534,10 +548,12 @@ function ProgressPanel({
   failed,
   onResume,
   resumeBusy,
+  routingCounts,
 }: {
   progress: MAGatedProgressResponse;
   status: MASessionDetail['session']['status'];
   queueCount: number;
+  routingCounts: { principale: number; daVerificare: number; azionabile: number; soppresso: number };
   running: boolean;
   failed: boolean;
   onResume: () => void;
@@ -563,10 +579,10 @@ function ProgressPanel({
           <h2 id="progress-title">{collapsed ? 'Esecuzione completata' : 'Avanzamento'}</h2>
           {collapsed ? (
             <p className={styles.hint}>
-              Superficie <b>{numberFormat.format(progress.surface.fetched || progress.surface.expected)}</b>
-              {' · '}Valutate <b>{numberFormat.format(buckets.keep + buckets.forse)}</b>
-              {' · '}Analizzate <b>{numberFormat.format(progress.enrich.enriched)}</b>
-              {' · '}Fuori tesi <b>{numberFormat.format(buckets.reject)}</b>
+              In tesi <b>{numberFormat.format(routingCounts.principale)}</b>
+              {' '}(di cui analizzate <b>{numberFormat.format(progress.enrich.enriched)}</b>)
+              {' · '}Da verificare <b>{numberFormat.format(routingCounts.daVerificare + routingCounts.azionabile)}</b>
+              {' · '}Soppresso <b>{numberFormat.format(routingCounts.soppresso)}</b>
             </p>
           ) : (
             <p className={styles.hint}>La valutazione richiede tempo. La pagina si aggiorna da sola.</p>
@@ -626,7 +642,7 @@ function ProgressPanel({
             <div className={styles.buckets}>
               <BucketLegend
                 className={styles.funnelKeep ?? ''}
-                label="Azionabile"
+                label="In tesi"
                 count={buckets.keep}
                 hint="Attività giudicata aderente agli ambiti descritti nella richiesta: prosegue nell’analisi completa."
               />
@@ -649,6 +665,9 @@ function ProgressPanel({
                 hint="Società cessata, dormiente o fuori dagli ambiti descritti: esclusa dall’analisi."
               />
             </div>
+            <p className={styles.hint} style={{ marginTop: 6 }}>
+              Verdetto del gate. A run completato, la riga di riepilogo usa il vocabolario della tabella: «In tesi» e «Da approfondire» diventano la lista di lavoro; «Da verificare» va nella coda di verifica; «Soppresso» è escluso.
+            </p>
           </>
         )}
         </div>
