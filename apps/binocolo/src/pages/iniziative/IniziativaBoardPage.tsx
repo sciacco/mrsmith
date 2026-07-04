@@ -68,14 +68,14 @@ function registryLabel(kind: string) {
   return REGISTRY_LABELS[kind] ?? { label: kind, kind: 'info' as const };
 }
 
-const STATE_COLORS: Record<string, string> = {
-  da_contattare: styles.statusGrey ?? '',
-  contattata: styles.statusBlue ?? '',
-  in_dialogo: styles.statusIndigo ?? '',
-  approfondimento: styles.statusPurple ?? '',
-  offerta: styles.statusOrange ?? '',
-  chiusa: styles.statusGreen ?? '',
-  rimossa: styles.statusMuted ?? '',
+const STATE_COLORS: Record<string, string | undefined> = {
+  da_contattare: styles.statusGrey,
+  contattata: styles.statusBlue,
+  in_dialogo: styles.statusIndigo,
+  approfondimento: styles.statusPurple,
+  offerta: styles.statusOrange,
+  chiusa: styles.statusGreen,
+  rimossa: styles.statusMuted,
 };
 
 // Etichetta di stato per la vista tabella. `rimossa` non è una colonna kanban
@@ -742,7 +742,6 @@ function CardDrawer({
   onOpenDossier,
   onOpenCloseModal,
   onOpenRemoveModal,
-  onReopen,
   sessions,
 }: {
   initiativeId: string;
