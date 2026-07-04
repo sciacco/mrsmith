@@ -767,6 +767,19 @@
   color: var(--color-text-secondary);
 }
 
+.initiativeBadge {
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+}
+
+.initiativeBadge:hover,
+.initiativeBadge:focus-visible {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  border-color: var(--color-accent-muted);
+  outline: none;
+}
+
 .cellStack {
   display: flex;
   flex-direction: column;

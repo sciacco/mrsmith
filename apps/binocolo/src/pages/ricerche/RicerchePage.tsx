@@ -205,7 +205,24 @@ export function RicerchePage() {
                     <span className={styles.inlineActions}>
                       <span className={styles.rowTitle}>{session.title || 'Ricerca senza titolo'}</span>
                       {session.initiativeTitle ? (
-                        <span className={`${styles.badge} ${styles.badgeLav}`}>{session.initiativeTitle}</span>
+                        <span
+                          className={`${styles.badge} ${styles.badgeLav} ${styles.initiativeBadge}`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            navigate(`/iniziative/${session.initiativeId}`);
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              navigate(`/iniziative/${session.initiativeId}`);
+                            }
+                          }}
+                          role="button"
+                          tabIndex={0}
+                        >
+                          {session.initiativeTitle}
+                        </span>
                       ) : visibility === 'active' ? (
                         <button
                           type="button"
