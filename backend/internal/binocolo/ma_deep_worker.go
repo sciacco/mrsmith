@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -197,6 +199,78 @@ func scorecardHasMetric(scorecard *MADeepScorecard) bool {
 		}
 	}
 	return false
+}
+
+// briefLLMRetryPolicy controls how the async brief call survives transient
+// provider errors (429/5xx). The brief is a paid, best-effort step: on failure
+// the scorecard is saved WITHOUT a brief (a silent gap until manual regeneration),
+// so an async job that can afford to wait should back off and retry rather than
+// drop the brief on a passing rate-limit — which can hit any aggregator
+// (OpenRouter, Fireworks) under load. Interactive callers keep the SDK's own
+// 2-retry default; this second, longer loop is only for the batch worker.
+type briefLLMRetryPolicy struct {
+	maxRetries  int
+	backoffBase time.Duration
+	backoffMax  time.Duration
+}
+
+const (
+	briefLLMMaxRetriesDefault  = 4
+	briefLLMBackoffBaseDefault = 2 * time.Second
+	briefLLMBackoffMaxDefault  = 30 * time.Second
+)
+
+// briefLLMRetryPolicyFromEnv reads the (optional) ops tunables; zero-config uses
+// the defaults. BINOCOLO_BRIEF_LLM_MAX_RETRIES=0 disables the outer loop.
+func briefLLMRetryPolicyFromEnv() briefLLMRetryPolicy {
+	p := briefLLMRetryPolicy{
+		maxRetries:  briefLLMMaxRetriesDefault,
+		backoffBase: briefLLMBackoffBaseDefault,
+		backoffMax:  briefLLMBackoffMaxDefault,
+	}
+	if v, err := strconv.Atoi(strings.TrimSpace(os.Getenv("BINOCOLO_BRIEF_LLM_MAX_RETRIES"))); err == nil && v >= 0 {
+		p.maxRetries = v
+	}
+	if v, err := strconv.Atoi(strings.TrimSpace(os.Getenv("BINOCOLO_BRIEF_LLM_BACKOFF_MS"))); err == nil && v > 0 {
+		p.backoffBase = time.Duration(v) * time.Millisecond
+	}
+	if v, err := strconv.Atoi(strings.TrimSpace(os.Getenv("BINOCOLO_BRIEF_LLM_BACKOFF_MAX_MS"))); err == nil && v > 0 {
+		p.backoffMax = time.Duration(v) * time.Millisecond
+	}
+	return p
+}
+
+// chatWithBriefRetry runs the brief chat call, retrying on transient provider
+// errors (429/5xx) with exponential backoff. Non-retryable errors and context
+// cancellation return immediately. The SDK already retries twice at the HTTP
+// layer (honoring Retry-After); this adds a longer, batch-appropriate outer loop
+// so a paid async brief is not silently dropped on a passing rate-limit.
+func chatWithBriefRetry(ctx context.Context, client maAIClient, req llm.ChatRequest) (llm.ChatResponse, error) {
+	policy := briefLLMRetryPolicyFromEnv()
+	var resp llm.ChatResponse
+	var err error
+	for attempt := 0; ; attempt++ {
+		resp, err = client.Chat(ctx, req)
+		if err == nil {
+			return resp, nil
+		}
+		var apiErr *llm.APIError
+		if attempt >= policy.maxRetries || !errors.As(err, &apiErr) || !apiErr.Retryable() {
+			return resp, err
+		}
+		backoff := policy.backoffBase << attempt
+		if backoff <= 0 || backoff > policy.backoffMax {
+			backoff = policy.backoffMax
+		}
+		logging.FromContext(ctx).Warn("binocolo deep brief llm retry",
+			"component", "binocolo", "operation", "ma_deep_brief",
+			"attempt", attempt+1, "status", apiErr.StatusCode, "backoff_ms", backoff.Milliseconds())
+		select {
+		case <-ctx.Done():
+			return resp, ctx.Err()
+		case <-time.After(backoff):
+		}
+	}
 }
 
 // generateBrief asks the LLM (scope ma_deep_brief) to narrate the already-computed

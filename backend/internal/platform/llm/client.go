@@ -102,6 +102,20 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("%s: HTTP %d: %s", provider, e.StatusCode, e.Body)
 }
 
+// Retryable reports whether the status is a transient provider condition worth
+// retrying (rate-limit or upstream unavailability) rather than a client error.
+// 429 and 5xx gateway codes can hit any aggregator (OpenRouter, Fireworks) under
+// load; a caller that can afford to wait — an async batch job — should back off
+// and retry instead of surfacing the failure.
+func (e *APIError) Retryable() bool {
+	switch e.StatusCode {
+	case 429, 500, 502, 503, 504:
+		return true
+	default:
+		return false
+	}
+}
+
 func NewWithBaseURL(apiKey, baseURL string, httpCli *http.Client) *Client {
 	if strings.TrimSpace(apiKey) == "" {
 		return nil

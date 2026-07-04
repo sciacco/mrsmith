@@ -1727,6 +1727,10 @@ func (f *fakeMAWorkspaceStore) ListMAInitiativeCardEvents(context.Context, strin
 	return nil, errors.New("not implemented")
 }
 
+func (f *fakeMAWorkspaceStore) ListMALatestCardEvents(context.Context, string, []string) (map[string]string, error) {
+	return nil, errors.New("not implemented")
+}
+
 type fakeProvinceCache struct {
 	response json.RawMessage
 }
