@@ -995,10 +995,22 @@ function TargetDetailModal({
               ))}
             </div>
           ) : null}
-          {target.vatCode ? (
-            <a className={styles.linkButton} href={`/azienda?vat=${encodeURIComponent(target.vatCode)}`}>
-              Apri dossier azienda
-            </a>
+          {(row && (row.registryFacts?.length || row.inLavorazione?.length)) ? (
+            <div className={styles.cellBadges}>
+              {(row.registryFacts ?? []).map((kind) => {
+                const meta = registryFactLabels[kind];
+                if (!meta) return null;
+                const toneClass = meta.tone === 'warn' ? styles.badgeWarn : styles.badgeInfo;
+                return (
+                  <span key={kind} className={`${styles.badge} ${toneClass}`}>{meta.label}</span>
+                );
+              })}
+              {(row.inLavorazione ?? []).map((marker) => (
+                <span key={marker.initiativeId} className={`${styles.badge} ${styles.badgeLav}`}>
+                  In lavorazione · {marker.initiativeTitle}
+                </span>
+              ))}
+            </div>
           ) : null}
         </div>
       ) : null}

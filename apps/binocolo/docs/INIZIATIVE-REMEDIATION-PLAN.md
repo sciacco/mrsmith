@@ -5,6 +5,8 @@
 > **Metodo**: confronto schermata-per-schermata tra i wireframe approvati (`gated-ux-wireframe.html`, 10 stati; `iniziative-wireframe.html`, 7 stati) e il prodotto a HEAD `996ce47`, screenshot contro screenshot (`artifacts/claude/wf-*.png` vs `live-*.png`, riproducibili). Gli stati non catturabili senza spesa reale (D1 S2–S6, D2 S7 run in corso) sono confrontati su codice e copy. I difetti funzionali della v1 sono assorbiti in §5.
 >
 > **Re-baseline (2026-07-02, sera)**: l'audit originale è stato condotto a `996ce47`; tre commit successivi nella stessa giornata hanno spostato il codice. Il documento è ora re-baselinato a HEAD `6217051` — vedi §0 per il diff e i claim corretti inline (F2 e Q7 risolti, F3 e Q5 precisati, S2 marcato pre-rewrite). **La tesi centrale (pattern semantici Q) sopravvive intatta.**
+>
+> **Re-baseline 2 (2026-07-04)**: riscontro codice a HEAD `24bbdf3` (§0.1). Tre commit successivi a `6217051` hanno **chiuso la maggior parte del perimetro attivo**: Q1, Q2, Q3, Q4 ✅ risolti; F1, F3 ✅ risolti; F4 ✅ committato; Q5 quasi completo (2 residui); Q6 parziale (collasso fatto, nomenclatura da unificare). **Perimetro attivo reale ridotto a: Q5 residuo, Q6, F5, F7, F8.** La tesi centrale è confermata ma il remediation residuo è molto più piccolo di quanto il documento §1–§5 dica inline; le sezioni sono aggiornate con marker `✅ risolto (re-baseline 2)`.
 
 ## 0. Re-baseline vs HEAD `6217051` (2026-07-02, sera)
 
@@ -29,49 +31,76 @@ L'audit originale (§1–§9) è stato condotto a HEAD `996ce47` (2026-07-02 17:
 
 **Claim confermati intatti a `6217051` (verificati a codice):** F1, F4, F5 (funzionali) · Q1, Q2, Q3, Q4, Q6 (pattern semantici). È la sostanza del remediation e regge.
 
-**Perimetro attivo dopo il re-baseline:**
+## 0.1. Riscontro codice vs HEAD `24bbdf3` (2026-07-04)
 
-- Pattern Q: **5 attivi** (Q1, Q2, Q3, Q4, Q6) · Q5 parziale · Q7 fatto.
-- Difetti F: **F1, F4, F5** attivi · F3 parziale · F2 fatto · F7 igiene (SQL §8) · F8 da spot-check · F6 ritirata (falso problema, vedi D-D).
+Riscontro puntuale del codice a HEAD `24bbdf3` (working tree pulito). **Tre commit successivi a `6217051` hanno chiuso la maggior parte del perimetro attivo** dichiarato in §0. Il documento §1–§5 rifletteva lo stato a `6217051` ed è ora storto; questa sezione lo corregge e i claim sono aggiornati inline con marker `✅ risolto (re-baseline 2)`.
+
+**Commit intervenuti dopo `6217051`:**
+
+- `a627066` — *feat(board): enhance last activity display with semantic events*. **Risolve Q1** (backend `ListMALatestCardEvents` + `ma_store.go` `last_activity_event` CASE → etichette umane; board tabella usa `card.lastEvent`).
+- `9704883` — *feat(iniziative): enhance initiative management and display*. **Risolve Q2** (`.kcardName`/`.companyNameText`: `text-overflow: ellipsis` + `title` tooltip), **Q3** (`relativeDate()` + `shortAuthor()` in `helpers.ts`, usati in S1/diario/drawer), **Q4** (`eventLabel()` in `IniziativaBoardPage.tsx:1160`: stato da→a, chiusura esito+nota, card_creata sessione+stelle+nota, nota inline, contattato/buon_lead/no_go; scheda azienda cita ultima nota con autore breve + data relativa), **F1** (backend aggrega `counts` jsonb per stato; frontend `item.counts[state.key]`), **F3** (`onArchive`/`onRestore` per-iniziativa in `IniziativaCard` + endpoint `POST .../archive`/`.../restore`).
+- `24bbdf3` — *docs(remediation): update F4 status and remove company link*. **Risolve F4** (committato, non più working tree): rimozione link `/azienda?vat=` + badge B5 inline in `TargetDetailModal`.
+
+**Claim aggiornati (re-baseline 2):**
+
+| Claim | Esito riscontro codice `24bbdf3` | Sezione |
+|---|---|---|
+| **Q1** | ✅ RISOLTO (`a627066`) — `last_activity_event` backend + `lastEvent` board | §4 |
+| **Q2** | ✅ RISOLTO (`9704883`) — `ellipsis` + `title` su `.kcardName`/`.companyNameText` | §4 |
+| **Q3** | ✅ RISOLTO (`9704883`) — `relativeDate()` + `shortAuthor()` | §4 |
+| **Q4** | ✅ RISOLTO (`9704883`) — `eventLabel()` completo + citazione ultima nota | §4 |
+| **Q5** | ⚠️ QUASI COMPLETO — pill cliccabili ✓, valorizzate ✓ (F1), highlight >0 ✓ (`statePillActive`); **restano**: contatore sul toggle Kanban/Tabella, e click pill → `onOpen` apre il board **non filtrato** per stato (title dice "filtrato" ma l'azione non filtra) | §4 |
+| **Q6** | ⚠️ PARZIALE — collasso ✓ (`collapsed`, header cliccabile, riga-riepilogo); **nomenclatura ancora duplice**: legenda funnel "Da approfondire" vs tabella/chip "Da verificare"; "In tesi"/"Fuori tesi" per principale/reject; numeri funnel da verificare | §4 |
+| **F1** | ✅ RISOLTO (`9704883`) — `counts` aggregati e renderizzati | §5 |
+| **F3** | ✅ RISOLTO (`9704883`) — archive/restore per-iniziativa + endpoint; delete assente (corretto per D-A) | §5 |
+| **F4** | ✅ COMMITTATO (`24bbdf3`) — non più working tree | §5 |
+| **F5** | ⚠️ APERTO confermato — `ListMAActiveCardsByCompany` non joina `ma_initiative` per escludere archiviate | §5 |
+
+**Perimetro attivo reale dopo il re-baseline 2:**
+
+- Pattern Q: **Q6** attivo (nomenclatura duplice + numeri funnel) · **Q5** quasi fatto (2 residui: contatore toggle, filtraggio stato dal click pill) · Q1, Q2, Q3, Q4, Q7 fatti.
+- Difetti F: **F5** attivo · F7 igiene (SQL §8) · F8 da spot-check · F1, F2, F3, F4 fatti · F6 ritirata.
+
+**Impatto sulla Fase 4 (riverifica di parità):** Q1–Q4 erano dichiarati "attivi" sulla base di `6217051` ma sono ora implementati — vanno **verificati visivamente** (non più implementati) nella Fase 4, insieme agli stati non ancora visti (S6 registro renderizzato, D1 S2–S6, D2 S7, badge/marker/collisioni con dati veri).
 
 ## 1. Verdetto
 
-Il costruito si divide in tre fasce nette:
+Il costruito si divide in tre fasce nette (aggiornato al re-baseline 2, HEAD `24bbdf3`):
 
 - **A standard (da preservare)**: D1 stato iniziale, modali di chiusura/rimozione, coda di verifica D2, impianto kanban (colonne flessibili/rail), backend dei flussi card e schema 087–090.
-- **Sotto lo standard approvato (il grosso del danno)**: non sono feature mancanti ma **pattern di qualità mai implementati** — il wireframe prescriveva superfici che *raccontano il lavoro* (eventi semantici, conteggi azionabili, funnel che collassa) e il prodotto mostra scheletri (timestamp ISO, "Stato aggiornato" nudo, pannelloni di avanzamento perenni). Sono 7 pattern trasversali (§4), non 30 difetti sparsi: si rimediano per pattern, non per pagina.
-- **Mancante**: ciclo di vita iniziative (le ricerche sono ora coperte — F2 risolto al re-baseline), contatori, parità del dettaglio D2 (§5).
+- **Sotto lo standard approvato (rimediato quasi tutto)**: i pattern di qualità Q1–Q4 sono ora **implementati** (`a627066`/`9704883`): eventi semantici, conteggi valorizzati e evidenziati, date relative, diario che racconta, troncamento ragioni sociali. **Restano sotto standard**: Q6 (nomenclatura bucket duplice nella legenda funnel vs tabella) e i 2 residui di Q5 (contatore toggle, filtraggio stato dal click pill). Il danno residuo è piccolo e puntuale, non più «il grosso».
+- **Mancante**: F5 (marker ignora iniziative archiviate), Q6 nomenclatura, Q5 residui; igiene dati di prova (F7, SQL tua); spot-check minori (F8). Il ciclo di vita iniziative (F3) e i contatori (F1) sono ora **fatti**.
 
-**Raccomandazione: si recupera.** Nulla di ciò che è sotto standard richiede rifacimenti: il modello dati e i flussi reggono (smoke end-to-end), i gap sono di resa e di completamento. Butterei solo il `TargetDetailModal` di D2 — non per ricostruirlo, ma per **togliere il link `/azienda`** (accoppiamento col tool standalone) e tenerlo nel ruolo di setaccio (razionale + badge B5); il dossier profondo resta azione di card sul MA card-dossier, già autosufficiente (D-B ratificata).
+**Raccomandazione: si recupera, e in buona parte è già recuperato.** Il modello dati e i flussi reggono (smoke end-to-end); i gap residui sono di resa puntuale (Q6 nomenclatura, Q5 toggle) e di un fix di query (F5 join su `ma_initiative`). Il `TargetDetailModal` di D2 è già disaccoppiato (F4 committato `24bbdf3`): link `/azienda` rimosso, badge B5 inline, dossier profondo resta azione di card sul MA card-dossier autosufficiente (D-B ratificata).
 
 ## 2. Audit per schermata — Iniziative (wireframe S1–S7)
 
-### S1 · Indice iniziative — SOTTO STANDARD
-| Wireframe (approvato) | Live | Gap |
+### S1 · Indice iniziative — ✅ RISOLTO (re-baseline 2)
+| Wireframe (approvato) | Live (`24bbdf3`) | Gap |
 |---|---|---|
-| Conteggi per stato valorizzati, pill dello stato attivo evidenziata | Tutti 0, pill tutte grigie | Aggregazione mai scritta (`ListMAInitiatives`, ma_store.go:281) → F1 |
-| Pill **cliccabili → board filtrato** («non contatori decorativi», nota 2) | Cliccabili ✓ al re-baseline; ma conteggi a 0 (F1) e niente highlight >0 | Q5 (parziale) |
-| «Ultima attività: **nota su Nexa Systems S.r.l.**» — semantica: cosa è successo | `2026-07-02T16:55:57.52851+02:00` — ISO grezzo | Q1 + Q3 |
-| «aggiornata 2 g fa» (relativa) | «aggiornata 02/07/2026» | Q3 |
-| Archiviazione come uscita di scena (nota 3) | Nessuna azione di archiviazione | F3 |
+| Conteggi per stato valorizzati, pill dello stato attivo evidenziata | ✅ Conteggi valorizzati (`item.counts[state.key]`), pill `statePillActive` quando >0 | F1 ✅, Q5 highlight ✅ |
+| Pill **cliccabili → board filtrato** («non contatori decorativi», nota 2) | ⚠️ Cliccabili (`onClick={onOpen}`) ma aprono il board **non filtrato** per stato (title dice «filtrato») | Q5 residuo |
+| «Ultima attività: **nota su Nexa Systems S.r.l.**» — semantica | ✅ `Ultima attività: {item.lastActivityEvent}` (backend CASE → etichetta umana) | Q1 ✅ |
+| «aggiornata 2 g fa» (relativa) | ✅ `aggiornata {relativeDate(item.updatedAt)}` | Q3 ✅ |
+| Archiviazione come uscita di scena (nota 3) | ✅ Bottoni Archivia/Ripristina per-iniziativa + endpoint | F3 ✅ |
 | Empty state e modal Nuova iniziativa | Verbatim ✓ | — |
 
-### S2 · Board kanban — BOARD RISCRITTO POST-AUDIT (descrizione pre-rewrite)
-> ⚠️ **Re-baseline**: il board è stato riscritto da `8284248` (2026-07-02: drag-and-drop + state colors, `IniziativaBoardPage.tsx` +529 righe, CSS +467). La descrizione qui sotto è quella dell'audit a `996ce47` e va **riverificata visivamente in Fase 4**. Confermato a codice a `6217051`: **ragioni sociali ancora non troncate** (nessun `line-clamp`/`ellipsis` in `Iniziative.module.css`; `kcardName`/`companyNameText` senza truncation) → Q2 regge; **contatore sul toggle Tabella ancora assente** → Q5 regge. Collasso/rail/contatori colonna/DnD: da riverificare.
+### S2 · Board kanban — ✅ Q2 RISOLTO (re-baseline 2); board da riverificare visivamente in Fase 4
+> ⚠️ **Re-baseline 2**: a `24bbdf3` la truncation Q2 è **implementata** (`.kcardName`/`.companyNameText`: `text-overflow: ellipsis; white-space: nowrap; overflow: hidden; max-width: 100%` + `title={companyName}`). Contatori colonna ✓ (`kcolCount`), collasso ✓, DnD ✓. **Contatore sul toggle Kanban/Tabella ancora assente** → Q5 residuo confermato. Badge registro, marker collisione, rendering visivo del board riscritto da `8284248`: da riverificare in Fase 4 con dati reali.
 
-_(Audit a `996ce47`):_ Colonne flessibili, rail, contatori colonna, collasso ricordato: ✓ conformi. Gap: **ragioni sociali mai troncate** (la card KRAL è un francobollo verticale — l'esatto difetto che le colonne flessibili dovevano eliminare) → Q2; manca il contatore sul toggle Tabella; badge registro e marker collisione presenti a codice ma non verificabili visivamente (nessun dato attivo) — da coprire nella riverifica di parità (§6 fase 4).
+_(Audit a `996ce47`, pre-rewrite):_ Colonne flessibili, rail, contatori colonna, collasso ricordato: ✓ conformi. Gap storico: ragioni sociali mai troncate (la card KRAL era un francobollo verticale) → **Q2 ora risolto**.
 
-### S3 · Board tabella — SOTTO STANDARD
-Filtri e colonne presenti ✓. Gap: «Ultima attività» = **data nuda** contro «card creata · 2 g fa / contattato · ieri / chiusura · 8 g fa» → Q1+Q3; stato «rimossa» in minuscolo, senza pill esito (wireframe: «Chiusa ~Non idonea~» rossa, «Rimandata» ambra); colonna Dossier: ✅ azione a 3 stati presente in tabella al re-baseline (`<DossierButton>`, Q7 risolto); ragioni sociali intere → Q2; layout filtri (cerca full-width su riga separata) più sciatto del compatto approvato.
+### S3 · Board tabella — ✅ Q1/Q2/Q3 RISOLTI (re-baseline 2); residui minori
+Filtri e colonne presenti ✓. ✅ «Ultima attività» = `card.lastEvent || dateLabel(card.updatedAt)` (semantica + relativa) → Q1+Q3 risolti; ✅ ragioni sociali troncate (`.companyNameText` ellipsis) → Q2 risolto; colonna Dossier: ✅ `<DossierButton>` 3-state (Q7). **Residui**: stato «rimossa» in minuscolo, senza pill esito (wireframe: «Chiusa ~Non idonea~» rossa, «Rimandata» ambra); layout filtri (cerca full-width su riga separata) più sciatto del compatto approvato → F8.
 
-### S4 · Drawer card — IL GAP PIÙ GRAVE DEL WORKSTREAM
-| Wireframe | Live | Gap |
+### S4 · Drawer card — ✅ Q4/Q3/Q2 RISOLTI (re-baseline 2)
+| Wireframe | Live (`24bbdf3`) | Gap |
 |---|---|---|
-| Diario che racconta: «**Contattata** — telefonata col titolare…», «**Card creata** da MSP Lombardia · giu (★★★)» | «Stato aggiornato» nudo, «Card creata» nuda — senza da→a, senza nota inline, senza provenienza/stelle | Q4 |
-| Autore breve + data breve (`g.rossi · 30 giu 2026`) | Email intera cruda + data assoluta | Q4+Q3 |
+| Diario che racconta: «**Contattata** — telefonata col titolare…», «**Card creata** da MSP Lombardia · giu (★★★)» | ✅ `eventLabel()` renderizza stato da→a, chiusura esito+nota, card_creata sessione+stelle+nota, nota inline, contattato/buon_lead/no_go | Q4 ✅ |
+| Autore breve + data breve (`g.rossi · 30 giu 2026`) | ✅ `shortAuthor()` (email→nome.cognome) + `relativeDate()` | Q4+Q3 ✅ |
 | Sezione PROVENIENZE sempre presente (righe: sessione · mese — ★★☆ score) | Sezione **omessa** quando vuota | ~~F6~~ ritirata (falso problema) |
-| Scheda azienda: fatti + «ultima nota d'azienda» citata con data | Solo «Nessun fatto registrato.» — la citazione dell'ultima nota non è implementata | Q4 |
-| Titolo compatto | Ragione sociale intera troncata a «K…» | Q2 |
+| Scheda azienda: fatti + «ultima nota d'azienda» citata con data | ✅ Citazione «Ultima nota: “…” · {shortAuthor} · {relativeDate}» implementata | Q4 ✅ |
+| Titolo compatto | ✅ `.kcardName`/titoli con ellipsis + tooltip | Q2 ✅ |
 | Stato a pill, «Chiusa…» apre S5, rimozione, analisi a 3 stati | ✓ | — |
 
 ### S5 · Chiusura ed esiti · Rimozione — FEDELE
@@ -93,42 +122,42 @@ Non catturabili senza lanciare stime/run. Copy dei componenti presente a codice;
 
 ### S7 · Run in corso — NON CATTURABILE (idem sopra)
 
-### S8 · Run completato · Risultati — GAP STRUTTURALE
-Il wireframe prescrive: «il funnel **collassa a riepilogo** [riga compatta ri-espandibile]; il lavoro diventa protagonista». Live: il pannello «Avanzamento» con le tre fasi «Completato» + progress bar **resta permanente** sopra la Lavorazione anche a run finito — metà viewport spesa a dire che è finito. In più: la legenda della progress usa una nomenclatura («In tesi / Da approfondire / Da verificare / Fuori tesi») **diversa dai bucket ratificati** mostrati in tabella (azionabile / da verificare / soppresso) — due vocabolari nella stessa schermata → Q6. E la riga funnel mostra «oltre il gate 1 → analizzate 5»: **i numeri non quadrano per costruzione**, contro la nota 1 del wireframe («i numeri quadrano per costruzione») → da spiegare o correggere (Q6).
+### S8 · Run completato · Risultati — ⚠️ PARZIALE (re-baseline 2): collasso fatto, nomenclatura duplice resta
+Il wireframe prescrive: «il funnel **collassa a riepilogo** [riga compatta ri-espandibile]; il lavoro diventa protagonista». ✅ **Collasso implementato** (`collapsed`, header cliccabile, «Esecuzione completata» vs «Avanzamento», riga-riepilogo compatta con Superficie/Valutate/Analizzate/Fuori tesi). **Residuo Q6**: la legenda della progress usa ancora una nomenclatura duplice — «Da approfondire» in `BucketLegend` (~riga 637) vs «Da verificare» in tabella/chip (`bucketLabel`/`bucketChipLabel` in `helpers.ts`); e «In tesi»/«Fuori tesi» per principale/reject. Due vocabolari nella stessa schermata → da unificare su quello ratificato (azionabile/da verificare/soppresso). E la riga funnel mostra «oltre il gate 1 → analizzate 5»: **i numeri non quadrano per costruzione**, contro la nota 1 del wireframe → da spiegare o correggere (Q6).
 
 ### S9 · Coda di verifica — FEDELE
 Motivo derivato verbatim («Identità non confermata sulle pagine lette», «Sito irraggiungibile…») ✓, rimedi Associa dominio / Nessun sito ✓. Non verificati visivamente (nessun caso nei dati): «Conferma sito di gruppo» quando c'è l'hint, «Riprova analisi», stato re-processo per-riga → checklist fase 4.
 
 ### S10 · Fuori tesi — presente, vuoto nei dati di prova: parità da verificare con una sessione con scarti reali.
 
-## 4. Pattern trasversali di qualità (Q) — i veri responsabili della «mediocrità»
+## 4. Pattern trasversali di qualità (Q) — stato a `24bbdf3` (re-baseline 2)
 
-- **Q1 — Ultima attività semantica**: il wireframe la usa in S1, S3 e nel diario («cosa è successo · quanto tempo fa»); il prodotto mostra date. Richiede: ultimo evento per iniziativa/card esposto dal backend (il log unico ce l'ha già — è una query) + formattazione evento→etichetta.
-- **Q2 — Ragioni sociali**: line-clamp/troncamento con tooltip ovunque (card kanban, righe tabella, titoli drawer/modali). Le ragioni sociali italiane lunghe erano prevedibili e il wireframe usa ovunque nomi compatti.
-- **Q3 — Date**: relative («2 g fa», «ieri») nelle superfici di lavoro, mai ISO grezzo, mai email intera come autore (formato `nome.cognome` breve).
-- **Q4 — Diario che racconta**: ogni evento renderizza il suo contenuto — `stato`: da→a; `nota`: corpo inline; `card_creata`: sessione di provenienza + stelle (il payload jsonb c'è già, mig 089); `chiusura`: esito + nota. La scheda azienda cita l'ultima nota d'azienda con data.
-- **Q5 — Conteggi azionabili** · ⚠️ **PARZIALE al re-baseline**: le pill di stato sono **cliccabili → board filtrato** (fatte). Restano: pill **valorizzate** (bloccate da F1), **evidenziate quando >0**, e **contatore sul toggle Kanban/Tabella**.
-- **Q6 — Funnel S8**: collasso a riga-riepilogo a run completato (ri-espandibile); UNA nomenclatura bucket (quella ratificata: azionabile/da verificare/soppresso) in legenda e tabella; numeri del funnel che quadrano o spiegano lo scarto.
-- **Q7 — Azioni contestuali in tabella** · ✅ **RISOLTO al re-baseline**: la vista tabella usa `<DossierButton>` con il ciclo a 3 stati (Avvia analisi completa / Analisi in corso… / Apri dossier), riga `IniziativaBoardPage.tsx:534`. **Fuori perimetro.**
+- **Q1 — Ultima attività semantica** · ✅ **RISOLTO** (`a627066`): backend `ma_store.go` calcola `last_activity_event` (CASE WHEN su eventi → «Card creata», «No-go: …», «Buon lead: …»); `IniziativePage` renderizza «Ultima attività: {lastActivityEvent}»; board tabella usa `card.lastEvent` da `ListMALatestCardEvents`.
+- **Q2 — Ragioni sociali** · ✅ **RISOLTO** (`9704883`): `.kcardName`/`.companyNameText` con `text-overflow: ellipsis; white-space: nowrap; overflow: hidden; max-width: 100%` + `title={companyName}` tooltip ovunque (kanban, tabella, titoli).
+- **Q3 — Date** · ✅ **RISOLTO** (`9704883`): `relativeDate()` («adesso»/«min fa»/«h fa»/«ieri»/«g fa»/data breve) + `shortAuthor()` (email→nome.cognome, default «Sistema») in `helpers.ts`; usati in S1, diario, drawer.
+- **Q4 — Diario che racconta** · ✅ **RISOLTO** (`9704883`): `eventLabel()` (`IniziativaBoardPage.tsx:1160`) gestisce stato da→a, chiusura esito+nota, card_creata sessione+stelle+nota, nota inline, contattato/buon_lead/no_go; scheda azienda cita «Ultima nota: “…” · {shortAuthor} · {relativeDate}».
+- **Q5 — Conteggi azionabili** · ⚠️ **QUASI COMPLETO (re-baseline 2)**: pill cliccabili ✓ (`onClick`), pill **valorizzate** ✓ (F1 risolto), **evidenziate quando >0** ✓ (`statePillActive`). **Restano 2 residui**: (a) **contatore sul toggle Kanban/Tabella** (il toggle mostra solo «Kanban»/«Tabella», nessun numero); (b) **click pill → board filtrato per stato** — oggi `onClick={onOpen}` apre il board **non filtrato** (il `title` dice «Vai al board filtrato su X» ma l'azione non passa lo stato).
+- **Q6 — Funnel S8** · ⚠️ **PARZIALE (re-baseline 2)**: ✅ collasso a riga-riepilogo a run completato (ri-espandibile, header cliccabile); **residui**: UNA nomenclatura bucket — la legenda funnel usa ancora «Da approfondire» vs «Da verificare» in tabella/chip (e «In tesi»/«Fuori tesi» per principale/reject) → da unificare su quella ratificata (azionabile/da verificare/soppresso); numeri del funnel che quadrano o spiegano lo scarto.
+- **Q7 — Azioni contestuali in tabella** · ✅ **RISOLTO al re-baseline**: la vista tabella usa `<DossierButton>` con il ciclo a 3 stati. **Fuori perimetro.**
 
 ## 5. Difetti funzionali (dalla v1, verificati a codice)
 
-- **F1 — Contatori iniziative**: aggregazione card per stato in `ListMAInitiatives` (il passo è caduto tra B1 e B2 del piano). Prerequisito di Q5.
+- **F1 — Contatori iniziative** · ✅ **RISOLTO** (`9704883`): l'aggregazione card per stato è in `ListMAInitiatives` (`ma_store.go`: `jsonb_object_agg` per stato → `item.counts`); il frontend renderizza `item.counts[state.key] ?? 0` con highlight `statePillActive` quando >0. Sblocca Q5.
 - **F2 — Ciclo di vita ricerche in /ricerche** · ✅ **RISOLTO al re-baseline** (commit `79169e2`, 2026-07-02): `RicerchePage.tsx` ha ora archivia/cestino/purge/ripristino + filtri di visibilità (Attive/Archiviate/Cestino) + modali di conferma. **Fuori perimetro.** (L'audit a `996ce47` lo rilevava ancora aperto: era il gap reale a quel HEAD, chiuso nelle ore successive.)
-- **F3 — Ciclo di vita iniziative** · ⚠️ **PARZIALE al re-baseline**: la vista archivio è presente (link «Archivio (N)» + conteggio + empty state in `IniziativePage.tsx`), ma `IniziativaCard` espone solo `onOpen` — **nessuna azione archive/restore per-iniziativa**, e delete resta assente anche a backend (decisione D-A). Resta da fare: aggiungere l'azione di lifecycle (e decidere D-A sul delete).
-- **F4 — Dettaglio D2** · ✅ **decisione D-B ratificata (2026-07-02)**: il `TargetDetailModal` (`RicercaDetailPage.tsx:974`) ha un link `/azienda?vat=` che **accoppia il setaccio MA al tool standalone** (`CompanyDossierPage` è indipendente da MA). **Fix: rimuovere il link, non ripararlo.** Il modale resta magro nel ruolo di setaccio — razionale aderenza + contesto scoring + badge B5 inline (`registryFacts`, `inLavorazione`); il dossier profondo è azione di card (B6 → MA card-dossier). Verificato al re-baseline: il MA card-dossier è **già autosufficiente e disaccoppiato** (`GetMATargetByID` popola `target.Deep` dalla cache company-keyed via `ListMADeepAnalysis`) — niente riuso di sezioni, niente refinement da costruire. Lavoro: 1 riga (rimozione link) + badge B5 + fix wording PRD §7.
-- **F5 — Marker vs archiviazione**: `ListMAActiveCardsByCompany` (ma_store.go:2373) non esclude le iniziative archiviate.
+- **F3 — Ciclo di vita iniziative** · ✅ **RISOLTO** (`9704883`): `IniziativaCard` espone `onArchive`/`onRestore` con bottoni «Archivia»/«Ripristina» per-iniziativa; endpoint backend `POST .../archive` + `.../restore` (`handler.go:121-122`); vista archivio con link «Archivio (N)» + conteggio + empty state. Delete assente (corretto per D-A: archive + restore, no delete/purge).
+- **F4 — Dettaglio D2** · ✅ **COMMITTATO** (`24bbdf3`, 2026-07-04): il `TargetDetailModal` (`RicercaDetailPage.tsx`) non ha più il link `/azienda?vat=` — sostituito dai badge B5 inline (`registryFacts` + `inLavorazione`), riusando il pattern già presente nella tabella risultati (`cellBadges` + `registryFactLabels` + `badgeWarn`/`badgeInfo`/`badgeLav`). Il modale resta magro nel ruolo di setaccio (razionale aderenza + contesto scoring + badge B5); il dossier profondo resta azione di card sul MA card-dossier, già autosufficiente e disaccoppiato (`GetMATargetByID` → cache company-keyed via `ListMADeepAnalysis`). Wording PRD §7 aggiornato in committed code (`INIZIATIVE-PRD.md:105`: «Il tool standalone `/azienda` è indipendente da MA e non è accoppiato al flusso (ratifica D-B)»). **Fuori perimetro.**
+- **F5 — Marker vs archiviazione** · ⚠️ **APERTO confermato (re-baseline 2)**: `ListMAActiveCardsByCompany` (`ma_store.go`) filtra `state NOT IN ('chiusa','rimossa')` ma **non joina `ma_initiative`** per escludere le iniziative archiviate → le card di iniziative archiviate ancora appaiono come marker di collisione. Fix: join su `ma_initiative` con `archived_at IS NULL`.
 - **F6 — Provenienze robuste** · ❌ **RITIRATA (2026-07-02)**: stesso falso problema di D-D. Il rimedio (leggere dallo snapshot invece che dalle sessioni agganciate) servirebbe solo a rendere la card indipendente dalla sessione — ma non è il modello implementato (la card risolve i dettagli attraverso la sessione agganciata). Per le operazioni supportate (archive, purge soft) le provenienze **non** si perdono: la sessione resta con `initiative_id` intatto e le query filtrano solo per quello. Lo sgancio — l'unico caso che rompe — non è supportato. (Se in futuro si volesse supportarlo, servirebbe uno snapshot completo su card: decisione «cambia modello», non un task di remediation.)
 - **F7 — Igiene dati di prova**: SQL in §8 (include anche i 2 cambi di stato accidentali fatti oggi durante l'audit da click su riferimenti browser stantii — errore mio, registrato).
 - **F8 — Lotto minori**: gli 8 della v1 + flash dropdown D1 + ordine bottoni S5.
 
-## 6. Piano di esecuzione proposto (dopo la tua ratifica)
+## 6. Piano di esecuzione proposto (aggiornato al re-baseline 2, HEAD `24bbdf3`)
 
-1. **Fase 0 — Ratifica**: decidi sulle aree (recupera/butta) e sulle decisioni D-A…D-D (§7).
-2. **Fase 1 — Igiene** (immediata): riga `.gitignore` `**/.playwright-cli/` ✅ fatta (2026-07-02: consolidato `/.playwright-cli` + `/backend/.playwright-cli` nel pattern globale, verificato con `git check-ignore`); SQL §8 (tu, one-shot) — copre l'iniziativa audit `aac1ef5b…`; **verifica anche eventuali altri dati di prova** residui dai smoke test recenti (`79169e2` lifecycle, `8284248` board) prima di dichiarare la fase chiusa.
-3. **Fase 2 — Pattern Q1–Q7**: un intervento per pattern, trasversale alle pagine (non pagina-per-pagina: è così che si ricade nei rattoppi). Q1+Q4 condividono il lavoro sul log; Q5 dipende da F1.
-4. **Fase 3 — Funzionali F1, F3, F4, F5** (F2 fatto, F6 ritirata, F7 igiene).
-5. **Fase 4 — Riverifica di parità formale**: per OGNI stato dei due wireframe, screenshot fianco a fianco e checklist puntuale (inclusi gli stati oggi non verificabili: S6 registro renderizzato, D1 S2–S6 e S7 al primo run reale, badge/marker/collisioni con dati veri). **Questa checklist è il gate di accettazione: niente «fatto» senza il confronto visivo.** La eseguo io direttamente.
+1. **Fase 0 — Ratifica**: ✅ chiusa (D-A, D-B, D-C ratificate; D-D ritirata).
+2. **Fase 1 — Igiene** (immediata): riga `.gitignore` `**/.playwright-cli/` ✅ fatta (2026-07-02); SQL §8 (tu, one-shot) — copre l'iniziativa audit `aac1ef5b…`; **verifica anche eventuali altri dati di prova** residui dai smoke test recenti prima di dichiarare la fase chiusa.
+3. **Fase 2 — Pattern Q residui**: **Q6** (unificare nomenclatura bucket: legenda funnel «Da approfondire» → «Da verificare», allineare «In tesi»/«Fuori tesi»; numeri funnel che quadrano) + **Q5 residui** (contatore sul toggle Kanban/Tabella; click pill → board filtrato per stato). Q1, Q2, Q3, Q4, Q7 ✅ fatti (da verificare visivamente in Fase 4, non più da implementare).
+4. **Fase 3 — Funzionali residui**: **F5** (join `ma_initiative` in `ListMAActiveCardsByCompany` per escludere archiviate). F1, F2, F3, F4 ✅ fatti · F6 ritirata · F7 = igiene Fase 1.
+5. **Fase 4 — Riverifica di parità formale**: per OGNI stato dei due wireframe, screenshot fianco a fianco e checklist puntuale. **Inclusi i pattern Q1–Q4 ora implementati** (verifica visiva, non più implementazione) e gli stati oggi non verificabili: S6 registro renderizzato, D1 S2–S6 e S7 al primo run reale, badge/marker/collisioni con dati veri, rendering del board riscritto da `8284248`. **Questa checklist è il gate di accettazione: niente «fatto» senza il confronto visivo.** La eseguo io direttamente.
 
 Sequenza e granularità dei task esecutori le definiamo dopo la ratifica — non prima, per non ripetere l'errore di piani che promettono ciò che non specificano.
 
