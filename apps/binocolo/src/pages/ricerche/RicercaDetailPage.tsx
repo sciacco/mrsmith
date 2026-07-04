@@ -775,27 +775,57 @@ function ResultsTable({
   onOpen: (target: MATargetRow) => void;
   onRate: (target: MATargetRow, rating: number) => void;
 }) {
+  const [onlyFavorites, setOnlyFavorites] = useState(false);
+  const [hideExcluded, setHideExcluded] = useState(false);
+
   if (loading && rows.length === 0) {
     return <div className={styles.panelBody}><Skeleton rows={8} /></div>;
   }
-  if (rows.length === 0) {
-    return <div className={styles.emptyState}><span className={styles.emptyIcon}><Icon name="file-text" size={28} /></span><strong>Nessun risultato</strong></div>;
-  }
+
+  const filtered = rows.filter((target) => {
+    const rating = target.rating ?? 0;
+    if (hideExcluded && rating === -1) return false;
+    if (onlyFavorites && rating < 1) return false;
+    return true;
+  });
+
   return (
-    <div className={styles.tableWrap}>
-      <table className={styles.table}>
-        <thead>
-          <tr>
-            <th>Azienda</th>
-            <th>Prov.</th>
-            <th>Esito</th>
-            <th>Punteggio</th>
-            <th>Preferenza</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((target) => (
-            <tr key={target.id} className={styles.clickRow} onClick={() => onOpen(target)}>
+    <div>
+      {rows.length > 0 ? (
+        <div className={styles.filterRow}>
+          <button
+            type="button"
+            className={`${styles.filterChip} ${onlyFavorites ? styles.filterChipActive : ''}`}
+            onClick={() => setOnlyFavorites((v) => !v)}
+          >
+            Solo preferiti
+          </button>
+          <button
+            type="button"
+            className={`${styles.filterChip} ${hideExcluded ? styles.filterChipActive : ''}`}
+            onClick={() => setHideExcluded((v) => !v)}
+          >
+            Nascondi esclusi
+          </button>
+        </div>
+      ) : null}
+      {filtered.length === 0 ? (
+        <div className={styles.emptyState}><span className={styles.emptyIcon}><Icon name="file-text" size={28} /></span><strong>Nessun risultato</strong></div>
+      ) : (
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Azienda</th>
+                <th>Prov.</th>
+                <th>Esito</th>
+                <th>Punteggio</th>
+                <th>Preferenza</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((target) => (
+                <tr key={target.id} className={`${styles.clickRow} ${(target.rating ?? 0) === -1 ? styles.rowExcluded : ''}`} onClick={() => onOpen(target)}>
               <td>
                 <span className={styles.cellStack}>
                   <b>{target.companyName}</b>
@@ -846,6 +876,8 @@ function ResultsTable({
           ))}
         </tbody>
       </table>
+    </div>
+      )}
     </div>
   );
 }
