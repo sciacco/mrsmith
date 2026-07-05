@@ -14,6 +14,24 @@
 8. **Non toccare**: scoring v3, routing v3, gate UC2, TargetPage, TestPage. Il registro azienda e le card NON sono mai letti da gate/routing/scoring (PRD §6, §10): effetti solo di presentazione. L'endpoint legacy `POST /sessions/{id}/outcome` e `addTargetOutcome` (ma_service.go:1312) restano funzionanti com'è (D2 li usa).
 9. A fine task: file toccati + comandi di verifica con esito. Mai dichiarare fatto ciò che non è verificato.
 
+## Emendamenti / anomalie emerse (post-approvazione)
+
+### EA-1 — `/azienda` non è il luogo del dossier del flusso MA (2026-07-05)
+
+**Anomalia**: i task F2 e F4 di questo piano, nella loro stesura originale, istruivano di puntare i link "Apri dossier" e "Gestione dal dossier" a `/azienda?vat=`, e di aggiungere le sezioni del registro azienda in `CompanyDossierPage.tsx` (`/azienda`). Questo **contraddice** il PRD §6/§7 (ratifica D-B, 2026-07-02) e l'implementazione reale.
+
+**Fatto accertato sul codice**:
+- `/azienda` (`CompanyDossierPage`, handler `handleGetCompanyDossier`/`handleCreateCompanyDossier` in `handler.go:1393/1408`) è un **tool standalone** per la *quick review di un'azienda qualunque* via P.IVA. È deliberatamente indipendente dal flusso MA: non legge card, non legge iniziativa, non è accoppiato al dossier di lavorazione.
+- Il deep cached company-keyed viene **letto** dal **MA card-dossier** `/iniziative/:id/dossier/:companyKey` (`IniziativaCardDossierPage`), che è autosufficiente (deep + registro + tesi context-scoped + IRL + diario).
+- L'implementazione reale ha **già corretto** l'istruzione del piano: "Apri dossier" naviga a `/iniziative/:id/dossier/:companyKey` (`IniziativaBoardPage.tsx:277`), e il registro vive in `CompanyRegistrySection.tsx` sotto `pages/iniziative/` (consumato dal card-dossier, non da `/azienda`).
+
+**Correzioni al piano** (applicate inline sotto, marker `[EMENDATO EA-1]`):
+- **F2**: "Apri dossier" → naviga `/iniziative/:id/dossier/:companyKey`, NON `/azienda?vat=`.
+- **F4 drawer**: "Gestione dal dossier ↗" → apre il **card-dossier** `/iniziative/:id/dossier/:companyKey`, NON `/azienda`.
+- **F4 sezioni registro**: si aggiungono in **`IniziativaCardDossierPage`** (`apps/binocolo/src/pages/iniziative/`), NON in `CompanyDossierPage.tsx`.
+
+**Conseguenza cross-workstream**: nessun link al flusso MA deve puntare a `/azienda` aspettandosi il dossier di lavorazione o il deep cached. `/azienda` resta solo quick review standalone via P.IVA. Il workstream Target Inspector (DX) è stato corretto di conseguenza.
+
 ## Ordine di esecuzione e dipendenze
 
 ```
@@ -142,9 +160,9 @@ F1 dopo B1 · F2 dopo B4+B6 · F3 dopo B4+B3 · F4 dopo B3 · F5 dopo B1+B5
 
 **Passi**:
 1. **IniziativaBoardPage** (`/iniziative/:id`): header (titolo, descrizione, chips ricerche agganciate + "+ Aggancia ricerca" → modal con le sessioni non agganciate via `GET /ma/sessions` + `POST /sessions/{id}/initiative`), toggle Kanban|Tabella (**viste indipendenti**, filtri propri — PRD §8).
-2. **Kanban (S2)**: 6 colonne a larghezza fissa (~240px), board a scroll orizzontale, colonne collassabili a rail verticale (nome+conteggio); vuote e "Chiusa" nascono collassate; stato di collasso in localStorage per utente. Card: nome, provincia, badge registro (`registryFacts`), marker collisione (`collisions`), bottone dossier a 3 stati (`dossierStatus`: none → "Avvia analisi completa" → conferma senza cifre → POST B6; working → "Analisi in corso…" pulse; ready → "Apri dossier" → naviga `/azienda?vat=`). Drag tra colonne → `POST .../state` (drop su "Chiusa" apre il flusso F3). Colonna Chiusa: card compatte con pill esito.
+2. **Kanban (S2)**: 6 colonne a larghezza fissa (~240px), board a scroll orizzontale, colonne collassabili a rail verticale (nome+conteggio); vuote e "Chiusa" nascono collassate; stato di collasso in localStorage per utente. Card: nome, provincia, badge registro (`registryFacts`), marker collisione (`collisions`), bottone dossier a 3 stati (`dossierStatus`: none → "Avvia analisi completa" → conferma senza cifre → POST B6; working → "Analisi in corso…" pulse; ready → "Apri dossier" → naviga `/iniziative/:id/dossier/:companyKey`) **[EMENDATO EA-1: originariamente `/azienda?vat=`, errore. `/azienda` è tool standalone, non accoppiato a MA — vedi Emendamenti in cima]**. Drag tra colonne → `POST .../state` (drop su "Chiusa" apre il flusso F3). Colonna Chiusa: card compatte con pill esito.
 3. **Tabella (S3)**: colonne Azienda / Prov. / Stato / Dossier / Registro / Ultima attività; filtri Stato + Esito + ricerca testuale, indipendenti dal kanban.
-4. **Drawer card (S4)**: selettore stato (pill; "Chiusa…" apre F3), marker collisione, provenienze (sessione + stelle + score al momento), scheda azienda read-only (badge fatti + ultima nota + link "Gestione dal dossier ↗" → `/azienda?vat=`), azione analisi, diario (timeline eventi da `GET .../events` con autore/data) + composer nota di diario → `POST .../cards/{companyKey}/note` (B4 passo 7).
+4. **Drawer card (S4)**: selettore stato (pill; "Chiusa…" apre F3), marker collisione, provenienze (sessione + stelle + score al momento), scheda azienda read-only (badge fatti + ultima nota + link "Gestione dal dossier ↗" → `/iniziative/:id/dossier/:companyKey`) **[EMENDATO EA-1: originariamente `/azienda?vat=`, errore]**, azione analisi, diario (timeline eventi da `GET .../events` con autore/data) + composer nota di diario → `POST .../cards/{companyKey}/note` (B4 passo 7).
 5. Polling del board ogni 5s SOLO quando esiste almeno una card con `dossierStatus === 'working'`; altrimenti niente polling.
 
 **Verifica**: tsc + smoke read-only sull'iniziativa di prova di F1 (kanban, collasso colonne, tabella, drawer; nessuna azione di spesa).
@@ -161,7 +179,7 @@ F1 dopo B1 · F2 dopo B4+B6 · F3 dopo B4+B3 · F4 dopo B3 · F5 dopo B1+B5
 
 ## F4 — Registro azienda nel dossier (wireframe S6) — dipende da B3
 
-**Contesto verificato**: `CompanyDossierPage.tsx` (`/azienda?vat=`) è la pagina dossier esistente — aggiungere sezioni, non ristrutturarla.
+**Contesto verificato** **[EMENDATO EA-1]**: la sede corretta è `IniziativaCardDossierPage.tsx` (`apps/binocolo/src/pages/iniziative/IniziativaCardDossierPage.tsx`, rotta `/iniziative/:id/dossier/:companyKey`). La stesura originale citava `CompanyDossierPage.tsx` (`/azienda`): **errore** — `/azienda` è tool standalone indipendente da MA (ratifica D-B). Il registro si scrive SOLO dal card-dossier (PRD §6). Implementazione reale già allineata: `CompanyRegistrySection.tsx` sotto `pages/iniziative/`.
 
 **Passi**:
 1. Sezione "Registro azienda": fatti attivi (badge + nota + autore/data + "Revoca" con conferma), storico revocati dietro un toggle sobrio; "+ Registra fatto" → menu dei 5 tipi + nota → POST.

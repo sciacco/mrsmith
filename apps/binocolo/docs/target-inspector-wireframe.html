@@ -1,0 +1,1066 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Binocolo — Wireframe Target Inspector</title>
+<style>
+  :root{
+    --ink:#0f172a; --ink-2:#475569; --muted:#94a3b8; --faint:#cbd5e1;
+    --border:#e2e8f0; --border-soft:#f0f3f7;
+    --accent:#635bff; --accent-2:#7c6cff;
+    --accent-subtle:rgba(99,91,255,.08); --accent-muted:rgba(99,91,255,.15); --accent-glow:rgba(99,91,255,.25);
+    --danger:#ef4444; --danger-strong:#b91c1c; --danger-subtle:rgba(239,68,68,.08);
+    --warn:#f59e0b; --warn-strong:#b45309; --warn-subtle:rgba(245,158,11,.12);
+    --ok:#10b981; --ok-bg:#ecfdf5;
+    --info-strong:#075985; --info-subtle:rgba(14,116,144,.10);
+    --inspect:#7c3aed; --inspect-2:#9b5cff;
+    --inspect-subtle:rgba(124,58,237,.08); --inspect-muted:rgba(124,58,237,.18); --inspect-glow:rgba(124,58,237,.25);
+    --doc-bg:#eef1f6; --doc-ink:#1e293b;
+    --sans:"DM Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    --mono:"JetBrains Mono","SF Mono",ui-monospace,Menlo,monospace;
+    --r-sm:6px; --r-md:10px; --r-lg:14px; --r-xl:20px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--doc-bg);color:var(--doc-ink);font:400 15px/1.55 var(--sans)}
+
+  /* ---------- review-document chrome ---------- */
+  .doc{max-width:1140px;margin:0 auto;padding:40px 24px 96px}
+  .doc-head{margin-bottom:8px}
+  .doc-head .eyebrow{font:600 11px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2)}
+  .doc-head h1{margin:10px 0 6px;font-size:1.75rem;font-weight:700;letter-spacing:-.04em;color:var(--ink);text-wrap:balance}
+  .doc-head p{margin:0;max-width:68ch;color:var(--ink-2)}
+  .legend{display:flex;gap:16px;align-items:center;margin:18px 0 0;font-size:.8125rem;color:var(--ink-2);flex-wrap:wrap}
+  .legend .m{margin-right:2px}
+  .legend .hide-chip{display:inline-flex;align-items:center;gap:5px;font:700 10px/1 var(--mono);letter-spacing:.08em;
+    text-transform:uppercase;padding:3px 7px;border-radius:5px;background:#f1f5f9;color:var(--muted);border:1px solid var(--border)}
+  .legend .hide-chip i{width:6px;height:6px;border-radius:50%;background:var(--muted)}
+
+  .statenav{position:sticky;top:0;z-index:20;display:flex;gap:8px;flex-wrap:wrap;padding:12px 0;margin:20px 0 8px;
+    background:linear-gradient(180deg,var(--doc-bg) 78%,rgba(238,241,246,0))}
+  .statenav a{font:600 12px/1 var(--mono);letter-spacing:.04em;text-decoration:none;color:var(--ink-2);
+    padding:8px 12px;border:1px solid var(--border);border-radius:999px;background:#fff}
+  .statenav a:hover{border-color:var(--inspect);color:var(--inspect)}
+  .statenav a:focus-visible{outline:2px solid var(--inspect);outline-offset:2px}
+
+  section.state{margin:48px 0 0}
+  .state-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  .state-head .sid{font:700 12px/1 var(--mono);letter-spacing:.1em;color:#fff;background:var(--inspect);
+    padding:6px 10px;border-radius:6px}
+  .state-head h2{margin:0;font-size:1.15rem;font-weight:700;letter-spacing:-.02em;color:var(--ink)}
+  .state-head .ref{font:500 11px/1 var(--mono);color:var(--muted)}
+  .state-intent{margin:8px 0 16px;max-width:78ch;color:var(--ink-2);font-size:.875rem}
+
+  /* ---------- annotation markers & notes ---------- */
+  .m{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;
+    background:var(--ink);color:#fff;font:700 10.5px/1 var(--mono);vertical-align:2px;flex:none}
+  .notes{margin:14px 0 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:10px 22px;padding:0;list-style:none}
+  .notes li{display:flex;gap:9px;font-size:.8125rem;color:var(--ink-2)}
+  .notes li .m{margin-top:1px}
+  .notes li b{color:var(--ink);font-weight:600}
+  .notes li .ref{font:500 10.5px/1.5 var(--mono);color:var(--muted);white-space:nowrap}
+
+  /* ---------- viewport frame ---------- */
+  .frame{background:#fff;border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;
+    box-shadow:0 10px 24px -14px rgba(15,23,42,.18)}
+  .frame-bar{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border-soft);background:#fbfcfe}
+  .frame-bar .dots{display:flex;gap:5px}
+  .frame-bar .dots i{width:9px;height:9px;border-radius:50%;background:var(--faint)}
+  .frame-bar .url{font:500 11px/1 var(--mono);color:var(--muted);background:#fff;border:1px solid var(--border-soft);
+    border-radius:999px;padding:5px 12px}
+
+  /* ---------- clean-theme app inside frames (full-width inspector) ---------- */
+  .app{background:
+      radial-gradient(circle at top left, rgba(124,58,237,.05), transparent 28%),
+      linear-gradient(180deg,#f8fafc 0%,#eef2ff 100%);
+    color:var(--ink)}
+  .app-head{display:flex;align-items:center;gap:10px;padding:0 22px;height:52px;background:rgba(255,255,255,.85);
+    border-bottom:1px solid var(--border)}
+  .app-logo{width:26px;height:26px;border-radius:7px;background:var(--accent);color:#fff;display:flex;
+    align-items:center;justify-content:center;font:700 13px/1 var(--sans)}
+  .app-name{font-weight:700;font-size:.9375rem}
+  .app-back{margin-left:14px;font-size:.8125rem;color:var(--ink-2)}
+  .app-back b{color:var(--accent);font-weight:600}
+  .app-user{margin-left:auto;font-size:.8125rem;color:var(--muted)}
+
+  /* inspector banner */
+  .inspect-banner{display:flex;align-items:center;gap:12px;padding:11px 22px;background:var(--inspect-subtle);
+    border-bottom:1px solid var(--inspect-muted);color:#5b21b6;font-size:.8125rem}
+  .inspect-banner .ib-ico{width:22px;height:22px;border-radius:6px;background:var(--inspect);color:#fff;
+    display:flex;align-items:center;justify-content:center;font:700 12px/1 var(--mono);flex:none}
+  .inspect-banner b{color:#4c1d95;font-weight:700}
+  .inspect-banner .ib-link{margin-left:auto;font-weight:600;color:var(--inspect);text-decoration:none}
+  .inspect-banner .ib-link:hover{text-decoration:underline}
+
+  /* inspector body — full width (no max-720 here) */
+  .app-body{padding:22px 28px 36px;display:flex;flex-direction:column;gap:16px}
+
+  /* target identity header */
+  .ident{display:flex;align-items:flex-start;gap:18px;flex-wrap:wrap}
+  .ident .ident-main{flex:1;min-width:280px}
+  .ident h1{margin:0;font-size:1.5rem;font-weight:700;letter-spacing:-.03em;color:var(--ink)}
+  .ident .ident-meta{margin-top:6px;display:flex;gap:10px;flex-wrap:wrap;font-size:.8125rem;color:var(--ink-2)}
+  .ident .ident-meta b{color:var(--ink);font-weight:600}
+  .ident .ident-pills{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .bkt{display:inline-flex;padding:5px 11px;border-radius:999px;font-size:.6875rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+  .bkt-pr{background:var(--accent-subtle);color:var(--accent);border:1px solid var(--accent-muted)}
+  .bkt-dv{background:var(--warn-subtle);color:var(--warn-strong)}
+  .bkt-az{background:var(--accent-subtle);color:var(--accent)}
+  .bkt-so{background:#f1f5f9;color:var(--muted)}
+  .conf{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;font-size:.6875rem;
+    font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:#f1f5f9;color:var(--ink-2)}
+  .conf.med{background:var(--warn-subtle);color:var(--warn-strong)}
+  .conf.high{background:var(--ok-bg);color:#047857}
+  .conf.low{background:var(--danger-subtle);color:var(--danger-strong)}
+
+  .score-block{display:flex;flex-direction:column;align-items:flex-end;gap:4px;padding:10px 18px;border-radius:var(--r-md);
+    background:#fff;border:1px solid var(--border)}
+  .score-block .score-n{font-size:2rem;font-weight:700;letter-spacing:-.03em;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1}
+  .score-block .score-sub{font:500 10.5px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+
+  /* tabs */
+  .tabs{display:flex;gap:6px;border-bottom:1px solid var(--border);margin-top:6px;overflow-x:auto}
+  .tab{padding:11px 14px;font-size:.8125rem;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;
+    white-space:nowrap;border-radius:8px 8px 0 0}
+  .tab.on{color:var(--inspect);border-bottom-color:var(--inspect);background:var(--inspect-subtle)}
+  .tab .tnum{font:700 10px/1 var(--mono);color:var(--muted);margin-right:6px}
+  .tab.on .tnum{color:var(--inspect)}
+
+  /* generic card & helpers */
+  .card{background:#fff;border:1px solid var(--border);border-radius:var(--r-lg);padding:18px 20px}
+  .card.compact{padding:14px 18px}
+  .card h3{margin:0 0 4px;font-size:.9375rem;font-weight:700;color:var(--ink)}
+  .card .sub{margin:0 0 14px;font-size:.8125rem;color:var(--muted)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  @media (max-width:880px){.grid2,.grid3{grid-template-columns:1fr}}
+  .kv{display:grid;grid-template-columns:160px 1fr;gap:6px 14px;font-size:.8125rem;align-items:baseline}
+  .kv dt{color:var(--muted);font-weight:500}
+  .kv dd{margin:0;color:var(--ink);font-weight:600}
+  .kv dd.mono,.mono{font:500 12px/1.5 var(--mono);color:var(--ink-2)}
+  .lab{display:flex;align-items:center;gap:7px;font-size:.75rem;font-weight:600;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--ink-2);margin:0 0 8px}
+
+  /* hidden-in-prod marker — the curation map. Discreto: puntino + title nativo. */
+  .hide{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--muted);
+    vertical-align:1px;margin-left:6px;cursor:help;border:1px solid var(--border)}
+
+  .rationale{padding:12px 14px;border-radius:var(--r-md);background:var(--info-subtle);color:var(--info-strong);
+    font-size:.875rem;line-height:1.55}
+  .rationale b{font-weight:600}
+
+  /* evidence table */
+  table.ev{width:100%;border-collapse:collapse;font-size:.8125rem}
+  table.ev th{font:600 10px/1.4 var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+    text-align:left;padding:9px 10px;border-bottom:1px solid var(--border)}
+  table.ev td{padding:10px;border-bottom:1px solid var(--border-soft);color:var(--ink-2);vertical-align:top}
+  table.ev td.label{color:var(--ink);font-weight:600}
+  table.ev td.num{font-variant-numeric:tabular-nums;text-align:right}
+  .stmatch{display:inline-flex;align-items:center;gap:6px;font:600 10px/1 var(--mono);letter-spacing:.06em;
+    text-transform:uppercase;padding:4px 8px;border-radius:5px}
+  .stmatch.m{background:var(--ok-bg);color:#047857}
+  .stmatch.p{background:var(--warn-subtle);color:var(--warn-strong)}
+  .stmatch.x{background:var(--danger-subtle);color:var(--danger-strong)}
+  .stmatch.o{background:#f1f5f9;color:var(--muted)}
+  .srcpath{font:500 10px/1.5 var(--mono);color:var(--muted)}
+  .recon{display:flex;gap:8px;align-items:center;font-size:.75rem;color:var(--ink-2);margin-top:4px}
+  .recon .bar{flex:1;height:6px;border-radius:999px;background:var(--border-soft);overflow:hidden;max-width:120px}
+  .recon .bar i{display:block;height:100%;background:var(--accent)}
+
+  /* adjustments & flags */
+  .rows-list{display:flex;flex-direction:column;gap:10px}
+  .rowline{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--border-soft);
+    border-radius:var(--r-md);background:#fbfcfe}
+  .rowline .rl-main{font-size:.875rem;color:var(--ink);font-weight:600}
+  .rowline .rl-sub{font-size:.75rem;color:var(--muted);margin-top:2px}
+  .rowline .rl-val{font:700 12px/1 var(--mono);color:var(--danger-strong);
+    background:var(--danger-subtle);padding:6px 10px;border-radius:6px}
+  .rowline.warn{background:var(--warn-subtle);border-color:rgba(245,158,11,.25)}
+  .rowline.warn .rl-val{color:var(--warn-strong);background:#fff}
+  .rowline.neutral .rl-val{color:var(--ink-2);background:#fff}
+  .missing{display:flex;flex-wrap:wrap;gap:7px}
+  .missing .mchip{font-size:.8125rem;padding:6px 11px;border-radius:999px;background:#fff;border:1px dashed var(--faint);color:var(--ink-2)}
+
+  /* web validation grid */
+  .wv-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 22px;font-size:.8125rem}
+  @media (max-width:880px){.wv-grid{grid-template-columns:1fr}}
+  .wv-grid .wv-cell{display:flex;flex-direction:column;gap:3px}
+  .wv-grid .wv-k{font:600 10px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .wv-grid .wv-v{color:var(--ink);font-weight:600}
+  .wv-grid .wv-v.mono{font:500 12px/1.5 var(--mono);color:var(--ink-2);font-weight:400}
+  .fresh{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:999px;font:600 10.5px/1 var(--mono);
+    letter-spacing:.04em;text-transform:uppercase}
+  .fresh.fresh{background:var(--ok-bg);color:#047857}
+  .fresh.stale{background:var(--warn-subtle);color:var(--warn-strong)}
+  .fresh.expired{background:var(--danger-subtle);color:var(--danger-strong)}
+
+  .keywordset{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .keywordset .kw{font:500 11px/1 var(--mono);padding:4px 8px;border-radius:5px;background:var(--accent-subtle);
+    color:var(--accent);border:1px solid var(--accent-muted)}
+  .json-block{font:500 11.5px/1.6 var(--mono);color:var(--ink-2);background:#0f172a;color:#cbd5e1;padding:14px 16px;
+    border-radius:var(--r-md);overflow:auto;max-height:280px;white-space:pre}
+  .json-block .k{color:#93c5fd}
+  .json-block .s{color:#86efac}
+  .json-block .n{color:#fcd34d}
+
+  /* deep scorecard */
+  .rag{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;font:700 10.5px/1 var(--mono);
+    letter-spacing:.04em;text-transform:uppercase}
+  .rag.green{background:var(--ok-bg);color:#047857}
+  .rag.amber{background:var(--warn-subtle);color:var(--warn-strong)}
+  .rag.red{background:var(--danger-subtle);color:var(--danger-strong)}
+  .rag.na{background:#f1f5f9;color:var(--muted)}
+  .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  @media (max-width:880px){.metrics{grid-template-columns:1fr 1fr}}
+  .metric{padding:12px 14px;border:1px solid var(--border-soft);border-radius:var(--r-md);background:#fbfcfe}
+  .metric .mg{font:600 9.5px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .metric .ml{font-size:.8125rem;color:var(--ink);font-weight:600;margin-top:4px}
+  .metric .mv{font-size:1.05rem;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;margin-top:4px}
+  .metric.contorno{opacity:.7}
+  .metric.contorno .ml::after{content:" · contorno";font-weight:400;color:var(--muted);font-size:.7rem}
+
+  .val-block{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;padding:14px;border:1px solid var(--border-soft);
+    border-radius:var(--r-md);background:#fbfcfe}
+  .val-block .vb-range{font-size:1.6rem;font-weight:700;letter-spacing:-.02em;color:var(--ink);font-variant-numeric:tabular-nums}
+  .val-block .vb-range small{font-size:.875rem;color:var(--ink-2);font-weight:500}
+  .val-block .vb-meta{font-size:.75rem;color:var(--muted);line-height:1.6}
+  .bridge{display:grid;grid-template-columns:1fr auto;gap:6px 14px;font-size:.8125rem;margin-top:8px;font-variant-numeric:tabular-nums}
+  .bridge .bk{color:var(--muted)}
+  .bridge .bv{color:var(--ink);font-weight:600;text-align:right}
+  .bridge .bv.eq{color:#047857;border-top:1px solid var(--border);padding-top:6px;margin-top:4px}
+
+  .brief-section{display:flex;flex-direction:column;gap:14px}
+  .brief-para{font-size:.875rem;line-height:1.6;color:var(--ink-2)}
+  .brief-list{display:flex;flex-direction:column;gap:7px;margin:0;padding:0;list-style:none}
+  .brief-list li{font-size:.8125rem;color:var(--ink-2);padding-left:16px;position:relative}
+  .brief-list li::before{content:"";position:absolute;left:0;top:8px;width:6px;height:6px;border-radius:50%;background:var(--accent)}
+  .brief-list.red li::before{background:var(--danger)}
+  .ddq{display:flex;flex-direction:column;gap:6px;margin:0;padding:0;list-style:none}
+  .ddq li{font-size:.8125rem;color:var(--ink);padding:9px 12px;border:1px solid var(--border-soft);border-radius:var(--r-md);background:#fbfcfe}
+
+  /* tesi caveat box */
+  .tesis-caveat{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:var(--r-md);
+    background:var(--info-subtle);color:var(--info-strong);font-size:.8125rem;line-height:1.55}
+  .tesis-caveat .tc-ico{flex:none;width:20px;height:20px;border-radius:6px;background:var(--info-strong);color:#fff;
+    display:flex;align-items:center;justify-content:center;font:700 11px/1 var(--mono)}
+  .dossier-link{display:inline-flex;align-items:center;gap:8px;margin-top:10px;padding:9px 14px;border-radius:999px;
+    background:var(--inspect-subtle);border:1px solid var(--inspect-muted);color:var(--inspect);font-weight:600;font-size:.8125rem;text-decoration:none}
+
+  /* raw json viewer (tab 6 + tab 9) */
+  .raw-toggle{display:flex;gap:8px;align-items:center;font-size:.75rem;color:var(--muted);margin-bottom:8px}
+  .raw-toggle .rt-btn{font:600 11px/1 var(--mono);padding:5px 10px;border-radius:6px;background:#fff;border:1px solid var(--border);color:var(--ink-2)}
+  .raw-toggle .rt-btn.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+  /* provenance */
+  .prov-list{display:flex;flex-direction:column;gap:0}
+  .prov-item{display:grid;grid-template-columns:170px 1fr;gap:10px;padding:10px 0;border-bottom:1px solid var(--border-soft);font-size:.8125rem}
+  .prov-item:last-child{border-bottom:none}
+  .prov-item .pk{color:var(--muted)}
+  .prov-item .pv{color:var(--ink);font-weight:600}
+  .prov-item .pv.mono{font:500 12px/1.5 var(--mono);color:var(--ink-2);font-weight:400}
+
+  /* rating & registry mirror */
+  .rating-stars{color:var(--warn);font-size:1.05rem;letter-spacing:2px}
+  .rating-stars .off{color:var(--faint)}
+  .outcomes{display:flex;flex-direction:column;gap:8px}
+  .outcome{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:9px 12px;
+    border:1px solid var(--border-soft);border-radius:var(--r-md);background:#fbfcfe;font-size:.8125rem}
+  .outcome .od{font:600 11px/1 var(--mono);color:var(--muted)}
+  .outcome .ot{color:var(--ink)}
+  .outcome .ob{font:600 10px/1 var(--mono);padding:4px 8px;border-radius:5px;background:#fff;color:var(--ink-2);border:1px solid var(--border)}
+  .facts{display:flex;flex-wrap:wrap;gap:8px}
+  .fact{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;font-size:.8125rem;font-weight:600}
+  .fact.warn{background:var(--warn-subtle);color:var(--warn-strong)}
+  .fact.info{background:var(--info-subtle);color:var(--info-strong)}
+
+  .footer-note{margin-top:64px;padding-top:18px;border-top:1px solid var(--border);font-size:.8125rem;color:var(--muted);max-width:72ch}
+  @media (prefers-reduced-motion:no-preference){
+    section.state{animation:rise .5s cubic-bezier(.16,1,.3,1) both}
+    @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  }
+</style>
+</head>
+<body>
+<div class="doc">
+  <header class="doc-head">
+    <span class="eyebrow">Binocolo · Workstream DX · TARGET-INSPECTOR-PLAN.md — iterazione 1</span>
+    <h1>Wireframe — Target Inspector</h1>
+    <p>Mid-fidelity sul clean theme di <code style="font:500 12px var(--mono)">docs/UI-UX.md</code>. Route <code style="font:500 12px var(--mono)">/ricerche/:id/target/:targetId/inspect</code>, session-scoped, read-only. Superficie di scoperta: non analista. Banner viola esplicito. 8 tab T1–T8. Target di esempio: ricerca completata, deep pronto.</p>
+    <div class="legend">
+      <span><span class="m">1</span> = nota di review ancorata al PRD — non fa parte della UI.</span>
+      <span><span class="hide" style="vertical-align:-2px"></span> = campo prodotto dalla pipeline, oggi NON surfaced all'analista — mappa diretta della curation Fase 1. Hover per il tooltip.</span>
+    </div>
+  </header>
+
+  <nav class="statenav" aria-label="Sezioni">
+    <a href="#chrome">Chrome &amp; Header</a>
+    <a href="#t1">T1 · Sintesi</a>
+    <a href="#t2">T2 · Punteggio</a>
+    <a href="#t3">T3 · Web validation</a>
+    <a href="#t4">T4 · Deep-dive</a>
+    <a href="#t5">T5 · Tesi</a>
+    <a href="#t6">T6 · Provenienza</a>
+    <a href="#t7">T7 · Registro &amp; rating</a>
+    <a href="#t8">T8 · JSON grezzo</a>
+  </nav>
+
+  <!-- ============ CHROME & HEADER ============ -->
+  <section class="state" id="chrome">
+    <div class="state-head">
+      <span class="sid">CHROME</span>
+      <h2>Header, banner modalità ispezione, identità target, tab bar</h2>
+      <span class="ref">PRD §2.1 · banner fisso · 8 tab fissi · identità + score sempre visibili</span>
+    </div>
+    <p class="state-intent">L'inspector è una rotta dedicata aperta in nuova tab. Il banner viola "Modalità ispezione" è la dichiarazione onesta che questa non è una superficie analista. L'header di target (nome, anagrafica, bucket, confidence, score) è fisso sopra la tab bar, così il contesto non si perde fra tab.</p>
+
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dots"><i></i><i></i><i></i></span>
+        <span class="url">/ricerche/s_8f3…/target/t_21c…/inspect</span>
+      </div>
+      <div class="app">
+        <div class="app-head">
+          <span class="app-logo">B</span>
+          <span class="app-name">Binocolo</span>
+          <span class="app-back">← <b>Ricerca · MSP Nord-Est 2026</b></span>
+          <span class="app-user">m.rossi@mrsmith</span>
+        </div>
+
+        <div class="inspect-banner">
+          <span class="ib-ico">!</span>
+          <span><b>Modalità ispezione.</b> Superficie di scoperta, non analista: dati grezzi e tecnici visibili. Read-only.</span>
+          <a class="ib-link" href="#">Apri in nuova tab ↗</a>
+        </div>
+
+        <div class="app-body">
+          <div class="ident">
+            <div class="ident-main">
+              <h1>Logistica Smart S.r.l. <span class="hide" title="activityStatus — oggi non visibile all’analista"></span></h1>
+              <div class="ident-meta">
+                <span>P.IVA <b>0478…231</b></span>
+                <span>·</span>
+                <span>C.F. <b>0478…231</b></span>
+                <span>·</span>
+                <span>Milano (MI)</span>
+                <span>·</span>
+                <span>ATECO <b>62.01</b> — Produzione di software non connesso alla consulenza</span>
+              </div>
+              <div class="ident-pills" style="margin-top:12px">
+                <span class="bkt bkt-pr">In tesi</span>
+                <span class="conf med">Confidence media <span class="hide" title="confidence — oggi non visibile all’analista"></span></span>
+                <span class="conf">match_parziale <span class="hide" title="matchState — oggi non visibile all’analista"></span></span>
+                <span class="conf">advanced <span class="hide" title="enrichmentLevel — oggi non visibile all’analista"></span></span>
+              </div>
+            </div>
+            <div class="score-block">
+              <span class="score-n">72</span>
+              <span class="score-sub">score Â· v3 <span class="hide" title="scoreVersion — oggi non visibile all’analista"></span></span>
+            </div>
+          </div>
+
+          <div class="tabs" role="tablist">
+            <span class="tab on"><span class="tnum">T1</span>Sintesi</span>
+            <span class="tab"><span class="tnum">T2</span>Punteggio</span>
+            <span class="tab"><span class="tnum">T3</span>Web validation</span>
+            <span class="tab"><span class="tnum">T4</span>Deep-dive</span>
+            <span class="tab"><span class="tnum">T5</span>Tesi</span>
+            <span class="tab"><span class="tnum">T6</span>Provenienza</span>
+            <span class="tab"><span class="tnum">T7</span>Registro &amp; rating</span>
+            <span class="tab"><span class="tnum">T8</span>JSON</span>
+          </div>
+
+          <!-- placeholder body of T1 shown below in #t1 -->
+          <div style="font-size:.8125rem;color:var(--muted);padding:8px 2px">[… corpo del tab attivo — vedi T1 …]</div>
+        </div>
+      </div>
+    </div>
+
+    <ul class="notes">
+      <li><span class="m">1</span><div><b>Banner sempre presente.</b> Copy: "Modalità ispezione. Superficie di scoperta, non analista." Il colore viola separa visivamente dalle altre rotte Binocolo (accent blu). <span class="ref">PRD §2.1</span></div></li>
+      <li><span class="m">2</span><div><b>IdentitÃ  + score fissi sopra i tab.</b> CosÃ¬ bucket, confidence e punteggio restano contesto mentre si scorrono i tab. Il chip <span class="hide" title="nascosto — oggi non visibile all’analista"></span> marca ciÃ² che l'analista non vede oggi. <span class="ref">PRD Â§3.1</span></div></li>
+      <li><span class="m">3</span><div><b>8 tab fissi.</b> Nessun accordion, nessun master-detail: l'inspector è piatto e onesto. T8 JSON proposto in v0. <span class="ref">PRD §3.8 · APERTO</span></div></li>
+    </ul>
+  </section>
+
+  <!-- ============ T1 SINTESI ============ -->
+  <section class="state" id="t1">
+    <div class="state-head">
+      <span class="sid">T1</span>
+      <h2>Sintesi</h2>
+      <span class="ref">PRD §3.1 · score, bucket, rationale, freshness, CTA dossier</span>
+    </div>
+    <p class="state-intent">In 10 secondi: cos'è, dov'è stata collocata dal gate, quanto è solido il punteggio, quanto è fresca l'evidenza web, e dov'è il dossier completo. È il candidato naturale a diventare il "curato" dell'analista in Fase 1.</p>
+
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dots"><i></i><i></i><i></i></span>
+        <span class="url">/ricerche/s_8f3…/target/t_21c…/inspect</span>
+      </div>
+      <div class="app">
+        <div class="app-body" style="padding-top:18px">
+          <div class="rationale">
+            <b>Rationale del gate.</b> Aderente al perimetro "system integrator logistica", fatturato in banda (3,4 M€), titolare 64enne. Penalizzata dal criterion dipendenti (parziale: 8 vs soglia 10) e da un fattore di viability 0,85 per controllo holding.
+          </div>
+
+          <div class="grid3">
+            <div class="card compact">
+              <p class="lab">Numeri struttura</p>
+              <dl class="kv">
+                <dt>Fatturato</dt><dd>3,4 M€ <small style="color:var(--muted)">(2024)</small></dd>
+                <dt>Dipendenti</dt><dd>8</dd>
+                <dt>Stato attivitÃ </dt><dd>Registrata <span class="hide" title="activityStatus — oggi non visibile all’analista"></span></dd>
+              </dl>
+            </div>
+            <div class="card compact">
+              <p class="lab">Web validation</p>
+              <dl class="kv">
+                <dt>Dominio</dt><dd class="mono">logisticasmart.it</dd>
+                <dt>Freshness</dt><dd><span class="fresh fresh">fresh</span> <span class="hide" title="freshness — oggi non visibile all’analista"></span></dd>
+                <dt>Stato</dt><dd>keep</dd>
+              </dl>
+            </div>
+            <div class="card compact">
+              <p class="lab">Deep-dive</p>
+              <dl class="kv">
+                <dt>Stato</dt><dd><span class="rag green">ready</span></dd>
+                <dt>RAG overall</dt><dd><span class="rag amber">amber</span></dd>
+                <dt>Banda equity</dt><dd>1,8 – 2,4 M€</dd>
+              </dl>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            <a class="dossier-link" href="#" style="margin-top:0">Apri dossier ↗ <small style="font-weight:400;color:var(--muted)">nell'iniziativa «MSP Nord-Est 2026»</small></a>
+            <span style="font-size:.75rem;color:var(--muted)">La lettura di tesi context-scoped vive nel dossier.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <ul class="notes">
+      <li><span class="m">1</span><div><b>Rationale in evidenza.</b> Oggi è nel modal come fallback di <code>finalDecision.reason</code>; qui è il pezzo forte della Sintesi. <span class="ref">PRD §3.1</span></div></li>
+      <li><span class="m">2</span><div><b>Freshness come segnale di prima classe.</b> Oggi nascosta: promuoverla è candidato ovvio della Fase 1. <span class="ref">PRD §3.1 🔒</span></div></li>
+    </ul>
+  </section>
+
+  <!-- ============ T2 PUNTEGGIO ============ -->
+  <section class="state" id="t2">
+    <div class="state-head">
+      <span class="sid">T2</span>
+      <h2>Punteggio — il "perché"</h2>
+      <span class="ref">PRD §3.2 · evidence[] · adjustments[] · flags[] · missingCriteria[]</span>
+    </div>
+    <p class="state-intent">Ricostruire a occhio <code style="font:500 12px var(--mono)">score = Σ(points) × Π(factor)</code>. È il tab più "rivelatore": ogni criterion con status, value, points, weight, sourcePath; i fattori moltiplicativi; i flag non-scoring; cosa manca per il match pieno.</p>
+
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dots"><i></i><i></i><i></i></span>
+        <span class="url">/ricerche/s_8f3…/target/t_21c…/inspect</span>
+      </div>
+      <div class="app">
+        <div class="app-body" style="padding-top:18px">
+
+          <div class="card">
+            <h3>Composizione del punteggio</h3>
+            <p class="sub">8 criteri attivi su 100 punti di budget, poi due fattori moltiplicativi. 85 × 0,85 = 72.</p>
+            <table class="ev">
+              <thead><tr>
+                <th>Criterion</th><th>Stato</th><th>Value</th><th class="num">Points</th><th class="num">Weight</th><th>Source</th>
+              </tr></thead>
+              <tbody>
+                <tr>
+                  <td class="label">Ambito: system integrator logistica</td>
+                  <td><span class="stmatch m">match</span></td>
+                  <td class="mono">62.01 + keyword match</td>
+                  <td class="num">22,0</td><td class="num">22,0</td>
+                  <td><span class="srcpath">ateco + kw[logistica,magazzino]</span></td>
+                </tr>
+                <tr>
+                  <td class="label">Territorio: Nord-Est</td>
+                  <td><span class="stmatch m">match</span></td>
+                  <td class="mono">MI</td>
+                  <td class="num">15,0</td><td class="num">15,0</td>
+                  <td><span class="srcpath">province</span></td>
+                </tr>
+                <tr>
+                  <td class="label">Fatturato in banda 1–5 M€</td>
+                  <td><span class="stmatch m">match</span></td>
+                  <td class="mono">3.400.000</td>
+                  <td class="num">18,0</td><td class="num">18,0</td>
+                  <td><span class="srcpath">vendor.turnover[2024]</span></td>
+                </tr>
+                <tr>
+                  <td class="label">Dipendenti ≥ 10</td>
+                  <td><span class="stmatch p">parziale</span></td>
+                  <td class="mono">8</td>
+                  <td class="num">8,0</td><td class="num">12,0</td>
+                  <td><span class="srcpath">vendor.employees</span></td>
+                </tr>
+                <tr>
+                  <td class="label">Ricavo/dipendente ≥ 80 k€</td>
+                  <td><span class="stmatch m">match</span></td>
+                  <td class="mono">425.000</td>
+                  <td class="num">12,0</td><td class="num">12,0</td>
+                  <td><span class="srcpath">derived: turnover/employees</span></td>
+                </tr>
+                <tr>
+                  <td class="label">Forma giuridica SRL/SPA</td>
+                  <td><span class="stmatch m">match</span></td>
+                  <td class="mono">SRL</td>
+                  <td class="num">5,0</td><td class="num">5,0</td>
+                  <td><span class="srcpath">vendor.legalForm</span></td>
+                </tr>
+                <tr>
+                  <td class="label">Età titolare ≥ 60 (successione)</td>
+                  <td><span class="stmatch m">match</span></td>
+                  <td class="mono">64</td>
+                  <td class="num">5,0</td><td class="num">5,0</td>
+                  <td><span class="srcpath">vendor.shareholders[0].birthYear</span></td>
+                </tr>
+                <tr>
+                  <td class="label">Non web agency</td>
+                  <td><span class="stmatch m">match</span></td>
+                  <td class="mono">esclusione rispettata</td>
+                  <td class="num">0,0</td><td class="num">11,0</td>
+                  <td><span class="srcpath">exclusion rule</span></td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr style="border-top:2px solid var(--border)">
+                  <td colspan="3" style="font-weight:700;color:var(--ink)">Σ punti additivi</td>
+                  <td class="num" style="font-weight:700;color:var(--ink)">85,0</td>
+                  <td class="num" style="color:var(--muted)">/100</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <div class="grid2">
+            <div class="card">
+              <p class="lab">Adjustments <span class="hide" title="adjustments[] — oggi non visibile all’analista"></span></p>
+              <div class="rows-list">
+                <div class="rowline warn">
+                  <div>
+                    <div class="rl-main">Viability — controllo holding</div>
+                    <div class="rl-sub">HoldCo estera detiene 100%. Fattore applicato allo score.</div>
+                  </div>
+                  <span class="rl-val">× 0,85</span>
+                </div>
+                <div class="rowline neutral">
+                  <div>
+                    <div class="rl-main">Thesis-fit <span class="hide" title="thesis-fit — oggi non visibile all’analista"></span></div>
+                    <div class="rl-sub">Successione: titolare in banda, nessun fattore applicato.</div>
+                  </div>
+                  <span class="rl-val">× 1,00</span>
+                </div>
+              </div>
+              <p class="sub" style="margin:10px 0 0">85 × 0,85 × 1,00 = <b style="color:var(--ink)">72</b></p>
+            </div>
+
+            <div class="card">
+              <p class="lab">Flags non-scoring <span class="hide" title="flags[] — oggi non visibile all’analista"></span></p>
+              <div class="rows-list">
+                <div class="rowline warn">
+                  <div>
+                    <div class="rl-main">Bilanci ultimi 2 anni</div>
+                    <div class="rl-sub">Solo 2024 disponibile; 2023 non depositato.</div>
+                  </div>
+                  <span class="rl-val">warning</span>
+                </div>
+                <div class="rowline neutral">
+                  <div>
+                    <div class="rl-main">Profilo deal — successione</div>
+                    <div class="rl-sub">Titolare in banda, struttura societaria pulita.</div>
+                  </div>
+                  <span class="rl-val">neutral</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <p class="lab">Criteri mancanti <span class="hide" title="missingCriteria[] — oggi non visibile all’analista"></span></p>
+            <div class="missing">
+              <span class="mchip">Certificazione ISO 27001 (non valutabile)</span>
+              <span class="mchip">Portfolio clienti enterprise (non valutabile)</span>
+            </div>
+            <p class="sub" style="margin:10px 0 0">Cosa le manca per un match pieno. Seme naturale di domande DD.</p>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <ul class="notes">
+      <li><span class="m">1</span><div><b>Tab più denso.</b> Ogni criterion porta <code>status</code>, <code>points</code>, <code>weight</code>, <code>sourcePath</code>: l'analista ricostruisce il punteggio con gli occhi. <span class="ref">PRD §3.2</span></div></li>
+      <li><span class="m">2</span><div><b>Adjustments espliciti.</b> Il fattore viability è la spiegazione del salto 85 → 72. Promuovere questo blocco è candidato forte di Fase 1. <span class="ref">PRD §3.2 🔒</span></div></li>
+      <li><span class="m">3</span><div><b>Flags non confondono lo score.</b> Sono caveat, non componente matematica. Separazione visiva netta dalla tabella evidence. <span class="ref">ma_types.go MATargetFlag</span></div></li>
+    </ul>
+  </section>
+
+  <!-- ============ T3 WEB VALIDATION ============ -->
+  <section class="state" id="t3">
+    <div class="state-head">
+      <span class="sid">T3</span>
+      <h2>Web validation</h2>
+      <span class="ref">PRD §3.3 · domain, identity, freshness, evidenceRuns, candidateMatchAnalysis</span>
+    </div>
+    <p class="state-intent">Il verdetto "di chi è questo sito e cosa fa davvero". Domain resolution, identity state, freshness con scadenza, keyword set, run di evidence per keyword, analisi LLM completa. Oggi solo la "ragione" testuale è surfaced.</p>
+
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dots"><i></i><i></i><i></i></span>
+        <span class="url">/ricerche/s_8f3…/target/t_21c…/inspect</span>
+      </div>
+      <div class="app">
+        <div class="app-body" style="padding-top:18px">
+
+          <div class="grid2">
+            <div class="card compact">
+              <p class="lab">Domain resolution</p>
+              <dl class="kv">
+                <dt>selectedDomain</dt><dd class="mono">logisticasmart.it</dd>
+                <dt>domainConfidence</dt><dd>alta</dd>
+                <dt>domainScore</dt><dd>92</dd>
+                <dt>identityState</dt><dd>confirmed</dd>
+              </dl>
+            </div>
+            <div class="card compact">
+              <p class="lab">Verdetto pipeline</p>
+              <dl class="kv">
+                <dt>webValidationState</dt><dd>keep</dd>
+                <dt>finalAction</dt><dd>keep</dd>
+                <dt>webScore / conf</dt><dd>78 · media</dd>
+                <dt>freshness</dt><dd><span class="fresh fresh">fresh</span> <small style="color:var(--muted)">· exp 2026-09</small></dd>
+              </dl>
+            </div>
+          </div>
+
+          <div class="card">
+            <p class="lab">Keyword set estratte dalla strategia</p>
+            <div class="keywordset">
+              <span class="kw">system integrator</span>
+              <span class="kw">logistica</span>
+              <span class="kw">automazione magazzino</span>
+              <span class="kw">software gestionale</span>
+              <span class="kw">WMS</span>
+              <span class="kw">consulenza software</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Evidence runs <span class="hide" title="evidenceRuns[] — oggi non visibile all’analista"></span></h3>
+            <p class="sub">Una riga per keyword: score di match sul contenuto del dominio selezionato.</p>
+            <div class="rows-list">
+              <div class="rowline">
+                <div>
+                  <div class="rl-main">logistica · magazzino</div>
+                  <div class="rl-sub">Pagina servizi: "soluzioni WMS per magazzino". Match forte.</div>
+                </div>
+                <span class="rl-val" style="color:var(--ok);background:var(--ok-bg)">0,91</span>
+              </div>
+              <div class="rowline">
+                <div>
+                  <div class="rl-main">system integrator</div>
+                  <div class="rl-sub">Case study: integrazione SAP–WMS per cliente retail.</div>
+                </div>
+                <span class="rl-val" style="color:var(--ok);background:var(--ok-bg)">0,84</span>
+              </div>
+              <div class="rowline">
+                <div>
+                  <div class="rl-main">software gestionale</div>
+                  <div class="rl-sub">Citata in homepage ma non come core business.</div>
+                </div>
+                <span class="rl-val" style="color:var(--warn-strong);background:var(--warn-subtle)">0,52</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Candidate match analysis <span class="hide" title="candidateMatchAnalysis — oggi non visibile all’analista"></span></h3>
+            <p class="sub">Verdetto LLM sulla corrispondenza azienda↔perimetro. Sintesi; payload intero nel T8.</p>
+            <div class="rationale" style="background:var(--accent-subtle);color:var(--ink)">
+              <b>Logistica Smart</b> è un system integrator specializzato in WMS e automazione di magazzino, con portfolio in retail e manifatturiero. Il posizionamento è coerente con il perimetro "software gestionale per logistica"; secondario il ramo consulenza.
+            </div>
+            <dl class="kv" style="margin-top:12px">
+              <dt>finalDecision.reason</dt><dd>Aderente agli ambiti, web score solido, dominio confermato.</dd>
+              <dt>analystVerdict</dt><dd>— <span class="hide" title="analystVerdict — oggi non visibile all’analista"></span></dd>
+              <dt>llmModel / prompt</dt><dd class="mono">gpt-5-mini · candidate-web-validation-v2-concept</dd>
+              <dt>updatedBy</dt><dd>m.rossi@mrsmith · 2026-07-03</dd>
+            </dl>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <ul class="notes">
+      <li><span class="m">1</span><div><b>Freshness + expiry.</b> Il dato web ha una data di scadenza: va mostrato. Candidato Fase 1. <span class="ref">PRD §3.3 🔒</span></div></li>
+      <li><span class="m">2</span><div><b>Evidence runs per keyword.</b> Spiega il webScore granularmente; oggi totalmente invisibile. <span class="ref">PRD §3.3 🔒</span></div></li>
+    </ul>
+  </section>
+
+  <!-- ============ T4 DEEP-DIVE ============ -->
+  <section class="state" id="t4">
+    <div class="state-head">
+      <span class="sid">T4</span>
+      <h2>Deep-dive</h2>
+      <span class="ref">PRD §3.4 · deep.scorecard · deep.valuation · deep.brief · riuso dossier</span>
+    </div>
+    <p class="state-intent">Artefatto cached (cache globale per <code>companyKey</code>): se l'azienda è già stata analizzata altrove, qui è ready a costo zero. Quattro stati — ready / working / failed / nil — sempre read-only, mai trigger inline (opzione D). Rendering "ready" riusato dal card-dossier.</p>
+
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dots"><i></i><i></i><i></i></span>
+        <span class="url">/ricerche/s_8f3…/target/t_21c…/inspect</span>
+      </div>
+      <div class="app">
+        <div class="app-body" style="padding-top:18px">
+
+          <div class="card">
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <h3 style="margin:0">Scorecard finanziaria</h3>
+              <span class="rag amber">overall · amber</span>
+              <span class="hide" title="deep.scorecard.overallRAG — oggi non visibile all’analista"></span>
+            </div>
+            <p class="sub">Numeri letti dal payload IT-full + semafori deterministici. Metriche "contorno" opacizzate (struttura capitale del venditore, non guida il RAG).</p>
+            <div class="metrics">
+              <div class="metric"><span class="mg">Margine</span><div class="ml">EBITDA %</div><div class="mv">14,2%</div><span class="rag amber" style="align-self:flex-start;margin-top:6px">amber</span></div>
+              <div class="metric"><span class="mg">Liquidità</span><div class="ml">Current ratio</div><div class="mv">1,4×</div><span class="rag green" style="align-self:flex-start;margin-top:6px">green</span></div>
+              <div class="metric"><span class="mg">Patrimoniale</span><div class="ml">Patrimonio netto</div><div class="mv">1,1 M€</div><span class="rag green" style="align-self:flex-start;margin-top:6px">green</span></div>
+              <div class="metric"><span class="mg">Leva</span><div class="ml">PFN / EBITDA</div><div class="mv">1,9×</div><span class="rag amber" style="align-self:flex-start;margin-top:6px">amber</span></div>
+              <div class="metric contorno"><span class="mg">Capitale venditore</span><div class="ml">PFN totale</div><div class="mv">920 k€</div></div>
+              <div class="metric contorno"><span class="mg">Capitale venditore</span><div class="ml">Finanziamenti soci</div><div class="mv">180 k€</div></div>
+            </div>
+          </div>
+
+          <div class="grid2">
+            <div class="card compact">
+              <p class="lab">Reconciliation vendor â CEE <span class="hide" title="reconciliation — oggi non visibile all’analista"></span></p>
+              <dl class="kv">
+                <dt>EBITDA Δ</dt><dd>0,8% <small style="color:var(--ok)">✓ entro tolleranza</small></dd>
+                <dt>PFN Δ</dt><dd>1,2% <small style="color:var(--ok)">✓</small></dd>
+                <dt>PFN provenance</dt><dd class="mono">cee_detail</dd>
+                <dt>ROE Δ</dt><dd>0,4 pp</dd>
+              </dl>
+            </div>
+            <div class="card compact">
+              <p class="lab">Quality flags <span class="hide" title="qualityFlags[] — oggi non visibile all’analista"></span></p>
+              <div class="rows-list">
+                <div class="rowline warn">
+                  <div><div class="rl-main">Bilancio singolo</div><div class="rl-sub">DD: richiedere bilancio 2023.</div></div>
+                  <span class="rl-val">warning</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <p class="lab">Valuation — Damodaran sector multiples <span class="hide" title="deep.valuation — oggi non visibile all’analista"></span></p>
+            <div class="val-block">
+              <div>
+                <div class="vb-range">1,8 – 2,4 <small>M€ equity</small></div>
+                <div class="vb-meta">EV 2,7 – 3,3 M€ · multiplo 6,5× EBITDA · settore IT Services · n.firms 142 · fonte Damodaran 2026-01</div>
+              </div>
+              <div style="flex:1;min-width:240px">
+                <div class="bridge">
+                  <span class="bk">EV low (EBITDA prudenziale)</span><span class="bv">2,7 M€</span>
+                  <span class="bk">EV high (EBITDA reported)</span><span class="bv">3,3 M€</span>
+                  <span class="bk">− PFN</span><span class="bv">− 920 k€</span>
+                  <span class="bk">− TFR</span><span class="bv">− 60 k€</span>
+                  <span class="bk">− Fondo imposte</span><span class="bv">− 20 k€</span>
+                  <span class="bk">ℹ Finanziamenti soci (già in PFN)</span><span class="bv">180 k€</span>
+                  <span class="bk">= Equity range</span><span class="bv eq">1,8 – 2,4 M€</span>
+                </div>
+              </div>
+            </div>
+            <p class="sub" style="margin:10px 0 0">Banda asimmetrica: estremo alto su EBITDA reported, basso su prudenziale. Caveat nel JSON (T8).</p>
+          </div>
+
+          <div class="card">
+            <p class="lab">Brief LLM <span class="hide" title="deep.brief — oggi non visibile all’analista"></span></p>
+            <div class="brief-section">
+              <div>
+                <p class="lab" style="margin:0 0 4px">Business profile</p>
+                <p class="brief-para">System integrator di nicchia nel WMS, ricavi 3,4 M€ con 8 dipendenti, clienti nel retail e nella manifatturiera. Struttura societaria con HoldCo estera.</p>
+              </div>
+              <div>
+                <p class="lab" style="margin:0 0 4px">Lettura finanziaria</p>
+                <p class="brief-para">Margine EBITDA nella banda di settore, leva contenuta. Rischio concentrazione clienti da verificare.</p>
+              </div>
+              <div class="grid2" style="gap:18px">
+                <div>
+                  <p class="lab" style="margin:0 0 6px">Punti di forza</p>
+                  <ul class="brief-list"><li>Posizionamento di nicchia difendibile</li><li>Portfolio clienti ricorrenti</li></ul>
+                </div>
+                <div>
+                  <p class="lab" style="margin:0 0 6px">Red flags</p>
+                  <ul class="brief-list red"><li>Bilancio 2023 non depositato</li><li>HoldCo estera</li></ul>
+                </div>
+              </div>
+              <div>
+                <p class="lab" style="margin:0 0 6px">DD questions</p>
+                <ul class="ddq">
+                  <li>Portabilità dei contratti clienti al cambio controllo?</li>
+                  <li>Struttura e costi della HoldCo?</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <p class="state-intent" style="margin-top:18px"><b>Stati B / C / D</b> — empty state + percorso, mai bottone "Avvia" inline. La produzione del deep è un gesto di lavorazione che appartiene al card-dossier.</p>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:6px">
+      <div class="frame">
+        <div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span><span class="url">stato B · working</span></div>
+        <div class="app"><div class="app-body" style="padding:20px">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 12px;text-align:center">
+            <span class="statuspill run"><span class="pulse"></span>Analisi completa in corso…</span>
+            <p style="font-size:.8125rem;color:var(--muted);max-width:38ch;margin:0">Il deep cached è in produzione. Appare qui automaticamente quando è ready.</p>
+            <span style="font:500 11px/1 var(--mono);color:var(--muted)">deep.updatedAt · 2026-07-05 09:21</span>
+          </div>
+        </div></div>
+      </div>
+      <div class="frame">
+        <div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span><span class="url">stato C · failed</span></div>
+        <div class="app"><div class="app-body" style="padding:20px">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 12px;text-align:center">
+            <span class="rag red">analisi non riuscita</span>
+            <p style="font-size:.8125rem;color:var(--ink-2);max-width:38ch;margin:0">Il deep è fallito in un'esecuzione precedente.</p>
+            <span style="font:500 11px/1 var(--mono);color:var(--muted)">deep.errorCode · vendor_timeout</span>
+            <a class="dossier-link" href="#" style="margin-top:4px;font-size:.78rem">Apri dossier ↗ <small style="font-weight:400;color:var(--muted)">per ritentare</small></a>
+          </div>
+        </div></div>
+      </div>
+      <div class="frame">
+        <div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span><span class="url">stato D · nil</span></div>
+        <div class="app"><div class="app-body" style="padding:20px">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 12px;text-align:center">
+            <span class="rag na">nessuna analisi completa</span>
+            <p style="font-size:.8125rem;color:var(--ink-2);max-width:38ch;margin:0">Questa azienda non ha ancora un dossier.</p>
+            <a class="dossier-link" href="#" style="margin-top:4px;font-size:.78rem">Apri dossier ↗ <small style="font-weight:400;color:var(--muted)">nell'iniziativa «MSP NE 2026»</small></a>
+            <span style="font-size:.7rem;color:var(--muted);max-width:36ch">Se la ricerca non ha iniziativa: "Associa un'iniziativa per abilitare l'analisi completa."</span>
+          </div>
+        </div></div>
+      </div>
+    </div>
+
+    <ul class="notes">
+      <li><span class="m">1</span><div><b>Riuso esplicito.</b> Scorecard, valuation+bridge e brief sono gli stessi componenti del <b>card-dossier</b> (<code>/iniziative/:id/dossier/:companyKey</code>), non di <code>/azienda</code>. L'inspector è il primo fruitore "puro". <span class="ref">PRD §3.4 · EA-1</span></div></li>
+      <li><span class="m">2</span><div><b>Mai bottone "Avvia" inline.</b> Read-only puro (opzione D): il tab mostra il deep cached negli stati ready/working/failed, e negli stati nil/failed rimanda al card-dossier per la produzione. <code>/azienda</code> non compare: è quick review standalone, non una destinazione del flusso MA. <span class="ref">PRD §3.4 · R-DX-2 DECISO</span></div></li>
+      <li><span class="m">3</span><div><b>Cache globale = valore discovery.</b> Azienda già analizzata altrove → qui ready gratis. Il tab è un visualizzatore di sistema, non un motivatore di spesa. <span class="ref">PRD §3.4</span></div></li>
+    </ul>
+  </section>
+
+  <!-- ============ T5 TESI ============ -->
+  <section class="state" id="t5">
+    <div class="state-head">
+      <span class="sid">T5</span>
+      <h2>Tesi (session-scoped)</h2>
+      <span class="ref">PRD §3.5 · caveat: tesi vera context-scoped nel dossier</span>
+    </div>
+    <p class="state-intent">Onesto: la thesisReading <i>vera</i> (fit, sinergie, valuationStance) è prodotta per iniziativa, non vive sul target di sessione. Qui mostriamo solo l'adjustment thesis-fit applicato e il link al dossier.</p>
+
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dots"><i></i><i></i><i></i></span>
+        <span class="url">/ricerche/s_8f3…/target/t_21c…/inspect</span>
+      </div>
+      <div class="app">
+        <div class="app-body" style="padding-top:18px">
+
+          <div class="tesis-caveat">
+            <span class="tc-ico">i</span>
+            <div>
+              <b>La lettura di tesi è context-scoped all'iniziativa.</b> Questo target mostra solo il fattore di tesi applicato allo score in questa sessione. Per fit, sinergie e postura valutativa, apri il dossier dell'iniziativa collegata.
+            </div>
+          </div>
+
+          <div class="card">
+            <p class="lab">Fattore thesis-fit (in questa sessione) <span class="hide" title="adjustments[thesis-fit] — oggi non visibile all’analista"></span></p>
+            <div class="rowline neutral">
+              <div>
+                <div class="rl-main">Tesi: successione</div>
+                <div class="rl-sub">Titolare 64enne, in banda (≥60). Nessun fattore applicato.</div>
+              </div>
+              <span class="rl-val">× 1,00</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <p class="lab">Lettura legacy (pre-v3) <span class="hide" title="deep.brief.thesisReading — oggi non visibile all’analista"></span></p>
+            <p class="brief-para" style="color:var(--muted);font-style:italic">— vuota —</p>
+            <p class="sub" style="margin:6px 0 0">Le run v3 non popolano questo campo; la lettura vera vive come <code>MACardThesisReading</code> nel dossier.</p>
+          </div>
+
+          <a class="dossier-link" href="#">Apri dossier ↗ <small style="font-weight:400;color:var(--muted)">lettura di tesi context-scoped</small></a>
+
+        </div>
+      </div>
+    </div>
+
+    <ul class="notes">
+      <li><span class="m">1</span><div><b>Onestà esplicita.</b> Il caveat evita di fingere un dato che non abbiamo. Il dossier è il luogo della tesi. <span class="ref">PRD §3.5</span></div></li>
+    </ul>
+  </section>
+  <!-- ============ T6 PROVENENZA ============ -->
+  <section class="state" id="t6">
+    <div class="state-head">
+      <span class="sid">T6</span>
+      <h2>Provenienza &amp; traccia</h2>
+      <span class="ref">PRD §3.6 · run, strategyVersion, scoreVersion, freshness</span>
+    </div>
+    <p class="state-intent">L'audit: quando e con quale strategia/pipeline è stato prodotto il target. Confronto fra score versioni (Fase 2) parte da qui.</p>
+
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dots"><i></i><i></i><i></i></span>
+        <span class="url">/ricerche/s_8f3…/target/t_21c…/inspect</span>
+      </div>
+      <div class="app">
+        <div class="app-body" style="padding-top:18px">
+
+          <div class="card">
+            <div class="prov-list">
+              <div class="prov-item"><span class="pk">target id</span><span class="pv mono">t_21c9…</span></div>
+              <div class="prov-item"><span class="pk">session id</span><span class="pv mono">s_8f3a… · MSP Nord-Est 2026</span></div>
+              <div class="prov-item"><span class="pk">run id</span><span class="pv mono">r_77b1… · completed</span></div>
+              <div class="prov-item"><span class="pk">strategy version</span><span class="pv mono">v4 · expanded · <a href="#" style="color:var(--accent)">apri strategia ↗</a></span></div>
+              <div class="prov-item"><span class="pk">score version</span><span class="pv">v3 <span class="hide" title="scoreVersion — oggi non visibile all’analista"></span></span></div>
+              <div class="prov-item"><span class="pk">enrichment level</span><span class="pv">advanced</span></div>
+              <div class="prov-item"><span class="pk">creato il</span><span class="pv">2026-07-03 09:14</span></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <p class="lab">Pipeline web validation</p>
+            <div class="prov-list">
+              <div class="prov-item"><span class="pk">pipelineVersion</span><span class="pv mono">candidate-web-validation-v2-concept</span></div>
+              <div class="prov-item"><span class="pk">llm model</span><span class="pv mono">gpt-5-mini</span></div>
+              <div class="prov-item"><span class="pk">llm prompt id</span><span class="pv mono">cwm-v2-r3</span></div>
+              <div class="prov-item"><span class="pk">inputHash / kwHash</span><span class="pv mono">9f3a… / 21ec…</span></div>
+              <div class="prov-item"><span class="pk">validation updated</span><span class="pv">2026-07-03 · m.rossi@mrsmith</span></div>
+              <div class="prov-item"><span class="pk">deep updated</span><span class="pv">2026-07-03 09:21</span></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ T7 REGISTRO & RATING ============ -->
+  <section class="state" id="t7">
+    <div class="state-head">
+      <span class="sid">T7</span>
+      <h2>Registro &amp; rating (mirror del card-dossier, read-only)</h2>
+      <span class="ref">PRD §3.7 · rating · outcomes[] · registry facts/notes · riuso dal card-dossier</span>
+    </div>
+    <p class="state-intent">Read-only mirror di quello che sappiamo già dell'azienda. Le scritture (rating, registro, diario) vivono nel dossier. Qui si vedono, non si toccano.</p>
+
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dots"><i></i><i></i><i></i></span>
+        <span class="url">/ricerche/s_8f3…/target/t_21c…/inspect</span>
+      </div>
+      <div class="app">
+        <div class="app-body" style="padding-top:18px">
+
+          <div class="grid2">
+            <div class="card compact">
+              <p class="lab">Rating in questa sessione</p>
+              <div class="rating-stars">★ ★ ★ <span class="off">★</span></div>
+              <p class="sub" style="margin:6px 0 0">Assegnato 2026-07-03. Score al rating: 72.</p>
+            </div>
+            <div class="card compact">
+              <p class="lab">Registro azienda <span class="hide" title="registry facts — oggi non visibile all’analista"></span></p>
+              <div class="facts">
+                <span class="fact warn">In trattativa con altri</span>
+                <span class="fact info">Partner</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <p class="lab">Outcomes / eventi di lavorazione <span class="hide" title="outcomes[] — oggi non visibile all’analista"></span></p>
+            <div class="outcomes">
+              <div class="outcome">
+                <span class="od">2026-07-04</span>
+                <span class="ot">Primo contatto telefonico con CFO.</span>
+                <span class="ob">contattato</span>
+              </div>
+              <div class="outcome">
+                <span class="od">2026-07-05</span>
+                <span class="ot">In attesa di NDA per dati 2023.</span>
+                <span class="ob">in_dialogo</span>
+              </div>
+            </div>
+            <p class="sub" style="margin:10px 0 0">Diario completo e IRL nel dossier di lavorazione.</p>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <ul class="notes">
+      <li><span class="m">1</span><div><b>Riuso CompanyRegistrySection</b> in modalità read-only. Nessuna azione di scrittura qui. <span class="ref">PRD §6 · §5 non-CRM</span></div></li>
+    </ul>
+  </section>
+
+  <!-- ============ T8 JSON GREZZO ============ -->
+  <section class="state" id="t8">
+    <div class="state-head">
+      <span class="sid">T8</span>
+      <h2>JSON grezzo</h2>
+      <span class="ref">PRD §3.8 · intero MATarget · PROPOSTA in v0</span>
+    </div>
+    <p class="state-intent">L'intero <code>MATarget</code> così com'è tornato dall'endpoint. Verità a monte di qualunque decisione di curation. Collassabile; rimuovibile in Fase 1 se ritenuto rumore.</p>
+
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dots"><i></i><i></i><i></i></span>
+        <span class="url">/ricerche/s_8f3…/target/t_21c…/inspect</span>
+      </div>
+      <div class="app">
+        <div class="app-body" style="padding-top:18px">
+          <div class="card">
+            <div class="raw-toggle">
+              <span class="rt-btn on">MATarget</span>
+              <span class="rt-btn">solo non-null</span>
+              <span class="rt-btn">copia</span>
+              <span style="margin-left:auto">~ 14 KB</span>
+            </div>
+            <pre class="json-block">{
+  <span class="k">"id"</span>: <span class="s">"t_21c9…"</span>, <span class="k">"sessionId"</span>: <span class="s">"s_8f3a…"</span>, <span class="k">"runId"</span>: <span class="s">"r_77b1…"</span>,
+  <span class="k">"companyKey"</span>: <span class="s">"vat:0478…231"</span>, <span class="k">"companyName"</span>: <span class="s">"Logistica Smart S.r.l."</span>,
+  <span class="k">"score"</span>: <span class="n">72</span>, <span class="k">"scoreVersion"</span>: <span class="n">3</span>, <span class="k">"confidence"</span>: <span class="s">"media"</span>,
+  <span class="k">"matchState"</span>: <span class="s">"match_parziale"</span>, <span class="k">"bucket"</span>: <span class="s">"principale"</span>,
+  <span class="k">"rationale"</span>: <span class="s">"…"</span>, <span class="k">"missingCriteria"</span>: […],
+  <span class="k">"evidence"</span>: [ { <span class="k">"criterion"</span>: <span class="s">"…"</span>, <span class="k">"points"</span>: <span class="n">22.0</span>, <span class="k">"weight"</span>: <span class="n">22.0</span> } … ],
+  <span class="k">"adjustments"</span>: [ { <span class="k">"code"</span>: <span class="s">"controllo_holding"</span>, <span class="k">"factor"</span>: <span class="n">0.85</span> } ],
+  <span class="k">"flags"</span>: […],
+  <span class="k">"webValidation"</span>: { <span class="k">"selectedDomain"</span>: <span class="s">"…"</span>, <span class="k">"freshness"</span>: <span class="s">"fresh"</span>, <span class="k">"evidenceRuns"</span>: […] },
+  <span class="k">"deep"</span>: { <span class="k">"status"</span>: <span class="s">"ready"</span>, <span class="k">"scorecard"</span>: {…}, <span class="k">"valuation"</span>: {…}, <span class="k">"brief"</span>: {…} },
+  <span class="k">"vendorPayload"</span>: { … },
+  <span class="k">"createdAt"</span>: <span class="s">"2026-07-03T09:14:22Z"</span>
+}</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <ul class="notes">
+      <li><span class="m">1</span><div><b>Verità a monte.</b> Da qui si decide cosa è degno di una sua renderizzazione dedicata (Fase 1). <span class="ref">PRD §3.9 · APERTO conferma v0</span></div></li>
+    </ul>
+  </section>
+
+  <p class="footer-note">
+    Wireframe mid-fidelity — Target Inspector, iterazione 1. Costante cromatica viola (<code style="font:500 12px var(--mono)">--inspect</code>) a marcare il confine "non analista". Il marker <span class="hide" style="position:static;display:inline-block;vertical-align:-2px"></span> (puntino discreto, tooltip in hover) accompagna ogni campo oggi non surfaced: è la mappa diretta del workstream Fase 1 (curation del modal di dettaglio target). Riferimento: <code style="font:500 12px var(--mono)">TARGET-INSPECTOR-PLAN.md</code>.
+  </p>
+</div>
+</body>
+</html>
