@@ -633,3 +633,98 @@
   border-radius: var(--radius-md);
   font-size: 0.8125rem;
 }
+
+/* ---------- T4 Deep-dive ---------- */
+@keyframes tiPulse {
+  0%, 100% { opacity: 0.55; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+/* scorecard metric cards */
+.metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); margin-top: var(--space-3); }
+@media (max-width: 880px) { .metrics { grid-template-columns: 1fr 1fr; } }
+.metric {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: #fbfcfe;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.metricContorno { opacity: 0.7; }
+.metricContorno .metricLabel::after { content: " · contorno"; font-weight: 400; color: var(--color-text-muted); font-size: 0.7rem; }
+.metricGroup { font-size: 0.625rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-muted); }
+.metricLabel { font-size: 0.8125rem; color: var(--color-text); font-weight: 600; }
+.metricValue { font-size: 1.05rem; font-weight: 700; color: var(--color-text); font-variant-numeric: tabular-nums; }
+.metricGroupLabel { font-size: 0.75rem; font-weight: 700; color: var(--color-text-secondary); margin: var(--space-4) 0 var(--space-2); text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* valuation bridge */
+.valBlock {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  align-items: flex-end;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: #fbfcfe;
+}
+.valRange { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; color: var(--color-text); font-variant-numeric: tabular-nums; }
+.valRange small { font-size: 0.875rem; color: var(--color-text-secondary); font-weight: 500; }
+.valMeta { font-size: 0.75rem; color: var(--color-text-muted); line-height: 1.6; }
+.bridge { display: grid; grid-template-columns: 1fr auto; gap: 6px var(--space-3); font-size: 0.8125rem; margin-top: var(--space-2); font-variant-numeric: tabular-nums; min-width: 240px; flex: 1; }
+.bridgeK { color: var(--color-text-muted); }
+.bridgeV { color: var(--color-text); font-weight: 600; text-align: right; }
+.bridgeVEq { color: #047857; border-top: 1px solid var(--color-border); padding-top: 6px; margin-top: 4px; }
+
+/* brief sections */
+.briefPara { font-size: 0.875rem; line-height: 1.6; color: var(--color-text-secondary); }
+.briefList { display: flex; flex-direction: column; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.briefList li { font-size: 0.8125rem; color: var(--color-text-secondary); padding-left: 16px; position: relative; }
+.briefList li::before { content: ""; position: absolute; left: 0; top: 8px; width: 6px; height: 6px; border-radius: 50%; background: var(--color-accent); }
+.briefListRed li::before { background: var(--color-danger); }
+.ddq { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.ddq li { font-size: 0.8125rem; color: var(--color-text); padding: 9px 12px; border: 1px solid var(--color-border-subtle); border-radius: var(--radius-md); background: #fbfcfe; }
+
+/* deep empty states (B/C/D) */
+.deepEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+}
+.deepEmptyPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.deepEmptyRun { background: var(--color-accent-subtle); color: var(--color-accent); }
+.deepEmptyFailed { background: var(--color-danger-subtle); color: var(--color-danger-hover); }
+.deepEmptyNa { background: var(--color-bg-elevated); color: var(--color-text-muted); border: 1px solid var(--color-border); }
+.deepEmptyText { font-size: 0.875rem; color: var(--color-text-secondary); max-width: 48ch; margin: 0; }
+.deepEmptyMono { font-family: var(--font-mono, ui-monospace, monospace); font-size: 0.6875rem; color: var(--color-text-muted); }
+.deepFooter {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  align-items: center;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  padding-top: var(--space-2);
+}
+.pulseDot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  animation: tiPulse 1.4s ease-in-out infinite;
+}

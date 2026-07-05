@@ -1,7 +1,7 @@
 import { ApiError } from '@mrsmith/api-client';
 import { Icon, Skeleton } from '@mrsmith/ui';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useApiClient } from '../../api/client';
 import type { MASessionDetail, MATarget, MATargetBucket, MAConfidence } from '../../api/types';
@@ -11,6 +11,7 @@ import { TesiTab } from './inspector/tabs/TesiTab';
 import { ProvenienzaTab } from './inspector/tabs/ProvenienzaTab';
 import { PunteggioTab } from './inspector/tabs/PunteggioTab';
 import { WebValidationTab } from './inspector/tabs/WebValidationTab';
+import { DeepTab } from './inspector/tabs/DeepTab';
 import styles from './inspector/Inspector.module.css';
 
 type TabKey = 'sintesi' | 'punteggio' | 'web' | 'deep' | 'tesi' | 'provenienza' | 'registro' | 'json';
@@ -87,6 +88,19 @@ export function TargetInspectorPage() {
     queryFn: () => api.get<MASessionDetail>(`/binocolo/v1/ma/sessions/${id!}?targets=none`),
     retry: (failureCount, error) => !(isNotFound(error)) && failureCount < 2,
   });
+
+  // Polling deep (F5 stato B): invalida la query target ogni 5s finché deep.status
+  // resta queued/running. Si ferma a ready/failed/nil. Pattern di RicercaDetailPage/
+  // IniziativaBoardPage. refetchType 'active' + refetch forzato.
+  const deepStatus = targetQuery.data?.deep?.status;
+  const deepRunning = deepStatus === 'queued' || deepStatus === 'running';
+  useEffect(() => {
+    if (!deepRunning) return;
+    const handle = setInterval(() => {
+      void targetQuery.refetch();
+    }, 5000);
+    return () => clearInterval(handle);
+  }, [deepRunning, targetQuery]);
 
   if (!id || !targetId) {
     return (
@@ -225,6 +239,12 @@ export function TargetInspectorPage() {
         <SintesiTab target={target} initiativeId={initiativeId} />
       ) : tab === 'web' ? (
         <WebValidationTab target={target} />
+      ) : tab === 'deep' ? (
+        <DeepTab
+          deep={target.deep}
+          initiativeId={initiativeId}
+          companyKey={target.companyKey}
+        />
       ) : tab === 'punteggio' ? (
         <PunteggioTab target={target} />
       ) : tab === 'tesi' ? (
