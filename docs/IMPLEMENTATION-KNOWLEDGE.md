@@ -197,6 +197,15 @@ Alyante ERP ID
 - Used by: Binocolo M&A estimate, execute, and target web validation.
 - Open questions: none.
 
+### Binocolo `/azienda` Is A Standalone Quick-Review Tool, Never The MA Dossier Destination
+
+- Context: Binocolo M&A navigation from session/board/card surfaces; cross-workstream wiring of the deep cached dossier.
+- Discovery: `/azienda` (`CompanyDossierPage`, handlers `handleGetCompanyDossier`/`handleCreateCompanyDossier` in `backend/internal/binocolo/handler.go`, service `getCompanyDossier`/`companyDossier`) is a **standalone tool for quick review of an arbitrary company by P.IVA**. It is deliberately decoupled from the MA flow: it reads no card, no initiative, and is not the place where the MA working dossier lives. The deep cached company-keyed artifact is consumed by the **MA card-dossier** at `/iniziative/:id/dossier/:companyKey` (`IniziativaCardDossierPage`), which is self-sufficient (deep + registry + context-scoped thesis reading + IRL + diary).
+- Practical rule: no link inside the MA flow (search detail modal, board card, drawer, inspector) may point to `/azienda` expecting the working dossier, the deep cached dossier, or the registry. The card-dossier `/iniziative/:id/dossier/:companyKey` is the only MA destination for those. `/azienda` is reserved for ad-hoc P.IVA lookups outside any MA session/initiative.
+- Evidence: `apps/binocolo/src/App.tsx:10` (nav label "Dossier azienda" → `/azienda`), `apps/binocolo/src/pages/CompanyDossierPage.tsx:782` (h1 "Dossier azienda"), `apps/binocolo/src/pages/iniziative/IniziativaBoardPage.tsx:277` ("Apri dossier" navigates to the card-dossier, not `/azienda`), `apps/binocolo/src/pages/iniziative/CompanyRegistrySection.tsx` (registry lives under `pages/iniziative/`, consumed by the card-dossier). The PRD `apps/binocolo/docs/INIZIATIVE-PRD.md` §6/§7 ratified this on 2026-07-02 (decision D-B); the implementation plan `INIZIATIVE-IMPLEMENTATION-PLAN.md` had stale F2/F4 instructions pointing to `/azienda?vat=` and was emended as EA-1 on 2026-07-05.
+- Used by: every Binocolo surface that links the working dossier of an MA target (D2 search detail, D3 board/drawer, DX target inspector).
+- Open questions: none.
+
 ### Binocolo ATECO 2025 Codes Are Resolver-Gated
 
 - Context: Binocolo M&A ATECO candidate selection and OpenAPI.it Company `IT-search` calls.
