@@ -1,0 +1,584 @@
+/* Target Inspector — costante cromatica viola (--inspect) a marcare il
+   confine "non analista". Variabili locali con fallback sul design system. */
+
+.page {
+  display: flex;
+  min-height: calc(100vh - 140px);
+  flex-direction: column;
+  gap: var(--space-5);
+  animation: pageEnter 0.35s var(--ease-out) both;
+}
+
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---------- header ---------- */
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.header .logo {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--color-accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.8125rem;
+}
+
+.header .brand {
+  font-weight: 700;
+  font-size: 0.9375rem;
+}
+
+.backLink {
+  margin-left: var(--space-3);
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.backLink b {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.backLink:hover b {
+  text-decoration: underline;
+}
+
+/* ---------- banner modalità ispezione (viola) ---------- */
+.banner {
+  --inspect: #7c3aed;
+  --inspect-2: #9b5cff;
+  --inspect-subtle: rgba(124, 58, 237, 0.08);
+  --inspect-muted: rgba(124, 58, 237, 0.18);
+  --inspect-ink: #5b21b6;
+  --inspect-ink-strong: #4c1d95;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 11px var(--space-5);
+  background: var(--inspect-subtle);
+  border: 1px solid var(--inspect-muted);
+  border-radius: var(--radius-md);
+  color: var(--inspect-ink);
+  font-size: 0.8125rem;
+}
+
+.banner .ico {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--inspect);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.75rem;
+  flex: none;
+}
+
+.banner b {
+  color: var(--inspect-ink-strong);
+  font-weight: 700;
+}
+
+.bannerLink {
+  margin-left: auto;
+  font-weight: 600;
+  color: var(--inspect);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.bannerLink:hover {
+  text-decoration: underline;
+}
+
+/* ---------- identità target + score ---------- */
+.ident {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+}
+
+.identMain {
+  flex: 1;
+  min-width: 280px;
+}
+
+.identMain h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+}
+
+.identMeta {
+  margin-top: var(--space-2);
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
+.identMeta b {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.identMeta .sep {
+  color: var(--color-text-faint);
+}
+
+.identPills {
+  margin-top: var(--space-3);
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 11px;
+  border-radius: var(--radius-full);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pillPrincipale {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  border: 1px solid var(--color-accent-muted);
+}
+
+.pillDaVerificare {
+  background: var(--color-warning-subtle);
+  color: var(--color-warning-strong);
+}
+
+.pillAzionabile {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.pillSoppresso {
+  background: var(--color-bg-elevated);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
+.pillNeutral {
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+
+.pillConfMed { background: var(--color-warning-subtle); color: var(--color-warning-strong); }
+.pillConfHigh { background: var(--color-success-bg); color: #047857; }
+.pillConfLow { background: var(--color-danger-subtle); color: var(--color-danger-hover); }
+
+.scoreBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 10px 18px;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+}
+
+.scoreN {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.scoreSub {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.scoreAbsent {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-text-faint);
+  line-height: 1;
+}
+
+/* ---------- tab bar ---------- */
+.tabs {
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid var(--color-border);
+  margin-top: var(--space-1);
+  overflow-x: auto;
+}
+
+.tab {
+  padding: 11px 14px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  border: none;
+  background: transparent;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tab:hover {
+  color: var(--color-text-secondary);
+}
+
+.tabActive {
+  color: var(--inspect, #7c3aed);
+  border-bottom-color: var(--inspect, #7c3aed);
+  background: rgba(124, 58, 237, 0.06);
+}
+
+.tabNum {
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+.tabActive .tabNum {
+  color: var(--inspect, #7c3aed);
+}
+
+/* ---------- stati ---------- */
+.danger {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-danger);
+  background: var(--color-danger-subtle);
+  color: var(--color-danger-hover);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+}
+
+.placeholder {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  padding: var(--space-4) var(--space-1);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+/* ---------- tab body primitives ---------- */
+.tabBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.card {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-5);
+}
+
+.cardCompact {
+  padding: var(--space-3) var(--space-4);
+}
+
+.cardTitle {
+  margin: 0 0 var(--space-2);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.cardSub {
+  margin: 0 0 var(--space-3);
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.lab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 var(--space-2);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); }
+@media (max-width: 880px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
+
+.kv {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 6px var(--space-3);
+  font-size: 0.8125rem;
+  align-items: baseline;
+}
+.kv dt { color: var(--color-text-muted); font-weight: 500; }
+.kv dd { margin: 0; color: var(--color-text); font-weight: 600; }
+.mono { font-family: var(--font-mono, ui-monospace, Menlo, monospace); font-size: 0.75rem; color: var(--color-text-secondary); font-weight: 500; }
+.kv dd.mono { font-weight: 500; }
+
+.muted { color: var(--color-text-muted); }
+.absent { color: var(--color-text-faint); }
+
+/* rationale box (info subtle) */
+.rationale {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: rgba(14, 116, 144, 0.10);
+  color: #075985;
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+.rationale b { font-weight: 600; }
+
+/* freshness pill */
+.fresh {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 9px;
+  border-radius: var(--radius-full);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.freshFresh { background: var(--color-success-bg); color: #047857; }
+.freshStale { background: var(--color-warning-subtle); color: var(--color-warning-strong); }
+.freshExpired { background: var(--color-danger-subtle); color: var(--color-danger-hover); }
+.freshUnknown { background: var(--color-bg-elevated); color: var(--color-text-muted); border: 1px solid var(--color-border); }
+
+/* RAG pill (deep overall) */
+.rag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.ragGreen { background: var(--color-success-bg); color: #047857; }
+.ragAmber { background: var(--color-warning-subtle); color: var(--color-warning-strong); }
+.ragRed { background: var(--color-danger-subtle); color: var(--color-danger-hover); }
+.ragNa { background: var(--color-bg-elevated); color: var(--color-text-muted); border: 1px solid var(--color-border); }
+
+/* dossier link (viola, contesto ispezione) */
+.dossierLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 9px 14px;
+  border-radius: var(--radius-full);
+  background: rgba(124, 58, 237, 0.08);
+  border: 1px solid rgba(124, 58, 237, 0.18);
+  color: #7c3aed;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  text-decoration: none;
+}
+.dossierLink:hover { background: rgba(124, 58, 237, 0.14); }
+.dossierLink small { font-weight: 400; color: var(--color-text-muted); }
+.linkRow {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* tesi caveat box */
+.caveat {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: rgba(14, 116, 144, 0.10);
+  color: #075985;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+}
+.caveat .tcIco {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: #075985;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.6875rem;
+}
+.caveat b { font-weight: 600; }
+
+/* adjustment / generic rowline */
+.rowsList { display: flex; flex-direction: column; gap: var(--space-2); }
+.rowline {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: #fbfcfe;
+}
+.rowlineNeutral .rlVal { color: var(--color-text-secondary); background: var(--color-bg-elevated); }
+.rlMain { font-size: 0.875rem; color: var(--color-text); font-weight: 600; }
+.rlSub { font-size: 0.75rem; color: var(--color-text-muted); margin-top: 2px; }
+.rlVal {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-weight: 700;
+  font-size: 0.75rem;
+  color: var(--color-warning-strong);
+  background: var(--color-warning-subtle);
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+/* provenance list */
+.provList { display: flex; flex-direction: column; }
+.provItem {
+  display: grid;
+  grid-template-columns: 170px 1fr;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-size: 0.8125rem;
+}
+.provItem:last-child { border-bottom: none; }
+.provK { color: var(--color-text-muted); }
+.provV { color: var(--color-text); font-weight: 600; }
+.provV.mono { font-weight: 500; }
+.provLink { color: var(--color-accent); text-decoration: none; font-weight: 600; }
+.provLink:hover { text-decoration: underline; }
+
+/* ---------- T2 Punteggio ---------- */
+.ev { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+.ev th {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  text-align: left;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--color-border);
+}
+.ev th.num, .ev td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.ev td {
+  padding: 10px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  color: var(--color-text-secondary);
+  vertical-align: top;
+}
+.ev td.label { color: var(--color-text); font-weight: 600; }
+.ev td.num { color: var(--color-text); font-weight: 600; }
+.ev tfoot td { border-top: 2px solid var(--color-border); border-bottom: none; padding-top: 10px; font-weight: 700; color: var(--color-text); }
+.srcpath {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.625rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+/* status match chip: m=match, p=parziale, x=fuori, o=mancante */
+.stmatch {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 5px;
+  white-space: nowrap;
+}
+.stmatchM { background: var(--color-success-bg); color: #047857; }
+.stmatchP { background: var(--color-warning-subtle); color: var(--color-warning-strong); }
+.stmatchX { background: var(--color-danger-subtle); color: var(--color-danger-hover); }
+.stmatchO { background: var(--color-bg-elevated); color: var(--color-text-muted); border: 1px solid var(--color-border); }
+
+/* adjustments rowline (warn per factor < 1, neutral per factor = 1) */
+.rowlineWarn { background: var(--color-warning-subtle); border-color: rgba(245, 158, 11, 0.25); }
+.rowlineWarn .rlVal { color: var(--color-warning-strong); background: var(--color-bg-elevated); }
+
+/* ricostruzione score */
+.recon {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  border: 1px dashed var(--color-border);
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.recon b { color: var(--color-text); font-weight: 700; }
+.reconDelta { font-weight: 700; margin-left: var(--space-2); }
+.reconDeltaOk { color: #047857; }
+.reconDeltaWarn { color: var(--color-warning-strong); }
+
+/* flags severity */
+.flagValNeutral { color: var(--color-text-secondary); background: var(--color-bg-elevated); }
+.flagValWarn { color: var(--color-warning-strong); background: var(--color-warning-subtle); }
+
+/* missing criteria chips */
+.missing { display: flex; flex-wrap: wrap; gap: 7px; }
+.mchip {
+  font-size: 0.8125rem;
+  padding: 6px 11px;
+  border-radius: var(--radius-full);
+  background: var(--color-bg-elevated);
+  border: 1px dashed var(--color-text-faint);
+  color: var(--color-text-secondary);
+}

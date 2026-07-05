@@ -7,6 +7,7 @@ import { WebSearchPage } from './pages/WebSearchPage';
 import { RicerchePage } from './pages/ricerche/RicerchePage';
 import { NuovaRicercaPage } from './pages/ricerche/NuovaRicercaPage';
 import { RicercaDetailPage } from './pages/ricerche/RicercaDetailPage';
+import { TargetInspectorPage } from './pages/ricerche/TargetInspectorPage';
 import { IniziativePage } from './pages/iniziative/IniziativePage';
 import { IniziativaBoardPage } from './pages/iniziative/IniziativaBoardPage';
 import { IniziativaCardDossierPage } from './pages/iniziative/IniziativaCardDossierPage';
@@ -16,6 +17,7 @@ export const routes: RouteObject[] = [
   { path: 'ricerche', element: <RicerchePage /> },
   { path: 'ricerche/nuova', element: <NuovaRicercaPage /> },
   { path: 'ricerche/:id', element: <RicercaDetailPage /> },
+  { path: 'ricerche/:id/target/:targetId/inspect', element: <TargetInspectorPage /> },
   { path: 'iniziative', element: <IniziativePage /> },
   { path: 'iniziative/:id', element: <IniziativaBoardPage /> },
   { path: 'iniziative/:id/dossier/:companyKey', element: <IniziativaCardDossierPage /> },

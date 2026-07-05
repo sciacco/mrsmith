@@ -15,6 +15,14 @@ Scopo di questo workstream: una superficie di **ispezione completa, read-only, m
 - **Goal**: renderizzare ogni campo prodotto dalla pipeline per un target session-scoped, in forma navigabile, onesta (raw incluso), marcatamente separata dalle superfici analista.
 - **Non-goal**: curare la presentazione per l'analista (Fase 1, successiva); introdurre superfici di scrittura; sostituire il modal di dettaglio esistente; diventare il dossier D3.
 
+### 1.2 Confine di accettazione (v0) **[DECISO]**
+
+Per evitare dibattito su "è completo?" in fase di implementazione/review:
+- i campi **esplicitamente nominati** nelle tabelle dei tab (§3.1–3.8) **devono** essere renderizzati in modo dedicato (campo o gruppo strutturato);
+- il **Tab 8 JSON grezzo** deve esporre **l'intera risposta** dell'endpoint `GET /sessions/{id}/targets/{targetId}` (il `MATarget` completo), senza filtri;
+- i campi **raggruppati** (es. `deep.valuation.*`) si considerano soddisfatti rendendo esplicitamente i sotto-campi elencati nella riga di tabella;
+- **campi sconosciuti/aggiunti dopo** questa iterazione sono accettabili in v0 se restano visibili nel raw JSON (la renderizzazione dedicata è demandata a un'iterazione successiva).
+
 ## 2. Modello **[DECISO]**
 
 - **Session-scoped**: l'inspector mostra cosa *questa ricerca* ha prodotto/veduto per un'azienda. La cornice di lavorazione nel tempo (registro, diario, tesi context-scoped, IRL, deep cached) vive nel **MA card-dossier** (`/iniziative/:id/dossier/:companyKey`). Il tool standalone `/azienda` **non è una cornice del flusso MA**: è una quick review di un'azienda qualunque via P.IVA, indipendente da MA (ratifica D-B del PRD Iniziative, emendamento EA-1). L'inspector linka il card-dossier quando la sessione ha un'iniziativa; non linka mai `/azienda` come destinazione di lavorazione MA.
@@ -49,7 +57,7 @@ Coerente col PRD Iniziative (piano lavoro vs piano entità). Tab in ordine di co
 | `enrichmentLevel` | 🔒 |
 | `webValidation.selectedDomain`, `webValidation.freshness` | dominio ✅, freshness 🔒 |
 | `deep.status` | 🔒 |
-| CTA: "Apri dossier D3" / "Avvia analisi completa" | — |
+| CTA: "Apri dossier ↗" (navigation link al card-dossier, **mai trigger**) | — |
 
 ### 3.2 Tab 2 — Punteggio (il "perché")
 Goal: ricostruire a occhio `score = Σ(points) × Π(factor)`.
@@ -107,7 +115,7 @@ Il deep cached è **company-keyed globale**: se l'azienda è già stata analizza
 
 Footer: "Deep cached aggiornato il {data}" + link **"Apri dossier ↗"** al card-dossier `/iniziative/:id/dossier/:companyKey` (se `session.initiativeId` presente) per la lavorazione completa.
 
-**Stato B — `deep.status == queued || running`**: empty state "Analisi completa in corso…" (pulse) + `deep.updatedAt`. L'artefatto appare quando `status` diventa `ready` (polling del target). Link "Apri dossier ↗" opzionale.
+**Stato B — `deep.status == queued || running`**: empty state "Analisi completa in corso…" (pulse) + `deep.updatedAt`. L'artefatto appare quando `status` diventa `ready`. **Polling automatico** dell'endpoint target a 5s finché `deep.status` resta `queued/running`, riuso del pattern di `RicercaDetailPage` (polling su status running) e `IniziativaBoardPage` (polling board ogni 5s se `dossierStatus === 'working'`); si ferma a `ready`/`failed`/`nil`. Link "Apri dossier ↗" opzionale.
 
 **Stato C — `deep.status == failed`**: empty state "Analisi non riuscita" + `deep.errorCode` + `deep.updatedAt`. Link "Apri dossier ↗" (se iniziativa presente) per la ritentata nel suo contesto.
 
@@ -151,8 +159,8 @@ Copy onesto nel tab: la lettura di tesi è prodotta per iniziativa; il dossier �
 
 Read-only; le scritture vivono nel dossier.
 
-### 3.8 Tab 8 — JSON grezzo **[PROPOSTA]**
-L'intero `MATarget` — inclusi `vendorPayload`, `webValidation` completo, `deep` — in un viewer collassabile. Verità a monte di qualunque decisione di curation. Copre anche il bisogno "vedere il payload vendor così come torna" (in precedenza tab dedicato, ora assorbito qui). Consigliato in Fase 0; rimuovibile in Fase 1 se ritenuto rumore.
+### 3.8 Tab 8 — JSON grezzo **[DECISO]**
+L'intero `MATarget` — inclusi `vendorPayload`, `webValidation` completo, `deep` — in un viewer collassabile. Verità a monte di qualunque decisione di curation. Copre anche il bisogno "vedere il payload vendor così come torna" (in precedenza tab dedicato, ora assorbito qui). Include in v0 (§7 Fase 0, §8 punto 2); rimuovibile in Fase 1 solo se l'uso reale lo ritiene rumore.
 
 ## 4. Requisiti dati/API
 
@@ -160,7 +168,7 @@ L'intero `MATarget` — inclusi `vendorPayload`, `webValidation` completo, `deep
 |----|-----------|-------|
 | R-DX-1 | Frontend-only per la v0: `GET /binocolo/v1/ma/sessions/{id}/targets/{targetId}` torna già il `MATarget` completo (`vendorPayload`, `evidence` con `points`/`weight`/`sourcePath`, `adjustments`, `flags`, `webValidation` intero, `deep` cached, `outcomes`) | DECISO — verificato in `sessionTargetDetail` / `GetMATargetByID` |
 | R-DX-2 | Trigger deep nell'inspector | **DECISO opzione D**: nessun trigger. Il tab 4 è read-only sul deep cached (stati ready/queued/running/failed/nil). Link al card-dossier `/iniziative/:id/dossier/:companyKey` per la produzione. Endpoint company-keyed puro → APERTO Fase 2 |
-| R-DX-3 | Endpoint registro azienda per facts/notes nel tab 8 | GIÀ esiste in D3 (riuso) |
+| R-DX-3 | Endpoint registro azienda per facts/notes nel **tab 7** | GIÀ esiste in D3 (riuso) |
 | R-DX-4 | Route frontend `/ricerche/:id/target/:targetId/inspect` + voce "Ispezione completa ↗" in row menu e modal di dettaglio | DECISO |
 
 ## 5. Vincoli trasversali
@@ -175,7 +183,7 @@ L'intero `MATarget` — inclusi `vendorPayload`, `webValidation` completo, `deep
 ## 6. Riuso componenti
 
 - **Tab 4 (deep)**: estrarre scorecard/valuation+bridge/brief da `CompanyDossierPage` e `IniziativaCardDossierPage` in componenti condivisi. L'inspector è il primo fruitore "puro" di quei pezzi.
-- **Tab 8 (registro)**: riuso di `CompanyRegistrySection` in modalità read-only (già esiste in `IniziativaCardDossierPage`).
+- **Tab 7 (registro)**: riuso di `CompanyRegistrySection` in modalità read-only (già esiste in `IniziativaCardDossierPage`).
 - **Tab 2 (evidence)**: rendering nuovo ma pattern `evidence` già consumato (top 6) nel modal di dettaglio: generalizzare.
 
 ## 7. Phasing
