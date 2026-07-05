@@ -10,6 +10,7 @@ import { SintesiTab } from './inspector/tabs/SintesiTab';
 import { TesiTab } from './inspector/tabs/TesiTab';
 import { ProvenienzaTab } from './inspector/tabs/ProvenienzaTab';
 import { PunteggioTab } from './inspector/tabs/PunteggioTab';
+import { WebValidationTab } from './inspector/tabs/WebValidationTab';
 import styles from './inspector/Inspector.module.css';
 
 type TabKey = 'sintesi' | 'punteggio' | 'web' | 'deep' | 'tesi' | 'provenienza' | 'registro' | 'json';
@@ -222,6 +223,8 @@ export function TargetInspectorPage() {
           F2 implementa T1 Sintesi, T5 Tesi, T6 Provenienza. */}
       {tab === 'sintesi' ? (
         <SintesiTab target={target} initiativeId={initiativeId} />
+      ) : tab === 'web' ? (
+        <WebValidationTab target={target} />
       ) : tab === 'punteggio' ? (
         <PunteggioTab target={target} />
       ) : tab === 'tesi' ? (
