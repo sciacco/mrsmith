@@ -872,6 +872,24 @@
   text-decoration: line-through;
 }
 
+/* Link "Ispezione completa" — entry point al Target Inspector (F8). */
+.inspectLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-accent);
+  text-decoration: none;
+  margin-left: var(--space-2);
+  vertical-align: middle;
+}
+.inspectLink:hover { text-decoration: underline; }
+/* Nella tabella (riga target): icona compatta accanto alle stelle. */
+td .inspectLink { margin-left: var(--space-1); }
+/* Nel modal: link a sé stante in fondo al body. */
+.detailModalBody .inspectLink { margin-top: var(--space-3); font-size: 0.8125rem; }
+
 /* Filtri sopra ResultsTable */
 .filterRow {
   display: flex;

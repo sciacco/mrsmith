@@ -1,5 +1,22 @@
 # Binocolo — Piano di implementazione Target Inspector (workstream DX)
 
+## Stato implementazione (aggiornato al 2026-07-05)
+
+| Fase | Stato | Note / deviazioni |
+|------|-------|-------------------|
+| **F1** — Shell + fetch + header + tab bar | ✅ DONE | Marker 🔒 usa `Tooltip` design system (non `title` nativo) per affidabilità UX. |
+| **F2** — T1 Sintesi + T5 Tesi + T6 Provenienza | ✅ DONE | Sub-copy «iniziativa «X»» omessa: l'endpoint lean di session espone solo `initiativeId`, non il title (richiederebbe fetch del board intero). |
+| **F3** — T2 Punteggio | ✅ DONE | Ricostruzione `Σpoints × Πfactor` validata su target reale (Δ=0). |
+| **F4** — T3 Web validation | ✅ DONE | Aggiunta `summary` card (mini-grid score components) oltre al wireframe. |
+| **F5** — T4 Deep-dive | ✅ DONE ⚠️ | **Deviazione**: componenti deep ricchi creati in `inspector/deep/` ma **NON swappati** in `IniziativaCardDossierPage` (rendering card-dossier è volontariamente più basilare; swap = refactor con rischio regressione, posticipato). |
+| **F6** — T7 Registro & rating | ✅ DONE | Aggiunta prop `readOnly` a `CompanyRegistrySection` (non-breaking). "Assegnato il {data}" / "Score al rating" omessi: dati non presenti su `MATarget.rating` / `MATargetOutcome`. |
+| **F7** — T8 JSON grezzo | ✅ DONE | Viewer con toggle MATarget/solo non-null + Copia + size indicator. |
+| **F8** — Voci di ingresso | ✅ DONE | **Rettifica piano**: la premessa "RicerchePage row menu" era sbagliata (le righe di `RicerchePage` sono sessioni, non target). Entry point reali: (1) link `Ispezione completa ↗` in fondo al `TargetDetailModal`; (2) icona `external-link` sulla riga target in `ResultsTable` (entrambi in `RicercaDetailPage`). |
+
+**Verifica globale**: `pnpm --filter mrsmith-binocolo exec tsc --noEmit` verde. Tutti i tab T1–T8 popolati + 2 entry point (modal + riga target). Nessun backend toccato. Rotte smoke: `/ricerche/e95445c4-.../target/cc7dc7b0-.../inspect` (deep ready), `/ricerche/5d2b043d-.../target/8b717a73-.../inspect` (deep nil, web validation ricca).
+
+---
+
 > Esegue la specifica di `TARGET-INSPECTOR-PLAN.md` (iterazione 1, tutta [DECISO]) col wireframe `target-inspector-wireframe.html` (T1–T8 + stati A/B/C/D per T4). Frontend-only: l'endpoint `GET /binocolo/v1/ma/sessions/{id}/targets/{targetId}` torna già il `MATarget` completo (`vendorPayload`, `evidence`, `adjustments`, `flags`, `webValidation` intero, `deep` cached, `outcomes`) — verificato in `backend/internal/binocolo/ma_service.go:342` (`sessionTargetDetail`) e `ma_store.go:1990` (`GetMATargetByID`). Ogni task è pensato per essere eseguito **da solo, in ordine**, da un LLM esecutore. Riferimenti a simboli/file verificati sul codice al 2026-07-05: usarli, non inventarne. Se un simbolo citato non esiste più, fermarsi e segnalarlo.
 
 ## Regole globali per l'esecutore (valgono per OGNI task)
@@ -31,7 +48,7 @@ Ordine consigliato: **F1 → F2 → F3 → F4 → F5 → F6 → F7 → F8**. F8 
 
 ---
 
-## F1 — Shell: rotta, banner, identità, tab bar, fetch + stati — PRD §2.1, §3
+## F1 — Shell: rotta, banner, identità, tab bar, fetch + stati — PRD §2.1, §3 — ✅ DONE
 
 **Contesto verificato**: `routes.tsx` (sopra); pattern `useApiClient` + `api.get<MATarget>` in `RicercaDetailPage.tsx:159`; tipo `MATarget` in `api/types.ts:831`; `MASession`/`MASessionDetail` per leggere `initiativeId` sono nello stesso file tipo.
 
@@ -48,7 +65,7 @@ Ordine consigliato: **F1 → F2 → F3 → F4 → F5 → F6 → F7 → F8**. F8 
 
 ---
 
-## F2 — Tab 1 Sintesi + Tab 5 Tesi + Tab 6 Provenienza (tab leggeri) — PRD §3.1, §3.5, §3.6
+## F2 — Tab 1 Sintesi + Tab 5 Tesi + Tab 6 Provenienza (tab leggeri) — PRD §3.1, §3.5, §3.6 — ✅ DONE
 
 **Contesto verificato**: campi `target.rationale`, `target.webValidation?.selectedDomain/freshness`, `target.deep?.status/overallRAG` (via `deep.scorecard.overallRAG`), `target.adjustments`, `target.runId/sessionId/createdAt/scoreVersion/enrichmentLevel`, `target.webValidation.{pipelineVersion,llmModelId,llmPromptId,llmModel,updatedAt,updatedByEmail}`, `target.deep?.updatedAt`.
 
@@ -73,7 +90,7 @@ Ordine consigliato: **F1 → F2 → F3 → F4 → F5 → F6 → F7 → F8**. F8 
 
 ---
 
-## F3 — Tab 2 Punteggio — PRD §3.2
+## F3 — Tab 2 Punteggio — PRD §3.2 — ✅ DONE
 
 **Contesto verificato**: `target.evidence[]` (MATargetEvidence: criterion/status/family/label/value/points/weight/sourcePath), `target.adjustments[]` (MATargetAdjustment: code/label/factor), `target.flags[]` (MATargetFlag: code/label/severity), `target.missingCriteria[]`.
 
@@ -88,7 +105,7 @@ Ordine consigliato: **F1 → F2 → F3 → F4 → F5 → F6 → F7 → F8**. F8 
 
 ---
 
-## F4 — Tab 3 Web validation — PRD §3.3
+## F4 — Tab 3 Web validation — PRD §3.3 — ✅ DONE
 
 **Contesto verificato**: `target.webValidation` (MAWebValidation in `ma_types.go:1165`): `selectedDomain/domainConfidence/domainScore/selectedDomainPayload/domainResponse/identityState/webScore/webConfidence/webValidationState/finalAction/finalDecision.reason/analystVerdict/Action/Confidence/freshness/staleAfter/expiresAt/keywordSet/summary/evidenceRuns[]/candidateMatchAnalysis/candidateMatchError/pipelineVersion/llmModelId/llmPromptId/llmModel/inputHash/keywordSetHash/updatedAt/updatedByEmail`.
 
@@ -103,7 +120,7 @@ Ordine consigliato: **F1 → F2 → F3 → F4 → F5 → F6 → F7 → F8**. F8 
 
 ---
 
-## F5 — Tab 4 Deep-dive (4 stati + polling + riuso componenti) — PRD §3.4
+## F5 — Tab 4 Deep-dive (4 stati + polling + riuso componenti) — PRD §3.4 — ✅ DONE ⚠️ (vedi stato)
 
 **Contesto verificato**: `target.deep` (MADeepAnalysis: status queued/running/ready/failed + scorecard/valuation/brief/costEur/errorCode/updatedAt). Componenti deep rendering oggi **inline** in `apps/binocolo/src/pages/iniziative/IniziativaCardDossierPage.tsx` (scorecard metriche+RAG, reconciliation, quality flags, valuation+bridge, brief a sezioni) — non ancora estratti in modulo condiviso. Pattern polling: `RicercaDetailPage` (polling 4s su status running via `useEffect`+`setInterval`) e `IniziativaBoardPage` (polling board 5s se `dossierStatus === 'working'`).
 
@@ -119,7 +136,7 @@ Ordine consigliato: **F1 → F2 → F3 → F4 → F5 → F6 → F7 → F8**. F8 
 
 ---
 
-## F6 — Tab 7 Registro & rating (read-only mirror) — PRD §3.7
+## F6 — Tab 7 Registro & rating (read-only mirror) — PRD §3.7 — ✅ DONE
 
 **Contesto verificato**: `target.rating` + `target.outcomes[]` (MATargetOutcome); `CompanyRegistrySection` in `apps/binocolo/src/pages/iniziative/CompanyRegistrySection.tsx` ha signature `({ companyKey, vatCode, companyName })` — riusabile **così com'è** (è già read + write, ma nel contesto inspector le sue azioni di scrittura vanno **disabilitate** o omesse: verificare se accetta una prop `readOnly` — se no, aggiungerla o creare un wrapper read-only).
 
@@ -133,7 +150,7 @@ Ordine consigliato: **F1 → F2 → F3 → F4 → F5 → F6 → F7 → F8**. F8 
 
 ---
 
-## F7 — Tab 8 JSON grezzo — PRD §3.8
+## F7 — Tab 8 JSON grezzo — PRD §3.8 — ✅ DONE
 
 **Contesto verificato**: l'intero `MATarget` è già in mano alla page (F1). Niente endpoint aggiuntivi.
 
@@ -147,9 +164,11 @@ Ordine consigliato: **F1 → F2 → F3 → F4 → F5 → F6 → F7 → F8**. F8 
 
 ---
 
-## F8 — Voci di ingresso "Ispezione completa ↗" — PRD §2.1
+## F8 — Voci di ingresso "Ispezione completa ↗" — PRD §2.1 — ✅ DONE (con rettifica)
 
-**Contesto verificato**: `TargetDetailModal` in `RicercaDetailPage.tsx:523` (riceve `row`/`target`); row menu actions in `RicerchePage` sulle `rowCard` (azioni archive/restore/trash). `target.id` e `session.id` (param route) sono disponibili in entrambi i contesti.
+**Contesto verificato**: `TargetDetailModal` in `RicercaDetailPage.tsx` (riceve `row`/`target`); righe target nella `ResultsTable` di `RicercaDetailPage` (il `<tr>` clickabile apre il modal). `target.id` e `session.id` (param route) sono disponibili in entrambi i contesti.
+
+> **Rettifica rispetto al piano originale**: il piano citava "RicerchePage row menu (azioni archive/restore/trash)" come secondo entry point. Quella premessa era **errata**: `RicerchePage` è la lista delle **sessioni**, non dei target — le azioni archive/restore/trash sono su righe di sessione. I target vivono solo in `RicercaDetailPage`. Il secondo entry point è quindi stato posizionato sulla riga target della `ResultsTable`.
 
 **Passi**:
 1. **In `TargetDetailModal`**: aggiungere in fondo al body un link `Ispezione completa ↗` (target `_blank`) → `/ricerche/${sessionId}/target/${target.id}/inspect`. Style: link secondario, non compete con le CTA principali del modal. Verificare che `sessionId` sia disponibile nel scope del modal (in `RicercaDetailPage` è `id` da `useParams`; passarlo come prop al modal se non già fatto).

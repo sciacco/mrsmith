@@ -481,7 +481,7 @@ export function RicercaDetailPage() {
                 </button>
               </div>
               {activeTab === 'results' ? (
-                <ResultsTable rows={resultTargets} loading={rowsLoading} onOpen={setSelectedRow} onRate={(target, rating) => void rateTarget(target, rating)} />
+                <ResultsTable rows={resultTargets} loading={rowsLoading} sessionId={id} onOpen={setSelectedRow} onRate={(target, rating) => void rateTarget(target, rating)} />
               ) : null}
               {activeTab === 'queue' ? (
                 <QueueTab
@@ -525,6 +525,7 @@ export function RicercaDetailPage() {
         target={selectedTarget}
         loading={targetLoading}
         error={targetError}
+        sessionId={id}
         onClose={() => {
           setSelectedRow(null);
           setTargetError(null);
@@ -767,11 +768,13 @@ function BucketLegend({ className, label, count, hint }: { className: string; la
 function ResultsTable({
   rows,
   loading,
+  sessionId,
   onOpen,
   onRate,
 }: {
   rows: MATargetRow[];
   loading: boolean;
+  sessionId?: string;
   onOpen: (target: MATargetRow) => void;
   onRate: (target: MATargetRow, rating: number) => void;
 }) {
@@ -871,6 +874,18 @@ function ResultsTable({
                   rating={target.rating ?? 0}
                   onRate={(rating) => onRate(target, rating)}
                 />
+                {sessionId ? (
+                  <a
+                    className={styles.inspectLink}
+                    href={`/ricerche/${sessionId}/target/${target.id}/inspect`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    title="Ispezione completa (nuova tab)"
+                  >
+                    <Icon name="external-link" size={14} />
+                  </a>
+                ) : null}
               </td>
             </tr>
           ))}
@@ -1078,12 +1093,14 @@ function TargetDetailModal({
   target,
   loading,
   error,
+  sessionId,
   onClose,
 }: {
   row: MATargetRow | null;
   target: MATarget | null;
   loading: boolean;
   error: string | null;
+  sessionId?: string;
   onClose: () => void;
 }) {
   return (
@@ -1139,6 +1156,17 @@ function TargetDetailModal({
                 </span>
               ))}
             </div>
+          ) : null}
+
+          {sessionId && row ? (
+            <a
+              className={styles.inspectLink}
+              href={`/ricerche/${sessionId}/target/${row.id}/inspect`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Ispezione completa <Icon name="external-link" size={14} />
+            </a>
           ) : null}
         </div>
       ) : null}

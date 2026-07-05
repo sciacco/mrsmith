@@ -12,6 +12,8 @@ import { ProvenienzaTab } from './inspector/tabs/ProvenienzaTab';
 import { PunteggioTab } from './inspector/tabs/PunteggioTab';
 import { WebValidationTab } from './inspector/tabs/WebValidationTab';
 import { DeepTab } from './inspector/tabs/DeepTab';
+import { RegistroTab } from './inspector/tabs/RegistroTab';
+import { JsonTab } from './inspector/tabs/JsonTab';
 import styles from './inspector/Inspector.module.css';
 
 type TabKey = 'sintesi' | 'punteggio' | 'web' | 'deep' | 'tesi' | 'provenienza' | 'registro' | 'json';
@@ -247,6 +249,10 @@ export function TargetInspectorPage() {
         />
       ) : tab === 'punteggio' ? (
         <PunteggioTab target={target} />
+      ) : tab === 'json' ? (
+        <JsonTab target={target} />
+      ) : tab === 'registro' ? (
+        <RegistroTab target={target} initiativeId={initiativeId} />
       ) : tab === 'tesi' ? (
         <TesiTab target={target} initiativeId={initiativeId} />
       ) : tab === 'provenienza' ? (

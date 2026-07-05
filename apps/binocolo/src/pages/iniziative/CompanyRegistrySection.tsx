@@ -51,10 +51,12 @@ export function CompanyRegistrySection({
   companyKey,
   vatCode,
   companyName,
+  readOnly = false,
 }: {
   companyKey: string;
   vatCode?: string;
   companyName?: string;
+  readOnly?: boolean;
 }) {
   const api = useApiClient();
   const queryClient = useQueryClient();
@@ -144,9 +146,11 @@ export function CompanyRegistrySection({
                   {f.note}
                   <span className={styles.factWho}>{whoWhen(f.createdByEmail, f.createdAt)}</span>
                 </span>
-                <button type="button" className={styles.linkBtn} onClick={() => setRevokeTarget(f)}>
-                  Revoca
-                </button>
+                {readOnly ? null : (
+                  <button type="button" className={styles.linkBtn} onClick={() => setRevokeTarget(f)}>
+                    Revoca
+                  </button>
+                )}
               </li>
             ))}
           </ul>
@@ -175,11 +179,13 @@ export function CompanyRegistrySection({
             ) : null}
           </div>
         ) : null}
-        <div className={styles.factActions}>
-          <Button variant="secondary" size="sm" onClick={() => setFactModalOpen(true)}>
-            + Registra fatto
-          </Button>
-        </div>
+        {readOnly ? null : (
+          <div className={styles.factActions}>
+            <Button variant="secondary" size="sm" onClick={() => setFactModalOpen(true)}>
+              + Registra fatto
+            </Button>
+          </div>
+        )}
       </section>
 
       <section className={styles.section}>
@@ -198,25 +204,27 @@ export function CompanyRegistrySection({
             ))}
           </ul>
         )}
-        <div className={styles.noteComposer}>
-          <input
-            type="text"
-            className={styles.noteInput}
-            value={noteBody}
-            onChange={(e) => setNoteBody(e.target.value)}
-            placeholder="Aggiungi nota d'azienda…"
-            maxLength={1000}
-          />
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={!noteBody.trim()}
-            loading={createNote.isPending}
-            onClick={() => createNote.mutate()}
-          >
-            Aggiungi
-          </Button>
-        </div>
+        {readOnly ? null : (
+          <div className={styles.noteComposer}>
+            <input
+              type="text"
+              className={styles.noteInput}
+              value={noteBody}
+              onChange={(e) => setNoteBody(e.target.value)}
+              placeholder="Aggiungi nota d'azienda…"
+              maxLength={1000}
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={!noteBody.trim()}
+              loading={createNote.isPending}
+              onClick={() => createNote.mutate()}
+            >
+              Aggiungi
+            </Button>
+          </div>
+        )}
       </section>
 
       <Modal open={factModalOpen} onClose={() => setFactModalOpen(false)} title="Registra fatto">
