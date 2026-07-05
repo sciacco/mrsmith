@@ -23,6 +23,9 @@ const (
 	RDAAppID   = "rda"
 	RDAAppHref = "/apps/rda/"
 
+	StatsRDAAppID   = "stats-rda"
+	StatsRDAAppHref = "/apps/stats-rda/"
+
 	ComplianceAppID   = "compliance"
 	ComplianceAppHref = "/apps/compliance/"
 
@@ -82,6 +85,7 @@ var (
 	fornitoriAccessRoles             = []string{"app_fornitori_access"}
 	fornitoriSkipQualificationRoles  = []string{"app_fornitori_skip_qualification"}
 	rdaAccessRoles                   = []string{"app_rda_access"}
+	statsRdaAccessRoles              = []string{"app_stats_rda_access"}
 	complianceAccessRoles            = []string{"app_compliance_access"}
 	copertureAccessRoles             = []string{"app_coperture_access"}
 	cpBackofficeAccessRoles          = []string{"app_cpbackoffice_access"}
@@ -175,6 +179,17 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 			CategoryID:    "acquisti",
 			CategoryTitle: "Acquisti",
 			AccessRoles:   RDAAccessRoles(),
+		},
+		{
+			ID:            StatsRDAAppID,
+			Name:          "Statistiche RDA",
+			Description:   "Ricerca e consultazione degli ordini di acquisto (archivio PA).",
+			Icon:          "chart",
+			Href:          StatsRDAAppHref,
+			Status:        "ready",
+			CategoryID:    "acquisti",
+			CategoryTitle: "Acquisti",
+			AccessRoles:   StatsRDAAccessRoles(),
 		},
 		// {
 		// 	ID:            "gestione-utenti",
@@ -505,6 +520,10 @@ func RDAAccessRoles() []string {
 	return slices.Clone(rdaAccessRoles)
 }
 
+func StatsRDAAccessRoles() []string {
+	return slices.Clone(statsRdaAccessRoles)
+}
+
 func ComplianceAccessRoles() []string {
 	return slices.Clone(complianceAccessRoles)
 }
@@ -639,6 +658,7 @@ func AllRoles() []string {
 		fornitoriAccessRoles,
 		fornitoriSkipQualificationRoles,
 		rdaAccessRoles,
+		statsRdaAccessRoles,
 		complianceAccessRoles,
 		copertureAccessRoles,
 		cpBackofficeAccessRoles,

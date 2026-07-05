@@ -10,6 +10,7 @@
     "dev:budget": "pnpm --filter mrsmith-budget dev",
     "dev:fornitori": "pnpm --filter mrsmith-fornitori dev",
     "dev:rda": "pnpm --filter mrsmith-rda dev",
+    "dev:stats-rda": "pnpm --filter mrsmith-stats-rda dev",
     "dev:compliance": "pnpm --filter mrsmith-compliance dev",
     "dev:kit-products": "pnpm --filter mrsmith-kit-products dev",
     "dev:listini": "pnpm --filter mrsmith-listini-e-sconti dev",

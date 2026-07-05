@@ -22,6 +22,7 @@ export const APP_ACCESS_ROLES = {
   budget: ['app_budget_access'],
   fornitori: ['app_fornitori_access'],
   rda: ['app_rda_access'],
+  'stats-rda': ['app_stats_rda_access'],
   compliance: ['app_compliance_access'],
   coperture: ['app_coperture_access'],
   'cp-backoffice': CP_BACKOFFICE_APP_ACCESS_ROLES,

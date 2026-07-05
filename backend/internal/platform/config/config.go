@@ -33,6 +33,7 @@ type Config struct {
 	BudgetAppURL               string
 	FornitoriAppURL            string
 	RDAAppURL                  string
+	StatsRDAAppURL             string
 	ComplianceAppURL           string
 	CopertureAppURL            string
 	CPBackofficeAppURL         string
@@ -212,6 +213,7 @@ func Load() Config {
 		BudgetAppURL:                 envOr("BUDGET_APP_URL", ""),
 		FornitoriAppURL:              envOr("FORNITORI_APP_URL", ""),
 		RDAAppURL:                    envOr("RDA_APP_URL", ""),
+		StatsRDAAppURL:               envOr("STATS_RDA_APP_URL", ""),
 		ComplianceAppURL:             envOr("COMPLIANCE_APP_URL", ""),
 		CopertureAppURL:              envOr("COPERTURE_APP_URL", ""),
 		CPBackofficeAppURL:           envOr("CP_BACKOFFICE_APP_URL", ""),

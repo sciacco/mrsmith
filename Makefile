@@ -47,6 +47,10 @@ dev-fornitori:        ## Solo fornitori app
 dev-rda:              ## Solo RDA app
 	pnpm --filter mrsmith-rda dev
 
+.PHONY: dev-stats-rda
+dev-stats-rda:        ## Solo Statistiche RDA app
+	pnpm --filter mrsmith-stats-rda dev
+
 .PHONY: dev-compliance
 dev-compliance:       ## Solo compliance app
 	pnpm --filter mrsmith-compliance dev

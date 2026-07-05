@@ -53,6 +53,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/raenad"
 	"github.com/sciacco/mrsmith/internal/rda"
 	"github.com/sciacco/mrsmith/internal/rdf"
+	"github.com/sciacco/mrsmith/internal/statsrda"
 	"github.com/sciacco/mrsmith/internal/rdfbackend"
 	"github.com/sciacco/mrsmith/internal/reports"
 	"github.com/sciacco/mrsmith/internal/simulatorivendita"
@@ -405,6 +406,11 @@ func main() {
 	} else if cfg.StaticDir == "" {
 		hrefOverrides[applaunch.RDAAppID] = "http://localhost:5190"
 	}
+	if cfg.StatsRDAAppURL != "" {
+		hrefOverrides[applaunch.StatsRDAAppID] = cfg.StatsRDAAppURL
+	} else if cfg.StaticDir == "" {
+		hrefOverrides[applaunch.StatsRDAAppID] = "http://localhost:5196"
+	}
 	if cfg.ComplianceAppURL != "" {
 		hrefOverrides[applaunch.ComplianceAppID] = cfg.ComplianceAppURL
 	} else if cfg.StaticDir == "" {
@@ -515,6 +521,9 @@ func main() {
 			if definition.ID == applaunch.RDAAppID && (arakCli == nil || arakDB == nil) {
 				continue
 			}
+			if definition.ID == applaunch.StatsRDAAppID && arakDB == nil {
+				continue
+			}
 			if definition.ID == applaunch.EnergiaDCAppID && cfg.GrappaDSN == "" {
 				continue
 			}
@@ -564,6 +573,7 @@ func main() {
 	binocoloDeepWorker := binocolo.RegisterRoutes(api, binocolo.Deps{OpenAPIIT: openapiitCli, Brave: braveCli, Scrape: scrapeCli, LLM: llmSvc, AnisettaDB: anisettaDB, InstanceOwner: cfg.InstanceOwner})
 	budget.RegisterRoutes(api, arakCli)
 	fornitori.RegisterRoutes(api, arakCli, arakDB, alyanteDB)
+	statsrda.RegisterRoutes(api, arakDB)
 	rda.RegisterRoutes(api, rda.Deps{
 		Arak:               arakCli,
 		ArakDB:             arakDB,
