@@ -88,6 +88,40 @@ export interface RiepilogoResponse {
   details: RiepilogoDetail[];
 }
 
+export interface RiepilogoRdaBudget {
+  budget_key: string;
+  budget: string;
+  budget_id: number | null;
+  budget_name: string | null;
+  budget_year: number | null;
+  order_count: number;
+  amount: number;
+  percentage: number;
+}
+
+export interface RiepilogoRdaDetail {
+  code: string;
+  project: string | null;
+  object: string | null;
+  requester: string | null;
+  budget_id: number | null;
+  budget_name: string | null;
+  budget_year: number | null;
+  cost_center: string | null;
+  currency: string | null;
+  total_price: number;
+  state: string | null;
+  created: string | null;
+  company_name: string | null;
+}
+
+export interface RiepilogoRdaResponse {
+  period: RiepilogoPeriod;
+  totals: RiepilogoTotals;
+  budgets: RiepilogoRdaBudget[];
+  details: RiepilogoRdaDetail[];
+}
+
 export interface IssueHeader {
   issue_key: string;
   summary: string;

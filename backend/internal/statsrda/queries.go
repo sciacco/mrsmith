@@ -49,6 +49,14 @@ func (n nullInt) ptr() *int64 {
 	return &n.Int64
 }
 
+func (n nullInt) intPtr() *int {
+	if !n.Valid {
+		return nil
+	}
+	v := int(n.Int64)
+	return &v
+}
+
 // ---- /pa/filters --------------------------------------------------------- //
 
 const filtersQuery = `
@@ -97,7 +105,7 @@ func (h *Handler) handleFilters(w http.ResponseWriter, r *http.Request) {
 
 	resp := FiltersResponse{
 		Budget: []FilterOption{}, Stati: []FilterOption{},
-		Tipi:   []FilterOption{}, Valute: []FilterOption{},
+		Tipi: []FilterOption{}, Valute: []FilterOption{},
 	}
 
 	readOptions := func(query string) ([]FilterOption, error) {

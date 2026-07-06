@@ -50,6 +50,43 @@ type RiepilogoResponse struct {
 	Details []RiepilogoDetail `json:"details"`
 }
 
+// RiepilogoRDABudget is one RDA budget aggregate row.
+type RiepilogoRDABudget struct {
+	BudgetKey  string  `json:"budget_key"`
+	Budget     string  `json:"budget"`
+	BudgetID   *int64  `json:"budget_id"`
+	BudgetName *string `json:"budget_name"`
+	BudgetYear *int    `json:"budget_year"`
+	OrderCount int     `json:"order_count"`
+	Amount     float64 `json:"amount"`
+	Percentage float64 `json:"percentage"`
+}
+
+// RiepilogoRDADetail is one RDA purchase order detail row for the selected period.
+type RiepilogoRDADetail struct {
+	Code        string  `json:"code"`
+	Project     *string `json:"project"`
+	Object      *string `json:"object"`
+	Requester   *string `json:"requester"`
+	BudgetID    *int64  `json:"budget_id"`
+	BudgetName  *string `json:"budget_name"`
+	BudgetYear  *int    `json:"budget_year"`
+	CostCenter  *string `json:"cost_center"`
+	Currency    *string `json:"currency"`
+	TotalPrice  float64 `json:"total_price"`
+	State       *string `json:"state"`
+	Created     *string `json:"created"`
+	CompanyName *string `json:"company_name"`
+}
+
+// RiepilogoRDAResponse is the JSON envelope for /rda/riepilogo.
+type RiepilogoRDAResponse struct {
+	Period  RiepilogoPeriod      `json:"period"`
+	Totals  RiepilogoTotals      `json:"totals"`
+	Budgets []RiepilogoRDABudget `json:"budgets"`
+	Details []RiepilogoRDADetail `json:"details"`
+}
+
 // IssueSummary is one row of the list endpoint (/pa/issues).
 type IssueSummary struct {
 	IssueKey             string   `json:"issue_key"`

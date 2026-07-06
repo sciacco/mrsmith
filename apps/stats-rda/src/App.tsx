@@ -5,9 +5,10 @@ import { routes } from './routes';
 import { useOptionalAuth } from './hooks/useOptionalAuth';
 
 const navItems = [
-  { label: 'Archivio PA', path: '/archivio-pa' },
+  { label: 'Riepilogo RDA', path: '/riepilogo-rda' },
   { label: 'Riepilogo PA Jira', path: '/riepilogo-pa' },
   { label: 'RDA', path: '/rda' },
+  { label: 'Archivio PA', path: '/archivio-pa' },
 ];
 
 function AppRoutes() {

@@ -65,6 +65,8 @@ func RegisterRoutes(mux *http.ServeMux, arakDB *sql.DB) {
 	handle("GET /stats-rda/v1/pa/richiedenti", h.handleRichiedentiAutocomplete)
 	handle("GET /stats-rda/v1/pa/riepilogo", h.handleRiepilogo)
 	handle("GET /stats-rda/v1/pa/riepilogo/export", h.handleRiepilogoExport)
+	handle("GET /stats-rda/v1/rda/riepilogo", h.handleRiepilogoRDA)
+	handle("GET /stats-rda/v1/rda/riepilogo/export", h.handleRiepilogoRDAExport)
 	handle("GET /stats-rda/v1/pa/issues", h.handleIssueList)
 	handle("GET /stats-rda/v1/pa/issues/{issueKey}", h.handleIssueDetail)
 }
