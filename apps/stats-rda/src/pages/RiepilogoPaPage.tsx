@@ -65,13 +65,6 @@ function formatDateTime(value: string | null | undefined): string {
   }).format(date);
 }
 
-function formatPercent(value: number): string {
-  return new Intl.NumberFormat('it-IT', {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  }).format(value);
-}
-
 function filenameFor(period: RiepilogoPeriodSelection, from?: string, to?: string): string {
   if (from && to) return `riepilogo-pa-jira_${period}_${from}_${to}.xlsx`;
   return `riepilogo-pa-jira_${period}.xlsx`;
@@ -315,7 +308,7 @@ export function RiepilogoPaPage() {
                   budget={budget}
                   maxAmount={maxAmount}
                   selected={selectedBudget === budget.budget}
-                  onSelect={() => setSelectedBudget(budget.budget)}
+                  onSelect={() => setSelectedBudget((current) => (current === budget.budget ? null : budget.budget))}
                 />
               ))}
             </div>
@@ -395,7 +388,9 @@ function BudgetBar({
   onSelect: () => void;
 }) {
   const width = maxAmount > 0 ? Math.max(4, (budget.amount / maxAmount) * 100) : 0;
-  const tooltip = `${budget.budget} — ${formatEUR(budget.amount)} — ${formatPercent(budget.percentage)}% — ${budget.order_count} ordini`;
+  const readableAmount = formatEUR(Math.floor(budget.amount));
+  const readablePercentage = Math.floor(budget.percentage).toLocaleString('it-IT');
+  const tooltip = `${budget.budget} — ${readableAmount} — ${readablePercentage}% — ${budget.order_count} ordini`;
 
   return (
     <button
@@ -406,11 +401,13 @@ function BudgetBar({
       aria-pressed={selected}
       aria-label={tooltip}
     >
-      <span className={s.barMeta}>
+      <span className={s.barHeader}>
         <span className={s.barBudget}>{budget.budget}</span>
-        <span className={s.barValues}>
-          {formatEUR(budget.amount)} · {formatPercent(budget.percentage)}% · {budget.order_count} ordini
-        </span>
+        <span className={s.barAmount}>{readableAmount}</span>
+      </span>
+      <span className={s.barStats}>
+        <span>{readablePercentage}% del totale</span>
+        <span>{budget.order_count.toLocaleString('it-IT')} ordini PA</span>
       </span>
       <span className={s.barTrack} aria-hidden="true">
         <span className={s.barFill} style={{ width: `${width}%` }} />
