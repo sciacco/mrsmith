@@ -359,7 +359,7 @@ export function RicerchePage() {
   );
 }
 
-function EmptyState({ icon, title, text }: { icon: 'search' | 'file-text'; title: string; text: string }) {
+function EmptyState({ icon, title, text }: { icon: 'search' | 'file-text' | 'trash'; title: string; text: string }) {
   return (
     <div className={styles.emptyState}>
       <span className={styles.emptyIcon}>
@@ -371,10 +371,3 @@ function EmptyState({ icon, title, text }: { icon: 'search' | 'file-text'; title
   );
 }
 
-function statusClassName(status: MASessionSummary['status']): string {
-  const base = styles.statusPill ?? '';
-  if (status === 'running' || status === 'estimating') return `${base} ${styles.statusRunning}`;
-  if (status === 'completed' || status === 'estimated') return `${base} ${styles.statusDone}`;
-  if (status === 'failed') return `${base} ${styles.statusFailed}`;
-  return base;
-}

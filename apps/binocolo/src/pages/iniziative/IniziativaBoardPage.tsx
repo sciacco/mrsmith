@@ -1,5 +1,6 @@
 import { Button, Drawer, Icon, Modal, Skeleton, useToast } from '@mrsmith/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApiClient } from '../../api/client';
 import type {
@@ -68,16 +69,16 @@ function registryLabel(kind: string) {
 }
 
 const STATE_COLORS: Record<string, string> = {
-  da_contattare: styles.statusGrey,
-  contattata: styles.statusBlue,
-  in_dialogo: styles.statusIndigo,
-  approfondimento: styles.statusPurple,
-  offerta: styles.statusOrange,
-  chiusa: styles.statusGreen,
+  da_contattare: styles.statusGrey ?? '',
+  contattata: styles.statusBlue ?? '',
+  in_dialogo: styles.statusIndigo ?? '',
+  approfondimento: styles.statusPurple ?? '',
+  offerta: styles.statusOrange ?? '',
+  chiusa: styles.statusGreen ?? '',
 };
 
 function stateBadgeClass(state: string) {
-  return `${styles.statusBadge} ${STATE_COLORS[state] || styles.statusGrey}`;
+  return `${styles.statusBadge} ${STATE_COLORS[state] ?? styles.statusGrey ?? ''}`;
 }
 
 function collapseStorageKey(initiativeId: string) {
@@ -762,7 +763,7 @@ function CardDrawer({
       );
       setEvents(res.items);
     } catch (e) {
-      toast(errorLabel(e, 'Errore nel caricamento del diario'), 'error');
+      toast(errorLabel(e), 'error');
     } finally {
       setLoadingEvents(false);
     }
@@ -822,6 +823,11 @@ function CardDrawer({
           <Button variant="secondary" size="sm" onClick={() => onOpenDossier(card)}>
             Dossier ↗
           </Button>
+          {card.state === 'chiusa' ? (
+            <Button variant="secondary" size="sm" onClick={() => void onReopen(card.companyKey)}>
+              Riapri
+            </Button>
+          ) : null}
           {card.state !== 'chiusa' && card.state !== 'rimossa' && (
             <Button variant="secondary" size="sm" onClick={() => onOpenRemoveModal(card)}>
               <Icon name="trash" size={14} />
