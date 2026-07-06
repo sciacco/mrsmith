@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ApiError } from '@mrsmith/api-client';
 import { Icon, SingleSelect, Skeleton } from '@mrsmith/ui';
@@ -366,33 +366,49 @@ export function RiepilogoRdaPage() {
                   <thead>
                     <tr>
                       <th>Ordine</th>
-                      <th>Progetto</th>
-                      <th>Oggetto</th>
                       <th>Budget</th>
-                      <th>Centro di costo</th>
                       <th className={s.numeric}>Importo totale</th>
-                      <th>Valuta</th>
-                      <th>Richiedente</th>
-                      <th>Fornitore</th>
                       <th>Stato</th>
                       <th>Creato</th>
                     </tr>
                   </thead>
                   <tbody>
                     {visibleDetails.map((detail, idx) => (
-                      <tr key={`${detail.code}-${idx}`} style={{ animationDelay: `${Math.min(idx * 20, 300)}ms` }}>
-                        <td><div className={s.orderKey}>{nz(detail.code)}</div></td>
-                        <td>{nz(detail.project)}</td>
-                        <td>{nz(detail.object)}</td>
-                        <td>{budgetLabel(detail)}</td>
-                        <td>{nz(detail.cost_center)}</td>
-                        <td className={s.numeric}>{formatEUR(detail.total_price)}</td>
-                        <td>{nz(detail.currency)}</td>
-                        <td>{nz(detail.requester)}</td>
-                        <td>{nz(detail.company_name)}</td>
-                        <td>{stateLabel(detail.state)}</td>
-                        <td>{formatDateTime(detail.created)}</td>
-                      </tr>
+                      <Fragment key={`${detail.code}-${idx}`}>
+                        <tr className={s.recordMainRow} style={{ animationDelay: `${Math.min(idx * 20, 300)}ms` }}>
+                          <td><div className={s.orderKey}>{nz(detail.code)}</div></td>
+                          <td>{budgetLabel(detail)}</td>
+                          <td className={s.numeric}>{formatEUR(detail.total_price)}</td>
+                          <td>{stateLabel(detail.state)}</td>
+                          <td>{formatDateTime(detail.created)}</td>
+                        </tr>
+                        <tr className={s.recordContextRow} style={{ animationDelay: `${Math.min(idx * 20 + 40, 340)}ms` }}>
+                          <td colSpan={5}>
+                            <dl className={s.contextGrid} aria-label={`Contesto ordine ${nz(detail.code)}`}>
+                              <div className={s.metaItem}>
+                                <dt>Oggetto</dt>
+                                <dd>{nz(detail.object)}</dd>
+                              </div>
+                              <div className={s.metaItem}>
+                                <dt>Progetto</dt>
+                                <dd>{nz(detail.project)}</dd>
+                              </div>
+                              <div className={s.metaItem}>
+                                <dt>Centro di costo</dt>
+                                <dd>{nz(detail.cost_center)}</dd>
+                              </div>
+                              <div className={s.metaItem}>
+                                <dt>Fornitore</dt>
+                                <dd>{nz(detail.company_name)}</dd>
+                              </div>
+                              <div className={s.metaItem}>
+                                <dt>Richiedente</dt>
+                                <dd>{nz(detail.requester)}</dd>
+                              </div>
+                            </dl>
+                          </td>
+                        </tr>
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>

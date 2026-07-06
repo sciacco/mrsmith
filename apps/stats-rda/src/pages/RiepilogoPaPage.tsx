@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ApiError } from '@mrsmith/api-client';
 import { Icon, SingleSelect, Skeleton } from '@mrsmith/ui';
@@ -336,34 +336,48 @@ export function RiepilogoPaPage() {
                   <thead>
                     <tr>
                       <th>Ordine</th>
-                      <th>Oggetto</th>
                       <th>Budget</th>
                       <th className={s.numeric}>Importo totale</th>
-                      <th>Valuta</th>
-                      <th>Richiedente</th>
-                      <th>Fornitore</th>
                       <th>Stato</th>
-                      <th>Risoluzione</th>
                       <th>Creato</th>
                     </tr>
                   </thead>
                   <tbody>
                     {visibleDetails.map((detail, idx) => (
-                      <tr key={detail.issue_key} style={{ animationDelay: `${Math.min(idx * 20, 300)}ms` }}>
-                        <td>
-                          <div className={s.orderKey}>{detail.issue_key}</div>
-                          {detail.numero_ordine && <div className={s.secondaryText}>{detail.numero_ordine}</div>}
-                        </td>
-                        <td>{nz(detail.summary)}</td>
-                        <td>{nz(detail.budget_di_riferimento)}</td>
-                        <td className={s.numeric}>{formatEUR(detail.importo_totale)}</td>
-                        <td>{nz(detail.valuta)}</td>
-                        <td>{nz(detail.reporter_name)}</td>
-                        <td>{nz(detail.fornitore_selezionato)}</td>
-                        <td>{nz(detail.status)}</td>
-                        <td>{nz(detail.resolution)}</td>
-                        <td>{formatDateTime(detail.created)}</td>
-                      </tr>
+                      <Fragment key={detail.issue_key}>
+                        <tr className={s.recordMainRow} style={{ animationDelay: `${Math.min(idx * 20, 300)}ms` }}>
+                          <td>
+                            <div className={s.orderKey}>{nz(detail.issue_key)}</div>
+                            <div className={s.secondaryText}>Numero ordine: {nz(detail.numero_ordine)}</div>
+                          </td>
+                          <td>{nz(detail.budget_di_riferimento)}</td>
+                          <td className={s.numeric}>{formatEUR(detail.importo_totale)}</td>
+                          <td>{nz(detail.status)}</td>
+                          <td>{formatDateTime(detail.created)}</td>
+                        </tr>
+                        <tr className={s.recordContextRow} style={{ animationDelay: `${Math.min(idx * 20 + 40, 340)}ms` }}>
+                          <td colSpan={5}>
+                            <dl className={s.contextGrid} aria-label={`Contesto ordine ${nz(detail.issue_key)}`}>
+                              <div className={s.metaItem}>
+                                <dt>Oggetto</dt>
+                                <dd>{nz(detail.summary)}</dd>
+                              </div>
+                              <div className={s.metaItem}>
+                                <dt>Fornitore</dt>
+                                <dd>{nz(detail.fornitore_selezionato)}</dd>
+                              </div>
+                              <div className={s.metaItem}>
+                                <dt>Richiedente</dt>
+                                <dd>{nz(detail.reporter_name)}</dd>
+                              </div>
+                              <div className={s.metaItem}>
+                                <dt>Risoluzione</dt>
+                                <dd>{nz(detail.resolution)}</dd>
+                              </div>
+                            </dl>
+                          </td>
+                        </tr>
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>

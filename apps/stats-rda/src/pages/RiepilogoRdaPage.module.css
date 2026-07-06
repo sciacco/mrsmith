@@ -313,7 +313,7 @@
 
 .table {
   width: 100%;
-  min-width: 78rem;
+  min-width: 54rem;
   border-collapse: collapse;
   font-size: 0.875rem;
 }
@@ -333,7 +333,6 @@
 
 .table tbody td {
   padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--color-border-subtle);
   color: var(--color-text);
   vertical-align: top;
 }
@@ -343,12 +342,23 @@
   transition: background var(--duration-fast) var(--ease-out);
 }
 
-.table tbody tr:hover {
+.recordMainRow td {
+  border-bottom: 0;
+}
+
+.recordMainRow:hover,
+.recordContextRow:hover {
   background: var(--color-accent-subtle);
 }
 
-.table tbody tr:active {
+.recordMainRow:active {
   transform: scale(0.995);
+}
+
+.recordContextRow td {
+  padding-top: 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  color: var(--color-text-secondary);
 }
 
 .numeric {
@@ -368,6 +378,38 @@
   margin-top: var(--space-1);
   color: var(--color-text-muted);
   font-size: 0.8125rem;
+}
+
+.contextGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+}
+
+.metaItem {
+  min-width: 0;
+}
+
+.metaItem dt {
+  margin: 0 0 var(--space-1);
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.metaItem dd {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .emptyState,
@@ -436,6 +478,10 @@
   .barAmount {
     text-align: left;
   }
+
+  .contextGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 640px) {
@@ -448,6 +494,14 @@
 
   .metricCard strong {
     font-size: 1.4rem;
+  }
+
+  .table {
+    min-width: 46rem;
+  }
+
+  .contextGrid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
