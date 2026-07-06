@@ -76,6 +76,16 @@ function errorMessage(error: unknown): string {
   return 'Non è stato possibile caricare il riepilogo PA.';
 }
 
+function formatBudgetEUR(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value)) return '—';
+  return new Intl.NumberFormat('it-IT', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(Math.floor(value));
+}
+
 export function RiepilogoPaPage() {
   const [params, setParams] = useSearchParams();
   const api = useApiClient();
@@ -174,6 +184,12 @@ export function RiepilogoPaPage() {
     () => Math.max(0, ...(data?.budgets.map((budget) => budget.amount) ?? [])),
     [data?.budgets],
   );
+
+  const visibleBudgets = useMemo(() => {
+    const budgets = data?.budgets ?? [];
+    if (!selectedBudget) return budgets;
+    return budgets.filter((budget) => budget.budget === selectedBudget);
+  }, [data?.budgets, selectedBudget]);
 
   const visibleDetails = useMemo(() => {
     const details = data?.details ?? [];
@@ -302,7 +318,7 @@ export function RiepilogoPaPage() {
               )}
             </div>
             <div className={s.barList} role="list" aria-label="Budget ordinati per importo">
-              {data.budgets.map((budget) => (
+              {visibleBudgets.map((budget) => (
                 <BudgetBar
                   key={budget.budget}
                   budget={budget}
@@ -402,7 +418,7 @@ function BudgetBar({
   onSelect: () => void;
 }) {
   const width = maxAmount > 0 ? Math.max(4, (budget.amount / maxAmount) * 100) : 0;
-  const readableAmount = formatEUR(Math.floor(budget.amount));
+  const readableAmount = formatBudgetEUR(budget.amount);
   const readablePercentage = Math.floor(budget.percentage).toLocaleString('it-IT');
   const tooltip = `${budget.budget} — ${readableAmount} — ${readablePercentage}% — ${budget.order_count} ordini`;
 
