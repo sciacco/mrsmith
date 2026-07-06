@@ -38,6 +38,54 @@ export interface AutocompleteResponse {
   items: FilterOption[];
 }
 
+export type PeriodPreset =
+  | 'this_month'
+  | 'previous_month'
+  | 'this_quarter'
+  | 'previous_quarter'
+  | 'current_year'
+  | 'previous_year';
+
+export interface RiepilogoPeriod {
+  preset: PeriodPreset;
+  from: string;
+  to: string;
+}
+
+export interface RiepilogoTotals {
+  order_count: number;
+  budget_count: number;
+  amount: number;
+}
+
+export interface RiepilogoBudget {
+  budget: string;
+  order_count: number;
+  amount: number;
+  percentage: number;
+}
+
+export interface RiepilogoDetail {
+  issue_key: string;
+  numero_ordine: string | null;
+  summary: string;
+  budget_di_riferimento: string;
+  importo_totale: number;
+  valuta: string | null;
+  reporter_name: string | null;
+  fornitore_selezionato: string | null;
+  status: string | null;
+  resolution: string | null;
+  created: string | null;
+}
+
+export interface RiepilogoResponse {
+  period: RiepilogoPeriod;
+  totals: RiepilogoTotals;
+  budgets: RiepilogoBudget[];
+  details: RiepilogoDetail[];
+}
+
 export interface IssueHeader {
   issue_key: string;
   summary: string;

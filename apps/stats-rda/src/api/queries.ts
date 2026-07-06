@@ -1,10 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
+import type { ApiClient } from '@mrsmith/api-client';
 import { useApiClient } from './client';
 import type {
   AutocompleteResponse,
   FiltersResponse,
   IssueDetail,
   IssueListResponse,
+  PeriodPreset,
+  RiepilogoResponse,
 } from './types';
 
 const ROOT = '/stats-rda/v1/pa';
@@ -82,4 +85,29 @@ export function useIssueDetail(issueKey: string | null) {
     queryFn: () => api.get<IssueDetail>(`${ROOT}/issues/${encodeURIComponent(issueKey!)}`),
     enabled: Boolean(issueKey),
   });
+}
+
+export function useRiepilogoPa(period: PeriodPreset) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['stats-rda', 'riepilogo-pa', period],
+    queryFn: () => api.get<RiepilogoResponse>(`${ROOT}/riepilogo${buildSearch({ period })}`),
+    placeholderData: (prev) => prev,
+  });
+}
+
+export async function downloadRiepilogoPaExcel(
+  api: ApiClient,
+  period: PeriodPreset,
+  filename = `riepilogo-pa-jira_${period}.xlsx`,
+) {
+  const blob = await api.getBlob(`${ROOT}/riepilogo/export${buildSearch({ period })}`);
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }

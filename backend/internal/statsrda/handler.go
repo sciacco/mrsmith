@@ -9,11 +9,11 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/sciacco/mrsmith/internal/acl"
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
-	"time"
 )
 
 const (
@@ -63,6 +63,8 @@ func RegisterRoutes(mux *http.ServeMux, arakDB *sql.DB) {
 	handle("GET /stats-rda/v1/pa/filters", h.handleFilters)
 	handle("GET /stats-rda/v1/pa/fornitori", h.handleFornitoriAutocomplete)
 	handle("GET /stats-rda/v1/pa/richiedenti", h.handleRichiedentiAutocomplete)
+	handle("GET /stats-rda/v1/pa/riepilogo", h.handleRiepilogo)
+	handle("GET /stats-rda/v1/pa/riepilogo/export", h.handleRiepilogoExport)
 	handle("GET /stats-rda/v1/pa/issues", h.handleIssueList)
 	handle("GET /stats-rda/v1/pa/issues/{issueKey}", h.handleIssueDetail)
 }
@@ -162,31 +164,31 @@ func parseDate(w http.ResponseWriter, raw string, field string) (string, bool) {
 
 // issueFilters holds parsed query params for /pa/issues.
 type issueFilters struct {
-	q          string
-	budget     string
-	stato      string
-	tipo       string
-	fornitore  string
+	q           string
+	budget      string
+	stato       string
+	tipo        string
+	fornitore   string
 	richiedente string
-	valuta     string
-	from       string
-	to         string
-	sortCol    string
-	sortDir    string
-	page       int
-	limit      int
+	valuta      string
+	from        string
+	to          string
+	sortCol     string
+	sortDir     string
+	page        int
+	limit       int
 }
 
 // parseIssueFilters reads and validates all /pa/issues query params.
 func parseIssueFilters(w http.ResponseWriter, q url.Values) (issueFilters, bool) {
 	f := issueFilters{
-		q:          strings.TrimSpace(q.Get("q")),
-		budget:     strings.TrimSpace(q.Get("budget")),
-		stato:      strings.TrimSpace(q.Get("stato")),
-		tipo:       strings.TrimSpace(q.Get("tipo")),
-		fornitore:  strings.TrimSpace(q.Get("fornitore")),
+		q:           strings.TrimSpace(q.Get("q")),
+		budget:      strings.TrimSpace(q.Get("budget")),
+		stato:       strings.TrimSpace(q.Get("stato")),
+		tipo:        strings.TrimSpace(q.Get("tipo")),
+		fornitore:   strings.TrimSpace(q.Get("fornitore")),
 		richiedente: strings.TrimSpace(q.Get("richiedente")),
-		valuta:     strings.TrimSpace(q.Get("valuta")),
+		valuta:      strings.TrimSpace(q.Get("valuta")),
 	}
 	var ok bool
 	if f.from, ok = parseDate(w, q.Get("from"), "from"); !ok {

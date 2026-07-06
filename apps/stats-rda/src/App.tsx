@@ -6,6 +6,7 @@ import { useOptionalAuth } from './hooks/useOptionalAuth';
 
 const navItems = [
   { label: 'Archivio PA', path: '/archivio-pa' },
+  { label: 'Riepilogo PA Jira', path: '/riepilogo-pa' },
   { label: 'RDA', path: '/rda' },
 ];
 
