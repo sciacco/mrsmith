@@ -51,6 +51,38 @@ func resolveRiepilogoPeriod(preset string, now time.Time) (from time.Time, to ti
 	return from, to, normalizedPreset, nil
 }
 
+func resolveRiepilogoRequestPeriod(period, fromParam, toParam string, now time.Time) (from time.Time, to time.Time, normalizedPreset string, err error) {
+	period = strings.TrimSpace(period)
+	fromParam = strings.TrimSpace(fromParam)
+	toParam = strings.TrimSpace(toParam)
+
+	if period == "custom" || fromParam != "" || toParam != "" {
+		if period != "" && period != "custom" {
+			return time.Time{}, time.Time{}, "", errors.New("period non valido")
+		}
+		if fromParam == "" || toParam == "" {
+			return time.Time{}, time.Time{}, "", errors.New("range date obbligatorio")
+		}
+
+		loc := now.Location()
+		from, err = time.ParseInLocation(riepilogoDateLayout, fromParam, loc)
+		if err != nil {
+			return time.Time{}, time.Time{}, "", errors.New("data inizio non valida")
+		}
+		to, err = time.ParseInLocation(riepilogoDateLayout, toParam, loc)
+		if err != nil {
+			return time.Time{}, time.Time{}, "", errors.New("data fine non valida")
+		}
+		if !from.Before(to) {
+			return time.Time{}, time.Time{}, "", errors.New("la data inizio deve precedere la data fine")
+		}
+
+		return from, to, "custom", nil
+	}
+
+	return resolveRiepilogoPeriod(period, now)
+}
+
 const riepilogoBudgetQuery = `
 SELECT
   CASE
@@ -62,7 +94,7 @@ SELECT
   COALESCE(SUM(COALESCE(i.importo_totale, 0)), 0) AS amount
 FROM pa.issue i
 WHERE i.issue_type = 'Acquisto'
-  AND i.resolution NOT IN ('Annullato')
+  AND i.resolution NOT IN ('Annullato','Rifiutato')
   AND i.created >= $1
   AND i.created < $2
 GROUP BY 1
@@ -87,7 +119,7 @@ SELECT
   to_char(i.created, 'YYYY-MM-DD"T"HH24:MI:SSOF') AS created
 FROM pa.issue i
 WHERE i.issue_type = 'Acquisto'
-  AND i.resolution NOT IN ('Annullato')
+  AND i.resolution NOT IN ('Annullato','Rifiutato')
   AND i.created >= $1
   AND i.created < $2
 ORDER BY i.created DESC, i.issue_key ASC`
@@ -97,7 +129,8 @@ func (h *Handler) handleRiepilogo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	from, to, preset, err := resolveRiepilogoPeriod(r.URL.Query().Get("period"), time.Now())
+	query := r.URL.Query()
+	from, to, preset, err := resolveRiepilogoRequestPeriod(query.Get("period"), query.Get("from"), query.Get("to"), time.Now())
 	if err != nil {
 		badRequest(w, err.Error())
 		return
@@ -117,7 +150,8 @@ func (h *Handler) handleRiepilogoExport(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	from, to, preset, err := resolveRiepilogoPeriod(r.URL.Query().Get("period"), time.Now())
+	query := r.URL.Query()
+	from, to, preset, err := resolveRiepilogoRequestPeriod(query.Get("period"), query.Get("from"), query.Get("to"), time.Now())
 	if err != nil {
 		badRequest(w, err.Error())
 		return

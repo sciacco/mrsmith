@@ -55,7 +55,7 @@ Copy suggerita per nav/tab: `Riepilogo PA Jira`.
 
 ## 6. Selezione periodo
 
-La selezione iniziale è limitata a preset, senza date libere.
+La selezione iniziale offre preset rapidi e un intervallo date personalizzato.
 
 Preset richiesti:
 
@@ -67,6 +67,9 @@ Preset richiesti:
 | `Trimestre precedente` | Dal primo giorno del trimestre precedente al primo giorno del trimestre corrente, esclusivo | No |
 | `Anno corrente` | Dal 1 gennaio dell'anno corrente al 1 gennaio dell'anno successivo, esclusivo | No |
 | `Anno precedente` | Dal 1 gennaio dell'anno precedente al 1 gennaio dell'anno corrente, esclusivo | No |
+| `Intervallo personalizzato` | Date `from`/`to` scelte dall'utente, con `to` escluso | No |
+
+Per l'intervallo personalizzato il client invia `period=custom&from=YYYY-MM-DD&to=YYYY-MM-DD`; il backend valida che entrambe le date siano presenti e che `from < to`.
 
 Regola tecnica per le date:
 
@@ -85,7 +88,7 @@ La clausola base è sempre applicata:
 
 ```sql
 issue_type = 'Acquisto'
-AND resolution NOT IN ('Annullato')
+AND resolution NOT IN ('Annullato','Rifiutato')
 ```
 
 Più filtro periodo:
@@ -103,7 +106,7 @@ SELECT
   SUM(importo_totale) AS importo
 FROM pa.issue
 WHERE issue_type = 'Acquisto'
-  AND resolution NOT IN ('Annullato')
+  AND resolution NOT IN ('Annullato','Rifiutato')
   AND created >= :from
   AND created < :to
 GROUP BY budget_di_riferimento;
@@ -114,7 +117,7 @@ GROUP BY budget_di_riferimento;
 - Budget vuoto o `NULL`: mostrarlo come `Senza budget`.
 - Importo `NULL`: trattarlo come `0` nell'aggregazione, usando `COALESCE(importo_totale, 0)`.
 - Valuta: tutti gli importi vanno sommati come se fossero in euro. Non è prevista alcuna conversione valuta e il totale aggregato è presentato come importo unico.
-- `resolution NULL`: non deve essere incluso. La clausola resta `resolution NOT IN ('Annullato')`, quindi il comportamento SQL standard esclude anche i valori `NULL`.
+- `resolution NULL`: non deve essere incluso. La clausola resta `resolution NOT IN ('Annullato','Rifiutato')`, quindi il comportamento SQL standard esclude anche i valori `NULL`.
 
 ---
 
@@ -241,7 +244,9 @@ Per budget `NULL` usare sheet `Senza budget`.
 
 ### Endpoint riepilogo
 
-`GET /api/stats-rda/pa/riepilogo?period=this_month|previous_month|this_quarter|previous_quarter|current_year|previous_year`
+`GET /api/stats-rda/v1/pa/riepilogo?period=this_month|previous_month|this_quarter|previous_quarter|current_year|previous_year`
+
+Range personalizzato: `GET /api/stats-rda/v1/pa/riepilogo?period=custom&from=YYYY-MM-DD&to=YYYY-MM-DD`
 
 Response suggerita:
 
@@ -285,7 +290,9 @@ Response suggerita:
 
 ### Endpoint export
 
-`GET /api/stats-rda/pa/riepilogo/export?period=previous_month`
+`GET /api/stats-rda/v1/pa/riepilogo/export?period=previous_month`
+
+Range personalizzato: `GET /api/stats-rda/v1/pa/riepilogo/export?period=custom&from=YYYY-MM-DD&to=YYYY-MM-DD`
 
 Response:
 
@@ -307,7 +314,7 @@ Response:
 ## 12. Criteri di accettazione
 
 1. Visitando `/riepilogo-pa`, la pagina mostra il preset `Mese precedente` selezionato.
-2. Il riepilogo usa solo ordini con `issue_type = 'Acquisto'` e `resolution NOT IN ('Annullato')`.
+2. Il riepilogo usa solo ordini con `issue_type = 'Acquisto'` e `resolution NOT IN ('Annullato','Rifiutato')`.
 3. Cambiando preset, grafico, totali e lista dettagli si aggiornano.
 4. I totali sono raggruppati per `budget_di_riferimento`.
 5. Il grafico mostra un dato per ogni budget e permette di filtrare la lista dettagli cliccando su un budget.
@@ -322,6 +329,6 @@ Response:
 ## 13. Decisioni confermate
 
 - Gli importi aggregati includono tutti i valori come se fossero in euro; non si applicano conversioni e non si separa per valuta.
-- Le righe con `resolution NULL` non sono incluse: resta valida la clausola `resolution NOT IN ('Annullato')`.
+- Le righe con `resolution NULL` non sono incluse: resta valida la clausola `resolution NOT IN ('Annullato','Rifiutato')`.
 - Il dettaglio sotto il grafico viene caricato integralmente per il periodo selezionato.
 - Il file Excel esporta sempre tutti i budget e tutti i dettagli del periodo selezionato, indipendentemente dall'eventuale filtro budget attivo nella UI.

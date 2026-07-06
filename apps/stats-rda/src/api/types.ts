@@ -46,8 +46,10 @@ export type PeriodPreset =
   | 'current_year'
   | 'previous_year';
 
+export type RiepilogoPeriodSelection = PeriodPreset | 'custom';
+
 export interface RiepilogoPeriod {
-  preset: PeriodPreset;
+  preset: RiepilogoPeriodSelection;
   from: string;
   to: string;
 }

@@ -35,7 +35,7 @@ Non usare il prefisso del PRD senza `/v1`.
 
 ```sql
 issue_type = 'Acquisto'
-AND resolution NOT IN ('Annullato')
+AND resolution NOT IN ('Annullato','Rifiutato')
 ```
 
 Nota: questa clausola esclude anche `resolution NULL`, come richiesto dal PRD.
@@ -170,7 +170,10 @@ this_quarter
 previous_quarter
 current_year
 previous_year
+custom
 ```
+
+Per `custom`, accettare anche `from=YYYY-MM-DD&to=YYYY-MM-DD`; entrambe le date sono obbligatorie e `from` deve precedere `to`.
 
 Default frontend: `previous_month`.
 
@@ -187,7 +190,7 @@ Implementare funzione tipo:
 func resolveRiepilogoPeriod(preset string, now time.Time) (from time.Time, to time.Time, normalizedPreset string, err error)
 ```
 
-Se `period` mancante o non valido: `400`.
+Se `period` mancante/non valido o il range custom è incompleto/non valido: `400`.
 
 ---
 
@@ -197,6 +200,7 @@ Aggiungere endpoint:
 
 ```go
 GET /stats-rda/v1/pa/riepilogo?period=previous_month
+GET /stats-rda/v1/pa/riepilogo?period=custom&from=2026-06-01&to=2026-07-01
 ```
 
 Registrarlo in `RegisterRoutes`.
@@ -208,7 +212,7 @@ Base SQL:
 ```sql
 FROM pa.issue i
 WHERE i.issue_type = 'Acquisto'
-  AND i.resolution NOT IN ('Annullato')
+  AND i.resolution NOT IN ('Annullato','Rifiutato')
   AND i.created >= $1
   AND i.created < $2
 ```
@@ -226,7 +230,7 @@ SELECT
   COALESCE(SUM(COALESCE(i.importo_totale, 0)), 0) AS amount
 FROM pa.issue i
 WHERE i.issue_type = 'Acquisto'
-  AND i.resolution NOT IN ('Annullato')
+  AND i.resolution NOT IN ('Annullato','Rifiutato')
   AND i.created >= $1
   AND i.created < $2
 GROUP BY 1
@@ -254,7 +258,7 @@ SELECT
   to_char(i.created, 'YYYY-MM-DD"T"HH24:MI:SSOF') AS created
 FROM pa.issue i
 WHERE i.issue_type = 'Acquisto'
-  AND i.resolution NOT IN ('Annullato')
+  AND i.resolution NOT IN ('Annullato','Rifiutato')
   AND i.created >= $1
   AND i.created < $2
 ORDER BY i.created DESC, i.issue_key ASC
@@ -281,6 +285,7 @@ Aggiungere:
 
 ```go
 GET /stats-rda/v1/pa/riepilogo/export?period=previous_month
+GET /stats-rda/v1/pa/riepilogo/export?period=custom&from=2026-06-01&to=2026-07-01
 ```
 
 Deve riusare la stessa funzione dati del riepilogo, così JSON ed Excel non divergono.
@@ -363,8 +368,10 @@ export type PeriodPreset =
   | 'current_year'
   | 'previous_year';
 
+export type RiepilogoPeriodSelection = PeriodPreset | 'custom';
+
 export interface RiepilogoPeriod {
-  preset: PeriodPreset;
+  preset: RiepilogoPeriodSelection;
   from: string;
   to: string;
 }
@@ -409,12 +416,16 @@ export interface RiepilogoResponse {
 In `apps/stats-rda/src/api/queries.ts` aggiungere:
 
 ```ts
-export function useRiepilogoPa(period: PeriodPreset) {
+export function useRiepilogoPa(params: { period: RiepilogoPeriodSelection; from?: string; to?: string }) {
   const api = useApiClient();
+  const searchParams = params.period === 'custom'
+    ? { period: params.period, from: params.from, to: params.to }
+    : { period: params.period };
+
   return useQuery({
-    queryKey: ['stats-rda', 'riepilogo-pa', period],
+    queryKey: ['stats-rda', 'riepilogo-pa', searchParams],
     queryFn: () => api.get<RiepilogoResponse>(
-      `${ROOT}/riepilogo${buildSearch({ period })}`
+      `${ROOT}/riepilogo${buildSearch(searchParams)}`
     ),
     placeholderData: (prev) => prev,
   });
@@ -424,8 +435,8 @@ export function useRiepilogoPa(period: PeriodPreset) {
 Aggiungere helper export autenticato. Usare `api.getBlob`.
 
 ```ts
-export async function downloadRiepilogoPaExcel(api: ApiClient, period: PeriodPreset) {
-  const blob = await api.getBlob(`${ROOT}/riepilogo/export${buildSearch({ period })}`);
+export async function downloadRiepilogoPaExcel(api: ApiClient, params: { period: RiepilogoPeriodSelection; from?: string; to?: string }) {
+  const blob = await api.getBlob(`${ROOT}/riepilogo/export${buildSearch(params.period === 'custom' ? params : { period: params.period })}`);
   // creare Object URL, anchor temporaneo, click, revokeObjectURL
 }
 ```
@@ -485,6 +496,7 @@ Usare URL search params per il periodo:
 
 ```text
 /riepilogo-pa?period=previous_month
+/riepilogo-pa?period=custom&from=2026-06-01&to=2026-07-01
 ```
 
 Se assente, default `previous_month`.
@@ -509,6 +521,7 @@ Opzioni UI:
   { value: 'previous_quarter', label: 'Trimestre precedente' },
   { value: 'current_year', label: 'Anno corrente' },
   { value: 'previous_year', label: 'Anno precedente' },
+  { value: 'custom', label: 'Intervallo personalizzato' },
 ]
 ```
 
@@ -526,6 +539,7 @@ Sottotitolo: Totali degli ordini di acquisto PA per budget nel periodo seleziona
 Toolbar:
 
 - select periodo
+- se `Intervallo personalizzato`, input date `Da` e `A esclusa`
 - range calcolato, ad esempio:
 
 ```text

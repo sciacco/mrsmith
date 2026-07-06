@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { ApiError } from '@mrsmith/api-client';
 import { Icon, SingleSelect, Skeleton } from '@mrsmith/ui';
 import { downloadRiepilogoPaExcel, useRiepilogoPa } from '../api/queries';
-import type { PeriodPreset, RiepilogoBudget } from '../api/types';
+import type { PeriodPreset, RiepilogoBudget, RiepilogoPeriodSelection } from '../api/types';
 import { useApiClient } from '../api/client';
 import { ServiceUnavailable } from '../components/ServiceUnavailable';
 import { formatEUR, nz } from '../lib/format';
@@ -11,19 +11,38 @@ import s from './RiepilogoPaPage.module.css';
 
 const DEFAULT_PERIOD: PeriodPreset = 'previous_month';
 
-const PERIOD_OPTIONS: Array<{ value: PeriodPreset; label: string }> = [
+const PERIOD_OPTIONS: Array<{ value: RiepilogoPeriodSelection; label: string }> = [
   { value: 'this_month', label: 'Mese corrente' },
   { value: 'previous_month', label: 'Mese precedente' },
   { value: 'this_quarter', label: 'Trimestre corrente' },
   { value: 'previous_quarter', label: 'Trimestre precedente' },
   { value: 'current_year', label: 'Anno corrente' },
   { value: 'previous_year', label: 'Anno precedente' },
+  { value: 'custom', label: 'Intervallo personalizzato' },
 ];
 
-const periodValues = new Set<PeriodPreset>(PERIOD_OPTIONS.map((option) => option.value));
+const periodValues = new Set<RiepilogoPeriodSelection>(PERIOD_OPTIONS.map((option) => option.value));
 
-function isPeriodPreset(value: string | null): value is PeriodPreset {
-  return Boolean(value && periodValues.has(value as PeriodPreset));
+function isPeriodSelection(value: string | null): value is RiepilogoPeriodSelection {
+  return Boolean(value && periodValues.has(value as RiepilogoPeriodSelection));
+}
+
+function isISODate(value: string | null): value is string {
+  return Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value));
+}
+
+function toISODateLocal(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getDefaultCustomRange() {
+  const now = new Date();
+  const to = new Date(now.getFullYear(), now.getMonth(), 1);
+  const from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  return { from: toISODateLocal(from), to: toISODateLocal(to) };
 }
 
 function formatPeriodDate(value: string | null | undefined): string {
@@ -53,7 +72,7 @@ function formatPercent(value: number): string {
   }).format(value);
 }
 
-function filenameFor(period: PeriodPreset, from?: string, to?: string): string {
+function filenameFor(period: RiepilogoPeriodSelection, from?: string, to?: string): string {
   if (from && to) return `riepilogo-pa-jira_${period}_${from}_${to}.xlsx`;
   return `riepilogo-pa-jira_${period}.xlsx`;
 }
@@ -68,38 +87,78 @@ export function RiepilogoPaPage() {
   const [params, setParams] = useSearchParams();
   const api = useApiClient();
   const periodParam = params.get('period');
-  const period = isPeriodPreset(periodParam) ? periodParam : DEFAULT_PERIOD;
+  const period = isPeriodSelection(periodParam) ? periodParam : DEFAULT_PERIOD;
+  const customDefaults = useMemo(() => getDefaultCustomRange(), []);
+  const customFrom = isISODate(params.get('from')) ? params.get('from')! : customDefaults.from;
+  const customTo = isISODate(params.get('to')) ? params.get('to')! : customDefaults.to;
+  const riepilogoParams = useMemo(
+    () => (period === 'custom' ? { period, from: customFrom, to: customTo } : { period }),
+    [customFrom, customTo, period],
+  );
   const [selectedBudget, setSelectedBudget] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
-  const riepilogoQ = useRiepilogoPa(period);
+  const riepilogoQ = useRiepilogoPa(riepilogoParams);
   const data = riepilogoQ.data;
 
   useEffect(() => {
-    if (!isPeriodPreset(periodParam)) {
+    if (!isPeriodSelection(periodParam)) {
       setParams((prev) => {
         const next = new URLSearchParams(prev);
         next.set('period', DEFAULT_PERIOD);
+        next.delete('from');
+        next.delete('to');
+        return next;
+      }, { replace: true });
+      return;
+    }
+
+    if (period === 'custom' && (!isISODate(params.get('from')) || !isISODate(params.get('to')))) {
+      setParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('period', 'custom');
+        next.set('from', customFrom);
+        next.set('to', customTo);
         return next;
       }, { replace: true });
     }
-  }, [periodParam, setParams]);
+  }, [customFrom, customTo, params, period, periodParam, setParams]);
 
   useEffect(() => {
     setSelectedBudget(null);
-  }, [period]);
+  }, [period, customFrom, customTo]);
 
   const handlePeriodChange = useCallback(
-    (value: PeriodPreset | null) => {
+    (value: RiepilogoPeriodSelection | null) => {
       const nextPeriod = value ?? DEFAULT_PERIOD;
       setParams((prev) => {
         const next = new URLSearchParams(prev);
         next.set('period', nextPeriod);
+        if (nextPeriod === 'custom') {
+          next.set('from', data?.period.from ?? customFrom);
+          next.set('to', data?.period.to ?? customTo);
+        } else {
+          next.delete('from');
+          next.delete('to');
+        }
         return next;
       });
     },
-    [setParams],
+    [customFrom, customTo, data?.period.from, data?.period.to, setParams],
+  );
+
+  const handleCustomDateChange = useCallback(
+    (field: 'from' | 'to', value: string) => {
+      setParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('period', 'custom');
+        next.set('from', field === 'from' ? value : customFrom);
+        next.set('to', field === 'to' ? value : customTo);
+        return next;
+      });
+    },
+    [customFrom, customTo, setParams],
   );
 
   const handleExport = useCallback(async () => {
@@ -108,7 +167,7 @@ export function RiepilogoPaPage() {
     try {
       await downloadRiepilogoPaExcel(
         api,
-        period,
+        riepilogoParams,
         filenameFor(period, data?.period.from, data?.period.to),
       );
     } catch {
@@ -116,7 +175,7 @@ export function RiepilogoPaPage() {
     } finally {
       setIsExporting(false);
     }
-  }, [api, data?.period.from, data?.period.to, period]);
+  }, [api, data?.period.from, data?.period.to, period, riepilogoParams]);
 
   const maxAmount = useMemo(
     () => Math.max(0, ...(data?.budgets.map((budget) => budget.amount) ?? [])),
@@ -158,6 +217,32 @@ export function RiepilogoPaPage() {
             placeholder="Seleziona periodo"
           />
         </div>
+        {period === 'custom' && (
+          <>
+            <div className={s.toolbarField}>
+              <label htmlFor="riepilogo-pa-from">Da</label>
+              <input
+                id="riepilogo-pa-from"
+                className={s.dateInput}
+                type="date"
+                value={customFrom}
+                max={customTo}
+                onChange={(event) => handleCustomDateChange('from', event.target.value)}
+              />
+            </div>
+            <div className={s.toolbarField}>
+              <label htmlFor="riepilogo-pa-to">A esclusa</label>
+              <input
+                id="riepilogo-pa-to"
+                className={s.dateInput}
+                type="date"
+                value={customTo}
+                min={customFrom}
+                onChange={(event) => handleCustomDateChange('to', event.target.value)}
+              />
+            </div>
+          </>
+        )}
         <div className={s.rangeText} aria-live="polite">
           <Icon name="calendar" size={16} />
           <span>{dateRange}</span>

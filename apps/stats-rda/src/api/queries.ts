@@ -6,7 +6,7 @@ import type {
   FiltersResponse,
   IssueDetail,
   IssueListResponse,
-  PeriodPreset,
+  RiepilogoPeriodSelection,
   RiepilogoResponse,
 } from './types';
 
@@ -87,21 +87,34 @@ export function useIssueDetail(issueKey: string | null) {
   });
 }
 
-export function useRiepilogoPa(period: PeriodPreset) {
+export interface RiepilogoPaParams {
+  period: RiepilogoPeriodSelection;
+  from?: string;
+  to?: string;
+}
+
+export function useRiepilogoPa(params: RiepilogoPaParams) {
   const api = useApiClient();
+  const searchParams = params.period === 'custom'
+    ? { period: params.period, from: params.from, to: params.to }
+    : { period: params.period };
+
   return useQuery({
-    queryKey: ['stats-rda', 'riepilogo-pa', period],
-    queryFn: () => api.get<RiepilogoResponse>(`${ROOT}/riepilogo${buildSearch({ period })}`),
+    queryKey: ['stats-rda', 'riepilogo-pa', searchParams],
+    queryFn: () => api.get<RiepilogoResponse>(`${ROOT}/riepilogo${buildSearch(searchParams)}`),
     placeholderData: (prev) => prev,
   });
 }
 
 export async function downloadRiepilogoPaExcel(
   api: ApiClient,
-  period: PeriodPreset,
-  filename = `riepilogo-pa-jira_${period}.xlsx`,
+  params: RiepilogoPaParams,
+  filename = `riepilogo-pa-jira_${params.period}.xlsx`,
 ) {
-  const blob = await api.getBlob(`${ROOT}/riepilogo/export${buildSearch({ period })}`);
+  const searchParams = params.period === 'custom'
+    ? { period: params.period, from: params.from, to: params.to }
+    : { period: params.period };
+  const blob = await api.getBlob(`${ROOT}/riepilogo/export${buildSearch(searchParams)}`);
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
