@@ -742,6 +742,7 @@ function CardDrawer({
   onOpenDossier,
   onOpenCloseModal,
   onOpenRemoveModal,
+  onReopen,
   sessions,
 }: {
   initiativeId: string;
