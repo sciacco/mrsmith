@@ -3168,10 +3168,9 @@ func maInspectSummarize(devs []maInspectDeviation) MADeepInspectDeviation {
 }
 
 // companyDossier is the standalone P.IVA lookup (POST). Cache-first by vat_code: a
-// ready or in-flight analysis is served as-is (no charge, no enqueue). A miss or a
-// previously failed row needs an explicit cost acknowledgement before a fresh IT-full
-// call (~€0.30) is queued; without it the caller gets status "cost_required".
-func (s *maService) companyDossier(ctx context.Context, vat string, ack bool, email string) (MACompanyDossier, error) {
+// ready or in-flight analysis is served as-is (no enqueue). A miss or previously
+// failed row queues a fresh IT-full deep analysis directly.
+func (s *maService) companyDossier(ctx context.Context, vat string, email string) (MACompanyDossier, error) {
 	if s.store == nil {
 		return MACompanyDossier{}, errMAStoreUnavailable
 	}
@@ -3182,20 +3181,14 @@ func (s *maService) companyDossier(ctx context.Context, vat string, ack bool, em
 	if rec != nil && (rec.Status == maDeepStatusReady || rec.Status == maDeepStatusQueued || rec.Status == maDeepStatusRunning) {
 		return mapMACompanyDossier(vat, rec), nil
 	}
-	if !ack {
-		dossier := mapMACompanyDossier(vat, rec)
-		dossier.Status = "cost_required"
-		dossier.CostEUR = s.loadPricing(ctx).CostFull
-		return dossier, nil
-	}
 	if err := s.store.EnqueueMADeepAnalysis(ctx, vat, vat, "", email); err != nil {
 		return MACompanyDossier{}, err
 	}
 	return MACompanyDossier{VATCode: vat, Status: maDeepStatusQueued}, nil
 }
 
-// getCompanyDossier returns the current cached state for a P.IVA without ever
-// triggering a paid lookup; the frontend polls it until ready/failed.
+// getCompanyDossier returns the current cached state for a P.IVA without enqueueing;
+// the frontend polls it until ready/failed.
 func (s *maService) getCompanyDossier(ctx context.Context, vat string) (MACompanyDossier, error) {
 	if s.store == nil {
 		return MACompanyDossier{}, errMAStoreUnavailable
@@ -3230,7 +3223,6 @@ func mapMACompanyDossier(vat string, rec *maDeepVATRecord) MACompanyDossier {
 		Valuation:  rec.Valuation,
 		Brief:      rec.Brief,
 		Raw:        rec.Payload,
-		CostEUR:    rec.CostEUR,
 		ErrorCode:  rec.ErrorCode,
 	}
 	if !rec.UpdatedAt.IsZero() {
@@ -3311,51 +3303,98 @@ func (s *maService) deepDive(ctx context.Context, sessionID string, ack bool, em
 	return s.getSessionShape(ctx, sessionID, lean)
 }
 
-// deepDiveCard avvia l'analisi completa per-azienda della card (B6, PRD §7):
-// variante per-azienda del deep-dive di sessione (deepDive sopra), stesso
-// gate di spesa e stesso worker/cache, con count=1. No-op se già ready o già
-// in coda/running (il bottone in UI resta coerente senza doppia spesa).
-func (s *maService) deepDiveCard(ctx context.Context, initiativeID, companyKey string, ack bool, email string) (MACardDeepDiveResponse, error) {
+func (s *maService) deepDiveCompany(ctx context.Context, companyKey, subject, email string) (MACompanyDeepDiveResponse, error) {
 	if s.store == nil {
-		return MACardDeepDiveResponse{}, errMAStoreUnavailable
+		return MACompanyDeepDiveResponse{}, errMAStoreUnavailable
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey == "" {
+		return MACompanyDeepDiveResponse{}, fmt.Errorf("%w: company key", errMAStrategyInvalid)
+	}
+	existing, err := s.store.ListMADeepAnalysis(ctx, []string{companyKey})
+	if err != nil {
+		return MACompanyDeepDiveResponse{}, err
+	}
+	if record, ok := existing[companyKey]; ok && record.Status != maDeepStatusFailed {
+		return MACompanyDeepDiveResponse{Status: record.Status}, nil
+	}
+	identity, source, err := s.resolveCompanyDeepDiveIdentity(ctx, companyKey)
+	if err != nil {
+		return MACompanyDeepDiveResponse{}, err
 	}
 	if s.openapiit == nil {
-		return MACardDeepDiveResponse{}, errMAOpenAPIITUnavailable
+		return MACompanyDeepDiveResponse{}, errMAOpenAPIITUnavailable
+	}
+	if err := s.store.EnqueueMADeepAnalysis(ctx, companyKey, identity.VATCode, identity.TaxCode, email); err != nil {
+		return MACompanyDeepDiveResponse{}, err
+	}
+	_ = s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_company_deep_dive_started",
+		Status:    maTraceEventSucceeded,
+		Metadata: maTraceJSON(map[string]any{
+			"company_key": companyKey,
+			"vat_source":  source,
+			"has_vat":     identity.VATCode != "",
+			"has_tax":     identity.TaxCode != "",
+			"by":          email,
+			"subject":     subject,
+		}),
+	})
+	return MACompanyDeepDiveResponse{Status: maDeepStatusQueued}, nil
+}
+
+func (s *maService) resolveCompanyDeepDiveIdentity(ctx context.Context, companyKey string) (maDeepDiveIdentity, string, error) {
+	if identity, err := s.store.GetMATargetDeepDiveIdentity(ctx, companyKey); err != nil {
+		return maDeepDiveIdentity{}, "", err
+	} else if normalized, ok := normalizeDeepDiveIdentity(identity); ok {
+		return normalized, "ma_target", nil
+	}
+	if identity, err := s.store.GetMAInitiativeCardDeepDiveIdentity(ctx, companyKey); err != nil {
+		return maDeepDiveIdentity{}, "", err
+	} else if normalized, ok := normalizeDeepDiveIdentity(identity); ok {
+		return normalized, "ma_initiative_card", nil
+	}
+	if vat := normalizeDeepDiveIdentifier(companyKey); vat != "" {
+		return maDeepDiveIdentity{VATCode: vat}, "company_key", nil
+	}
+	return maDeepDiveIdentity{}, "", fmt.Errorf("%w: nessuna partita IVA o codice fiscale valido per company key", errMAStrategyInvalid)
+}
+
+func normalizeDeepDiveIdentity(identity *maDeepDiveIdentity) (maDeepDiveIdentity, bool) {
+	if identity == nil {
+		return maDeepDiveIdentity{}, false
+	}
+	out := maDeepDiveIdentity{
+		VATCode: normalizeDeepDiveIdentifier(identity.VATCode),
+		TaxCode: normalizeDeepDiveIdentifier(identity.TaxCode),
+	}
+	return out, out.VATCode != "" || out.TaxCode != ""
+}
+
+func normalizeDeepDiveIdentifier(value string) string {
+	value = strings.ToUpper(strings.TrimSpace(value))
+	if !isValidVATOrTax(value) {
+		return ""
+	}
+	return value
+}
+
+// deepDiveCard avvia l'analisi completa per-azienda della card. L'endpoint card
+// resta compatibile e conserva il controllo operativo, poi delega alla logica
+// azienda-scoped; acknowledgeCost è ignorato in questo flusso singolo.
+func (s *maService) deepDiveCard(ctx context.Context, initiativeID, companyKey string, _ bool, subject, email string) (MACardDeepDiveResponse, error) {
+	if s.store == nil {
+		return MACardDeepDiveResponse{}, errMAStoreUnavailable
 	}
 	card, err := s.requireOperationalInitiativeCard(ctx, initiativeID, companyKey)
 	if err != nil {
 		return MACardDeepDiveResponse{}, err
 	}
-	existing, err := s.store.ListMADeepAnalysis(ctx, []string{card.CompanyKey})
+	result, err := s.deepDiveCompany(ctx, card.CompanyKey, subject, email)
 	if err != nil {
 		return MACardDeepDiveResponse{}, err
 	}
-	if record, ok := existing[card.CompanyKey]; ok {
-		switch record.Status {
-		case maDeepStatusReady, maDeepStatusQueued, maDeepStatusRunning:
-			// Già pronto o già in coda: no-op, si riflette lo stato esistente.
-			return MACardDeepDiveResponse{DossierStatus: maCardDossierStatus(record)}, nil
-		}
-	}
-	pricing := s.loadPricing(ctx)
-	projected := pricing.CostFull
-	if projected > pricing.BudgetDefault && !ack {
-		_ = s.traceEvent(ctx, maTraceEventWrite{
-			EventType: "ma_card_deep_dive_over_budget",
-			Status:    maTraceEventInfo,
-			Metadata:  maTraceJSON(map[string]any{"initiative_id": initiativeID, "company_key": card.CompanyKey, "projected_cost": projected, "budget": pricing.BudgetDefault}),
-		})
-		return MACardDeepDiveResponse{}, errMAEstimateOverBudget
-	}
-	if err := s.store.EnqueueMADeepAnalysis(ctx, card.CompanyKey, card.VATCode, card.TaxCode, email); err != nil {
-		return MACardDeepDiveResponse{}, err
-	}
-	_ = s.traceEvent(ctx, maTraceEventWrite{
-		EventType: "ma_card_deep_dive_started",
-		Status:    maTraceEventSucceeded,
-		Metadata:  maTraceJSON(map[string]any{"initiative_id": initiativeID, "company_key": card.CompanyKey, "projected_cost": projected}),
-	})
-	return MACardDeepDiveResponse{DossierStatus: "working"}, nil
+	return MACardDeepDiveResponse{DossierStatus: maCardDossierStatus(MADeepAnalysis{Status: result.Status})}, nil
 }
 
 func (s *maService) extractIntent(ctx context.Context, prompt, subject, email string) (MAIntent, llm.CallAudit, error) {

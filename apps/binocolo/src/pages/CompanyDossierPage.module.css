@@ -83,7 +83,6 @@
 
 /* ── state panels ───────────────────────────────────────────────────── */
 .statePanel,
-.costPanel,
 .analyzing {
   display: flex;
   flex-direction: column;
@@ -120,12 +119,6 @@
   font-size: 0.875rem;
   color: var(--color-text-muted);
   max-width: 42ch;
-}
-
-.costActions {
-  display: flex;
-  gap: var(--space-3);
-  margin-top: var(--space-3);
 }
 
 .spinner {

@@ -142,6 +142,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("DELETE /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/irl/items/{itemId}", h.handleDeleteCardIRLItem)
 	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/irl/reorder", h.handleReorderCardIRL)
 	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/irl/export", h.handleExportCardIRL)
+	handle("POST /binocolo/v1/ma/companies/{companyKey}/deep-dive", h.handleDeepDiveMACompany)
 	handle("GET /binocolo/v1/ma/companies/{companyKey}/registry", h.handleGetMACompanyRegistry)
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/registry/facts", h.handleCreateMACompanyFact)
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/registry/facts/{factId}/revoke", h.handleRevokeMACompanyFact)
@@ -151,6 +152,8 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("GET /binocolo/v1/ma/sessions/{id}", h.handleGetMASession)
 	handle("GET /binocolo/v1/ma/sessions/{id}/targets", h.handleListMATargetRows)
 	handle("GET /binocolo/v1/ma/sessions/{id}/targets/{targetId}", h.handleGetMATarget)
+	handle("GET /binocolo/v1/ma/sessions/{id}/targets/{targetId}/thesis-reading", h.handleGetTargetThesisReading)
+	handle("POST /binocolo/v1/ma/sessions/{id}/targets/{targetId}/thesis-reading", h.handleGenerateTargetThesisReading)
 	handle("POST /binocolo/v1/ma/sessions/{id}/archive", h.handleArchiveMASession)
 	handle("POST /binocolo/v1/ma/sessions/{id}/restore", h.handleRestoreMASession)
 	handle("DELETE /binocolo/v1/ma/sessions/{id}", h.handleDeleteMASession)
@@ -341,6 +344,51 @@ func (h *Handler) handleGetMATarget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httputil.JSON(w, http.StatusOK, target)
+}
+
+func (h *Handler) handleGetTargetThesisReading(w http.ResponseWriter, r *http.Request) {
+	id, ok := maSessionID(w, r)
+	if !ok {
+		return
+	}
+	targetID, ok := maTargetID(w, r)
+	if !ok {
+		return
+	}
+	reading, err := h.ma.getTargetThesisReading(r.Context(), id, targetID)
+	if err != nil {
+		h.maFailure(w, r, "ma_target_thesis_reading_get", err, "session_id", id, "target_id", targetID)
+		return
+	}
+	if reading == nil {
+		httputil.Error(w, http.StatusNotFound, "thesis_reading_not_generated")
+		return
+	}
+	httputil.JSON(w, http.StatusOK, reading)
+}
+
+func (h *Handler) handleGenerateTargetThesisReading(w http.ResponseWriter, r *http.Request) {
+	id, ok := maSessionID(w, r)
+	if !ok {
+		return
+	}
+	targetID, ok := maTargetID(w, r)
+	if !ok {
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	var traceOK bool
+	r, traceOK = h.startMATrace(w, r, "ma_target_thesis_reading_generate", id, map[string]string{"targetId": targetID}, subject, email)
+	if !traceOK {
+		return
+	}
+	reading, err := h.ma.generateTargetThesisReading(r.Context(), id, targetID, subject, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_target_thesis_reading_generate", err, "session_id", id, "target_id", targetID)
+		return
+	}
+	h.completeMATraceSuccess(r, http.StatusOK)
+	httputil.JSON(w, http.StatusOK, reading)
 }
 
 func (h *Handler) handleListMAInitiatives(w http.ResponseWriter, r *http.Request) {
@@ -679,12 +727,18 @@ func (h *Handler) handleDeepDiveMACard(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, http.StatusBadRequest, "invalid_json")
 		return
 	}
-	_, email := companySearchRefreshActor(r.Context())
-	result, err := h.ma.deepDiveCard(r.Context(), id, companyKey, body.AcknowledgeCost, email)
+	subject, email := companySearchRefreshActor(r.Context())
+	var traceOK bool
+	r, traceOK = h.startMATrace(w, r, "ma_card_deep_dive", "", map[string]any{"initiativeId": id, "companyKey": companyKey, "acknowledgeCost": body.AcknowledgeCost}, subject, email)
+	if !traceOK {
+		return
+	}
+	result, err := h.ma.deepDiveCard(r.Context(), id, companyKey, body.AcknowledgeCost, subject, email)
 	if err != nil {
 		h.maFailure(w, r, "ma_card_deep_dive", err, "initiative_id", id, "company_key", companyKey)
 		return
 	}
+	h.completeMATraceSuccess(r, http.StatusOK)
 	httputil.JSON(w, http.StatusOK, result)
 }
 
@@ -725,8 +779,8 @@ func (h *Handler) handleGenerateCardThesisReading(w http.ResponseWriter, r *http
 	}
 	subject, email := companySearchRefreshActor(r.Context())
 	var traceOK bool
-	// Trace senza session id: la trace lo vincola con FK a ma_session, e qui
-	// l'ambito è (iniziativa, azienda) — gli id viaggiano nel log e negli attrs.
+	// Adapter card legacy: la generazione risolve la sessione di provenienza e
+	// registra l'evento con session_id/company_key nello storage session-scoped.
 	r, traceOK = h.startMATrace(w, r, "ma_thesis_reading_generate", "", nil, subject, email)
 	if !traceOK {
 		return
@@ -951,6 +1005,26 @@ func maFactID(w http.ResponseWriter, r *http.Request) (string, bool) {
 		return "", false
 	}
 	return id, true
+}
+
+func (h *Handler) handleDeepDiveMACompany(w http.ResponseWriter, r *http.Request) {
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	var traceOK bool
+	r, traceOK = h.startMATrace(w, r, "ma_company_deep_dive", "", map[string]string{"companyKey": companyKey}, subject, email)
+	if !traceOK {
+		return
+	}
+	result, err := h.ma.deepDiveCompany(r.Context(), companyKey, subject, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_company_deep_dive", err, "company_key", companyKey)
+		return
+	}
+	h.completeMATraceSuccess(r, http.StatusOK)
+	httputil.JSON(w, http.StatusOK, result)
 }
 
 func (h *Handler) handleGetMACompanyRegistry(w http.ResponseWriter, r *http.Request) {
@@ -1482,7 +1556,7 @@ func (h *Handler) handleRatifyBMFamily(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetCompanyDossier returns the cached dossier state for a P.IVA (poll target);
-// it never triggers a paid lookup.
+// it never enqueues analysis.
 func (h *Handler) handleGetCompanyDossier(w http.ResponseWriter, r *http.Request) {
 	vat, ok := maVATParam(w, r)
 	if !ok {
@@ -1497,26 +1571,19 @@ func (h *Handler) handleGetCompanyDossier(w http.ResponseWriter, r *http.Request
 }
 
 // handleCreateCompanyDossier is the standalone P.IVA lookup: cache-first, and on a
-// miss it queues a fresh IT-full deep-dive once the caller acknowledges the cost.
+// miss it queues a fresh IT-full deep analysis directly.
 func (h *Handler) handleCreateCompanyDossier(w http.ResponseWriter, r *http.Request) {
 	vat, ok := maVATParam(w, r)
 	if !ok {
 		return
 	}
-	var body MADeepDiveRequest
-	if r.Body != nil && r.ContentLength != 0 {
-		if err := decodeMABody(r, &body); err != nil {
-			httputil.Error(w, http.StatusBadRequest, "invalid_json")
-			return
-		}
-	}
 	subject, email := companySearchRefreshActor(r.Context())
 	var traceOK bool
-	r, traceOK = h.startMATrace(w, r, "ma_company_dossier", "", body, subject, email)
+	r, traceOK = h.startMATrace(w, r, "ma_company_dossier", "", nil, subject, email)
 	if !traceOK {
 		return
 	}
-	dossier, err := h.ma.companyDossier(r.Context(), vat, body.AcknowledgeCost, email)
+	dossier, err := h.ma.companyDossier(r.Context(), vat, email)
 	if err != nil {
 		h.maFailure(w, r, "ma_company_dossier", err)
 		return

@@ -565,6 +565,12 @@ type MACardDeepDiveResponse struct {
 	DossierStatus string `json:"dossierStatus"`
 }
 
+// MACompanyDeepDiveResponse drives the company-scoped deep analysis launch.
+// It returns the raw worker lifecycle status: queued/running/ready/failed.
+type MACompanyDeepDiveResponse struct {
+	Status string `json:"status"`
+}
+
 // MARescoreRequest — override della tesi da parte dell'analista: ri-scora i
 // target advanced della sessione dai payload già persistiti (gratis, nessuna
 // chiamata vendor) sotto la tesi indicata.
@@ -1372,7 +1378,7 @@ type MADeepQualityFlag struct {
 // scorecard/valuation). FinancialReading è il nome corretto della lettura
 // finanziaria (prompt v3); ThesisReading è la chiave legacy delle righe cached
 // pre-v3 (parseMADeepBrief la riversa in FinancialReading) — la lettura di tesi
-// VERA è context-scoped sulla card (MACardThesisReading).
+// VERA è context-scoped sulla sessione (MASessionThesisReading).
 type MADeepBrief struct {
 	Verdict            string            `json:"verdict,omitempty"`
 	RAG                string            `json:"rag,omitempty"`
@@ -1400,8 +1406,23 @@ type MAThesisReading struct {
 	NotAddressed      []string `json:"notAddressed,omitempty"`
 }
 
-// MACardThesisReading è il record persistito per (iniziativa, azienda) con lo
+// MASessionThesisReading è il record persistito per (sessione, azienda) con lo
 // snapshot della tesi usata (per la staleness) e la data dell'evidenza web.
+type MASessionThesisReading struct {
+	SessionID        string           `json:"sessionId,omitempty"`
+	CompanyKey       string           `json:"companyKey"`
+	ThesisSnapshot   string           `json:"thesisSnapshot,omitempty"`
+	Reading          *MAThesisReading `json:"reading,omitempty"`
+	WebEvidenceDate  *time.Time       `json:"webEvidenceDate,omitempty"`
+	GeneratedByEmail string           `json:"generatedByEmail,omitempty"`
+	UpdatedAt        *time.Time       `json:"updatedAt,omitempty"`
+	// StaleThesis è calcolato in lettura: lo snapshot non coincide più con la
+	// tesi corrente della sessione (rigenerazione esplicita).
+	StaleThesis bool `json:"staleThesis,omitempty"`
+}
+
+// MACardThesisReading è la risposta legacy delle rotte card. Lo storage è
+// session-scoped; InitiativeID è aggiunto dall'adapter per compatibilità JSON.
 type MACardThesisReading struct {
 	InitiativeID     string           `json:"initiativeId"`
 	CompanyKey       string           `json:"companyKey"`
@@ -1411,9 +1432,7 @@ type MACardThesisReading struct {
 	WebEvidenceDate  *time.Time       `json:"webEvidenceDate,omitempty"`
 	GeneratedByEmail string           `json:"generatedByEmail,omitempty"`
 	UpdatedAt        *time.Time       `json:"updatedAt,omitempty"`
-	// StaleThesis è calcolato in lettura: lo snapshot non coincide più con la
-	// tesi corrente della sessione di provenienza (rigenerazione esplicita).
-	StaleThesis bool `json:"staleThesis,omitempty"`
+	StaleThesis      bool             `json:"staleThesis,omitempty"`
 }
 
 // MACardIRLItem è una voce della Information Request List della card (Fase 6):
@@ -1537,7 +1556,7 @@ type MADeepInspectVintage struct {
 
 // MACompanyDossier is the standalone P.IVA lookup response: our elaborations
 // (scorecard/valuation/brief) plus the raw IT-full payload for the facts layer.
-// Status drives the frontend: absent | cost_required | queued | running | ready | failed.
+// Status drives the frontend: absent | queued | running | ready | failed.
 type MACompanyDossier struct {
 	VATCode string `json:"vatCode"`
 	// CompanyKey è la chiave del record deep (il funnel chiave per vendor id, il
@@ -1549,7 +1568,6 @@ type MACompanyDossier struct {
 	Brief      *MADeepBrief     `json:"brief,omitempty"`
 	BMFamily   *MABMFamily      `json:"bmFamily,omitempty"`
 	Raw        json.RawMessage  `json:"raw,omitempty"`
-	CostEUR    float64          `json:"costEur,omitempty"`
 	ErrorCode  string           `json:"errorCode,omitempty"`
 	UpdatedAt  *time.Time       `json:"updatedAt,omitempty"`
 }

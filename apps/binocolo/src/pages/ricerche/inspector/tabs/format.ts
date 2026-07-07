@@ -1,4 +1,5 @@
 import type { MAConfidence } from '../../../../api/types';
+import { deepRagClassName, formatDeepCompactEuro } from '../../../../components/deep/DeepComponents';
 import styles from '../Inspector.module.css';
 
 export const dateTimeFormat = new Intl.DateTimeFormat('it-IT', {
@@ -24,19 +25,11 @@ export function formatEuro(value?: number): string {
 }
 
 export function formatCompactEuro(value?: number): string {
-  if (value == null) return '—';
-  if (value >= 1_000_000) return `${(value / 1_000_000).toLocaleString('it-IT', { maximumFractionDigits: 1 })} M€`;
-  if (value >= 1_000) return `${Math.round(value / 1000)} k€`;
-  return `${numberFormat.format(value)} €`;
+  return formatDeepCompactEuro(value);
 }
 
 export function ragClass(rag?: string): string {
-  switch ((rag ?? '').toLowerCase()) {
-    case 'green': return styles.ragGreen ?? '';
-    case 'amber': return styles.ragAmber ?? '';
-    case 'red': return styles.ragRed ?? '';
-    default: return styles.ragNa ?? '';
-  }
+  return deepRagClassName(rag);
 }
 
 export function freshnessClass(f?: string): string {

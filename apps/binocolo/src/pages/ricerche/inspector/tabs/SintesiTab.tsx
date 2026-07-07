@@ -73,7 +73,7 @@ export function SintesiTab({
         </div>
 
         <div className={`${styles.card} ${styles.cardCompact}`}>
-          <p className={styles.lab}>Deep-dive</p>
+          <p className={styles.lab}>Analisi approfondita</p>
           <dl className={styles.kv}>
             <dt>Stato</dt>
             <dd>

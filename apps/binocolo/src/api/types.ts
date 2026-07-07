@@ -545,16 +545,23 @@ export interface MAThesisReading {
   notAddressed?: string[];
 }
 
-export interface MACardThesisReading {
-  initiativeId: string;
-  companyKey: string;
+export interface MAThesisReadingRecord {
   sessionId?: string;
+  companyKey: string;
   thesisSnapshot?: string;
   reading?: MAThesisReading;
   webEvidenceDate?: string;
   generatedByEmail?: string;
   updatedAt?: string;
   staleThesis?: boolean;
+}
+
+export interface MACardThesisReading extends MAThesisReadingRecord {
+  initiativeId: string;
+}
+
+export interface MASessionThesisReading extends MAThesisReadingRecord {
+  sessionId: string;
 }
 
 export interface MABMFamily {
@@ -645,13 +652,12 @@ export interface MADeepBrief {
 export interface MACompanyDossier {
   vatCode: string;
   companyKey?: string; // chiave del record deep: usarla per famiglia BM e ratifica
-  status: 'absent' | 'cost_required' | 'queued' | 'running' | 'ready' | 'failed';
+  status: 'absent' | 'queued' | 'running' | 'ready' | 'failed';
   scorecard?: MADeepScorecard;
   valuation?: MADeepValuation;
   brief?: MADeepBrief;
   bmFamily?: MABMFamily;
   raw?: unknown;
-  costEur?: number;
   errorCode?: string;
   updatedAt?: string;
 }

@@ -106,6 +106,33 @@ function stateBadgeClass(state: string) {
   return `${styles.statusBadge} ${STATE_COLORS[state] ?? styles.statusGrey ?? ''}`;
 }
 
+type AnalysisState = 'none' | 'working' | 'ready' | 'failed' | 'unknown';
+
+function analysisState(status?: string): AnalysisState {
+  const normalized = (status ?? '').toLowerCase();
+  if (normalized === 'ready') return 'ready';
+  if (normalized === 'working' || normalized === 'queued' || normalized === 'running') return 'working';
+  if (normalized === 'failed') return 'failed';
+  if (!normalized || normalized === 'none' || normalized === 'absent') return 'none';
+  return 'unknown';
+}
+
+function analysisStatusCopy(state: AnalysisState): { label: string; text: string } {
+  switch (state) {
+    case 'ready':
+      return { label: 'Disponibile', text: 'Il dossier è pronto per la consultazione.' };
+    case 'working':
+      return { label: 'In corso', text: 'Analisi in elaborazione. La board si aggiorna automaticamente.' };
+    case 'failed':
+      return { label: 'Non riuscita', text: 'L’ultima analisi non è andata a buon fine. Puoi riprovare.' };
+    case 'unknown':
+      return { label: 'Stato non disponibile', text: 'Stato analisi non riconosciuto.' };
+    case 'none':
+    default:
+      return { label: 'Non avviata', text: 'Avvia l’analisi approfondita per rendere disponibile il dossier.' };
+  }
+}
+
 function collapseStorageKey(initiativeId: string) {
   return `binocolo.iniziative.${initiativeId}.collapsedColumns`;
 }
@@ -187,7 +214,7 @@ export function IniziativaBoardPage() {
     void load();
   }, [load]);
 
-  const hasWorking = useMemo(() => board?.cards.some((c) => c.dossierStatus === 'working') ?? false, [board]);
+  const hasWorking = useMemo(() => board?.cards.some((c) => analysisState(c.dossierStatus) === 'working') ?? false, [board]);
 
   useEffect(() => {
     if (!hasWorking) return;
@@ -277,14 +304,12 @@ export function IniziativaBoardPage() {
   };
 
   const startDeepDive = async (companyKey: string) => {
-    if (!id) return;
     try {
-      await api.post(`/binocolo/v1/ma/initiatives/${id}/cards/${encodeURIComponent(companyKey)}/deep-dive`, {
-        acknowledgeCost: true,
-      });
+      await api.post(`/binocolo/v1/ma/companies/${encodeURIComponent(companyKey)}/deep-dive`, {});
       await load();
     } catch (err) {
       toast(errorLabel(err), 'error');
+      throw err;
     }
   };
 
@@ -482,7 +507,6 @@ export function IniziativaBoardPage() {
                         <div className={styles.kcardFoot}>
                           <DossierButton
                             card={card}
-                            onStart={() => void startDeepDive(card.companyKey)}
                             onOpen={() => openDossier(card)}
                           />
                         </div>
@@ -569,7 +593,6 @@ export function IniziativaBoardPage() {
                     <td>
                       <DossierButton
                         card={card}
-                        onStart={() => void startDeepDive(card.companyKey)}
                         onOpen={() => openDossier(card)}
                       />
                     </td>
@@ -683,16 +706,14 @@ export function IniziativaBoardPage() {
 
 function DossierButton({
   card,
-  onStart,
   onOpen,
 }: {
   card: MAInitiativeCardView;
-  onStart: () => void;
   onOpen: () => void;
 }) {
-  const [confirming, setConfirming] = useState(false);
+  const state = analysisState(card.dossierStatus);
 
-  if (card.dossierStatus === 'ready') {
+  if (state === 'ready') {
     return (
       <span
         className={styles.dossierBtn}
@@ -708,7 +729,7 @@ function DossierButton({
     );
   }
 
-  if (card.dossierStatus === 'working') {
+  if (state === 'working') {
     return (
       <span className={styles.dossierBtn} onClick={(e) => e.stopPropagation()}>
         <Button variant="secondary" size="sm" disabled className={styles.pulse}>
@@ -718,30 +739,17 @@ function DossierButton({
     );
   }
 
-  if (confirming) {
-    return (
-      <span className={styles.actionsRow} onClick={(e) => e.stopPropagation()}>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => {
-            setConfirming(false);
-            onStart();
-          }}
-        >
-          Conferma
-        </Button>
-        <Button variant="secondary" size="sm" onClick={() => setConfirming(false)}>
-          Annulla
-        </Button>
-      </span>
-    );
-  }
+  const statusLabel =
+    state === 'failed'
+      ? 'Analisi non riuscita'
+      : state === 'unknown'
+        ? 'Analisi non disponibile'
+        : 'Analisi non avviata';
 
   return (
     <span className={styles.dossierBtn} onClick={(e) => e.stopPropagation()}>
-      <Button variant="secondary" size="sm" onClick={() => setConfirming(true)}>
-        Avvia analisi completa
+      <Button variant="secondary" size="sm" disabled>
+        {statusLabel}
       </Button>
     </span>
   );
@@ -778,7 +786,8 @@ function CardDrawer({
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [note, setNote] = useState('');
   const [savingNote, setSavingNote] = useState(false);
-  const [confirmingDeepDive, setConfirmingDeepDive] = useState(false);
+  const [launchingAnalysis, setLaunchingAnalysis] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   const loadEvents = useCallback(async () => {
     setLoadingEvents(true);
@@ -831,6 +840,21 @@ function CardDrawer({
   }, [api, card.companyKey]);
 
   const activeStates = STATES.filter((s) => s.key !== 'chiusa');
+  const currentAnalysisState = analysisState(card.dossierStatus);
+  const analysisCopy = analysisStatusCopy(currentAnalysisState);
+  const canLaunchAnalysis = currentAnalysisState === 'none' || currentAnalysisState === 'failed';
+
+  const launchAnalysis = async () => {
+    setLaunchingAnalysis(true);
+    setAnalysisError(null);
+    try {
+      await onDeepDive(card.companyKey);
+    } catch (err) {
+      setAnalysisError(errorLabel(err));
+    } finally {
+      setLaunchingAnalysis(false);
+    }
+  };
 
   return (
     <Drawer
@@ -896,6 +920,39 @@ function CardDrawer({
             </div>
           )}
 
+          <div className={styles.drawerSec}>
+            <p className={styles.lab}>Analisi approfondita</p>
+            <div className={styles.analysisPanel}>
+              <div>
+                <span className={`${styles.analysisStatus} ${styles[`analysisStatus_${currentAnalysisState}`] ?? ''}`}>
+                  {analysisCopy.label}
+                </span>
+                <p className={styles.analysisText}>{analysisCopy.text}</p>
+              </div>
+              <div className={styles.actionsRow}>
+                {currentAnalysisState === 'ready' ? (
+                  <Button variant="secondary" size="sm" onClick={() => onOpenDossier(card)}>
+                    Apri dossier
+                  </Button>
+                ) : currentAnalysisState === 'working' ? (
+                  <Button variant="secondary" size="sm" disabled className={styles.pulse}>
+                    Analisi in corso…
+                  </Button>
+                ) : canLaunchAnalysis ? (
+                  <Button variant="secondary" size="sm" onClick={() => void launchAnalysis()} loading={launchingAnalysis}>
+                    Avvia analisi
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+            {analysisError ? (
+              <div className={styles.danger} role="alert">
+                <Icon name="triangle-alert" size={16} />
+                <span>{analysisError}</span>
+              </div>
+            ) : null}
+          </div>
+
           <Accordion title="Provenienze e Dettagli" initialOpen={false}>
             {(card.provenances ?? []).length > 0 && (
               <div className={styles.drawerSec}>
@@ -940,40 +997,6 @@ function CardDrawer({
               })()}
             </div>
 
-            <div className={styles.drawerSec}>
-              <p className={styles.lab}>Analisi completa</p>
-              <div className={styles.actionsRow}>
-                {card.dossierStatus === 'ready' ? (
-                  <Button variant="secondary" size="sm" onClick={() => onOpenDossier(card)}>
-                    Apri dossier
-                  </Button>
-                ) : card.dossierStatus === 'working' ? (
-                  <Button variant="secondary" size="sm" disabled className={styles.pulse}>
-                    Analisi in corso…
-                  </Button>
-                ) : confirmingDeepDive ? (
-                  <>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => {
-                        setConfirmingDeepDive(false);
-                        void onDeepDive(card.companyKey);
-                      }}
-                    >
-                      Conferma
-                    </Button>
-                    <Button variant="secondary" size="sm" onClick={() => setConfirmingDeepDive(false)}>
-                      Annulla
-                    </Button>
-                  </>
-                ) : (
-                  <Button variant="secondary" size="sm" onClick={() => setConfirmingDeepDive(true)}>
-                    Avvia analisi completa
-                  </Button>
-                )}
-              </div>
-            </div>
           </Accordion>
 
           <div className={styles.drawerSec}>

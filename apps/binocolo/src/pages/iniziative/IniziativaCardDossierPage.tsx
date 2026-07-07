@@ -4,6 +4,8 @@ import { ApiError } from '@mrsmith/api-client';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Button, Icon, Skeleton } from '@mrsmith/ui';
 import { useApiClient } from '../../api/client';
+import { DeepAnalysisContent } from '../../components/deep/DeepComponents';
+import { ThesisReadingPanel } from '../../components/ThesisReadingPanel/ThesisReadingPanel';
 import type {
   MACardDossier,
   MACardIRLItem,
@@ -11,9 +13,6 @@ import type {
   MAIRLSeedReport,
   MAIRLStatus,
   MADeepAnalysis,
-  MADeepMetric,
-  MADeepQualityFlag,
-  MADeepValuation,
   MATarget,
   MATargetAdjustment,
   MATargetEvidence,
@@ -148,7 +147,13 @@ export function IniziativaCardDossierPage() {
         </div>
 
         {activeTab === 'overview' && <OverviewTab target={target} />}
-        {activeTab === 'deep' && <DeepAnalysisTab deep={target.deep} />}
+        {activeTab === 'deep' && (
+          <DeepAnalysisTab
+            deep={target.deep}
+            companyKey={target.companyKey ?? companyKey ?? ''}
+            onStarted={() => void query.refetch()}
+          />
+        )}
         {activeTab === 'tesi' && (
           <ThesisReadingTab
             initiativeId={id ?? ''}
@@ -169,13 +174,6 @@ export function IniziativaCardDossierPage() {
     </main>
   );
 }
-
-const FIT_LEVEL_LABEL: Record<string, string> = {
-  alto: 'Fit alto',
-  medio: 'Fit medio',
-  basso: 'Fit basso',
-  non_valutabile: 'Fit non valutabile',
-};
 
 // ThesisReadingTab — lettura di tesi context-scoped (Fase 5): il memo che applica
 // la tesi della sessione di provenienza al dossier neutro. Generazione on-demand,
@@ -214,106 +212,17 @@ function ThesisReadingTab({
   const record = query.data;
   const notGenerated = !record && query.isError && query.error instanceof ApiError && query.error.status === 404;
 
-  if (notGenerated || !record) {
-    return (
-      <div>
-        <EmptyState
-          icon="target"
-          title="Lettura di tesi non ancora generata"
-          text={
-            deepReady
-              ? 'Applica la tesi della ricerca di provenienza al dossier: fit, flag ri-pesate, domande DD di tesi e ipotesi di sinergia.'
-              : "Serve prima l'analisi approfondita: la lettura di tesi si appoggia ai fatti del dossier."
-          }
-        />
-        <Button onClick={() => generate.mutate()} loading={generate.isPending} disabled={!deepReady}>
-          Genera lettura di tesi
-        </Button>
-        {generate.isError ? <p>Generazione non riuscita: riprova.</p> : null}
-      </div>
-    );
-  }
-
-  const reading = record.reading;
   return (
-    <div>
-      <div className={styles.headTop}>
-        <h3 className={styles.sectionTitle}>
-          {reading?.fitLevel ? FIT_LEVEL_LABEL[reading.fitLevel] ?? reading.fitLevel : 'Lettura di tesi'}
-        </h3>
-        {record.staleThesis ? <span className={styles.statePill}>tesi aggiornata dopo la generazione</span> : null}
-      </div>
-      {reading?.fit ? <p>{reading.fit}</p> : null}
-
-      {reading?.blockingFlags && reading.blockingFlags.length > 0 ? (
-        <div>
-          <h4>Bloccanti per questa tesi</h4>
-          <ul>
-            {reading.blockingFlags.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-      {reading?.tolerableFlags && reading.tolerableFlags.length > 0 ? (
-        <div>
-          <h4>Tollerabili per questa tesi</h4>
-          <ul>
-            {reading.tolerableFlags.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-      {reading?.thesisDdQuestions && reading.thesisDdQuestions.length > 0 ? (
-        <div>
-          <h4>Domande DD di tesi</h4>
-          <ul>
-            {reading.thesisDdQuestions.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-      {reading?.synergyHypotheses && reading.synergyHypotheses.length > 0 ? (
-        <div>
-          <h4>Ipotesi di sinergia (da validare)</h4>
-          <ul>
-            {reading.synergyHypotheses.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-      {reading?.valuationStance ? (
-        <div>
-          <h4>Postura sulla valutazione</h4>
-          <p>{reading.valuationStance}</p>
-        </div>
-      ) : null}
-      {reading?.notAddressed && reading.notAddressed.length > 0 ? (
-        <div>
-          <h4>La tesi non si esprime su</h4>
-          <ul>
-            {reading.notAddressed.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      <small>
-        Tesi di provenienza: “{record.thesisSnapshot}”
-        {record.webEvidenceDate ? ` · evidenza web del ${new Date(record.webEvidenceDate).toLocaleDateString('it-IT')}` : ''}
-        {record.updatedAt ? ` · generata il ${new Date(record.updatedAt).toLocaleDateString('it-IT')}` : ''}
-      </small>
-      <div>
-        <Button variant="secondary" onClick={() => generate.mutate()} loading={generate.isPending}>
-          Rigenera con la tesi corrente
-        </Button>
-        {generate.isError ? <p>Generazione non riuscita: riprova.</p> : null}
-      </div>
-    </div>
+    <ThesisReadingPanel
+      record={record}
+      notGenerated={notGenerated}
+      queryError={query.isError && !notGenerated ? errorLabel(query.error) : null}
+      deepReady={deepReady}
+      onGenerate={() => generate.mutate()}
+      generating={generate.isPending}
+      generationError={generate.isError ? 'Generazione non riuscita: riprova.' : null}
+      regenerateRequiresDeepReady={false}
+    />
   );
 }
 
@@ -634,43 +543,40 @@ function FlagChips({ flags }: { flags?: MATargetFlag[] }) {
   );
 }
 
-function ragLabel(rag: string): string {
-  switch (rag) {
-    case 'green':
-      return 'Solido';
-    case 'amber':
-      return 'Attenzione';
-    case 'red':
-      return 'Critico';
-    default:
-      return 'n.d.';
-  }
-}
-
-function formatMetricValue(value: number, unit: string): string {
-  const rounded = Math.round(value * 10) / 10;
-  if (unit === '%') return `${rounded}%`;
-  if (unit === 'x') return `${rounded}×`;
-  if (unit === 'gg') return `${Math.round(value)} gg`;
-  if (unit === '€') return moneyFormat.format(value);
-  return String(rounded);
-}
-
-function formatPercentagesInText(text: string): string {
-  return text.replace(/(\d+)\.(\d{2,})%/g, (_, p1, p2) => {
-    const num = parseFloat(`${p1}.${p2}`);
-    return `${num.toFixed(1)}%`;
+function DeepAnalysisTab({
+  deep,
+  companyKey,
+  onStarted,
+}: {
+  deep?: MADeepAnalysis;
+  companyKey: string;
+  onStarted: () => void;
+}) {
+  const api = useApiClient();
+  const launch = useMutation({
+    mutationFn: () => api.post(`/binocolo/v1/ma/companies/${encodeURIComponent(companyKey)}/deep-dive`, {}),
+    onSuccess: onStarted,
   });
-}
 
-function DeepAnalysisTab({ deep }: { deep?: MADeepAnalysis }) {
+  const launchButton = (
+    <>
+      <Button onClick={() => launch.mutate()} loading={launch.isPending} disabled={!companyKey}>
+        Avvia analisi
+      </Button>
+      {launch.isError ? <p>Avvio non riuscito: riprova.</p> : null}
+    </>
+  );
+
   if (!deep) {
     return (
-      <EmptyState
-        icon="search"
-        title="Analisi non ancora eseguita"
-        text="Assegna almeno una stella e avvia l'approfondimento dalla card per generare il brief analista."
-      />
+      <div>
+        <EmptyState
+          icon="search"
+          title="Analisi non ancora eseguita"
+          text="Avvia l’analisi approfondita per generare il brief analista."
+        />
+        {launchButton}
+      </div>
     );
   }
   if (deep.status === 'queued' || deep.status === 'running') {
@@ -684,211 +590,17 @@ function DeepAnalysisTab({ deep }: { deep?: MADeepAnalysis }) {
   }
   if (deep.status === 'failed') {
     return (
-      <EmptyState
-        icon="file-text"
-        title="Analisi non riuscita"
-        text={`Si è verificato un problema (${deep.errorCode || 'errore'}).`}
-      />
+      <div>
+        <EmptyState
+          icon="file-text"
+          title="Analisi non riuscita"
+          text={`Si è verificato un problema (${deep.errorCode || 'errore'}).`}
+        />
+        {launchButton}
+      </div>
     );
   }
-  const scorecard = deep.scorecard;
-  if (!scorecard) {
-    return <EmptyState icon="file-text" title="Dati non disponibili" text="L'analisi è pronta ma non contiene dati finanziari." />;
-  }
-  const groups: { key: string; label: string }[] = [
-    { key: 'redditivita', label: 'Redditività' },
-    { key: 'leva', label: 'Leva e struttura' },
-    { key: 'liquidita', label: 'Liquidità' },
-    { key: 'efficienza', label: 'Efficienza' },
-    { key: 'crescita', label: 'Crescita' },
-    { key: 'qualita_margine', label: 'Qualità del margine' },
-  ];
-  return (
-    <div>
-      <div>
-        <span>{ragLabel(scorecard.overallRag)}</span>
-        {scorecard.turnover != null ? (
-          <span>
-            Fatturato{scorecard.turnoverYear ? ` (${scorecard.turnoverYear})` : ''}: <strong>{moneyFormat.format(scorecard.turnover)}</strong>
-          </span>
-        ) : null}
-        {scorecard.ebitda != null ? (
-          <span>
-            EBITDA: <strong>{moneyFormat.format(scorecard.ebitda)}</strong>
-          </span>
-        ) : null}
-        {scorecard.pfn != null ? (
-          <span>
-            PFN: <strong>{moneyFormat.format(scorecard.pfn)}</strong>
-          </span>
-        ) : null}
-        {scorecard.netWorth != null ? (
-          <span>
-            Patrimonio netto: <strong>{moneyFormat.format(scorecard.netWorth)}</strong>
-          </span>
-        ) : null}
-      </div>
-
-      {deep.brief ? <DeepBriefBlock brief={deep.brief} /> : null}
-      {deep.valuation ? <DeepValuation valuation={deep.valuation} flags={deep.scorecard?.qualityFlags} /> : null}
-
-      {groups.map((group) => {
-        const metrics = scorecard.metrics.filter(
-          (metric) => metric.group === group.key && metric.tier !== 'contorno',
-        );
-        if (metrics.length === 0) return null;
-        return (
-          <div key={group.key}>
-            <h5>{group.label}</h5>
-            {metrics.map((metric) => (
-              <DeepMetricRow key={metric.key} metric={metric} />
-            ))}
-          </div>
-        );
-      })}
-      {scorecard.metrics.some((metric) => metric.tier === 'contorno') ? (
-        <div style={{ opacity: 0.72 }}>
-          <h5>Struttura finanziaria del venditore</h5>
-          {scorecard.metrics
-            .filter((metric) => metric.tier === 'contorno')
-            .map((metric) => (
-              <DeepMetricRow key={metric.key} metric={metric} />
-            ))}
-          <small>Fuori dal giudizio complessivo: il compratore sostituisce la struttura del capitale al closing.</small>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function DeepMetricRow({ metric }: { metric: MADeepMetric }) {
-  return (
-    <div>
-      <span>{metric.label}</span>
-      <span>{metric.value != null ? formatMetricValue(metric.value, metric.unit) : 'n.d.'}</span>
-    </div>
-  );
-}
-
-function bridgeProvenanceLabel(provenance?: string): string {
-  if (provenance === 'cee_total') return ' (da totali di bilancio)';
-  if (provenance === 'vendor_ratio') return ' (stimata da ratio)';
-  return '';
-}
-
-function DeepValuation({ valuation, flags }: { valuation: MADeepValuation; flags?: MADeepQualityFlag[] }) {
-  const bridge = valuation.bridge;
-  return (
-    <div>
-      <h5>Inquadramento di valore</h5>
-      {bridge ? (
-        <table>
-          <tbody>
-            <tr>
-              <td>Enterprise Value</td>
-              <td>
-                {moneyFormat.format(valuation.evLow)} – {moneyFormat.format(valuation.evHigh)}
-              </td>
-            </tr>
-            {bridge.pfn ? (
-              <tr>
-                <td>− PFN{bridgeProvenanceLabel(bridge.pfn.provenance)}</td>
-                <td>−{moneyFormat.format(bridge.pfn.value)}</td>
-              </tr>
-            ) : null}
-            {bridge.shareholderLoans ? (
-              <tr>
-                <td>di cui finanziamenti soci — riga negoziale</td>
-                <td>{moneyFormat.format(bridge.shareholderLoans.value)}</td>
-              </tr>
-            ) : null}
-            {bridge.tfr ? (
-              <tr>
-                <td>− TFR{bridge.tfr.note ? ` (${bridge.tfr.note})` : ''}</td>
-                <td>−{moneyFormat.format(bridge.tfr.value)}</td>
-              </tr>
-            ) : null}
-            {bridge.taxFund ? (
-              <tr>
-                <td>− Fondo imposte</td>
-                <td>−{moneyFormat.format(bridge.taxFund.value)}</td>
-              </tr>
-            ) : null}
-            {bridge.equityLow != null && bridge.equityHigh != null ? (
-              <tr>
-                <td>
-                  <strong>Equity implicito</strong>
-                </td>
-                <td>
-                  <strong>
-                    {moneyFormat.format(bridge.equityLow)} – {moneyFormat.format(bridge.equityHigh)}
-                  </strong>
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      ) : (
-        <>
-          <div>
-            <span>Enterprise Value stimato</span>
-            <strong>
-              {moneyFormat.format(valuation.evLow)} – {moneyFormat.format(valuation.evHigh)}
-            </strong>
-          </div>
-          {valuation.equityLow != null && valuation.equityHigh != null ? (
-            <div>
-              <span>Equity implicito (EV − PFN)</span>
-              <strong>
-                {moneyFormat.format(valuation.equityLow)} – {moneyFormat.format(valuation.equityHigh)}
-              </strong>
-            </div>
-          ) : null}
-        </>
-      )}
-      {valuation.lowMethod === 'ev_sales' ? (
-        <small>Estremo basso su EV/Sales: EBITDA prudenziale sotto soglia.</small>
-      ) : null}
-      <small>
-        {valuation.method === 'ev_sales' ? 'EV/Sales' : 'EV/EBITDA'} {valuation.multiple}× · sconto PMI {valuation.haircutPct}%
-        {valuation.sector ? ` · ${valuation.sector}` : ''}
-        {valuation.source ? ` · ${valuation.source}` : ''}
-        {valuation.sourceDate ? ` ${valuation.sourceDate}` : ''}
-        {valuation.nFirms ? ` · ${valuation.nFirms} soc.` : ''}
-      </small>
-      {valuation.caveat ? <small>{valuation.caveat}</small> : null}
-      {flags && flags.length > 0 ? (
-        <ul>
-          {flags.map((flag) => (
-            <li key={flag.code}>
-              <strong>{flag.label}</strong> — {flag.evidence}
-              {flag.ddQuestion ? <span> · DD: {flag.ddQuestion}</span> : null}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </div>
-  );
-}
-
-function DeepBriefBlock({ brief }: { brief: NonNullable<MADeepAnalysis['brief']> }) {
-  return (
-    <div>
-      <h5>Brief analista</h5>
-      {brief.verdict ? <p>{formatPercentagesInText(brief.verdict)}</p> : null}
-      {(brief.financialReading ?? brief.thesisReading) ? <p>{formatPercentagesInText(brief.financialReading ?? brief.thesisReading ?? "")}</p> : null}
-      {brief.redFlags && brief.redFlags.length > 0 ? (
-        <ul>
-          {brief.redFlags.map((flag, index) => (
-            <li key={index}>
-              <strong>{formatPercentagesInText(flag.claim)}</strong>
-              {flag.ddQuestion ? <span> — {formatPercentagesInText(flag.ddQuestion)}</span> : null}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </div>
-  );
+  return <DeepAnalysisContent deep={deep} variant="full" />;
 }
 
 function FinancialsTab({ target }: { target: MATarget }) {

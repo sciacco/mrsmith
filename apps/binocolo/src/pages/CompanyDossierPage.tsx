@@ -17,7 +17,6 @@ import styles from './CompanyDossierPage.module.css';
 
 const iicLegend = iicLegendRaw as Record<string, { description: string; section: string }>;
 
-const COST_LABEL = '0,30 €';
 const eur0 = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
 const num1 = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 });
 const num2 = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 2 });
@@ -728,20 +727,13 @@ export function CompanyDossierPage() {
   const api = useApiClient();
   const [vatInput, setVatInput] = useState('');
   const [activeVat, setActiveVat] = useState<string | null>(null);
-  const [costPrompt, setCostPrompt] = useState<{ vat: string; costEur?: number } | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
 
   const start = useMutation({
-    mutationFn: ({ v, ack }: { v: string; ack: boolean }) =>
-      api.post<MACompanyDossier>(`/binocolo/v1/companies/${encodeURIComponent(v)}/dossier`, { acknowledgeCost: ack }),
+    mutationFn: (v: string) =>
+      api.post<MACompanyDossier>(`/binocolo/v1/companies/${encodeURIComponent(v)}/dossier`),
     onSuccess: (data) => {
-      if (data.status === 'cost_required') {
-        setCostPrompt({ vat: data.vatCode, costEur: data.costEur });
-        setActiveVat(null);
-      } else {
-        setCostPrompt(null);
-        setActiveVat(data.vatCode);
-      }
+      setActiveVat(data.vatCode);
     },
   });
 
@@ -755,8 +747,7 @@ export function CompanyDossierPage() {
     },
   });
 
-  const dossier =
-    poll.data ?? (start.data && start.data.status !== 'cost_required' ? start.data : undefined);
+  const dossier = poll.data ?? start.data;
   const status = dossier?.status;
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -768,8 +759,7 @@ export function CompanyDossierPage() {
     }
     setLocalError(null);
     setActiveVat(null);
-    setCostPrompt(null);
-    start.mutate({ v, ack: false });
+    start.mutate(v);
   }
 
   const busy = start.isPending || status === 'queued' || status === 'running';
@@ -803,26 +793,6 @@ export function CompanyDossierPage() {
       </form>
       {localError ? <p className={styles.localError}>{localError}</p> : null}
 
-      {costPrompt ? (
-        <div className={styles.costPanel} role="alert">
-          <div className={styles.stateIcon}>
-            <Icon name="circle-dollar-sign" size={22} />
-          </div>
-          <p className={styles.stateTitle}>Prima analisi di {costPrompt.vat}</p>
-          <p className={styles.stateText}>
-            Questa azienda non è ancora in archivio. Confermi l'acquisizione del fascicolo?
-          </p>
-          <div className={styles.costActions}>
-            <Button variant="secondary" onClick={() => setCostPrompt(null)}>
-              Annulla
-            </Button>
-            <Button loading={start.isPending} onClick={() => start.mutate({ v: costPrompt.vat, ack: true })}>
-              Analizza
-            </Button>
-          </div>
-        </div>
-      ) : null}
-
       {start.isError ? (
         <div className={styles.statePanel} role="alert">
           <div className={styles.stateIcon}>
@@ -833,7 +803,7 @@ export function CompanyDossierPage() {
         </div>
       ) : null}
 
-      {!costPrompt && busy && status !== 'ready' ? (
+      {busy && status !== 'ready' ? (
         <div className={styles.analyzing}>
           <div className={styles.spinner} aria-hidden="true" />
           <p className={styles.stateTitle}>Analisi in corso…</p>
@@ -857,8 +827,8 @@ export function CompanyDossierPage() {
           <p className={styles.stateText}>
             {dossier?.errorCode ? `Errore: ${dossier.errorCode}.` : 'IT-full non ha restituito dati.'}
           </p>
-          <Button variant="secondary" onClick={() => activeVat && start.mutate({ v: activeVat, ack: true })}>
-            Riprova ({COST_LABEL})
+          <Button variant="secondary" onClick={() => activeVat && start.mutate(activeVat)}>
+            Riprova
           </Button>
         </div>
       ) : null}

@@ -1,13 +1,19 @@
+import { ApiError } from '@mrsmith/api-client';
 import { Button, Icon, Modal, Skeleton, Tooltip, useToast } from '@mrsmith/ui';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApiClient } from '../../api/client';
+import { DeepAnalysisContent } from '../../components/deep/DeepComponents';
+import { ThesisReadingPanel } from '../../components/ThesisReadingPanel/ThesisReadingPanel';
 import type {
   MAGatedProgressResponse,
   MASessionDetail,
+  MADeepAnalysis,
   MATarget,
   MATargetListResponse,
   MATargetRow,
+  MASessionThesisReading,
   MAVerificationQueueItem,
   MAVerificationQueueResponse,
   MAThesis,
@@ -15,6 +21,7 @@ import type {
 import {
   bucketChipDescription,
   bucketChipLabel,
+  bucketLabel,
   dateLabel,
   downloadBlob,
   errorLabel,
@@ -45,6 +52,12 @@ const thesisOptions: { value: MAThesis; label: string }[] = [
   { value: 'tuck_in', label: 'Competenze' },
 ];
 
+const moneyFormat = new Intl.NumberFormat('it-IT', {
+  style: 'currency',
+  currency: 'EUR',
+  maximumFractionDigits: 0,
+});
+
 type ActiveTab = 'results' | 'queue' | 'outside';
 
 export function RicercaDetailPage() {
@@ -64,6 +77,8 @@ export function RicercaDetailPage() {
   const [targetCache, setTargetCache] = useState<Record<string, MATarget>>({});
   const [targetLoading, setTargetLoading] = useState(false);
   const [targetError, setTargetError] = useState<string | null>(null);
+  const [deepLaunchFor, setDeepLaunchFor] = useState<string | null>(null);
+  const [deepLaunchError, setDeepLaunchError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [thesis, setThesis] = useState<MAThesis>('generico');
   const [associateFor, setAssociateFor] = useState<string | null>(null);
@@ -151,6 +166,16 @@ export function RicercaDetailPage() {
 
   const selectedTarget = selectedRow ? targetCache[selectedRow.id] ?? null : null;
 
+  const refetchTargetDetail = useCallback(
+    async (row: MATargetRow) => {
+      if (!id) return null;
+      const target = await api.get<MATarget>(`/binocolo/v1/ma/sessions/${id}/targets/${row.id}`);
+      setTargetCache((current) => ({ ...current, [row.id]: target }));
+      return target;
+    },
+    [api, id],
+  );
+
   useEffect(() => {
     if (!id || !selectedRow || targetCache[selectedRow.id]) return;
     let active = true;
@@ -172,6 +197,16 @@ export function RicercaDetailPage() {
       active = false;
     };
   }, [api, id, selectedRow, targetCache]);
+
+  const selectedDeepStatus = selectedTarget?.deep?.status;
+  const selectedDeepRunning = selectedDeepStatus === 'queued' || selectedDeepStatus === 'running';
+  useEffect(() => {
+    if (!selectedRow || !selectedDeepRunning) return;
+    const handle = setInterval(() => {
+      void refetchTargetDetail(selectedRow).catch(() => undefined);
+    }, 5000);
+    return () => clearInterval(handle);
+  }, [refetchTargetDetail, selectedDeepRunning, selectedRow]);
 
   const outsideTargets = useMemo(() => rows.filter(isGateReject), [rows]);
   const resultTargets = useMemo(
@@ -359,6 +394,40 @@ export function RicercaDetailPage() {
     }
   }
 
+  async function startTargetDeepAnalysis(row: MATargetRow, target: MATarget) {
+    const companyKey = target.companyKey || row.companyKey || target.vatCode || row.vatCode || target.taxCode || target.id;
+    if (!companyKey) {
+      setDeepLaunchError('Chiave azienda non disponibile.');
+      return;
+    }
+    setDeepLaunchFor(companyKey);
+    setDeepLaunchError(null);
+    try {
+      const response = await api.post<{ status: MADeepAnalysis['status'] }>(
+        `/binocolo/v1/ma/companies/${encodeURIComponent(companyKey)}/deep-dive`,
+        {},
+      );
+      setTargetCache((current) => {
+        const cached = current[row.id];
+        if (!cached) return current;
+        const nextDeep: MADeepAnalysis = {
+          ...(cached.deep ?? { companyKey }),
+          companyKey,
+          status: response.status,
+        };
+        return { ...current, [row.id]: { ...cached, deep: nextDeep } };
+      });
+      void refetchTargetDetail(row).catch(() => undefined);
+      toast(response.status === 'ready' ? 'Analisi già disponibile.' : 'Analisi avviata.', 'success');
+    } catch (err) {
+      const message = errorLabel(err);
+      setDeepLaunchError(message);
+      toast(message, 'error');
+    } finally {
+      setDeepLaunchFor(null);
+    }
+  }
+
   if (!id) {
     return <main className={styles.page}><div className={styles.danger}>Ricerca non indicata.</div></main>;
   }
@@ -531,9 +600,13 @@ export function RicercaDetailPage() {
         loading={targetLoading}
         error={targetError}
         sessionId={id}
+        deepLaunchBusy={deepLaunchFor !== null}
+        deepLaunchError={deepLaunchError}
+        onStartDeepAnalysis={(row, target) => void startTargetDeepAnalysis(row, target)}
         onClose={() => {
           setSelectedRow(null);
           setTargetError(null);
+          setDeepLaunchError(null);
         }}
       />
 
@@ -1122,6 +1195,9 @@ function TargetDetailModal({
   loading,
   error,
   sessionId,
+  deepLaunchBusy,
+  deepLaunchError,
+  onStartDeepAnalysis,
   onClose,
 }: {
   row: MATargetRow | null;
@@ -1129,8 +1205,35 @@ function TargetDetailModal({
   loading: boolean;
   error: string | null;
   sessionId?: string;
+  deepLaunchBusy: boolean;
+  deepLaunchError: string | null;
+  onStartDeepAnalysis: (row: MATargetRow, target: MATarget) => void;
   onClose: () => void;
 }) {
+  const api = useApiClient();
+  const thesisEnabled = Boolean(target?.deep?.status === 'ready' && sessionId && row?.id);
+  const thesisQuery = useQuery({
+    queryKey: ['ma-session-thesis-reading', sessionId, row?.id],
+    enabled: thesisEnabled,
+    queryFn: () => {
+      if (!sessionId || !row?.id) throw new Error('Target non disponibile.');
+      return api.get<MASessionThesisReading>(`/binocolo/v1/ma/sessions/${sessionId}/targets/${row.id}/thesis-reading`);
+    },
+    retry: (failureCount, queryError) => !(queryError instanceof ApiError && queryError.status === 404) && failureCount < 2,
+  });
+  const generateThesis = useMutation({
+    mutationFn: () => {
+      if (!sessionId || !row?.id) throw new Error('Target non disponibile.');
+      return api.post<MASessionThesisReading>(`/binocolo/v1/ma/sessions/${sessionId}/targets/${row.id}/thesis-reading`, {});
+    },
+    onSuccess: () => void thesisQuery.refetch(),
+  });
+  useEffect(() => {
+    generateThesis.reset();
+  }, [row?.id]);
+  const thesisNotGenerated = thesisQuery.isError && thesisQuery.error instanceof ApiError && thesisQuery.error.status === 404;
+  const thesisQueryError = thesisQuery.isError && !thesisNotGenerated ? errorLabel(thesisQuery.error) : null;
+
   return (
     <Modal open={row !== null} onClose={onClose} title={target?.companyName ?? row?.companyName ?? 'Dettaglio'} size="wide">
       {loading ? (
@@ -1146,47 +1249,37 @@ function TargetDetailModal({
         </div>
       ) : target ? (
         <div className={styles.detailModalBody}>
-          <dl className={styles.facts}>
-            <Fact label="Partita IVA" value={target.vatCode || '-'} />
-            <Fact label="Provincia" value={target.province || '-'} />
-            <Fact label="Comune" value={target.town || '-'} />
-            <Fact label="ATECO" value={target.atecoCode || '-'} />
-            <Fact label="Punteggio" value={numberFormat.format(target.score)} />
-            <Fact label="Dominio" value={target.webValidation?.selectedDomain || '-'} />
-          </dl>
-          <div className={styles.infoNotice}>
-            <Icon name="file-text" size={18} />
-            <span>{target.rationale || target.webValidation?.finalDecision?.reason || 'Nessun razionale disponibile.'}</span>
-          </div>
-          {target.evidence.length > 0 ? (
-            <div className={styles.stack}>
-              <span className={styles.label}>Evidenze</span>
-              {target.evidence.slice(0, 6).map((item) => (
-                <div key={`${item.criterion}-${item.label}`} className={styles.notice}>
-                  <span><b>{item.label}</b>{item.value ? ` · ${item.value}` : ''}</span>
-                </div>
-              ))}
-            </div>
-          ) : null}
-          {(row && (row.registryFacts?.length || row.inLavorazione?.length)) ? (
-            <div className={styles.cellBadges}>
-              {(row.registryFacts ?? []).map((kind) => {
-                const meta = registryFactLabels[kind];
-                if (!meta) return null;
-                const toneClass = meta.tone === 'warn' ? styles.badgeWarn : styles.badgeInfo;
-                return (
-                  <span key={kind} className={`${styles.badge} ${toneClass}`}>{meta.label}</span>
-                );
-              })}
-              {(row.inLavorazione ?? []).map((marker) => (
-                <span key={marker.initiativeId} className={`${styles.badge} ${styles.badgeLav}`}>
-                  In lavorazione · {marker.initiativeTitle}
-                </span>
-              ))}
-            </div>
+          <TargetPriorityMarkers row={row} />
+          <TargetIdentitySection target={target} />
+          <TargetNumbersSection target={target} />
+          <TargetAcquisitionAngle row={row} target={target} />
+          <TargetKillCriteria row={row} target={target} />
+
+          <TargetDeepAnalysisSection
+            row={row}
+            target={target}
+            sessionId={sessionId}
+            busy={deepLaunchBusy}
+            error={deepLaunchError}
+            onStart={onStartDeepAnalysis}
+          />
+
+          {target.deep?.status === 'ready' && sessionId && row?.id ? (
+            <ThesisReadingPanel
+              compact
+              record={thesisQuery.data}
+              loading={thesisQuery.isLoading}
+              notGenerated={thesisNotGenerated}
+              queryError={thesisQueryError}
+              deepReady
+              onGenerate={() => generateThesis.mutate()}
+              generating={generateThesis.isPending}
+              generationError={generateThesis.isError ? errorLabel(generateThesis.error) : null}
+              generateLabel="Lettura di tesi"
+            />
           ) : null}
 
-          {sessionId && row ? (
+          {sessionId && row && target.deep?.status !== 'ready' ? (
             <a
               className={styles.inspectLink}
               href={`/ricerche/${sessionId}/target/${row.id}/inspect`}
@@ -1196,19 +1289,499 @@ function TargetDetailModal({
               Ispezione completa <Icon name="external-link" size={14} />
             </a>
           ) : null}
+
+          <TargetScoreSection target={target} />
         </div>
       ) : null}
     </Modal>
   );
 }
 
-function Fact({ label, value }: { label: string; value: string }) {
+function TargetPriorityMarkers({ row }: { row: MATargetRow | null }) {
+  const registryFacts = row?.registryFacts ?? [];
+  const workMarkers = row?.inLavorazione ?? [];
+  if (registryFacts.length === 0 && workMarkers.length === 0) return null;
+
   return (
-    <div className={styles.fact}>
-      <dt>{label}</dt>
-      <dd>{value}</dd>
+    <div className={styles.targetPriorityMarkers} aria-label="Segnali prioritari">
+      {registryFacts.map((kind) => {
+        const meta = registryFactLabels[kind] ?? { label: humanizeCode(kind), tone: 'info' as const };
+        return (
+          <span key={kind} className={`${styles.badge} ${meta.tone === 'warn' ? styles.badgeWarn : styles.badgeInfo}`}>
+            {meta.label}
+          </span>
+        );
+      })}
+      {workMarkers.map((marker) => (
+        <span key={marker.initiativeId} className={`${styles.badge} ${styles.badgeLav}`}>
+          In lavorazione · {marker.initiativeTitle}
+        </span>
+      ))}
     </div>
   );
+}
+
+function TargetIdentitySection({ target }: { target: MATarget }) {
+  const validation = target.webValidation;
+  const selectedDomain = validation?.selectedDomain;
+  const domainHref = selectedDomain ? domainLink(selectedDomain) : undefined;
+  const businessFit = validation?.candidateMatchAnalysis?.businessFit?.trim();
+  const evidenceFor = validation?.candidateMatchAnalysis?.evidenceFor ?? [];
+  const evidenceAgainst = validation?.candidateMatchAnalysis?.evidenceAgainst ?? [];
+  const hasGateDetails = evidenceFor.length > 0 || evidenceAgainst.length > 0;
+  const legalForm = evidenceValue(target, 'legal_form');
+  const gate = gateVerdict(validation?.webValidationState, validation?.finalAction);
+
+  return (
+    <section className={styles.targetSection} aria-labelledby="target-identity-title">
+      <div className={styles.targetSectionHeader}>
+        <div>
+          <p className={styles.eyebrow}>Chi è e cosa fa</p>
+          <h3 id="target-identity-title">{target.companyName}</h3>
+        </div>
+        {gate ? <span className={`${styles.targetChip} ${chipToneClass(gate.tone)}`}>{gate.label}</span> : null}
+      </div>
+
+      <div className={styles.identityGrid}>
+        <div>
+          <span className={styles.targetMetaLabel}>Attività</span>
+          <p className={styles.identityText}>
+            {target.atecoDescription || 'Descrizione attività non disponibile'}
+            {target.atecoCode ? <small>{target.atecoCode}</small> : null}
+          </p>
+        </div>
+        <div>
+          <span className={styles.targetMetaLabel}>Sede</span>
+          <p className={styles.identityText}>{[target.town, target.province].filter(Boolean).join(' · ') || 'Sede non disponibile'}</p>
+        </div>
+        {legalForm || target.activityStatus ? (
+          <div>
+            <span className={styles.targetMetaLabel}>Stato</span>
+            <p className={styles.identityText}>{[legalForm, target.activityStatus].filter(Boolean).join(' · ')}</p>
+          </div>
+        ) : null}
+        {selectedDomain ? (
+          <div>
+            <span className={styles.targetMetaLabel}>Dominio selezionato</span>
+            <a className={styles.targetDomainLink} href={domainHref} target="_blank" rel="noopener noreferrer">
+              {selectedDomain}
+            </a>
+          </div>
+        ) : null}
+      </div>
+
+      {businessFit ? <p className={styles.targetDecisionText}>{businessFit}</p> : null}
+      {!businessFit && target.webValidation?.finalDecision?.reason ? (
+        <p className={styles.targetDecisionText}>{target.webValidation.finalDecision.reason}</p>
+      ) : null}
+
+      {hasGateDetails ? (
+        <details className={styles.targetDetails}>
+          <summary>Dettagli del verdetto</summary>
+          <div className={styles.evidenceColumns}>
+            {evidenceFor.length > 0 ? <EvidenceTextList title="A favore" items={evidenceFor} /> : null}
+            {evidenceAgainst.length > 0 ? <EvidenceTextList title="Contro" items={evidenceAgainst} /> : null}
+          </div>
+        </details>
+      ) : null}
+    </section>
+  );
+}
+
+function TargetNumbersSection({ target }: { target: MATarget }) {
+  const revenuePerEmployee = revenuePerEmployeeValue(target);
+  const trend = evidenceValue(target, 'turnover_trend') ?? evidenceValueByPattern(target, /^[+-]\d/);
+
+  return (
+    <section className={styles.targetSection} aria-labelledby="target-numbers-title">
+      <div className={styles.targetSectionHeader}>
+        <div>
+          <p className={styles.eyebrow}>I tre numeri</p>
+          <h3 id="target-numbers-title">Dimensione operativa</h3>
+        </div>
+        {trend ? <span className={`${styles.targetChip} ${chipToneClass(trend.startsWith('-') ? 'warning' : 'success')}`}>{trend}</span> : null}
+      </div>
+      <div className={styles.metricGrid}>
+        <MetricCard label="Fatturato" value={target.turnover != null ? moneyFormat.format(target.turnover) : '—'} detail={target.turnoverYear ? String(target.turnoverYear) : undefined} />
+        <MetricCard label="Dipendenti" value={target.employees != null ? numberFormat.format(target.employees) : '—'} />
+        <MetricCard label="Ricavo/dipendente" value={revenuePerEmployee ?? '—'} detail={revenuePerEmployee?.includes('/dip') ? undefined : 'derivato'} />
+      </div>
+    </section>
+  );
+}
+
+function TargetAcquisitionAngle({ row, target }: { row: MATargetRow | null; target: MATarget }) {
+  const flags = combinedFlags(row, target);
+  const ownerAge = evidenceValue(target, 'succession_owner');
+  const companyAge = evidenceValue(target, 'company_age');
+  const chips: Array<{ key: string; label: string }> = [];
+
+  for (const code of ['ricambio_generazionale', 'socio_unico', 'impresa_familiare', 'controllo_holding']) {
+    const flag = flags.get(code);
+    const adjustment = (target.adjustments ?? []).find((item) => item.code === code);
+    if (!flag && !adjustment) continue;
+    const label = flag?.label ?? adjustment?.label ?? humanizeCode(code);
+    const suffix = code === 'ricambio_generazionale' && ownerAge ? ` · ${ownerAge}` : '';
+    chips.push({ key: code, label: `${label}${suffix}` });
+  }
+  if (companyAge) chips.push({ key: 'company_age', label: `Anzianità · ${companyAge}` });
+
+  return (
+    <section className={styles.targetSection} aria-labelledby="target-acquisition-title">
+      <div className={styles.targetSectionHeader}>
+        <div>
+          <p className={styles.eyebrow}>Angolo d'acquisto</p>
+          <h3 id="target-acquisition-title">Segnali proprietari</h3>
+        </div>
+      </div>
+      {chips.length > 0 ? (
+        <div className={styles.targetChipList}>
+          {chips.map((chip) => (
+            <span key={chip.key} className={`${styles.targetChip} ${chipToneClass('info')}`}>{chip.label}</span>
+          ))}
+        </div>
+      ) : (
+        <p className={styles.targetMuted}>Nessun segnale proprietario rilevante nei dati disponibili.</p>
+      )}
+    </section>
+  );
+}
+
+function TargetKillCriteria({ row, target }: { row: MATargetRow | null; target: MATarget }) {
+  const { kills, caveats } = killCriteria(row, target);
+  if (kills.length === 0 && caveats.length === 0) return null;
+
+  return (
+    <section className={`${styles.targetSection} ${styles.killSection}`} aria-labelledby="target-kill-title">
+      <div className={styles.targetSectionHeader}>
+        <div>
+          <p className={styles.eyebrow}>Kill criteria</p>
+          <h3 id="target-kill-title">Blocchi e caveat</h3>
+        </div>
+      </div>
+      {kills.length > 0 ? (
+        <div className={styles.alertList}>
+          {kills.map((item) => (
+            <div key={item.key} className={item.tone === 'danger' ? styles.targetDanger : styles.targetWarning}>
+              <Icon name="triangle-alert" size={16} />
+              <span><b>{item.label}</b>{item.detail ? ` · ${item.detail}` : ''}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {caveats.length > 0 ? (
+        <div className={styles.caveatBlock}>
+          <span className={styles.targetMetaLabel}>Caveat informativi</span>
+          <div className={styles.targetChipList}>
+            {caveats.map((item) => (
+              <span key={item.key} className={`${styles.targetChip} ${chipToneClass('warning')}`}>{item.label}</span>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function TargetScoreSection({ target }: { target: MATarget }) {
+  const adjustments = target.adjustments ?? [];
+  const hasDetails = target.evidence.length > 0 || adjustments.length > 0;
+
+  return (
+    <section className={styles.targetSection} aria-labelledby="target-score-title">
+      <div className={styles.targetSectionHeader}>
+        <div>
+          <p className={styles.eyebrow}>Punteggio</p>
+          <h3 id="target-score-title">{numberFormat.format(target.score)}</h3>
+        </div>
+        <div className={styles.scorePills}>
+          <span className={`${styles.targetChip} ${chipToneClass('neutral')}`}>{confidenceLabel(target.confidence)}</span>
+          <span className={`${styles.targetChip} ${chipToneClass(target.bucket === 'soppresso' ? 'warning' : 'info')}`}>{bucketLabel(target.bucket)}</span>
+        </div>
+      </div>
+      {hasDetails ? (
+        <details className={styles.targetDetails}>
+          <summary>Dettaglio punteggio</summary>
+          <div className={styles.scoreDetailList}>
+            {target.evidence.map((item, index) => (
+              <div key={`${item.criterion}-${index}`} className={styles.scoreDetailRow}>
+                <span>{item.label}</span>
+                <span>{item.value || '—'}</span>
+                <strong>{item.points != null ? `${numberFormat.format(item.points)} pt` : '—'}</strong>
+              </div>
+            ))}
+            {adjustments.map((item) => (
+              <div key={`adjustment-${item.code}`} className={styles.scoreDetailRow}>
+                <span>{item.label}</span>
+                <span>Fattore</span>
+                <strong>{formatFactor(item.factor)}</strong>
+              </div>
+            ))}
+          </div>
+        </details>
+      ) : null}
+    </section>
+  );
+}
+
+function EvidenceTextList({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div className={styles.evidenceTextList}>
+      <span className={styles.targetMetaLabel}>{title}</span>
+      <ul>
+        {items.map((item) => <li key={item}>{item}</li>)}
+      </ul>
+    </div>
+  );
+}
+
+function MetricCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
+  return (
+    <div className={styles.metricCard}>
+      <span className={styles.metricLabel}>{label}</span>
+      <strong>{value}</strong>
+      {detail ? <span className={styles.metricDetail}>{detail}</span> : null}
+    </div>
+  );
+}
+
+type ChipTone = 'neutral' | 'info' | 'warning' | 'danger' | 'success';
+
+type KillItem = {
+  key: string;
+  label: string;
+  detail?: string;
+  tone: 'warning' | 'danger';
+};
+
+function combinedFlags(row: MATargetRow | null, target: MATarget): Map<string, { code: string; label: string }> {
+  const flags = new Map<string, { code: string; label: string }>();
+  for (const flag of [...(row?.flags ?? []), ...(target.flags ?? [])]) flags.set(flag.code, flag);
+  return flags;
+}
+
+function evidenceValue(target: MATarget, criterion: string): string | undefined {
+  return target.evidence.find((item) => item.criterion === criterion && item.value)?.value;
+}
+
+function evidenceValueByPattern(target: MATarget, pattern: RegExp): string | undefined {
+  return target.evidence.find((item) => item.value && pattern.test(item.value))?.value;
+}
+
+function revenuePerEmployeeValue(target: MATarget): string | undefined {
+  const direct = evidenceValue(target, 'revenue_per_employee_min') ?? evidenceValue(target, 'productivity');
+  if (direct && !direct.toLowerCase().includes('non valutabile')) return direct;
+  if (target.turnover != null && target.employees && target.employees > 0) {
+    return `${numberFormat.format(Math.round(target.turnover / target.employees / 1000))}k/dip`;
+  }
+  return undefined;
+}
+
+function gateVerdict(state?: string, action?: string): { label: string; tone: ChipTone } | null {
+  if (!state && !action) return null;
+  const source = action || state;
+  const label = action ? finalActionLabel(action) : webValidationStateLabel(state);
+  if (source === 'confirm' || source === 'confirmed') return { label, tone: 'success' };
+  if (source === 'reject' || source === 'rejected') return { label, tone: 'danger' };
+  if (source === 'needs_domain_review' || source === 'needs_business_validation' || source === 'domain_unresolved' || source === 'unclear') {
+    return { label, tone: 'warning' };
+  }
+  return { label, tone: 'info' };
+}
+
+function finalActionLabel(action?: string): string {
+  switch (action) {
+    case 'confirm':
+      return 'Confermata';
+    case 'deprioritize':
+      return 'Da approfondire';
+    case 'reject':
+      return 'Respinta';
+    case 'needs_domain_review':
+      return 'Dominio da verificare';
+    case 'needs_business_validation':
+      return 'Business da verificare';
+    case 'no_website_structured':
+      return 'Soli dati strutturati';
+    default:
+      return action ? humanizeCode(action) : 'Non valutata';
+  }
+}
+
+function webValidationStateLabel(state?: string): string {
+  switch (state) {
+    case 'confirmed':
+      return 'Confermata';
+    case 'deprioritized':
+      return 'Declassata';
+    case 'domain_unresolved':
+      return 'Dominio non risolto';
+    case 'analysis_unavailable':
+      return 'Analisi web non disponibile';
+    case 'no_website_declared':
+      return 'Nessun sito dichiarato';
+    case 'rejected':
+      return 'Respinta';
+    case 'unclear':
+      return 'Incerta';
+    default:
+      return state ? humanizeCode(state) : 'Non valutata';
+  }
+}
+
+function killCriteria(row: MATargetRow | null, target: MATarget): { kills: KillItem[]; caveats: KillItem[] } {
+  const flags = combinedFlags(row, target);
+  const kills = new Map<string, KillItem>();
+  const caveats = new Map<string, KillItem>();
+  const addKill = (key: string, label: string, tone: 'warning' | 'danger', detail?: string) => kills.set(key, { key, label, tone, detail });
+  const addCaveat = (key: string, label: string) => caveats.set(key, { key, label, tone: 'warning' });
+
+  for (const code of ['cessata_fiscalmente', 'non_attiva']) {
+    const flag = flags.get(code);
+    if (flag) addKill(code, flag.label, 'danger');
+  }
+  for (const [code, flag] of flags) {
+    if (code.startsWith('knockout_vitalita_')) addKill(code, flag.label, 'danger');
+  }
+  const viability = (target.adjustments ?? []).find((item) => item.code === 'viability' && item.factor < 1);
+  if (viability) addKill('viability', viability.label, 'warning', formatFactor(viability.factor));
+
+  for (const code of ['patrimonio_netto_negativo', 'patrimonio_netto_eroso']) {
+    const flag = flags.get(code);
+    if (flag) addKill(code, flag.label, 'warning');
+  }
+
+  for (const code of ['fuori_settore', 'ateco_fuori_perimetro']) {
+    const flag = flags.get(code);
+    if (flag) addKill(code, flag.label, 'warning');
+  }
+  if (isGateReject(target) || (row ? isGateReject(row) : false)) {
+    addKill('gate_reject', 'Fuori bersaglio', 'danger', target.webValidation?.finalDecision?.reason);
+  }
+
+  for (const code of ['bilancio_assente', 'bilancio_datato']) {
+    const flag = flags.get(code);
+    if (flag) addCaveat(code, flag.label);
+  }
+
+  return { kills: [...kills.values()], caveats: [...caveats.values()] };
+}
+
+function chipToneClass(tone: ChipTone): string {
+  if (tone === 'success') return styles.targetChipSuccess ?? '';
+  if (tone === 'warning') return styles.targetChipWarning ?? '';
+  if (tone === 'danger') return styles.targetChipDanger ?? '';
+  if (tone === 'info') return styles.targetChipInfo ?? '';
+  return styles.targetChipNeutral ?? '';
+}
+
+function confidenceLabel(value?: string): string {
+  if (!value) return 'Confidenza n/d';
+  return `Confidenza ${humanizeCode(value).toLowerCase()}`;
+}
+
+function humanizeCode(value: string): string {
+  const text = value.replace(/_/g, ' ').trim();
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : value;
+}
+
+function domainLink(domain: string): string {
+  return /^https?:\/\//i.test(domain) ? domain : `https://${domain}`;
+}
+
+function formatFactor(value: number): string {
+  return `×${value.toLocaleString('it-IT', { maximumFractionDigits: 2 })}`;
+}
+
+function TargetDeepAnalysisSection({
+  row,
+  target,
+  sessionId,
+  busy,
+  error,
+  onStart,
+}: {
+  row: MATargetRow | null;
+  target: MATarget;
+  sessionId?: string;
+  busy: boolean;
+  error: string | null;
+  onStart: (row: MATargetRow, target: MATarget) => void;
+}) {
+  const deep = target.deep;
+  const status = deep?.status;
+  const inspectorHref = sessionId && row ? `/ricerche/${sessionId}/target/${row.id}/inspect` : undefined;
+  const canLaunch = Boolean(row && !busy);
+
+  return (
+    <section className={styles.deepAnalysisSection} aria-labelledby="target-deep-analysis-title">
+      <div className={styles.deepAnalysisHeader}>
+        <div>
+          <h3 id="target-deep-analysis-title">Analisi approfondita</h3>
+          <p>Stato dell'analisi azienda.</p>
+        </div>
+        <span className={deepStatusClassName(status)}>
+          {status === 'queued' || status === 'running' ? <span className={styles.pulse} /> : null}
+          {deepStatusLabel(status)}
+        </span>
+      </div>
+
+      {!status ? (
+        <div className={styles.deepAnalysisBody}>
+          <p>Nessuna analisi approfondita disponibile.</p>
+          <Button size="sm" onClick={() => row && onStart(row, target)} loading={busy} disabled={!canLaunch}>
+            Avvia analisi
+          </Button>
+        </div>
+      ) : status === 'queued' || status === 'running' ? (
+        <div className={styles.deepAnalysisBody}>
+          <p>{status === 'queued' ? 'Analisi in coda.' : 'Analisi in corso.'} Il risultato viene aggiornato automaticamente.</p>
+          {deep?.updatedAt ? <span className={styles.deepAnalysisMeta}>Aggiornata {dateLabel(deep.updatedAt)}</span> : null}
+        </div>
+      ) : status === 'failed' ? (
+        <div className={styles.deepAnalysisBody}>
+          <p>Analisi non riuscita. Puoi avviarla di nuovo.</p>
+          <Button size="sm" onClick={() => row && onStart(row, target)} loading={busy} disabled={!canLaunch}>
+            Avvia analisi
+          </Button>
+        </div>
+      ) : (
+        <div className={styles.deepAnalysisBody}>
+          <DeepAnalysisContent deep={deep} variant="summary" />
+          <div className={styles.deepActions}>
+            {deep?.updatedAt ? <span className={styles.deepAnalysisMeta}>Aggiornata {dateLabel(deep.updatedAt)}</span> : null}
+            {inspectorHref ? (
+              <a className={styles.inspectLink} href={inspectorHref} target="_blank" rel="noopener noreferrer">
+                Ispezione completa ↗
+              </a>
+            ) : null}
+          </div>
+        </div>
+      )}
+
+      {error ? (
+        <div className={styles.deepInlineError} role="alert">
+          <Icon name="triangle-alert" size={16} />
+          <span>{error}</span>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function deepStatusLabel(status?: MADeepAnalysis['status']): string {
+  if (status === 'queued') return 'In coda';
+  if (status === 'running') return 'In corso';
+  if (status === 'ready') return 'Pronta';
+  if (status === 'failed') return 'Fallita';
+  return 'Assente';
+}
+
+function deepStatusClassName(status?: MADeepAnalysis['status']): string {
+  if (status === 'queued' || status === 'running') return `${styles.statusPill} ${styles.statusRunning}`;
+  if (status === 'ready') return `${styles.statusPill} ${styles.statusDone}`;
+  if (status === 'failed') return `${styles.statusPill} ${styles.statusFailed}`;
+  return styles.statusPill ?? '';
 }
 
 function statusPillClass(status: MASessionDetail['session']['status'], running: boolean, failed: boolean): string {

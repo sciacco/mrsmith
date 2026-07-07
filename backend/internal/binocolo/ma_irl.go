@@ -115,10 +115,13 @@ func (s *maService) seedCardIRL(ctx context.Context, initiativeID, companyKey, e
 		}
 	}
 
-	// 3) Lettura di tesi, se generata (ref = hash della domanda).
-	if reading, err := s.store.GetMACardThesisReading(ctx, initiativeID, card.CompanyKey); err == nil && reading != nil {
-		for _, question := range reading.Reading.ThesisDDQuestions {
-			add("thesis", maIRLSourceRef(question), "tesi", question)
+	// 3) Lettura di tesi, se generata (ref = hash della domanda). Lo storage è
+	// session-scoped: la card serve solo a risalire alla provenienza.
+	if sessionID, _, err := s.resolveCardThesis(ctx, initiativeID, card); err == nil {
+		if reading, err := s.store.GetMASessionThesisReading(ctx, sessionID, card.CompanyKey); err == nil && reading != nil && reading.Reading != nil {
+			for _, question := range reading.Reading.ThesisDDQuestions {
+				add("thesis", maIRLSourceRef(question), "tesi", question)
+			}
 		}
 	}
 

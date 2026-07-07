@@ -52,6 +52,8 @@ type maWorkspaceStore interface {
 	UpdateMAParameter(ctx context.Context, key, value, email string) error
 	ListMACompanyLegalForms(ctx context.Context) ([]maCompanyLegalForm, error)
 	ListMADeepAnalysis(ctx context.Context, companyKeys []string) (map[string]MADeepAnalysis, error)
+	GetMATargetDeepDiveIdentity(ctx context.Context, companyKey string) (*maDeepDiveIdentity, error)
+	GetMAInitiativeCardDeepDiveIdentity(ctx context.Context, companyKey string) (*maDeepDiveIdentity, error)
 	EnqueueMADeepAnalysis(ctx context.Context, companyKey, vatCode, taxCode, email string) error
 	ListMADeepReadyPayloads(ctx context.Context) ([]maDeepPayloadRow, error)
 	CountMADeepByStatus(ctx context.Context) (map[string]int, error)
@@ -63,8 +65,8 @@ type maWorkspaceStore interface {
 	UpsertMABMFamilySuggestion(ctx context.Context, companyKey, vatCode, taxCode, companyName string, suggestion maBMFamilySuggestion) error
 	GetMABMFamily(ctx context.Context, companyKey string) (*MABMFamily, error)
 	RatifyMABMFamily(ctx context.Context, companyKey, family, subject, email string) error
-	GetMACardThesisReading(ctx context.Context, initiativeID, companyKey string) (*MACardThesisReading, error)
-	UpsertMACardThesisReading(ctx context.Context, reading *MACardThesisReading, modelID, promptID, subject string) error
+	GetMASessionThesisReading(ctx context.Context, sessionID, companyKey string) (*MASessionThesisReading, error)
+	UpsertMASessionThesisReading(ctx context.Context, reading *MASessionThesisReading, modelID, promptID, subject string) error
 	GetMAWebValidationForCompany(ctx context.Context, sessionID, companyKey string) (*MAWebValidation, error)
 	ListMACardIRLItems(ctx context.Context, initiativeID, companyKey string) ([]MACardIRLItem, error)
 	MaxMACardIRLPosition(ctx context.Context, initiativeID, companyKey string) (int, error)
@@ -106,6 +108,11 @@ type maCompanyLegalForm struct {
 	Code          string
 	DescriptionIT string
 	DescriptionEN string
+}
+
+type maDeepDiveIdentity struct {
+	VATCode string
+	TaxCode string
 }
 
 // maCompanyDomain is one row of the cross-session verified-domain registry
@@ -3660,6 +3667,58 @@ WHERE company_key IN (` + strings.Join(placeholders, ", ") + `)`
 	return out, nil
 }
 
+func (s *SQLStore) GetMATargetDeepDiveIdentity(ctx context.Context, companyKey string) (*maDeepDiveIdentity, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey == "" {
+		return nil, nil
+	}
+	row := s.db.QueryRowContext(ctx, `
+SELECT COALESCE(NULLIF(btrim(vat_code), ''), ''), COALESCE(NULLIF(btrim(tax_code), ''), '')
+FROM binocolo.ma_target
+WHERE upper(COALESCE(NULLIF(btrim(vendor_id), ''), NULLIF(btrim(vat_code), ''), NULLIF(btrim(tax_code), ''), btrim(company_name))) = $1
+  AND (COALESCE(NULLIF(btrim(vat_code), ''), '') <> '' OR COALESCE(NULLIF(btrim(tax_code), ''), '') <> '')
+ORDER BY created_at DESC
+LIMIT 1
+`, companyKey)
+	var identity maDeepDiveIdentity
+	if err := row.Scan(&identity.VATCode, &identity.TaxCode); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get ma target deep dive identity: %w", err)
+	}
+	return &identity, nil
+}
+
+func (s *SQLStore) GetMAInitiativeCardDeepDiveIdentity(ctx context.Context, companyKey string) (*maDeepDiveIdentity, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey == "" {
+		return nil, nil
+	}
+	row := s.db.QueryRowContext(ctx, `
+SELECT COALESCE(NULLIF(btrim(vat_code), ''), ''), COALESCE(NULLIF(btrim(tax_code), ''), '')
+FROM binocolo.ma_initiative_card
+WHERE company_key = $1
+  AND (COALESCE(NULLIF(btrim(vat_code), ''), '') <> '' OR COALESCE(NULLIF(btrim(tax_code), ''), '') <> '')
+ORDER BY updated_at DESC
+LIMIT 1
+`, companyKey)
+	var identity maDeepDiveIdentity
+	if err := row.Scan(&identity.VATCode, &identity.TaxCode); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get ma initiative card deep dive identity: %w", err)
+	}
+	return &identity, nil
+}
+
 // EnqueueMADeepAnalysis queues a company for IT-full. New companies are inserted
 // queued; previously failed ones are re-queued; ready/running/queued rows are left
 // untouched (the ON CONFLICT WHERE only matches failed) so paid analyses are reused.
@@ -4055,7 +4114,6 @@ type maDeepVATRecord struct {
 	Valuation  *MADeepValuation
 	Brief      *MADeepBrief
 	Payload    json.RawMessage
-	CostEUR    float64
 	ErrorCode  string
 	UpdatedAt  time.Time
 }
@@ -4070,12 +4128,12 @@ func (s *SQLStore) GetMADeepByVAT(ctx context.Context, vat string) (*maDeepVATRe
 	var rec maDeepVATRecord
 	var scorecardRaw, valuationRaw, briefRaw, payloadRaw []byte
 	err := s.db.QueryRowContext(ctx, `
-SELECT company_key, status, scorecard, valuation, brief, itfull_payload, cost_eur, COALESCE(error_code, ''), updated_at
+SELECT company_key, status, scorecard, valuation, brief, itfull_payload, COALESCE(error_code, ''), updated_at
 FROM binocolo.ma_deep_analysis
 WHERE vat_code = $1
 ORDER BY (status = 'ready') DESC, updated_at DESC
 LIMIT 1
-`, vat).Scan(&rec.CompanyKey, &rec.Status, &scorecardRaw, &valuationRaw, &briefRaw, &payloadRaw, &rec.CostEUR, &rec.ErrorCode, &rec.UpdatedAt)
+`, vat).Scan(&rec.CompanyKey, &rec.Status, &scorecardRaw, &valuationRaw, &briefRaw, &payloadRaw, &rec.ErrorCode, &rec.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -4275,30 +4333,28 @@ func (s *SQLStore) GetMAWebValidationForCompany(ctx context.Context, sessionID, 
 	return s.loadMAWebValidationForCompany(ctx, sessionID, companyKey)
 }
 
-// GetMACardThesisReading ritorna la lettura di tesi persistita (nil se assente).
-func (s *SQLStore) GetMACardThesisReading(ctx context.Context, initiativeID, companyKey string) (*MACardThesisReading, error) {
+// GetMASessionThesisReading ritorna la lettura di tesi persistita (nil se assente).
+func (s *SQLStore) GetMASessionThesisReading(ctx context.Context, sessionID, companyKey string) (*MASessionThesisReading, error) {
 	if s == nil || s.db == nil {
 		return nil, errors.New("binocolo ma store not configured")
 	}
-	var out MACardThesisReading
-	var sessionID sql.NullString
+	var out MASessionThesisReading
 	var webDate sql.NullTime
 	var readingRaw []byte
 	var updatedAt time.Time
 	err := s.db.QueryRowContext(ctx, `
-SELECT initiative_id, company_key, COALESCE(session_id::text, ''), thesis_snapshot, reading,
+SELECT session_id::text, company_key, thesis_snapshot, reading,
        web_evidence_date, generated_by_email, updated_at
-FROM binocolo.ma_card_thesis_reading
-WHERE initiative_id = $1 AND company_key = $2
-`, initiativeID, companyKey).Scan(&out.InitiativeID, &out.CompanyKey, &sessionID, &out.ThesisSnapshot,
+FROM binocolo.ma_session_thesis_reading
+WHERE session_id = $1::uuid AND company_key = $2
+`, sessionID, companyKey).Scan(&out.SessionID, &out.CompanyKey, &out.ThesisSnapshot,
 		&readingRaw, &webDate, &out.GeneratedByEmail, &updatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("get ma card thesis reading: %w", err)
+		return nil, fmt.Errorf("get ma session thesis reading: %w", err)
 	}
-	out.SessionID = sessionID.String
 	if webDate.Valid {
 		ts := webDate.Time
 		out.WebEvidenceDate = &ts
@@ -4313,14 +4369,14 @@ WHERE initiative_id = $1 AND company_key = $2
 	return &out, nil
 }
 
-// UpsertMACardThesisReading persiste la lettura generata (rigenerazione =
+// UpsertMASessionThesisReading persiste la lettura generata (rigenerazione =
 // sovrascrittura consapevole: l'azione è esplicita dell'analista).
-func (s *SQLStore) UpsertMACardThesisReading(ctx context.Context, reading *MACardThesisReading, modelID, promptID, subject string) error {
+func (s *SQLStore) UpsertMASessionThesisReading(ctx context.Context, reading *MASessionThesisReading, modelID, promptID, subject string) error {
 	if s == nil || s.db == nil {
 		return errors.New("binocolo ma store not configured")
 	}
 	if reading == nil || reading.Reading == nil {
-		return errors.New("ma card thesis reading: missing reading")
+		return errors.New("ma session thesis reading: missing reading")
 	}
 	raw, err := json.Marshal(reading.Reading)
 	if err != nil {
@@ -4331,12 +4387,11 @@ func (s *SQLStore) UpsertMACardThesisReading(ctx context.Context, reading *MACar
 		webDate = sql.NullTime{Time: *reading.WebEvidenceDate, Valid: true}
 	}
 	_, err = s.db.ExecContext(ctx, `
-INSERT INTO binocolo.ma_card_thesis_reading
-  (initiative_id, company_key, session_id, thesis_snapshot, reading, web_evidence_date,
+INSERT INTO binocolo.ma_session_thesis_reading
+  (session_id, company_key, thesis_snapshot, reading, web_evidence_date,
    model_id, prompt_id, generated_by_subject, generated_by_email)
-VALUES ($1, $2, NULLIF($3, '')::uuid, $4, $5::jsonb, $6, NULLIF($7, '')::uuid, NULLIF($8, '')::uuid, $9, $10)
-ON CONFLICT (initiative_id, company_key) DO UPDATE SET
-  session_id = EXCLUDED.session_id,
+VALUES ($1::uuid, $2, $3, $4::jsonb, $5, NULLIF($6, '')::uuid, NULLIF($7, '')::uuid, $8, $9)
+ON CONFLICT (session_id, company_key) DO UPDATE SET
   thesis_snapshot = EXCLUDED.thesis_snapshot,
   reading = EXCLUDED.reading,
   web_evidence_date = EXCLUDED.web_evidence_date,
@@ -4345,10 +4400,10 @@ ON CONFLICT (initiative_id, company_key) DO UPDATE SET
   generated_by_subject = EXCLUDED.generated_by_subject,
   generated_by_email = EXCLUDED.generated_by_email,
   updated_at = now()
-`, reading.InitiativeID, reading.CompanyKey, reading.SessionID, reading.ThesisSnapshot, raw, webDate,
+`, reading.SessionID, reading.CompanyKey, reading.ThesisSnapshot, raw, webDate,
 		modelID, promptID, subject, reading.GeneratedByEmail)
 	if err != nil {
-		return fmt.Errorf("upsert ma card thesis reading: %w", err)
+		return fmt.Errorf("upsert ma session thesis reading: %w", err)
 	}
 	return nil
 }

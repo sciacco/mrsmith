@@ -2,10 +2,9 @@ package binocolo
 
 // Lettura di tesi context-scoped (Fase 5, DEEP-DIVE-IMPLEMENTATION-PLAN.md): il
 // dossier deep resta thesis-neutral e globale; questo è il secondo strato — il
-// memo per (iniziativa, azienda) che applica la TESI DELLA SESSIONE DI
-// PROVENIENZA al dossier. Generazione on-demand (pattern B6), nessun automatismo
-// sulla state machine del board; rigenerazione esplicita quando la tesi cambia
-// (staleness dal confronto con lo snapshot).
+// memo per (sessione, azienda) che applica la TESI DELLA SESSIONE al dossier.
+// Le vecchie rotte card sono adapter: risalgono alla sessione di provenienza e
+// leggono/scrivono solo lo storage session-scoped.
 
 import (
 	"context"
@@ -18,10 +17,34 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/llm"
 )
 
+// resolveSessionThesis compone la tesi corrente dalla strategia attiva della
+// sessione. Le iniziative/card non hanno tesi propria.
+func (s *maService) resolveSessionThesis(ctx context.Context, sessionID string) (string, error) {
+	if s.store == nil {
+		return "", errMAStoreUnavailable
+	}
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return "", fmt.Errorf("%w: sessione mancante", errMAStrategyInvalid)
+	}
+	session, err := s.store.GetMASessionState(ctx, sessionID)
+	if err != nil {
+		return "", err
+	}
+	version, err := s.store.GetMAStrategyVersion(ctx, sessionID, session.ActiveStrategyID)
+	if err != nil {
+		return "", err
+	}
+	return composeMAThesisText(version.Strategy), nil
+}
+
 // resolveCardThesis risolve la sessione di provenienza (rating più recente da
 // MACardProvenance, fallback CreatedFromSession) e ne compone la tesi. Le
 // iniziative NON hanno tesi propria (decisione E: la ricerca è centrica).
 func (s *maService) resolveCardThesis(ctx context.Context, initiativeID string, card MAInitiativeCard) (string, string, error) {
+	if s.store == nil {
+		return "", "", errMAStoreUnavailable
+	}
 	sessionID := card.CreatedFromSession
 	if provenances, err := s.store.ListMACardProvenances(ctx, initiativeID, []string{card.CompanyKey}); err == nil {
 		var latest time.Time
@@ -35,15 +58,11 @@ func (s *maService) resolveCardThesis(ctx context.Context, initiativeID string, 
 	if sessionID == "" {
 		return "", "", fmt.Errorf("%w: card senza sessione di provenienza, lettura di tesi non disponibile", errMAStrategyInvalid)
 	}
-	session, err := s.store.GetMASessionState(ctx, sessionID)
+	thesis, err := s.resolveSessionThesis(ctx, sessionID)
 	if err != nil {
 		return "", "", err
 	}
-	version, err := s.store.GetMAStrategyVersion(ctx, sessionID, session.ActiveStrategyID)
-	if err != nil {
-		return "", "", err
-	}
-	return sessionID, composeMAThesisText(version.Strategy), nil
+	return sessionID, thesis, nil
 }
 
 // composeMAThesisText: la tesi esplicita quando c'è; altrimenti il frame della
@@ -62,8 +81,42 @@ func composeMAThesisText(strategy MAStrategySpec) string {
 	return strings.Join(parts, " ")
 }
 
-// getCardThesisReading ritorna la lettura persistita (nil se mai generata) con
-// la staleness calcolata rispetto alla tesi corrente della provenienza.
+func maSessionReadingToCard(initiativeID string, record *MASessionThesisReading) *MACardThesisReading {
+	if record == nil {
+		return nil
+	}
+	return &MACardThesisReading{
+		InitiativeID:     initiativeID,
+		CompanyKey:       record.CompanyKey,
+		SessionID:        record.SessionID,
+		ThesisSnapshot:   record.ThesisSnapshot,
+		Reading:          record.Reading,
+		WebEvidenceDate:  record.WebEvidenceDate,
+		GeneratedByEmail: record.GeneratedByEmail,
+		UpdatedAt:        record.UpdatedAt,
+		StaleThesis:      record.StaleThesis,
+	}
+}
+
+// getSessionThesisReading ritorna la lettura persistita (nil se mai generata)
+// con la staleness calcolata rispetto alla tesi corrente della sessione.
+func (s *maService) getSessionThesisReading(ctx context.Context, sessionID, companyKey string) (*MASessionThesisReading, error) {
+	if s.store == nil {
+		return nil, errMAStoreUnavailable
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	record, err := s.store.GetMASessionThesisReading(ctx, sessionID, companyKey)
+	if err != nil || record == nil {
+		return record, err
+	}
+	if currentThesis, err := s.resolveSessionThesis(ctx, sessionID); err == nil {
+		record.StaleThesis = strings.TrimSpace(currentThesis) != strings.TrimSpace(record.ThesisSnapshot)
+	}
+	return record, nil
+}
+
+// getCardThesisReading è l'adapter legacy: risolve la sessione di provenienza
+// della card e legge solo ma_session_thesis_reading.
 func (s *maService) getCardThesisReading(ctx context.Context, initiativeID, companyKey string) (*MACardThesisReading, error) {
 	if s.store == nil {
 		return nil, errMAStoreUnavailable
@@ -76,40 +129,86 @@ func (s *maService) getCardThesisReading(ctx context.Context, initiativeID, comp
 	if card == nil {
 		return nil, errMACardNotFound
 	}
-	record, err := s.store.GetMACardThesisReading(ctx, initiativeID, companyKey)
+	sessionID, currentThesis, err := s.resolveCardThesis(ctx, initiativeID, *card)
+	if err != nil {
+		return nil, err
+	}
+	record, err := s.store.GetMASessionThesisReading(ctx, sessionID, card.CompanyKey)
 	if err != nil || record == nil {
-		return record, err
+		return maSessionReadingToCard(initiativeID, record), err
 	}
-	if _, currentThesis, err := s.resolveCardThesis(ctx, initiativeID, *card); err == nil {
-		record.StaleThesis = strings.TrimSpace(currentThesis) != strings.TrimSpace(record.ThesisSnapshot)
-	}
-	return record, nil
+	record.StaleThesis = strings.TrimSpace(currentThesis) != strings.TrimSpace(record.ThesisSnapshot)
+	return maSessionReadingToCard(initiativeID, record), nil
 }
 
-// generateCardThesisReading genera (o rigenera) la lettura di tesi: azione
+func (s *maService) resolveSessionTargetCompanyKey(ctx context.Context, sessionID, targetID string) (string, error) {
+	if s.store == nil {
+		return "", errMAStoreUnavailable
+	}
+	detail, err := s.store.GetMASessionLean(ctx, sessionID)
+	if err != nil {
+		return "", err
+	}
+	if detail.Session.DeletedAt != nil {
+		return "", errMASessionDeleted
+	}
+	target, err := s.store.GetMATargetByID(ctx, sessionID, targetID)
+	if err != nil {
+		return "", err
+	}
+	companyKey := normalizeMACompanyKey(target.CompanyKey)
+	if companyKey == "" {
+		return "", fmt.Errorf("%w: company key target non risolvibile", errMAStrategyInvalid)
+	}
+	return companyKey, nil
+}
+
+func (s *maService) getTargetThesisReading(ctx context.Context, sessionID, targetID string) (*MASessionThesisReading, error) {
+	companyKey, err := s.resolveSessionTargetCompanyKey(ctx, sessionID, targetID)
+	if err != nil {
+		return nil, err
+	}
+	return s.getSessionThesisReading(ctx, sessionID, companyKey)
+}
+
+func (s *maService) generateTargetThesisReading(ctx context.Context, sessionID, targetID, subject, email string) (*MASessionThesisReading, error) {
+	companyKey, err := s.resolveSessionTargetCompanyKey(ctx, sessionID, targetID)
+	if err != nil {
+		return nil, err
+	}
+	return s.generateSessionThesisReading(ctx, sessionID, companyKey, subject, email)
+}
+
+// generateSessionThesisReading genera (o rigenera) la lettura di tesi: azione
 // esplicita dell'analista, costo LLM in centesimi, nessun cancello di spesa.
 // Richiede il dossier deep pronto: senza fatti il fit sarebbe vuoto.
-func (s *maService) generateCardThesisReading(ctx context.Context, initiativeID, companyKey, subject, email string) (*MACardThesisReading, error) {
+func (s *maService) generateSessionThesisReading(ctx context.Context, sessionID, companyKey, subject, email string) (*MASessionThesisReading, error) {
+	return s.generateSessionThesisReadingWithMetadata(ctx, sessionID, companyKey, subject, email, nil)
+}
+
+func (s *maService) generateSessionThesisReadingWithMetadata(ctx context.Context, sessionID, companyKey, subject, email string, metadata map[string]any) (*MASessionThesisReading, error) {
+	if s.store == nil {
+		return nil, errMAStoreUnavailable
+	}
 	if s.llmp == nil {
 		return nil, errMAOpenRouterUnavailable
 	}
 	companyKey = normalizeMACompanyKey(companyKey)
-	card, err := s.requireOperationalInitiativeCard(ctx, initiativeID, companyKey)
-	if err != nil {
-		return nil, err
+	if companyKey == "" {
+		return nil, fmt.Errorf("%w: company key", errMAStrategyInvalid)
 	}
-	sessionID, thesis, err := s.resolveCardThesis(ctx, initiativeID, card)
+	thesis, err := s.resolveSessionThesis(ctx, sessionID)
 	if err != nil {
 		return nil, err
 	}
 	if strings.TrimSpace(thesis) == "" {
-		return nil, fmt.Errorf("%w: la sessione di provenienza non ha una tesi", errMAStrategyInvalid)
+		return nil, fmt.Errorf("%w: la sessione non ha una tesi", errMAStrategyInvalid)
 	}
-	deep, err := s.store.ListMADeepAnalysis(ctx, []string{card.CompanyKey})
+	deep, err := s.store.ListMADeepAnalysis(ctx, []string{companyKey})
 	if err != nil {
 		return nil, err
 	}
-	record, ok := deep[card.CompanyKey]
+	record, ok := deep[companyKey]
 	if !ok || record.Status != maDeepStatusReady || record.Scorecard == nil {
 		return nil, fmt.Errorf("%w: analisi approfondita non pronta — la lettura di tesi si appoggia al dossier", errMAStrategyInvalid)
 	}
@@ -123,7 +222,7 @@ func (s *maService) generateCardThesisReading(ctx context.Context, initiativeID,
 	var webEvidenceDate *time.Time
 	// Evidenza web (best-effort, già per company_key): curata — solo il verdetto
 	// semantico e la sua DATA, mai i payload grezzi.
-	if validation, err := s.store.GetMAWebValidationForCompany(ctx, sessionID, card.CompanyKey); err == nil && validation != nil {
+	if validation, err := s.store.GetMAWebValidationForCompany(ctx, sessionID, companyKey); err == nil && validation != nil {
 		ts := validation.UpdatedAt
 		webEvidenceDate = &ts
 		input["webEvidence"] = map[string]any{
@@ -197,27 +296,46 @@ func (s *maService) generateCardThesisReading(ctx context.Context, initiativeID,
 		return nil, err
 	}
 
-	out := &MACardThesisReading{
-		InitiativeID:     initiativeID,
-		CompanyKey:       card.CompanyKey,
+	out := &MASessionThesisReading{
 		SessionID:        sessionID,
+		CompanyKey:       companyKey,
 		ThesisSnapshot:   thesis,
 		Reading:          reading,
 		WebEvidenceDate:  webEvidenceDate,
 		GeneratedByEmail: email,
 	}
-	if err := s.store.UpsertMACardThesisReading(ctx, out, model.ID, prompt.ID, subject); err != nil {
+	if err := s.store.UpsertMASessionThesisReading(ctx, out, model.ID, prompt.ID, subject); err != nil {
 		return nil, err
+	}
+	traceMeta := map[string]any{"session_id": sessionID, "company_key": companyKey, "by": email}
+	for key, value := range metadata {
+		traceMeta[key] = value
 	}
 	_ = s.traceEvent(ctx, maTraceEventWrite{
 		EventType: "ma_thesis_reading_generated",
 		Status:    maTraceEventSucceeded,
-		Metadata: maTraceJSON(map[string]any{
-			"initiative_id": initiativeID, "company_key": card.CompanyKey,
-			"session_id": sessionID, "by": email,
-		}),
+		Metadata:  maTraceJSON(traceMeta),
 	})
-	return s.getCardThesisReading(ctx, initiativeID, card.CompanyKey)
+	return s.getSessionThesisReading(ctx, sessionID, companyKey)
+}
+
+// generateCardThesisReading è l'adapter legacy: mantiene controllo operativo
+// della card, risolve la provenienza e delega alla generazione session-scoped.
+func (s *maService) generateCardThesisReading(ctx context.Context, initiativeID, companyKey, subject, email string) (*MACardThesisReading, error) {
+	companyKey = normalizeMACompanyKey(companyKey)
+	card, err := s.requireOperationalInitiativeCard(ctx, initiativeID, companyKey)
+	if err != nil {
+		return nil, err
+	}
+	sessionID, _, err := s.resolveCardThesis(ctx, initiativeID, card)
+	if err != nil {
+		return nil, err
+	}
+	record, err := s.generateSessionThesisReadingWithMetadata(ctx, sessionID, card.CompanyKey, subject, email, map[string]any{"initiative_id": initiativeID})
+	if err != nil {
+		return nil, err
+	}
+	return maSessionReadingToCard(initiativeID, record), nil
 }
 
 func parseMAThesisReading(content string) (*MAThesisReading, error) {

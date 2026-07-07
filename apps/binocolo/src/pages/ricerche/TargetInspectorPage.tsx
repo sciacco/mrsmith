@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useApiClient } from '../../api/client';
-import type { MASessionDetail, MATarget, MATargetBucket, MAConfidence } from '../../api/types';
+import type { MADeepAnalysis, MASessionDetail, MATarget, MATargetBucket, MAConfidence } from '../../api/types';
 import { HiddenField } from './inspector/HiddenField';
 import { SintesiTab } from './inspector/tabs/SintesiTab';
 import { TesiTab } from './inspector/tabs/TesiTab';
@@ -22,7 +22,7 @@ const TABS: { key: TabKey; num: string; label: string }[] = [
   { key: 'sintesi', num: 'T1', label: 'Sintesi' },
   { key: 'punteggio', num: 'T2', label: 'Punteggio' },
   { key: 'web', num: 'T3', label: 'Web validation' },
-  { key: 'deep', num: 'T4', label: 'Deep-dive' },
+  { key: 'deep', num: 'T4', label: 'Analisi' },
   { key: 'tesi', num: 'T5', label: 'Tesi' },
   { key: 'provenienza', num: 'T6', label: 'Provenienza' },
   { key: 'registro', num: 'T7', label: 'Registro & rating' },
@@ -75,6 +75,7 @@ export function TargetInspectorPage() {
   const { id, targetId } = useParams<{ id: string; targetId: string }>();
   const api = useApiClient();
   const [tab, setTab] = useState<TabKey>('sintesi');
+  const [optimisticDeepStatus, setOptimisticDeepStatus] = useState<MADeepAnalysis['status'] | null>(null);
 
   const targetQuery = useQuery({
     queryKey: ['ma-target-inspector', id, targetId],
@@ -94,7 +95,8 @@ export function TargetInspectorPage() {
   // Polling deep (F5 stato B): invalida la query target ogni 5s finché deep.status
   // resta queued/running. Si ferma a ready/failed/nil. Pattern di RicercaDetailPage/
   // IniziativaBoardPage. refetchType 'active' + refetch forzato.
-  const deepStatus = targetQuery.data?.deep?.status;
+  const actualDeepStatus = targetQuery.data?.deep?.status;
+  const deepStatus = optimisticDeepStatus && (!actualDeepStatus || actualDeepStatus === 'failed') ? optimisticDeepStatus : actualDeepStatus;
   const deepRunning = deepStatus === 'queued' || deepStatus === 'running';
   useEffect(() => {
     if (!deepRunning) return;
@@ -103,6 +105,12 @@ export function TargetInspectorPage() {
     }, 5000);
     return () => clearInterval(handle);
   }, [deepRunning, targetQuery]);
+
+  useEffect(() => {
+    if (actualDeepStatus && actualDeepStatus !== 'failed') {
+      setOptimisticDeepStatus(null);
+    }
+  }, [actualDeepStatus]);
 
   if (!id || !targetId) {
     return (
@@ -161,7 +169,7 @@ export function TargetInspectorPage() {
       <div className={styles.banner} role="note">
         <span className={styles.ico}>!</span>
         <span>
-          <b>Modalità ispezione.</b> Superficie di scoperta, non analista: dati grezzi e tecnici visibili. Read-only.
+          <b>Modalità ispezione.</b> Superficie di scoperta, non analista: dati grezzi e tecnici visibili. Unica azione ammessa: avvio analisi in T4.
         </span>
         <a
           className={styles.bannerLink}
@@ -246,6 +254,13 @@ export function TargetInspectorPage() {
           deep={target.deep}
           initiativeId={initiativeId}
           companyKey={target.companyKey}
+          optimisticStatus={deepStatus === 'queued' || deepStatus === 'running' || deepStatus === 'ready' ? deepStatus : null}
+          onAnalysisStarted={(status) => {
+            if (status === 'queued' || status === 'running' || status === 'ready') {
+              setOptimisticDeepStatus(status);
+            }
+            void targetQuery.refetch();
+          }}
         />
       ) : tab === 'punteggio' ? (
         <PunteggioTab target={target} />
@@ -254,7 +269,7 @@ export function TargetInspectorPage() {
       ) : tab === 'registro' ? (
         <RegistroTab target={target} initiativeId={initiativeId} />
       ) : tab === 'tesi' ? (
-        <TesiTab target={target} initiativeId={initiativeId} />
+        <TesiTab target={target} sessionId={id} targetId={targetId} initiativeId={initiativeId} />
       ) : tab === 'provenienza' ? (
         <ProvenienzaTab target={target} strategyVersionId={strategyVersionId} />
       ) : (

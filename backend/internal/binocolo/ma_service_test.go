@@ -1528,6 +1528,14 @@ func (f *fakeMAWorkspaceStore) ListMADeepAnalysis(context.Context, []string) (ma
 	return map[string]MADeepAnalysis{}, nil
 }
 
+func (f *fakeMAWorkspaceStore) GetMATargetDeepDiveIdentity(context.Context, string) (*maDeepDiveIdentity, error) {
+	return nil, nil
+}
+
+func (f *fakeMAWorkspaceStore) GetMAInitiativeCardDeepDiveIdentity(context.Context, string) (*maDeepDiveIdentity, error) {
+	return nil, nil
+}
+
 func (f *fakeMAWorkspaceStore) EnqueueMADeepAnalysis(context.Context, string, string, string, string) error {
 	return nil
 }
@@ -1596,11 +1604,11 @@ func (f *fakeMAWorkspaceStore) RatifyMABMFamily(context.Context, string, string,
 	return nil
 }
 
-func (f *fakeMAWorkspaceStore) GetMACardThesisReading(context.Context, string, string) (*MACardThesisReading, error) {
+func (f *fakeMAWorkspaceStore) GetMASessionThesisReading(context.Context, string, string) (*MASessionThesisReading, error) {
 	return nil, nil
 }
 
-func (f *fakeMAWorkspaceStore) UpsertMACardThesisReading(context.Context, *MACardThesisReading, string, string, string) error {
+func (f *fakeMAWorkspaceStore) UpsertMASessionThesisReading(context.Context, *MASessionThesisReading, string, string, string) error {
 	return nil
 }
 
