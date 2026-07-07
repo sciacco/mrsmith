@@ -5,7 +5,7 @@ Use this checklist before approving any mini-app screen.
 ## Pre-gate minimum
 
 Require:
-- approved implementation plan
+- approved implementation plan (canonical location: `apps/<app>/docs/IMPLEMENTATION-PLAN.md`)
 - chosen archetype
 - explicit exceptions section, even if empty
 - 2 comparable repo screens with exact file paths
@@ -29,11 +29,12 @@ Prefer when reasonably obtainable:
 
 ## Evidence discipline
 
+- When a dev server is already running and the route is reachable, capture screenshots via the `playwright-cli` skill (cwd `artifacts/claude/`, reuse the running server — never restart it); with that path available, screenshots are expected for post-gate, not optional.
 - Approval from code alone is allowed when the reviewed route/component is identifiable and the implementation files expose the relevant behavior clearly.
 - Do not approve a primary screen from a screenshot alone when the implementation files are available.
 - If a state is important to the task and cannot be inferred from code or shown visually, block with `missing evidence`.
 - If the UI leaks raw auth/backend errors, capture that as a blocking copy finding, not as a backend-only issue.
-- If screenshots are unavailable because of RBAC or browser-access friction, cite file evidence and record the missing visual verification as a residual risk instead of blocking automatically.
+- If screenshots are genuinely unavailable (RBAC-blocked routes, no practical dev server), cite file evidence and record the missing visual verification as a residual risk instead of blocking automatically.
 
 ## Primary-screen defaults
 

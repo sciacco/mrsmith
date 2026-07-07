@@ -29,16 +29,7 @@ Default policy: `business-user-only`.
 
 Pass only if user-facing text talks about the business task, domain object, or next action.
 
-Fail if the UI includes technical or machine-facing text such as:
-- `server-side`
-- `inline update`
-- `record`
-- `widget`
-- `datasource`
-- `id.asc`
-- `replica dell'app originale`
-- `senza aprire modali`
-- text that explains how the interface is implemented instead of what the user can do
+Fail if the UI includes technical or machine-facing text, or text that explains how the interface is implemented instead of what the user can do. The canonical banned-terms list lives in the reviewer's Copy Gate (`.agents/skills/portal-miniapp-ui-review/references/blocking-gates.md` §4) — examples: `server-side`, `record`, `datasource`, `id.asc`, `replica dell'app originale`.
 
 Notes:
 - developer-facing language can exist in docs, comments, or plans

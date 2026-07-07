@@ -3,7 +3,7 @@ name: portal-miniapp-ui-fixer
 description: Use this skill to fix the UI of a specific MrSmith portal mini-app under `apps/`. It inspects the target app, applies the existing mini-app planning and blocking review rules, asks the expert human only when real ambiguity remains, implements focused UI corrections, and finishes with mandatory post-fix review.
 user-invocable: true
 disable-model-invocation: true
-allowed-tools: Read Grep Glob Bash
+allowed-tools: Read Grep Glob Bash Edit Write
 ---
 
 # Purpose
@@ -33,6 +33,7 @@ Do not use this skill when:
 - reviewing a screen without making changes
 - working on the Matrix-style portal launcher instead of a mini-app workspace
 - the task is primarily backend behavior rather than UI correction
+- the work is craft-driven design/styling (a new screen, a component, a table/form/drawer) not driven by review findings or family drift — use `tintoretto` (`.agents/skills/tintoretto/`)
 
 # Required input
 
@@ -88,6 +89,7 @@ Map the issue to the same rules already enforced by the reviewer:
 - invented KPI or decorative filler
 - shared shell abstractions forcing the wrong composition
 - missing or poor empty/error state behavior
+- hidden or buried primary filters that weaken the main working surface
 
 Prefer the smallest correction set that returns the screen to the approved family.
 
@@ -122,9 +124,15 @@ Implementation rules:
 - do not leak raw auth, backend, HTTP, or transport text into the UI
 - do not use a shared page-shell abstraction as the driver of a new composition unless it already fits the approved family
 
-## Step 5: Mandatory post-fix review
+## Step 5: Mandatory verification
 
-After editing, run the blocking review workflow again using `portal-miniapp-ui-review` as the standard.
+Both checks are required before the post-fix review; a passing build is not a rendering guarantee:
+- `pnpm --filter <app> exec tsc --noEmit` (never bare `npx tsc`)
+- UI smoke test in a real browser: reuse the already-running dev server (`make dev` / Vite) — never kill or restart it. Use the `playwright-cli` skill with cwd `artifacts/claude/` when automation or screenshots are needed.
+
+## Step 6: Mandatory post-fix review
+
+After editing and verifying, run the blocking review workflow again using `portal-miniapp-ui-review` as the standard.
 
 If the current client supports explicit skill handoff, hand off to `portal-miniapp-ui-review`.
 If it does not, manually apply the same review workflow and gates before declaring the work complete.
@@ -149,4 +157,5 @@ This skill is complete when:
 - the target app has been grounded in real code and real comparable screens
 - the fix follows the existing MrSmith mini-app rules rather than a fresh design interpretation
 - any real ambiguity has been escalated to the expert human instead of guessed
+- the change type-checks (`pnpm --filter <app> exec tsc --noEmit`) and has been smoke-tested in a real browser
 - the implemented result passes the equivalent of the blocking UI review post-gate, or the remaining blocking findings are reported explicitly

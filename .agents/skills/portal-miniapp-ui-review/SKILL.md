@@ -88,6 +88,7 @@ Read `references/blocking-gates.md`.
 Always check:
 - archetype fit
 - style-family fit against the cited repo screens
+- design-system fit against `docs/UI-UX.md` (§0 non-negotiables; §19 checklist for new screens)
 - copy and error-language fit
 - metrics/KPI discipline
 - exception handling
@@ -143,8 +144,10 @@ Findings
    Required correction: <what must change>
 
 Residual Risks
-- <only if no blocking findings remain>
+- <verification gaps and non-blocking observations>
 ```
+
+Findings are blocking by definition — a finding that would not block belongs under Residual Risks, not in the findings list.
 
 Keep findings concrete. Avoid generic design commentary.
 

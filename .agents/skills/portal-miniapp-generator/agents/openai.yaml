@@ -2,3 +2,5 @@ interface:
   display_name: "Portal Mini-App Generator"
   short_description: "Plan repo-fit MrSmith portal mini-apps"
   default_prompt: "Use $portal-miniapp-generator to turn this feature request or approved migration spec into a repo-fit MrSmith mini-app implementation plan."
+policy:
+  allow_implicit_invocation: false
