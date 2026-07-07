@@ -17,6 +17,7 @@ type maGatedSearchJobPayload struct {
 	StrategyType   string `json:"strategy_type"`
 	Limit          int    `json:"limit"`
 	EstimatedCount int    `json:"estimated_count"`
+	Force          bool   `json:"force,omitempty"`
 }
 
 // maAssociateDomainJobPayload is the associate_domain job's args: which held company and
@@ -143,7 +144,7 @@ func (s *maService) enqueueGatedSearch(ctx context.Context, sessionID string, re
 		return MASessionDetail{}, errMAEstimateTooLarge
 	}
 
-	payload, err := json.Marshal(maGatedSearchJobPayload{StrategyType: strategyType, Limit: limit, EstimatedCount: estimatedCount})
+	payload, err := json.Marshal(maGatedSearchJobPayload{StrategyType: strategyType, Limit: limit, EstimatedCount: estimatedCount, Force: req.Force})
 	if err != nil {
 		return MASessionDetail{}, fmt.Errorf("marshal ma gated search payload: %w", err)
 	}
@@ -359,7 +360,7 @@ func (s *maService) gatedSearchJobWork(ctx context.Context, job maJob) error {
 
 	// ---- Stage: gate (UC2 keep/forse/salta over all address targets) ----
 	// Idempotent via per-company freshness reuse, so a retry re-gates only the tail.
-	gatePayload := normalizeMAWebValidationPayload(MAWebValidationEnrichRequest{Limit: limit})
+	gatePayload := normalizeMAWebValidationPayload(MAWebValidationEnrichRequest{Limit: limit, Force: payload.Force})
 	// The gate MUST cover the WHOLE address surface. normalizeMAWebValidationPayload clamps
 	// to the standalone endpoint's 100-cap (maWebValidationMaxLimit), but here total gate
 	// cost is already bounded upstream by the surface cap, and any address target left

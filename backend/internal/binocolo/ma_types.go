@@ -348,6 +348,10 @@ type MAExecuteSessionRequest struct {
 	Strategy     *MAStrategySpec `json:"strategy,omitempty"`
 	StrategyType string          `json:"strategyType,omitempty"`
 	Limit        int             `json:"limit,omitempty"`
+	// Force re-runs the gated web-validation stage even when existing per-company
+	// validations are still fresh. It does not force paid Advanced enrichment for
+	// already-advanced survivors.
+	Force bool `json:"force,omitempty"`
 	// AcknowledgeCost lets the analyst proceed when the projected enrichment
 	// spend exceeds the budget ceiling (the cost gate).
 	AcknowledgeCost bool `json:"acknowledgeCost,omitempty"`

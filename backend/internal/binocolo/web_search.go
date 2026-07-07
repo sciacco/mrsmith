@@ -1075,6 +1075,7 @@ func isDomainResolutionExcludedDomain(domain string) bool {
 		// creditsafe.com surfaced as a CARDNOLOGY candidate (session 391e7c67,
 		// score 16) — same registry family as creditsafe.it; block both TLDs.
 		"creditsafe.com",
+		"visurissima.it",
 		// PEC (posta elettronica certificata) provider domains. A certified-email
 		// endpoint is NEVER a company's website, but the resolver scored them "alta"
 		// via the "email aziendale su dominio" hint (session centro/5d2b043d:

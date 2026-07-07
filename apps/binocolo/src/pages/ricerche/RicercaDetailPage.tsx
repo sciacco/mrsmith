@@ -70,6 +70,7 @@ export function RicercaDetailPage() {
   const [associateDomain, setAssociateDomain] = useState('');
   const [noWebsiteItem, setNoWebsiteItem] = useState<MAVerificationQueueItem | null>(null);
   const [reprocessingKeys, setReprocessingKeys] = useState<Set<string>>(() => new Set());
+  const [forceRerun, setForceRerun] = useState(false);
   const [excludeCandidate, setExcludeCandidate] = useState<MATargetRow | null>(null);
   const [excludeReason, setExcludeReason] = useState('');
   const rowsTerminalKey = useRef('');
@@ -205,7 +206,7 @@ export function RicercaDetailPage() {
   const isRunning = detail?.session.status === 'running' || progress?.stage === 'address' || progress?.stage === 'gate' || progress?.stage === 'enrich';
   const isFailed = detail?.session.status === 'failed' || progress?.stage === 'failed';
 
-  async function resumeSearch() {
+  async function resumeSearch(force = false) {
     if (!detail?.session.id) return;
     setBusy('resume');
     setError(null);
@@ -213,8 +214,10 @@ export function RicercaDetailPage() {
       await api.post<MASessionDetail>(`/binocolo/v1/ma/sessions/${detail.session.id}/gated-search?targets=none`, {
         strategyType: 'expanded',
         limit: normalizeSearchLimit(detail.strategy?.strategy.searchLimit),
+        force,
       });
       await loadAll();
+      toast(force ? 'Ricerca rilanciata con rivalutazione forzata.' : 'Ricerca rilanciata.', 'success');
     } catch (err) {
       setError(errorLabel(err));
       toast(errorLabel(err), 'error');
@@ -395,8 +398,10 @@ export function RicercaDetailPage() {
               routingCounts={routingCounts}
               running={isRunning}
               failed={isFailed}
-              onResume={() => void resumeSearch()}
+              onResume={(force) => void resumeSearch(force)}
               resumeBusy={busy === 'resume'}
+              forceRerun={forceRerun}
+              onForceRerunChange={setForceRerun}
             />
           ) : null}
 
@@ -614,6 +619,8 @@ function ProgressPanel({
   failed,
   onResume,
   resumeBusy,
+  forceRerun,
+  onForceRerunChange,
   routingCounts,
 }: {
   progress: MAGatedProgressResponse;
@@ -622,8 +629,10 @@ function ProgressPanel({
   routingCounts: { principale: number; daVerificare: number; azionabile: number; soppresso: number };
   running: boolean;
   failed: boolean;
-  onResume: () => void;
+  onResume: (force?: boolean) => void;
   resumeBusy: boolean;
+  forceRerun: boolean;
+  onForceRerunChange: (force: boolean) => void;
 }) {
   const buckets = gatedBucketCounts(progress);
   const total = Math.max(1, buckets.total);
@@ -642,16 +651,35 @@ function ProgressPanel({
         style={done ? { cursor: 'pointer' } : undefined}
       >
         <div>
-          <h2 id="progress-title">{collapsed ? 'Esecuzione completata' : 'Avanzamento'}</h2>
-          {collapsed ? (
-            <p className={styles.hint}>
-              In tesi <b>{numberFormat.format(routingCounts.principale)}</b>
-              {' '}(di cui analizzate <b>{numberFormat.format(progress.enrich.enriched)}</b>)
-              {' · '}Da verificare <b>{numberFormat.format(routingCounts.daVerificare + routingCounts.azionabile)}</b>
-              {' · '}Soppresso <b>{numberFormat.format(routingCounts.soppresso)}</b>
-            </p>
+          {done && !failed && !collapsed ? (
+            <div className={styles.rerunControls} onClick={(event) => event.stopPropagation()}>
+              <span id="progress-title" className={styles.srOnly}>Esecuzione completata</span>
+              <Button onClick={() => onResume(forceRerun)} loading={resumeBusy} leftIcon={<Icon name="refresh-cw" />}>
+                Riesegui
+              </Button>
+              <label className={styles.forceCheck}>
+                <input
+                  type="checkbox"
+                  checked={forceRerun}
+                  onChange={(event) => onForceRerunChange(event.target.checked)}
+                />
+                <span>Forza</span>
+              </label>
+            </div>
           ) : (
-            <p className={styles.hint}>La valutazione richiede tempo. La pagina si aggiorna da sola.</p>
+            <>
+              <h2 id="progress-title">{collapsed ? 'Esecuzione completata' : 'Avanzamento'}</h2>
+              {collapsed ? (
+                <p className={styles.hint}>
+                  In tesi <b>{numberFormat.format(routingCounts.principale)}</b>
+                  {' '}(di cui analizzate <b>{numberFormat.format(progress.enrich.enriched)}</b>)
+                  {' · '}Da verificare <b>{numberFormat.format(routingCounts.daVerificare + routingCounts.azionabile)}</b>
+                  {' · '}Soppresso <b>{numberFormat.format(routingCounts.soppresso)}</b>
+                </p>
+              ) : (
+                <p className={styles.hint}>La valutazione richiede tempo. La pagina si aggiorna da sola.</p>
+              )}
+            </>
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -672,7 +700,7 @@ function ProgressPanel({
                 <b>Ricerca interrotta</b> — errore del fornitore dati durante l'arricchimento. Le aziende già elaborate sono conservate: la ripresa riparte da dove si era fermata.
               </span>
             </div>
-            <Button onClick={onResume} loading={resumeBusy} leftIcon={<Icon name="refresh-cw" />}>Riprendi la ricerca</Button>
+            <Button onClick={() => onResume(false)} loading={resumeBusy} leftIcon={<Icon name="refresh-cw" />}>Riprendi la ricerca</Button>
           </div>
         ) : (
           <>
