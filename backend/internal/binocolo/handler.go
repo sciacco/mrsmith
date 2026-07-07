@@ -118,8 +118,11 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("PUT /binocolo/v1/ma/parameters", h.handleUpdateMAParameter)
 	handle("GET /binocolo/v1/ma/initiatives", h.handleListMAInitiatives)
 	handle("POST /binocolo/v1/ma/initiatives", h.handleCreateMAInitiative)
+	handle("PATCH /binocolo/v1/ma/initiatives/{id}", h.handleUpdateMAInitiative)
 	handle("POST /binocolo/v1/ma/initiatives/{id}/archive", h.handleArchiveMAInitiative)
 	handle("POST /binocolo/v1/ma/initiatives/{id}/restore", h.handleRestoreMAInitiative)
+	handle("DELETE /binocolo/v1/ma/initiatives/{id}", h.handleDeleteMAInitiative)
+	handle("POST /binocolo/v1/ma/initiatives/{id}/purge", h.handlePurgeMAInitiative)
 	handle("POST /binocolo/v1/ma/sessions/{id}/initiative", h.handleSetMASessionInitiative)
 	handle("GET /binocolo/v1/ma/initiatives/{id}", h.handleGetMAInitiativeBoard)
 	handle("GET /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/events", h.handleGetMAInitiativeCardEvents)
@@ -341,8 +344,11 @@ func (h *Handler) handleGetMATarget(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleListMAInitiatives(w http.ResponseWriter, r *http.Request) {
-	includeArchived := strings.TrimSpace(r.URL.Query().Get("archived")) == "1"
-	items, err := h.ma.listInitiatives(r.Context(), includeArchived)
+	visibility := r.URL.Query().Get("visibility")
+	if strings.TrimSpace(visibility) == "" && strings.TrimSpace(r.URL.Query().Get("archived")) == "1" {
+		visibility = maSessionVisibilityArchived
+	}
+	items, err := h.ma.listInitiatives(r.Context(), visibility)
 	if err != nil {
 		h.maFailure(w, r, "ma_initiative_list", err)
 		return
@@ -353,6 +359,11 @@ func (h *Handler) handleListMAInitiatives(w http.ResponseWriter, r *http.Request
 type maInitiativeCreateRequest struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
+}
+
+type maInitiativeUpdateRequest struct {
+	Title       *string `json:"title"`
+	Description *string `json:"description"`
 }
 
 func (h *Handler) handleCreateMAInitiative(w http.ResponseWriter, r *http.Request) {
@@ -370,16 +381,47 @@ func (h *Handler) handleCreateMAInitiative(w http.ResponseWriter, r *http.Reques
 	httputil.JSON(w, http.StatusOK, initiative)
 }
 
+func (h *Handler) handleUpdateMAInitiative(w http.ResponseWriter, r *http.Request) {
+	id, ok := maInitiativeID(w, r)
+	if !ok {
+		return
+	}
+	var body maInitiativeUpdateRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	var traceOK bool
+	r, traceOK = h.startMATrace(w, r, "ma_initiative_update", "", map[string]any{"initiativeId": id, "title": body.Title, "description": body.Description}, subject, email)
+	if !traceOK {
+		return
+	}
+	initiative, err := h.ma.updateInitiativeInfo(r.Context(), id, body.Title, body.Description, subject, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_initiative_update", err, "initiative_id", id)
+		return
+	}
+	h.completeMATraceSuccess(r, http.StatusOK)
+	httputil.JSON(w, http.StatusOK, initiative)
+}
+
 func (h *Handler) handleArchiveMAInitiative(w http.ResponseWriter, r *http.Request) {
 	id, ok := maInitiativeID(w, r)
 	if !ok {
 		return
 	}
 	subject, email := companySearchRefreshActor(r.Context())
+	var traceOK bool
+	r, traceOK = h.startMATrace(w, r, "ma_initiative_archive", "", map[string]string{"action": maSessionLifecycleArchive, "initiativeId": id}, subject, email)
+	if !traceOK {
+		return
+	}
 	if err := h.ma.archiveInitiative(r.Context(), id, subject, email); err != nil {
 		h.maFailure(w, r, "ma_initiative_archive", err, "initiative_id", id)
 		return
 	}
+	h.completeMATraceSuccess(r, http.StatusNoContent)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -389,10 +431,54 @@ func (h *Handler) handleRestoreMAInitiative(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	subject, email := companySearchRefreshActor(r.Context())
+	var traceOK bool
+	r, traceOK = h.startMATrace(w, r, "ma_initiative_restore", "", map[string]string{"action": maSessionLifecycleRestore, "initiativeId": id}, subject, email)
+	if !traceOK {
+		return
+	}
 	if err := h.ma.restoreInitiative(r.Context(), id, subject, email); err != nil {
 		h.maFailure(w, r, "ma_initiative_restore", err, "initiative_id", id)
 		return
 	}
+	h.completeMATraceSuccess(r, http.StatusNoContent)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) handleDeleteMAInitiative(w http.ResponseWriter, r *http.Request) {
+	id, ok := maInitiativeID(w, r)
+	if !ok {
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	var traceOK bool
+	r, traceOK = h.startMATrace(w, r, "ma_initiative_delete", "", map[string]string{"action": maSessionLifecycleDelete, "initiativeId": id}, subject, email)
+	if !traceOK {
+		return
+	}
+	if err := h.ma.softDeleteInitiative(r.Context(), id, subject, email); err != nil {
+		h.maFailure(w, r, "ma_initiative_delete", err, "initiative_id", id)
+		return
+	}
+	h.completeMATraceSuccess(r, http.StatusNoContent)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) handlePurgeMAInitiative(w http.ResponseWriter, r *http.Request) {
+	id, ok := maInitiativeID(w, r)
+	if !ok {
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	var traceOK bool
+	r, traceOK = h.startMATrace(w, r, "ma_initiative_purge", "", map[string]string{"action": maSessionLifecyclePurge, "initiativeId": id}, subject, email)
+	if !traceOK {
+		return
+	}
+	if err := h.ma.purgeInitiative(r.Context(), id, subject, email); err != nil {
+		h.maFailure(w, r, "ma_initiative_purge", err, "initiative_id", id)
+		return
+	}
+	h.completeMATraceSuccess(r, http.StatusNoContent)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -408,6 +494,11 @@ func (h *Handler) handleSetMASessionInitiative(w http.ResponseWriter, r *http.Re
 	var body maSessionInitiativeRequest
 	if err := decodeMABody(r, &body); err != nil {
 		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	body.InitiativeID = strings.TrimSpace(body.InitiativeID)
+	if body.InitiativeID == "" {
+		httputil.Error(w, http.StatusBadRequest, "initiative_id_required")
 		return
 	}
 	subject, email := companySearchRefreshActor(r.Context())
@@ -1699,6 +1790,15 @@ func maHTTPError(err error) (int, string, string) {
 	}
 	if errors.Is(err, errMAInitiativeArchived) {
 		return http.StatusConflict, "ma_initiative_archived", "warn"
+	}
+	if errors.Is(err, errMAInitiativeDeleted) {
+		return http.StatusConflict, "ma_initiative_deleted", "warn"
+	}
+	if errors.Is(err, errMAInitiativePurged) {
+		return http.StatusConflict, "ma_initiative_purged", "warn"
+	}
+	if errors.Is(err, errMAInitiativeNotFound) {
+		return http.StatusNotFound, "ma_initiative_not_found", "warn"
 	}
 	if errors.Is(err, errMACompanyFactActive) {
 		return http.StatusBadRequest, "ma_company_fact_already_active", "warn"

@@ -26,9 +26,9 @@ export function RicerchePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [initiatives, setInitiatives] = useState<MAInitiativeSummary[]>([]);
-  const [attachFor, setAttachFor] = useState<MASessionSummary | null>(null);
-  const [attachInitiativeId, setAttachInitiativeId] = useState('');
-  const [attachBusy, setAttachBusy] = useState(false);
+  const [moveFor, setMoveFor] = useState<MASessionSummary | null>(null);
+  const [moveInitiativeId, setMoveInitiativeId] = useState('');
+  const [moveBusy, setMoveBusy] = useState(false);
   const [visibility, setVisibility] = useState<MASessionVisibility>('active');
   const [lifecycleBusyId, setLifecycleBusyId] = useState<string | null>(null);
   const [deleteCandidate, setDeleteCandidate] = useState<MASessionSummary | null>(null);
@@ -61,19 +61,19 @@ export function RicerchePage() {
     void loadInitiatives();
   }, [loadSessions, loadInitiatives]);
 
-  async function attachInitiative() {
-    if (!attachFor || !attachInitiativeId) return;
-    setAttachBusy(true);
+  async function moveToInitiative() {
+    if (!moveFor || !moveInitiativeId) return;
+    setMoveBusy(true);
     try {
-      await api.post<void>(`/binocolo/v1/ma/sessions/${attachFor.id}/initiative`, { initiativeId: attachInitiativeId });
-      setAttachFor(null);
-      setAttachInitiativeId('');
+      await api.post<void>(`/binocolo/v1/ma/sessions/${moveFor.id}/initiative`, { initiativeId: moveInitiativeId });
+      setMoveFor(null);
+      setMoveInitiativeId('');
       await loadSessions();
-      toast('Ricerca agganciata all’iniziativa.', 'success');
+      toast("Ricerca spostata nell'iniziativa.", 'success');
     } catch (err) {
       toast(errorLabel(err), 'error');
     } finally {
-      setAttachBusy(false);
+      setMoveBusy(false);
     }
   }
 
@@ -223,17 +223,18 @@ export function RicerchePage() {
                         >
                           {session.initiativeTitle}
                         </span>
-                      ) : visibility === 'active' ? (
+                      ) : null}
+                      {visibility === 'active' ? (
                         <button
                           type="button"
                           className={styles.linkButton}
                           onClick={(event) => {
                             event.stopPropagation();
-                            setAttachFor(session);
-                            setAttachInitiativeId('');
+                            setMoveFor(session);
+                            setMoveInitiativeId('');
                           }}
                         >
-                          Aggancia a iniziativa…
+                          Sposta in iniziativa…
                         </button>
                       ) : null}
                     </span>
@@ -298,20 +299,20 @@ export function RicerchePage() {
       </section>
 
       <Modal
-        open={attachFor !== null}
-        onClose={() => setAttachFor(null)}
-        title="Aggancia a iniziativa"
+        open={moveFor !== null}
+        onClose={() => setMoveFor(null)}
+        title="Sposta in iniziativa"
         size="sm"
-        dismissible={!attachBusy}
+        dismissible={!moveBusy}
       >
         <div className={styles.stack}>
           <p className={styles.hint}>
-            Le aziende con almeno una stella in «{attachFor?.title || 'questa ricerca'}» entreranno nella lavorazione dell'iniziativa scelta.
+            Le aziende con almeno una stella in «{moveFor?.title || 'questa ricerca'}» entreranno nella lavorazione dell'iniziativa scelta.
           </p>
           <select
             className={styles.select}
-            value={attachInitiativeId}
-            onChange={(event) => setAttachInitiativeId(event.target.value)}
+            value={moveInitiativeId}
+            onChange={(event) => setMoveInitiativeId(event.target.value)}
           >
             <option value="">Seleziona iniziativa</option>
             {initiatives.map((item) => (
@@ -319,10 +320,10 @@ export function RicerchePage() {
             ))}
           </select>
           <div className={styles.modalActions}>
-            <Button onClick={() => void attachInitiative()} loading={attachBusy} disabled={!attachInitiativeId}>
-              Aggancia
+            <Button onClick={() => void moveToInitiative()} loading={moveBusy} disabled={!moveInitiativeId}>
+              Sposta
             </Button>
-            <Button variant="secondary" onClick={() => setAttachFor(null)} disabled={attachBusy}>
+            <Button variant="secondary" onClick={() => setMoveFor(null)} disabled={moveBusy}>
               Annulla
             </Button>
           </div>

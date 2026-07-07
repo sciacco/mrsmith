@@ -69,8 +69,74 @@
   border: 1px solid rgba(239, 68, 68, 0.22);
   border-radius: var(--radius-md);
   background: var(--color-danger-subtle);
-  color: var(--color-danger);
+  color: var(--color-danger-hover);
   font-size: 0.875rem;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-5) var(--space-3);
+}
+
+.panelHeader h2 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.tabs {
+  display: flex;
+  gap: var(--space-1);
+  margin: 0 var(--space-5);
+  padding: var(--space-1);
+  align-self: flex-start;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+}
+
+.tab {
+  min-height: 32px;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.tab:hover:not(.tabActive),
+.tab:focus-visible:not(.tabActive) {
+  background: var(--color-accent-subtle);
+  color: var(--color-text);
+  outline: none;
+}
+
+.tabActive {
+  background: var(--color-bg-elevated);
+  color: var(--color-accent);
+  box-shadow: var(--shadow-xs);
+}
+
+.panelBody {
+  padding: var(--space-5);
 }
 
 .list {
@@ -122,6 +188,11 @@
   outline: none;
 }
 
+.cardTitle:disabled {
+  color: var(--color-text);
+  cursor: default;
+}
+
 .hint {
   color: var(--color-text-muted);
   font-size: 0.8125rem;
@@ -171,6 +242,11 @@
   outline: none;
 }
 
+.statePill:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+
 .statePill b {
   color: var(--color-text);
   font-weight: 800;
@@ -178,9 +254,15 @@
 
 .cardFoot {
   display: flex;
+  align-items: center;
   gap: var(--space-2);
+  flex-wrap: wrap;
   color: var(--color-text-muted);
   font-size: 0.8125rem;
+}
+
+.actionSpacer {
+  flex: 1 1 auto;
 }
 
 .archiveLink {
@@ -273,6 +355,11 @@
   gap: var(--space-2);
   justify-content: flex-end;
   margin-top: var(--space-4);
+}
+
+.stack {
+  display: grid;
+  gap: var(--space-4);
 }
 
 /* ---- Board (F2) ---- */

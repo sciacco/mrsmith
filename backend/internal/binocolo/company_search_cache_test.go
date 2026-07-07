@@ -3,14 +3,14 @@ package binocolo
 import (
 	"context"
 	"encoding/json"
+	"github.com/sciacco/mrsmith/internal/platform/httputil"
+	"github.com/sciacco/mrsmith/internal/platform/openapiit"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"sync"
 	"testing"
 	"time"
-	"github.com/sciacco/mrsmith/internal/platform/httputil"
-	"github.com/sciacco/mrsmith/internal/platform/openapiit"
 )
 
 func TestCompanySearchCacheKeyNormalizesQueryOrderAndExcludesForceRefresh(t *testing.T) {

@@ -328,6 +328,12 @@ export interface MAInitiative {
   archivedAt?: string;
   archivedBySubject?: string;
   archivedByEmail?: string;
+  deletedAt?: string;
+  deletedBySubject?: string;
+  deletedByEmail?: string;
+  purgedAt?: string;
+  purgedBySubject?: string;
+  purgedByEmail?: string;
 }
 
 export interface MAInitiativeSummary extends MAInitiative {
@@ -709,6 +715,7 @@ export interface MASession {
   deletedBySubject?: string;
   deletedByEmail?: string;
   initiativeId?: string;
+  initiativeTitle?: string;
 }
 
 export interface MAStrategyVersion {

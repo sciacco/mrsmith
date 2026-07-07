@@ -36,6 +36,10 @@ var (
 	errMAVisibilityInvalid     = errors.New("ma session visibility invalid")
 	errMASessionArchived       = errors.New("ma session archived")
 	errMASessionDeleted        = errors.New("ma session deleted")
+	errMAInitiativeArchived    = errors.New("ma initiative archived")
+	errMAInitiativeDeleted     = errors.New("ma initiative deleted")
+	errMAInitiativePurged      = errors.New("ma initiative purged")
+	errMAInitiativeNotFound    = errors.New("ma initiative not found")
 	// errMAEstimateSuperseded is returned by ReplaceMAEstimates when the active
 	// strategy version changed mid-estimate (the user re-submitted). The estimate
 	// worker loops on it to re-run against the now-active version, so the latest
@@ -391,6 +395,49 @@ func (s *maService) updateSessionLifecycle(ctx context.Context, id, action, subj
 	if !updated {
 		return sql.ErrNoRows
 	}
+	return s.cascadeSessionLifecycleToInitiative(ctx, id, action, subject, email)
+}
+
+func (s *maService) cascadeSessionLifecycleToInitiative(ctx context.Context, sessionID, action, subject, email string) error {
+	session, err := s.store.GetMASessionState(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+	initiativeID := strings.TrimSpace(session.InitiativeID)
+	if initiativeID == "" {
+		return nil
+	}
+	attachedSessions, err := s.store.CountMAInitiativeAttachedSessions(ctx, initiativeID, sessionID)
+	if err != nil {
+		return err
+	}
+	if attachedSessions > 0 {
+		return nil
+	}
+	cards, err := s.store.CountMAInitiativeCards(ctx, initiativeID)
+	if err != nil {
+		return err
+	}
+	if cards > 0 {
+		return nil
+	}
+	if err := s.updateInitiativeLifecycle(ctx, initiativeID, action, subject, email); err != nil {
+		if errors.Is(err, errMAInitiativeNotFound) {
+			logging.FromContext(ctx).Warn("binocolo ma initiative cascade skipped", "component", "binocolo", "operation", "ma_initiative_cascade_skipped", "initiative_id", initiativeID, "action", action)
+			_ = s.traceEvent(ctx, maTraceEventWrite{
+				EventType: "ma_initiative_cascade_skipped",
+				Status:    maTraceEventInfo,
+				Metadata:  maTraceJSON(map[string]any{"initiative_id": initiativeID, "action": action}),
+			})
+			return nil
+		}
+		return err
+	}
+	_ = s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_initiative_cascade_applied",
+		Status:    maTraceEventSucceeded,
+		Metadata:  maTraceJSON(map[string]any{"initiative_id": initiativeID, "action": action}),
+	})
 	return nil
 }
 
@@ -417,11 +464,13 @@ func ensureMASessionOperational(session MASession) error {
 	return nil
 }
 
-// errMAInitiativeArchived mirrors errMASessionArchived: an archived Iniziativa
-// can still be viewed (index "Archivio") but refuses new anchors.
-var errMAInitiativeArchived = errors.New("ma initiative archived")
-
 func ensureMAInitiativeOperational(initiative MAInitiative) error {
+	if initiative.PurgedAt != nil {
+		return errMAInitiativePurged
+	}
+	if initiative.DeletedAt != nil {
+		return errMAInitiativeDeleted
+	}
 	if initiative.ArchivedAt != nil {
 		return errMAInitiativeArchived
 	}
@@ -450,12 +499,61 @@ func (s *maService) createInitiative(ctx context.Context, title, description, su
 	return s.store.CreateMAInitiative(ctx, initiative)
 }
 
-// listInitiatives returns the /iniziative index rows, active or archived.
-func (s *maService) listInitiatives(ctx context.Context, includeArchived bool) ([]MAInitiativeSummary, error) {
+func (s *maService) updateInitiativeInfo(ctx context.Context, id string, title, description *string, subject, email string) (MAInitiative, error) {
+	if s.store == nil {
+		return MAInitiative{}, errMAStoreUnavailable
+	}
+	if title == nil && description == nil {
+		return MAInitiative{}, fmt.Errorf("%w: title or description", errMAStrategyInvalid)
+	}
+	var cleanTitle *string
+	if title != nil {
+		value := cleanText(*title, 120)
+		if value == "" {
+			return MAInitiative{}, fmt.Errorf("%w: title", errMAStrategyInvalid)
+		}
+		cleanTitle = &value
+	}
+	var cleanDescription *string
+	if description != nil {
+		value := cleanText(*description, 500)
+		cleanDescription = &value
+	}
+	initiative, err := s.store.GetMAInitiative(ctx, id)
+	if err != nil {
+		return MAInitiative{}, err
+	}
+	if err := ensureMAInitiativeOperational(initiative); err != nil {
+		return MAInitiative{}, err
+	}
+	updated, err := s.store.UpdateMAInitiativeInfo(ctx, id, cleanTitle, cleanDescription)
+	if err != nil {
+		return MAInitiative{}, err
+	}
+	_ = s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_initiative_updated",
+		Status:    maTraceEventSucceeded,
+		Metadata: maTraceJSON(map[string]any{
+			"initiative_id":       id,
+			"title_updated":       cleanTitle != nil,
+			"description_updated": cleanDescription != nil,
+			"by":                  email,
+			"subject":             subject,
+		}),
+	})
+	return updated, nil
+}
+
+// listInitiatives returns the /iniziative index rows for the requested visibility.
+func (s *maService) listInitiatives(ctx context.Context, visibility string) ([]MAInitiativeSummary, error) {
 	if s.store == nil {
 		return nil, errMAStoreUnavailable
 	}
-	return s.store.ListMAInitiatives(ctx, includeArchived)
+	visibility, err := normalizeMASessionVisibility(visibility)
+	if err != nil {
+		return nil, err
+	}
+	return s.store.ListMAInitiatives(ctx, visibility)
 }
 
 func (s *maService) archiveInitiative(ctx context.Context, id, subject, email string) error {
@@ -464,6 +562,14 @@ func (s *maService) archiveInitiative(ctx context.Context, id, subject, email st
 
 func (s *maService) restoreInitiative(ctx context.Context, id, subject, email string) error {
 	return s.updateInitiativeLifecycle(ctx, id, maSessionLifecycleRestore, subject, email)
+}
+
+func (s *maService) softDeleteInitiative(ctx context.Context, id, subject, email string) error {
+	return s.updateInitiativeLifecycle(ctx, id, maSessionLifecycleDelete, subject, email)
+}
+
+func (s *maService) purgeInitiative(ctx context.Context, id, subject, email string) error {
+	return s.updateInitiativeLifecycle(ctx, id, maSessionLifecyclePurge, subject, email)
 }
 
 func (s *maService) updateInitiativeLifecycle(ctx context.Context, id, action, subject, email string) error {
@@ -475,17 +581,25 @@ func (s *maService) updateInitiativeLifecycle(ctx context.Context, id, action, s
 		return err
 	}
 	if !updated {
-		return sql.ErrNoRows
+		return errMAInitiativeNotFound
 	}
+	_ = s.traceEvent(ctx, maTraceEventWrite{
+		EventType: "ma_initiative_lifecycle_" + action,
+		Status:    maTraceEventSucceeded,
+		Metadata:  maTraceJSON(map[string]any{"initiative_id": id, "action": action, "by": email, "subject": subject}),
+	})
 	return nil
 }
 
-// setSessionInitiative anchors or unanchors (initiativeID == "") a session to
-// an Iniziativa (PRD §3.2). The session must be operational; a non-empty
-// target initiative must exist and not be archived. Card backfill for
-// already-rated companies is wired in B2 (ensureInitiativeCard) — B1 only
-// writes the anchor column.
+// setSessionInitiative moves/anchors a session to an Iniziativa (PRD §3.2).
+// The session must be operational; the target initiative must exist and be
+// operational. Card backfill for already-rated companies is wired in B2
+// (ensureInitiativeCard) — B1 only writes the anchor column.
 func (s *maService) setSessionInitiative(ctx context.Context, sessionID, initiativeID, subject, email string) error {
+	initiativeID = strings.TrimSpace(initiativeID)
+	if initiativeID == "" {
+		return fmt.Errorf("%w: initiativeId", errMAStrategyInvalid)
+	}
 	if s.store == nil {
 		return errMAStoreUnavailable
 	}
@@ -496,35 +610,29 @@ func (s *maService) setSessionInitiative(ctx context.Context, sessionID, initiat
 	if err := ensureMASessionOperational(session); err != nil {
 		return err
 	}
-	initiativeID = strings.TrimSpace(initiativeID)
-	if initiativeID != "" {
-		initiative, err := s.store.GetMAInitiative(ctx, initiativeID)
-		if err != nil {
-			return err
-		}
-		if err := ensureMAInitiativeOperational(initiative); err != nil {
-			return err
-		}
+	initiative, err := s.store.GetMAInitiative(ctx, initiativeID)
+	if err != nil {
+		return err
+	}
+	if err := ensureMAInitiativeOperational(initiative); err != nil {
+		return err
 	}
 	if err := s.store.SetMASessionInitiative(ctx, sessionID, initiativeID); err != nil {
 		return err
 	}
 	// Backfill (PRD §3.2): agganciare una sessione che ha già >=1★ crea le
 	// card mancanti, stessa regola d'ingresso di §4.1 applicata
-	// retroattivamente. Sgancio (initiativeID == "") non tocca le card
-	// esistenti: sono già autonome (§4.2).
-	if initiativeID != "" {
-		ratings, err := s.store.ListMARatings(ctx, sessionID)
-		if err != nil {
-			return err
+	// retroattivamente.
+	ratings, err := s.store.ListMARatings(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+	for companyKey, rating := range ratings {
+		if rating < 1 {
+			continue
 		}
-		for companyKey, rating := range ratings {
-			if rating < 1 {
-				continue
-			}
-			if err := s.ensureInitiativeCard(ctx, initiativeID, sessionID, companyKey, rating, subject, email); err != nil {
-				return err
-			}
+		if err := s.ensureInitiativeCard(ctx, initiativeID, sessionID, companyKey, rating, subject, email); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -982,6 +1090,11 @@ func (s *maService) createSession(ctx context.Context, req MACreateSessionReques
 	if prompt == "" {
 		return MASessionDetail{}, fmt.Errorf("%w: prompt", errMAStrategyInvalid)
 	}
+	initiativeID := strings.TrimSpace(req.InitiativeID)
+	newInitiativeTitle := strings.TrimSpace(req.NewInitiativeTitle)
+	if initiativeID != "" && newInitiativeTitle != "" {
+		return MASessionDetail{}, fmt.Errorf("%w: initiativeId and newInitiativeTitle are mutually exclusive", errMAStrategyInvalid)
+	}
 	params := []MAParameter(nil)
 	if listed, err := s.store.ListMAParameters(ctx); err == nil {
 		params = listed
@@ -1034,6 +1147,30 @@ func (s *maService) createSession(ctx context.Context, req MACreateSessionReques
 	if title == "" {
 		title = titleFromPrompt(prompt)
 	}
+	var initiative MAInitiative
+	createdNewInitiative := false
+	if initiativeID != "" {
+		loaded, err := s.store.GetMAInitiative(ctx, initiativeID)
+		if err != nil {
+			return MASessionDetail{}, err
+		}
+		if err := ensureMAInitiativeOperational(loaded); err != nil {
+			return MASessionDetail{}, err
+		}
+		initiative = loaded
+	} else {
+		initiativeTitle := newInitiativeTitle
+		if initiativeTitle == "" {
+			initiativeTitle = automaticMATargetInitiativeTitle(title)
+		}
+		created, err := s.createInitiative(ctx, initiativeTitle, "", subject, email)
+		if err != nil {
+			return MASessionDetail{}, err
+		}
+		initiative = created
+		initiativeID = created.ID
+		createdNewInitiative = true
+	}
 	detail, err := s.store.CreateMASession(ctx, maSessionCreate{
 		Session: MASession{
 			ID:               uuid.NewString(),
@@ -1041,12 +1178,24 @@ func (s *maService) createSession(ctx context.Context, req MACreateSessionReques
 			Prompt:           prompt,
 			CreatedBySubject: subject,
 			CreatedByEmail:   email,
+			InitiativeID:     initiativeID,
 		},
-		Strategy: strategy,
+		Strategy:     strategy,
+		InitiativeID: initiativeID,
 	})
 	if err != nil {
+		if createdNewInitiative {
+			_ = s.traceEvent(ctx, maTraceEventWrite{
+				EventType: "ma_session_create_orphaned_initiative",
+				Status:    maTraceEventInfo,
+				Metadata:  maTraceJSON(map[string]any{"initiative_id": initiativeID, "initiative_title": initiative.Title}),
+				Error:     err.Error(),
+			})
+		}
 		return MASessionDetail{}, err
 	}
+	detail.Session.InitiativeID = initiative.ID
+	detail.Session.InitiativeTitle = initiative.Title
 	if detail.Strategy != nil {
 		if err := s.linkTrace(ctx, maTraceLink{SessionID: detail.Session.ID, StrategyVersionID: detail.Strategy.ID}); err != nil {
 			return MASessionDetail{}, err
@@ -1061,6 +1210,8 @@ func (s *maService) createSession(ctx context.Context, req MACreateSessionReques
 			"session_id":          detail.Session.ID,
 			"strategy_version_id": nullableTraceString(detail.Session.ActiveStrategyID),
 			"title":               detail.Session.Title,
+			"initiative_id":       nullableTraceString(detail.Session.InitiativeID),
+			"initiative_title":    detail.Session.InitiativeTitle,
 		}),
 	}); err != nil {
 		return MASessionDetail{}, err
@@ -1698,6 +1849,13 @@ func (s *maService) ensureInitiativeCard(ctx context.Context, initiativeID, sess
 	if s.store == nil {
 		return errMAStoreUnavailable
 	}
+	initiative, err := s.store.GetMAInitiative(ctx, initiativeID)
+	if err != nil {
+		return err
+	}
+	if err := ensureMAInitiativeOperational(initiative); err != nil {
+		return err
+	}
 	existing, err := s.store.GetMAInitiativeCard(ctx, initiativeID, companyKey)
 	if err != nil {
 		return err
@@ -1819,6 +1977,9 @@ func (s *maService) getInitiativeBoard(ctx context.Context, initiativeID string)
 	initiative, err := s.store.GetMAInitiative(ctx, initiativeID)
 	if err != nil {
 		return MAInitiativeBoard{}, err
+	}
+	if initiative.DeletedAt != nil || initiative.PurgedAt != nil {
+		return MAInitiativeBoard{}, errMAInitiativeNotFound
 	}
 	sessions, err := s.store.ListMASessionsByInitiative(ctx, initiativeID)
 	if err != nil {
@@ -6725,6 +6886,11 @@ func titleFromPrompt(prompt string) string {
 		return "Nuova ricerca"
 	}
 	return title
+}
+
+func automaticMATargetInitiativeTitle(sessionTitle string) string {
+	const prefix = "TGT: "
+	return prefix + cleanText(sessionTitle, 120-len([]rune(prefix)))
 }
 
 func safeFilenamePart(value string) string {

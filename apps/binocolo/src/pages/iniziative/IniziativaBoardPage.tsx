@@ -1,3 +1,4 @@
+import { ApiError } from '@mrsmith/api-client';
 import { Button, Drawer, Icon, Modal, Skeleton, useToast } from '@mrsmith/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -49,6 +50,20 @@ const ESITI: Array<{ key: string; label: string; description: string; bridge: bo
 
 function stateDisplayLabel(key: string): string {
   return STATES.find((s) => s.key === key)?.label ?? key;
+}
+
+function apiErrorCode(error: ApiError): string | undefined {
+  const body = error.body;
+  if (body && typeof body === 'object' && 'error' in body && typeof body.error === 'string') return body.error;
+  if (body && typeof body === 'object' && 'code' in body && typeof body.code === 'string') return body.code;
+  return undefined;
+}
+
+function boardErrorLabel(error: unknown): string {
+  if (error instanceof ApiError && (error.status === 404 || apiErrorCode(error) === 'ma_initiative_not_found')) {
+    return 'Iniziativa nel cestino o non più disponibile.';
+  }
+  return errorLabel(error);
 }
 
 const BRIDGE_KINDS: Array<{ key: string; label: string; hint: string }> = [
@@ -162,7 +177,7 @@ export function IniziativaBoardPage() {
         setCollapsed(new Set(stored));
       }
     } catch (err) {
-      setError(errorLabel(err));
+      setError(boardErrorLabel(err));
     } finally {
       setLoading(false);
     }
@@ -212,7 +227,7 @@ export function IniziativaBoardPage() {
       await api.post(`/binocolo/v1/ma/sessions/${sessionId}/initiative`, { initiativeId: id });
       setAttachModalOpen(false);
       await load();
-      toast('Ricerca agganciata.', 'success');
+      toast('Ricerca collegata.', 'success');
     } catch (err) {
       toast(errorLabel(err), 'error');
     } finally {
@@ -361,7 +376,7 @@ export function IniziativaBoardPage() {
             </span>
           ))}
           <button type="button" className={styles.linkBtn} onClick={() => void openAttachModal()}>
-            + Aggancia ricerca
+            + Collega ricerca
           </button>
         </div>
       </div>
@@ -588,11 +603,11 @@ export function IniziativaBoardPage() {
         </div>
       )}
 
-      <Modal open={attachModalOpen} onClose={() => setAttachModalOpen(false)} title="Aggancia ricerca">
+      <Modal open={attachModalOpen} onClose={() => setAttachModalOpen(false)} title="Collega ricerca">
         {attachLoading ? (
           <Skeleton rows={3} />
         ) : availableSessions.length === 0 ? (
-          <p className={styles.hint}>Nessuna ricerca disponibile da agganciare.</p>
+          <p className={styles.hint}>Nessuna ricerca disponibile da collegare.</p>
         ) : (
           <div className={styles.list}>
             {availableSessions.map((session) => (
@@ -604,7 +619,7 @@ export function IniziativaBoardPage() {
                     onClick={() => void attachSession(session.id)}
                     loading={attaching === session.id}
                   >
-                    Aggancia
+                    Collega
                   </Button>
                 </div>
               </div>

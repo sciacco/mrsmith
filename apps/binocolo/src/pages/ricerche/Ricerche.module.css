@@ -299,6 +299,94 @@
   outline: none;
 }
 
+.inputError,
+.inputError:focus {
+  border-color: var(--color-danger);
+}
+
+.fieldError {
+  margin: 0;
+  color: var(--color-danger-hover);
+  font-size: 0.75rem;
+}
+
+.initiativeSelector {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0 0 var(--space-5);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.initiativeSelector legend {
+  padding: 0 var(--space-1);
+}
+
+.initiativeChoices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.initiativeChoice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: flex-start;
+  min-height: 92px;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.initiativeChoice:hover,
+.initiativeChoice:focus-within,
+.initiativeChoiceActive {
+  border-color: var(--color-accent);
+  background: var(--color-accent-subtle);
+  box-shadow: var(--shadow-xs);
+}
+
+.initiativeChoice:active {
+  transform: scale(0.995);
+}
+
+.initiativeChoice input {
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: var(--color-accent);
+}
+
+.initiativeChoice:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.initiativeChoice b {
+  display: block;
+  color: var(--color-text);
+  font-size: 0.875rem;
+}
+
+.initiativeChoice small {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
 .guide {
   display: grid;
   gap: var(--space-2);
@@ -335,6 +423,15 @@
   justify-content: space-between;
   color: var(--color-text-secondary);
   font-size: 0.875rem;
+}
+
+.collapsedSummary {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.collapsedSummary p {
+  margin: 0;
 }
 
 .chip,
@@ -1093,7 +1190,8 @@ td .inspectLink { margin-left: var(--space-1); }
 
 @media (max-width: 1000px) {
   .grid,
-  .stages {
+  .stages,
+  .initiativeChoices {
     grid-template-columns: 1fr;
   }
 

@@ -5,7 +5,6 @@ import { useApiClient } from '../../api/client';
 import type {
   MAAtecoCandidate,
   MAEstimate,
-  MAInitiative,
   MAInitiativeListResponse,
   MAInitiativeSummary,
   MAProvinceCatalogItem,
@@ -42,6 +41,7 @@ const thesisLabels: Record<MAThesis | 'unknown', string> = {
 };
 
 type BusyState = 'create' | 'estimate' | 'execute' | null;
+type InitiativeMode = 'auto' | 'manual' | 'existing';
 
 export function NuovaRicercaPage() {
   const api = useApiClient();
@@ -59,11 +59,10 @@ export function NuovaRicercaPage() {
   const [error, setError] = useState<string | null>(null);
   const [initiatives, setInitiatives] = useState<MAInitiativeSummary[]>([]);
   const [initiativesLoading, setInitiativesLoading] = useState(false);
+  const [initiativeMode, setInitiativeMode] = useState<InitiativeMode>('auto');
   const [initiativeId, setInitiativeId] = useState('');
-  const [newInitiativeOpen, setNewInitiativeOpen] = useState(false);
-  const [newInitiativeTitle, setNewInitiativeTitle] = useState('');
-  const [newInitiativeDescription, setNewInitiativeDescription] = useState('');
-  const [initiativeBusy, setInitiativeBusy] = useState(false);
+  const [manualInitiativeTitle, setManualInitiativeTitle] = useState('');
+  const [initiativeError, setInitiativeError] = useState<string | null>(null);
 
   const loadInitiatives = useCallback(async () => {
     setInitiativesLoading(true);
@@ -96,28 +95,6 @@ export function NuovaRicercaPage() {
     void loadInitiatives();
   }, [loadInitiatives]);
 
-  async function createInitiativeInline() {
-    const title = newInitiativeTitle.trim();
-    if (!title) return;
-    setInitiativeBusy(true);
-    setError(null);
-    try {
-      const created = await api.post<MAInitiative>('/binocolo/v1/ma/initiatives', {
-        title,
-        description: newInitiativeDescription.trim(),
-      });
-      await loadInitiatives();
-      setInitiativeId(created.id);
-      setNewInitiativeOpen(false);
-      setNewInitiativeTitle('');
-      setNewInitiativeDescription('');
-    } catch (err) {
-      setError(errorLabel(err));
-    } finally {
-      setInitiativeBusy(false);
-    }
-  }
-
   useEffect(() => {
     const sessionId = detail?.session.id;
     if (!sessionId || detail?.session.status !== 'estimating') return;
@@ -140,11 +117,24 @@ export function NuovaRicercaPage() {
     return () => clearInterval(handle);
   }, [api, detail?.session.id, detail?.session.status]);
 
+  const activeInitiatives = useMemo(() => initiatives.filter((item) => !item.archivedAt), [initiatives]);
   const blocker = strategy ? sectorBlocker(strategy) : null;
   const preview = estimateFresh ? expandedEstimatePreview(detail?.estimates ?? []) : null;
   const estimating = busy === 'estimate' || detail?.session.status === 'estimating';
   const canEstimate = Boolean(strategy) && !blocker && !estimating && busy !== 'create' && busy !== 'execute';
   const wideTerritory = strategy ? territoryIsWide(strategy.provinces, catalog) : false;
+
+  useEffect(() => {
+    if (initiativeMode !== 'existing') return;
+    if (activeInitiatives.length === 0) {
+      setInitiativeId('');
+      setInitiativeMode('auto');
+      return;
+    }
+    if (!activeInitiatives.some((item) => item.id === initiativeId)) {
+      setInitiativeId(activeInitiatives[0]?.id ?? '');
+    }
+  }, [activeInitiatives, initiativeId, initiativeMode]);
 
   const updateStrategy = useCallback((patch: Partial<MAStrategySpec>) => {
     setStrategy((current) => (current ? { ...current, ...patch } : current));
@@ -155,19 +145,39 @@ export function NuovaRicercaPage() {
     event.preventDefault();
     const normalized = prompt.trim();
     if (normalized.length < minPromptLength) return;
+
+    const initiativePayload: { initiativeId?: string; newInitiativeTitle?: string } = {};
+    setInitiativeError(null);
+    if (initiativeMode === 'manual') {
+      const title = manualInitiativeTitle.trim();
+      if (!title) {
+        setInitiativeError('Inserire un titolo iniziativa.');
+        return;
+      }
+      initiativePayload.newInitiativeTitle = title;
+    }
+    if (initiativeMode === 'existing') {
+      if (activeInitiatives.length === 0) {
+        setInitiativeError('Creare una nuova iniziativa o usare il titolo automatico.');
+        return;
+      }
+      if (!initiativeId) {
+        setInitiativeError("Selezionare un'iniziativa attiva.");
+        return;
+      }
+      initiativePayload.initiativeId = initiativeId;
+    }
+
     setBusy('create');
     setError(null);
     try {
       const data = await api.post<MASessionDetail>('/binocolo/v1/ma/sessions?targets=none', {
         prompt: normalized,
         gatedFlow: true,
+        ...initiativePayload,
       });
       if (!data.strategy?.strategy) {
         throw new Error('Perimetro non restituito dal server.');
-      }
-      if (initiativeId) {
-        await api.post<void>(`/binocolo/v1/ma/sessions/${data.session.id}/initiative`, { initiativeId });
-        data.session.initiativeId = initiativeId;
       }
       setDetail(data);
       setStrategy(data.strategy.strategy);
@@ -243,10 +253,106 @@ export function NuovaRicercaPage() {
           <div className={styles.panelHeader}>
             <div>
               <h2 id="request-title">Richiesta in linguaggio naturale</h2>
-              <p className={styles.hint}>La textarea è l'unico campo obbligatorio: niente selettori LLM, niente codici, niente limite risultati.</p>
+              <p className={styles.hint}>Ogni ricerca nasce dentro un'iniziativa. Il percorso rapido genera il titolo dal perimetro.</p>
             </div>
           </div>
           <form className={styles.panelBody} onSubmit={createSession}>
+            <fieldset className={styles.initiativeSelector} aria-describedby="initiative-help">
+              <legend className={styles.label}>Iniziativa</legend>
+              <div className={styles.initiativeChoices}>
+                <label className={`${styles.initiativeChoice} ${initiativeMode === 'auto' ? styles.initiativeChoiceActive : ''}`}>
+                  <input
+                    type="radio"
+                    name="initiativeMode"
+                    value="auto"
+                    checked={initiativeMode === 'auto'}
+                    onChange={() => {
+                      setInitiativeMode('auto');
+                      setInitiativeError(null);
+                    }}
+                  />
+                  <span>
+                    <b>Nuova iniziativa · titolo automatico</b>
+                    <small>Il titolo viene generato dalla ricerca (prefisso TGT).</small>
+                  </span>
+                </label>
+                <label className={`${styles.initiativeChoice} ${initiativeMode === 'manual' ? styles.initiativeChoiceActive : ''}`}>
+                  <input
+                    type="radio"
+                    name="initiativeMode"
+                    value="manual"
+                    checked={initiativeMode === 'manual'}
+                    onChange={() => {
+                      setInitiativeMode('manual');
+                      setInitiativeError(null);
+                    }}
+                  />
+                  <span>
+                    <b>Nuova iniziativa · titolo manuale</b>
+                    <small>Usare un nome già deciso per il filone di scouting.</small>
+                  </span>
+                </label>
+                <label className={`${styles.initiativeChoice} ${initiativeMode === 'existing' ? styles.initiativeChoiceActive : ''}`}>
+                  <input
+                    type="radio"
+                    name="initiativeMode"
+                    value="existing"
+                    checked={initiativeMode === 'existing'}
+                    onChange={() => {
+                      setInitiativeMode('existing');
+                      setInitiativeError(null);
+                      if (!initiativeId && activeInitiatives[0]) setInitiativeId(activeInitiatives[0].id);
+                    }}
+                    disabled={initiativesLoading || activeInitiatives.length === 0}
+                  />
+                  <span>
+                    <b>Iniziativa esistente</b>
+                    <small>{initiativesLoading ? 'Caricamento iniziative…' : activeInitiatives.length > 0 ? 'Collega la ricerca a un filone già aperto.' : 'Non ci sono iniziative attive disponibili.'}</small>
+                  </span>
+                </label>
+              </div>
+              {initiativeMode === 'manual' ? (
+                <label className={styles.field}>
+                  <span className={styles.label}>Titolo iniziativa</span>
+                  <input
+                    className={`${styles.input} ${initiativeError ? styles.inputError : ''}`}
+                    value={manualInitiativeTitle}
+                    onChange={(event) => {
+                      setManualInitiativeTitle(event.target.value);
+                      if (initiativeError) setInitiativeError(null);
+                    }}
+                    placeholder="es. Acquisizione MSP 2026"
+                    maxLength={120}
+                    required
+                    aria-invalid={Boolean(initiativeError)}
+                    aria-describedby={initiativeError ? 'initiative-error' : 'initiative-help'}
+                  />
+                </label>
+              ) : null}
+              {initiativeMode === 'existing' ? (
+                <label className={styles.field}>
+                  <span className={styles.label}>Iniziativa attiva</span>
+                  <select
+                    className={`${styles.select} ${initiativeError ? styles.inputError : ''}`}
+                    value={initiativeId}
+                    onChange={(event) => {
+                      setInitiativeId(event.target.value);
+                      if (initiativeError) setInitiativeError(null);
+                    }}
+                    disabled={initiativesLoading || activeInitiatives.length === 0}
+                    aria-invalid={Boolean(initiativeError)}
+                    aria-describedby={initiativeError ? 'initiative-error' : 'initiative-help'}
+                  >
+                    {activeInitiatives.map((item) => (
+                      <option key={item.id} value={item.id}>{item.title}</option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              {initiativeError ? <p className={styles.fieldError} id="initiative-error">{initiativeError}</p> : null}
+              <p className={styles.hint} id="initiative-help">Le aziende con almeno una stella entreranno nella lavorazione dell'iniziativa.</p>
+            </fieldset>
+
             <label className={styles.stack}>
               <span className={styles.label}>
                 <span className={styles.dotRequired} aria-hidden="true" />
@@ -269,28 +375,6 @@ export function NuovaRicercaPage() {
                 Esempio: «Aziende che sviluppano software gestionale per la logistica e l'automazione di magazzino, anche system integrator specializzati; escluse le web agency. Province di Milano e Monza, fatturato tra 1 e 5 milioni, titolare vicino alla pensione.»
               </span>
             </div>
-            <div className={styles.field}>
-              <span className={styles.label}>Iniziativa <small className={styles.hint}>(opzionale)</small></span>
-              <div className={styles.actions} style={{ justifyContent: 'flex-start', marginTop: 0 }}>
-                <select
-                  className={styles.select}
-                  value={initiativeId}
-                  onChange={(event) => setInitiativeId(event.target.value)}
-                  disabled={initiativesLoading}
-                >
-                  <option value="">{initiativesLoading ? 'Caricamento…' : 'Nessuna iniziativa'}</option>
-                  {initiatives.map((item) => (
-                    <option key={item.id} value={item.id}>{item.title}</option>
-                  ))}
-                </select>
-                <button type="button" className={styles.linkButton} onClick={() => setNewInitiativeOpen(true)}>
-                  + Nuova iniziativa
-                </button>
-              </div>
-              <p className={styles.hint} style={{ marginTop: 8 }}>
-                Le aziende con almeno una stella entreranno nella lavorazione dell'iniziativa.
-              </p>
-            </div>
             <div className={styles.actions}>
               <Button
                 type="submit"
@@ -309,9 +393,17 @@ export function NuovaRicercaPage() {
           <section className={styles.panel}>
             <div className={styles.panelBody}>
               <div className={styles.collapsedPrompt}>
-                <p>
-                  <b>Richiesta.</b> «{detail.session.prompt}»
-                </p>
+                <div className={styles.collapsedSummary}>
+                  <p>
+                    <b>Richiesta.</b> «{detail.session.prompt}»
+                  </p>
+                  {detail.session.initiativeTitle ? (
+                    <p>
+                      <b>Iniziativa.</b> {detail.session.initiativeTitle}{' '}
+                      <span className={styles.hint}>Titolo modificabile dalla pagina iniziative.</span>
+                    </p>
+                  ) : null}
+                </div>
                 <button
                   type="button"
                   className={styles.linkButton}
@@ -477,43 +569,6 @@ export function NuovaRicercaPage() {
         />
       ) : null}
 
-      <Modal
-        open={newInitiativeOpen}
-        onClose={() => setNewInitiativeOpen(false)}
-        title="Nuova iniziativa"
-        size="sm"
-        dismissible={!initiativeBusy}
-      >
-        <div className={styles.stack}>
-          <label className={styles.field}>
-            <span>Titolo</span>
-            <input
-              className={styles.input}
-              value={newInitiativeTitle}
-              onChange={(event) => setNewInitiativeTitle(event.target.value)}
-              placeholder="es. Acquisizione MSP 2026"
-              maxLength={120}
-            />
-          </label>
-          <label className={styles.field}>
-            <span>Descrizione <small className={styles.hint}>(opzionale)</small></span>
-            <input
-              className={styles.input}
-              value={newInitiativeDescription}
-              onChange={(event) => setNewInitiativeDescription(event.target.value)}
-              maxLength={500}
-            />
-          </label>
-          <div className={styles.modalActions}>
-            <Button onClick={() => void createInitiativeInline()} loading={initiativeBusy} disabled={!newInitiativeTitle.trim()}>
-              Crea
-            </Button>
-            <Button variant="secondary" onClick={() => setNewInitiativeOpen(false)} disabled={initiativeBusy}>
-              Annulla
-            </Button>
-          </div>
-        </div>
-      </Modal>
     </main>
   );
 }

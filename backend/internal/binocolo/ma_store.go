@@ -79,8 +79,11 @@ type maWorkspaceStore interface {
 	UpdateMADeepBrief(ctx context.Context, companyKey string, brief *MADeepBrief, modelID, promptID string) error
 	CreateMAInitiative(ctx context.Context, initiative MAInitiative) (MAInitiative, error)
 	GetMAInitiative(ctx context.Context, id string) (MAInitiative, error)
-	ListMAInitiatives(ctx context.Context, includeArchived bool) ([]MAInitiativeSummary, error)
+	UpdateMAInitiativeInfo(ctx context.Context, id string, title, description *string) (MAInitiative, error)
+	ListMAInitiatives(ctx context.Context, visibility string) ([]MAInitiativeSummary, error)
 	UpdateMAInitiativeLifecycle(ctx context.Context, id, action, subject, email string) (bool, error)
+	CountMAInitiativeAttachedSessions(ctx context.Context, initiativeID, excludeSessionID string) (int, error)
+	CountMAInitiativeCards(ctx context.Context, initiativeID string) (int, error)
 	SetMASessionInitiative(ctx context.Context, sessionID, initiativeID string) error
 	GetMAInitiativeCard(ctx context.Context, initiativeID, companyKey string) (*MAInitiativeCard, error)
 	UpsertMAInitiativeCard(ctx context.Context, card MAInitiativeCard) error
@@ -274,15 +277,27 @@ func (s *SQLStore) GetMAInitiative(ctx context.Context, id string) (MAInitiative
 	var archivedAt sql.NullTime
 	var archivedBySubject sql.NullString
 	var archivedByEmail sql.NullString
+	var deletedAt sql.NullTime
+	var deletedBySubject sql.NullString
+	var deletedByEmail sql.NullString
+	var purgedAt sql.NullTime
+	var purgedBySubject sql.NullString
+	var purgedByEmail sql.NullString
 	err := s.db.QueryRowContext(ctx, `
 SELECT id::text, title, description, created_by_subject, created_by_email, created_at, updated_at,
-       archived_at, archived_by_subject, archived_by_email
+       archived_at, archived_by_subject, archived_by_email,
+       deleted_at, deleted_by_subject, deleted_by_email,
+       purged_at, purged_by_subject, purged_by_email
 FROM binocolo.ma_initiative
 WHERE id = $1::uuid
 `, id).Scan(
 		&out.ID, &out.Title, &out.Description, &out.CreatedBySubject, &out.CreatedByEmail,
 		&out.CreatedAt, &out.UpdatedAt, &archivedAt, &archivedBySubject, &archivedByEmail,
+		&deletedAt, &deletedBySubject, &deletedByEmail, &purgedAt, &purgedBySubject, &purgedByEmail,
 	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return MAInitiative{}, errMAInitiativeNotFound
+	}
 	if err != nil {
 		return MAInitiative{}, fmt.Errorf("get ma initiative: %w", err)
 	}
@@ -291,21 +306,80 @@ WHERE id = $1::uuid
 	}
 	out.ArchivedBySubject = archivedBySubject.String
 	out.ArchivedByEmail = archivedByEmail.String
+	if deletedAt.Valid {
+		out.DeletedAt = &deletedAt.Time
+	}
+	out.DeletedBySubject = deletedBySubject.String
+	out.DeletedByEmail = deletedByEmail.String
+	if purgedAt.Valid {
+		out.PurgedAt = &purgedAt.Time
+	}
+	out.PurgedBySubject = purgedBySubject.String
+	out.PurgedByEmail = purgedByEmail.String
 	return out, nil
 }
 
-// ListMAInitiatives returns the index rows (wireframe S1): active by default,
-// archived when includeArchived is true. Counts are aggregated from
-// ma_initiative_card (B2 join); SessionCount and LastActivityAt are computed
-// from anchored sessions.
-func (s *SQLStore) ListMAInitiatives(ctx context.Context, includeArchived bool) ([]MAInitiativeSummary, error) {
+// UpdateMAInitiativeInfo patches title/description and leaves lifecycle fields untouched.
+func (s *SQLStore) UpdateMAInitiativeInfo(ctx context.Context, id string, title, description *string) (MAInitiative, error) {
+	if s == nil || s.db == nil {
+		return MAInitiative{}, errors.New("binocolo ma store not configured")
+	}
+	var out MAInitiative
+	var archivedAt sql.NullTime
+	var archivedBySubject sql.NullString
+	var archivedByEmail sql.NullString
+	var deletedAt sql.NullTime
+	var deletedBySubject sql.NullString
+	var deletedByEmail sql.NullString
+	var purgedAt sql.NullTime
+	var purgedBySubject sql.NullString
+	var purgedByEmail sql.NullString
+	err := s.db.QueryRowContext(ctx, `
+UPDATE binocolo.ma_initiative
+SET title = COALESCE($2::text, title),
+    description = COALESCE($3::text, description),
+    updated_at = now()
+WHERE id = $1::uuid
+RETURNING id::text, title, description, created_by_subject, created_by_email, created_at, updated_at,
+       archived_at, archived_by_subject, archived_by_email,
+       deleted_at, deleted_by_subject, deleted_by_email,
+       purged_at, purged_by_subject, purged_by_email
+`, id, nullStringPtr(title), nullStringPtr(description)).Scan(
+		&out.ID, &out.Title, &out.Description, &out.CreatedBySubject, &out.CreatedByEmail,
+		&out.CreatedAt, &out.UpdatedAt, &archivedAt, &archivedBySubject, &archivedByEmail,
+		&deletedAt, &deletedBySubject, &deletedByEmail, &purgedAt, &purgedBySubject, &purgedByEmail,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return MAInitiative{}, errMAInitiativeNotFound
+	}
+	if err != nil {
+		return MAInitiative{}, fmt.Errorf("update ma initiative info: %w", err)
+	}
+	if archivedAt.Valid {
+		out.ArchivedAt = &archivedAt.Time
+	}
+	out.ArchivedBySubject = archivedBySubject.String
+	out.ArchivedByEmail = archivedByEmail.String
+	if deletedAt.Valid {
+		out.DeletedAt = &deletedAt.Time
+	}
+	out.DeletedBySubject = deletedBySubject.String
+	out.DeletedByEmail = deletedByEmail.String
+	if purgedAt.Valid {
+		out.PurgedAt = &purgedAt.Time
+	}
+	out.PurgedBySubject = purgedBySubject.String
+	out.PurgedByEmail = purgedByEmail.String
+	return out, nil
+}
+
+// ListMAInitiatives returns the index rows (wireframe S1) for the requested
+// visibility. Purged tombstones are hidden from every visibility.
+func (s *SQLStore) ListMAInitiatives(ctx context.Context, visibility string) ([]MAInitiativeSummary, error) {
 	if s == nil || s.db == nil {
 		return nil, errors.New("binocolo ma store not configured")
 	}
-	where := "initiative.archived_at IS NULL"
-	if includeArchived {
-		where = "initiative.archived_at IS NOT NULL"
-	}
+	where, orderBy := maInitiativeListClauses(visibility)
 	rows, err := s.db.QueryContext(ctx, `
 SELECT
   initiative.id::text,
@@ -318,6 +392,12 @@ SELECT
   initiative.archived_at,
   initiative.archived_by_subject,
   initiative.archived_by_email,
+  initiative.deleted_at,
+  initiative.deleted_by_subject,
+  initiative.deleted_by_email,
+  initiative.purged_at,
+  initiative.purged_by_subject,
+  initiative.purged_by_email,
   COALESCE((SELECT COUNT(*) FROM binocolo.ma_session session WHERE session.initiative_id = initiative.id), 0) AS session_count,
   (SELECT MAX(session.updated_at) FROM binocolo.ma_session session WHERE session.initiative_id = initiative.id) AS last_activity_at,
   (SELECT
@@ -355,7 +435,7 @@ SELECT
   ) AS counts
 FROM binocolo.ma_initiative initiative
 WHERE `+where+`
-ORDER BY initiative.updated_at DESC, initiative.created_at DESC
+ORDER BY `+orderBy+`
 LIMIT 200
 `)
 	if err != nil {
@@ -369,12 +449,19 @@ LIMIT 200
 		var archivedAt sql.NullTime
 		var archivedBySubject sql.NullString
 		var archivedByEmail sql.NullString
+		var deletedAt sql.NullTime
+		var deletedBySubject sql.NullString
+		var deletedByEmail sql.NullString
+		var purgedAt sql.NullTime
+		var purgedBySubject sql.NullString
+		var purgedByEmail sql.NullString
 		var lastActivityAt sql.NullTime
 		var lastActivityEvent sql.NullString
 		var countsJSON json.RawMessage
 		if err := rows.Scan(
 			&item.ID, &item.Title, &item.Description, &item.CreatedBySubject, &item.CreatedByEmail,
 			&item.CreatedAt, &item.UpdatedAt, &archivedAt, &archivedBySubject, &archivedByEmail,
+			&deletedAt, &deletedBySubject, &deletedByEmail, &purgedAt, &purgedBySubject, &purgedByEmail,
 			&item.SessionCount, &lastActivityAt, &lastActivityEvent, &countsJSON,
 		); err != nil {
 			return nil, fmt.Errorf("scan ma initiative summary: %w", err)
@@ -384,6 +471,16 @@ LIMIT 200
 		}
 		item.ArchivedBySubject = archivedBySubject.String
 		item.ArchivedByEmail = archivedByEmail.String
+		if deletedAt.Valid {
+			item.DeletedAt = &deletedAt.Time
+		}
+		item.DeletedBySubject = deletedBySubject.String
+		item.DeletedByEmail = deletedByEmail.String
+		if purgedAt.Valid {
+			item.PurgedAt = &purgedAt.Time
+		}
+		item.PurgedBySubject = purgedBySubject.String
+		item.PurgedByEmail = purgedByEmail.String
 		if lastActivityAt.Valid {
 			item.LastActivityAt = &lastActivityAt.Time
 		}
@@ -404,9 +501,38 @@ LIMIT 200
 	return out, nil
 }
 
-// UpdateMAInitiativeLifecycle archives/restores an Iniziativa. action is
-// "archive" or "restore" (mirrors maSessionLifecycleArchive/Restore, kept
-// separate since initiatives have no delete/purge state in v1).
+func (s *SQLStore) CountMAInitiativeAttachedSessions(ctx context.Context, initiativeID, excludeSessionID string) (int, error) {
+	if s == nil || s.db == nil {
+		return 0, errors.New("binocolo ma store not configured")
+	}
+	var count int
+	if err := s.db.QueryRowContext(ctx, `
+SELECT COUNT(*)
+FROM binocolo.ma_session
+WHERE initiative_id = $1::uuid
+  AND id <> $2::uuid
+  AND purged_at IS NULL
+`, initiativeID, excludeSessionID).Scan(&count); err != nil {
+		return 0, fmt.Errorf("count ma initiative attached sessions: %w", err)
+	}
+	return count, nil
+}
+
+func (s *SQLStore) CountMAInitiativeCards(ctx context.Context, initiativeID string) (int, error) {
+	if s == nil || s.db == nil {
+		return 0, errors.New("binocolo ma store not configured")
+	}
+	var count int
+	if err := s.db.QueryRowContext(ctx, `
+SELECT COUNT(*)
+FROM binocolo.ma_initiative_card
+WHERE initiative_id = $1::uuid
+`, initiativeID).Scan(&count); err != nil {
+		return 0, fmt.Errorf("count ma initiative cards: %w", err)
+	}
+	return count, nil
+}
+
 func (s *SQLStore) UpdateMAInitiativeLifecycle(ctx context.Context, id, action, subject, email string) (bool, error) {
 	if s == nil || s.db == nil {
 		return false, errors.New("binocolo ma store not configured")
@@ -419,8 +545,13 @@ UPDATE binocolo.ma_initiative
 SET archived_at = COALESCE(archived_at, now()),
     archived_by_subject = CASE WHEN archived_at IS NULL THEN $2 ELSE archived_by_subject END,
     archived_by_email = CASE WHEN archived_at IS NULL THEN $3 ELSE archived_by_email END,
+    deleted_at = NULL,
+    deleted_by_subject = NULL,
+    deleted_by_email = NULL,
     updated_at = now()
 WHERE id = $1::uuid
+  AND deleted_at IS NULL
+  AND purged_at IS NULL
 RETURNING id::text
 `
 	case maSessionLifecycleRestore:
@@ -429,16 +560,51 @@ UPDATE binocolo.ma_initiative
 SET archived_at = NULL,
     archived_by_subject = NULL,
     archived_by_email = NULL,
+    deleted_at = NULL,
+    deleted_by_subject = NULL,
+    deleted_by_email = NULL,
     updated_at = now()
 WHERE id = $1::uuid
-  AND archived_at IS NOT NULL
+  AND purged_at IS NULL
+  AND (archived_at IS NOT NULL OR deleted_at IS NOT NULL)
+RETURNING id::text
+`
+	case maSessionLifecycleDelete:
+		query = `
+UPDATE binocolo.ma_initiative
+SET deleted_at = COALESCE(deleted_at, now()),
+    deleted_by_subject = CASE WHEN deleted_at IS NULL THEN $2 ELSE deleted_by_subject END,
+    deleted_by_email = CASE WHEN deleted_at IS NULL THEN $3 ELSE deleted_by_email END,
+    archived_at = NULL,
+    archived_by_subject = NULL,
+    archived_by_email = NULL,
+    updated_at = now()
+WHERE id = $1::uuid
+  AND deleted_at IS NULL
+  AND purged_at IS NULL
+RETURNING id::text
+`
+	case maSessionLifecyclePurge:
+		query = `
+UPDATE binocolo.ma_initiative
+SET purged_at = COALESCE(purged_at, now()),
+    purged_by_subject = CASE WHEN purged_at IS NULL THEN $2 ELSE purged_by_subject END,
+    purged_by_email = CASE WHEN purged_at IS NULL THEN $3 ELSE purged_by_email END,
+    updated_at = now()
+WHERE id = $1::uuid
+  AND deleted_at IS NOT NULL
+  AND purged_at IS NULL
 RETURNING id::text
 `
 	default:
 		return false, fmt.Errorf("unsupported ma initiative lifecycle action: %s", action)
 	}
+	args := []any{id, subject, email}
+	if action == maSessionLifecycleRestore {
+		args = []any{id}
+	}
 	var returnedID string
-	err := s.db.QueryRowContext(ctx, query, id, subject, email).Scan(&returnedID)
+	err := s.db.QueryRowContext(ctx, query, args...).Scan(&returnedID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}
@@ -448,8 +614,9 @@ RETURNING id::text
 	return true, nil
 }
 
-// SetMASessionInitiative anchors (or unanchors, when initiativeID is empty)
-// a session to an Iniziativa (PRD §3.2).
+// SetMASessionInitiative moves/anchors a session to an Iniziativa (PRD §3.2).
+// Empty initiativeID is retained only for nullable DB transition support and
+// must not be exposed by the public API.
 func (s *SQLStore) SetMASessionInitiative(ctx context.Context, sessionID, initiativeID string) error {
 	if s == nil || s.db == nil {
 		return errors.New("binocolo ma store not configured")
@@ -490,6 +657,17 @@ func maSessionListClauses(visibility string) (string, string) {
 		return "session.deleted_at IS NOT NULL AND session.purged_at IS NULL", "session.deleted_at DESC, session.updated_at DESC"
 	default:
 		return "session.archived_at IS NULL AND session.deleted_at IS NULL", "session.updated_at DESC, session.created_at DESC"
+	}
+}
+
+func maInitiativeListClauses(visibility string) (string, string) {
+	switch visibility {
+	case maSessionVisibilityArchived:
+		return "initiative.archived_at IS NOT NULL AND initiative.deleted_at IS NULL AND initiative.purged_at IS NULL", "initiative.archived_at DESC, initiative.updated_at DESC"
+	case maSessionVisibilityDeleted:
+		return "initiative.deleted_at IS NOT NULL AND initiative.purged_at IS NULL", "initiative.deleted_at DESC, initiative.updated_at DESC"
+	default:
+		return "initiative.archived_at IS NULL AND initiative.deleted_at IS NULL AND initiative.purged_at IS NULL", "initiative.updated_at DESC, initiative.created_at DESC"
 	}
 }
 
@@ -546,10 +724,15 @@ func (s *SQLStore) CreateMASession(ctx context.Context, input maSessionCreate) (
 	if err != nil {
 		return MASessionDetail{}, fmt.Errorf("marshal ma strategy: %w", err)
 	}
+	initiativeID := strings.TrimSpace(input.InitiativeID)
+	if initiativeID == "" {
+		initiativeID = strings.TrimSpace(input.Session.InitiativeID)
+	}
 
 	var session MASession
 	var estimated sql.NullTime
 	var executed sql.NullTime
+	var createdInitiativeID sql.NullString
 	if err := tx.QueryRowContext(ctx, `
 INSERT INTO binocolo.ma_session (
   id,
@@ -557,24 +740,27 @@ INSERT INTO binocolo.ma_session (
   prompt,
   status,
   created_by_subject,
-  created_by_email
+  created_by_email,
+  initiative_id
 ) VALUES (
   $1::uuid,
   $2,
   $3,
   $4,
   $5,
-  $6
+  $6,
+  NULLIF($7, '')::uuid
 )
 RETURNING id::text, title, prompt, status, COALESCE(selected_strategy, ''),
           COALESCE(created_by_subject, ''), COALESCE(created_by_email, ''), last_estimated_at,
-          last_executed_at, created_at, updated_at
+          last_executed_at, created_at, updated_at, initiative_id::text
 `, sessionID,
 		input.Session.Title,
 		input.Session.Prompt,
 		maSessionStatusDraft,
 		nullString(input.Session.CreatedBySubject),
 		nullString(input.Session.CreatedByEmail),
+		initiativeID,
 	).Scan(
 		&session.ID,
 		&session.Title,
@@ -587,6 +773,7 @@ RETURNING id::text, title, prompt, status, COALESCE(selected_strategy, ''),
 		&executed,
 		&session.CreatedAt,
 		&session.UpdatedAt,
+		&createdInitiativeID,
 	); err != nil {
 		return MASessionDetail{}, fmt.Errorf("insert ma session: %w", err)
 	}
@@ -596,6 +783,7 @@ RETURNING id::text, title, prompt, status, COALESCE(selected_strategy, ''),
 	if executed.Valid {
 		session.LastExecutedAt = &executed.Time
 	}
+	session.InitiativeID = createdInitiativeID.String
 
 	strategy, err := insertMAStrategyVersion(ctx, tx, session.ID, strategyID, 1, rawStrategy, input.Session.CreatedByEmail)
 	if err != nil {
@@ -1463,15 +1651,18 @@ func (s *SQLStore) loadMASession(ctx context.Context, q interface {
 	var deletedBySubject sql.NullString
 	var deletedByEmail sql.NullString
 	var initiativeID sql.NullString
+	var initiativeTitle sql.NullString
 	err := q.QueryRowContext(ctx, `
-SELECT id::text, title, prompt, status, selected_strategy, active_strategy_id::text,
-       created_by_subject, created_by_email, last_estimated_at, last_executed_at,
-       created_at, updated_at,
-       archived_at, archived_by_subject, archived_by_email,
-       deleted_at, deleted_by_subject, deleted_by_email,
-       initiative_id::text
-FROM binocolo.ma_session
-WHERE id = $1::uuid
+SELECT session.id::text, session.title, session.prompt, session.status, session.selected_strategy, session.active_strategy_id::text,
+       session.created_by_subject, session.created_by_email, session.last_estimated_at, session.last_executed_at,
+       session.created_at, session.updated_at,
+       session.archived_at, session.archived_by_subject, session.archived_by_email,
+       session.deleted_at, session.deleted_by_subject, session.deleted_by_email,
+       session.initiative_id::text,
+       initiative.title
+FROM binocolo.ma_session session
+LEFT JOIN binocolo.ma_initiative initiative ON initiative.id = session.initiative_id
+WHERE session.id = $1::uuid
 `, id).Scan(
 		&session.ID,
 		&session.Title,
@@ -1492,6 +1683,7 @@ WHERE id = $1::uuid
 		&deletedBySubject,
 		&deletedByEmail,
 		&initiativeID,
+		&initiativeTitle,
 	)
 	if err != nil {
 		return MASession{}, fmt.Errorf("load ma session: %w", err)
@@ -1517,6 +1709,7 @@ WHERE id = $1::uuid
 	session.DeletedBySubject = deletedBySubject.String
 	session.DeletedByEmail = deletedByEmail.String
 	session.InitiativeID = initiativeID.String
+	session.InitiativeTitle = initiativeTitle.String
 	return session, nil
 }
 
@@ -2494,8 +2687,8 @@ ORDER BY o.company_key, o.created_at DESC
 
 // ListMAActiveCardsByCompany batches the collision/badge lookup (PRD §6.1,
 // B5): for each company key, every ACTIVE card (state NOT IN chiusa/rimossa)
-// across all NON-ARCHIVED initiatives (archived initiatives are out of the
-// working scene — their cards must not surface as collision markers).
+// across all operational initiatives (archived/deleted/purged initiatives are
+// out of the working scene — their cards must not surface as collision markers).
 func (s *SQLStore) ListMAActiveCardsByCompany(ctx context.Context, companyKeys []string) (map[string][]MAInitiativeCard, error) {
 	if s == nil || s.db == nil {
 		return nil, errors.New("binocolo ma store not configured")
@@ -2519,6 +2712,8 @@ JOIN binocolo.ma_initiative i ON i.id = c.initiative_id
 WHERE c.company_key IN (%s)
   AND c.state NOT IN ('chiusa', 'rimossa')
   AND i.archived_at IS NULL
+  AND i.deleted_at IS NULL
+  AND i.purged_at IS NULL
 `, strings.Join(placeholders, ", "))
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {

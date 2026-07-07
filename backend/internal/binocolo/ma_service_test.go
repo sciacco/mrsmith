@@ -1663,12 +1663,24 @@ func (f *fakeMAWorkspaceStore) GetMAInitiative(context.Context, string) (MAIniti
 	return MAInitiative{}, errors.New("not implemented")
 }
 
-func (f *fakeMAWorkspaceStore) ListMAInitiatives(context.Context, bool) ([]MAInitiativeSummary, error) {
+func (f *fakeMAWorkspaceStore) UpdateMAInitiativeInfo(context.Context, string, *string, *string) (MAInitiative, error) {
+	return MAInitiative{}, errors.New("not implemented")
+}
+
+func (f *fakeMAWorkspaceStore) ListMAInitiatives(context.Context, string) ([]MAInitiativeSummary, error) {
 	return nil, nil
 }
 
 func (f *fakeMAWorkspaceStore) UpdateMAInitiativeLifecycle(context.Context, string, string, string, string) (bool, error) {
 	return false, errors.New("not implemented")
+}
+
+func (f *fakeMAWorkspaceStore) CountMAInitiativeAttachedSessions(context.Context, string, string) (int, error) {
+	return 0, nil
+}
+
+func (f *fakeMAWorkspaceStore) CountMAInitiativeCards(context.Context, string) (int, error) {
+	return 0, nil
 }
 
 func (f *fakeMAWorkspaceStore) SetMASessionInitiative(context.Context, string, string) error {

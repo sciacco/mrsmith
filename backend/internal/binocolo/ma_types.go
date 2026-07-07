@@ -333,10 +333,12 @@ func validMACardEsito(esito string) bool {
 }
 
 type MACreateSessionRequest struct {
-	Prompt    string `json:"prompt"`
-	ModelID   string `json:"modelId,omitempty"`
-	PromptID  string `json:"promptId,omitempty"`
-	GatedFlow bool   `json:"gatedFlow,omitempty"`
+	Prompt             string `json:"prompt"`
+	ModelID            string `json:"modelId,omitempty"`
+	PromptID           string `json:"promptId,omitempty"`
+	GatedFlow          bool   `json:"gatedFlow,omitempty"`
+	InitiativeID       string `json:"initiativeId,omitempty"`
+	NewInitiativeTitle string `json:"newInitiativeTitle,omitempty"`
 }
 
 type MAEstimateSessionRequest struct {
@@ -684,6 +686,12 @@ type MAInitiative struct {
 	ArchivedAt        *time.Time `json:"archivedAt,omitempty"`
 	ArchivedBySubject string     `json:"archivedBySubject,omitempty"`
 	ArchivedByEmail   string     `json:"archivedByEmail,omitempty"`
+	DeletedAt         *time.Time `json:"deletedAt,omitempty"`
+	DeletedBySubject  string     `json:"deletedBySubject,omitempty"`
+	DeletedByEmail    string     `json:"deletedByEmail,omitempty"`
+	PurgedAt          *time.Time `json:"purgedAt,omitempty"`
+	PurgedBySubject   string     `json:"purgedBySubject,omitempty"`
+	PurgedByEmail     string     `json:"purgedByEmail,omitempty"`
 }
 
 // MAInitiativeSummary is the row shown in the /iniziative index (wireframe
@@ -756,11 +764,11 @@ type MASession struct {
 	DeletedAt         *time.Time `json:"deletedAt,omitempty"`
 	DeletedBySubject  string     `json:"deletedBySubject,omitempty"`
 	DeletedByEmail    string     `json:"deletedByEmail,omitempty"`
-	// InitiativeID anchors the session to an Iniziativa (mig 087, nullable —
-	// exploratory sessions stay unanchored). Loaded by loadMASession /
-	// GetMASessionState so the rating hook (B2) can read it without an extra
-	// query.
-	InitiativeID string `json:"initiativeId,omitempty"`
+	// InitiativeID anchors the session to an Iniziativa (mig 087, nullable).
+	// InitiativeTitle is the joined display title when available, so create/detail
+	// responses can render the anchor without a second frontend fetch.
+	InitiativeID    string `json:"initiativeId,omitempty"`
+	InitiativeTitle string `json:"initiativeTitle,omitempty"`
 }
 
 type MAStrategyVersion struct {
@@ -1551,8 +1559,9 @@ type maStrategyDraftEnvelope struct {
 }
 
 type maSessionCreate struct {
-	Session  MASession
-	Strategy MAStrategySpec
+	Session      MASession
+	Strategy     MAStrategySpec
+	InitiativeID string
 }
 
 type maExecutionRunCreate struct {
