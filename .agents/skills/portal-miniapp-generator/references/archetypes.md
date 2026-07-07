@@ -16,22 +16,28 @@ Pick the smallest archetype that fits the user task. Reuse the repo family befor
   - KPI row or stat cards
   - explanatory side panels that describe implementation mechanics
   - decorative status pills unless status is real domain data
+- Note: the archetype does not mandate a side master-detail split — the detail surface may be a sticky panel, an inline form, or a modal. Per `docs/UI-UX.md` §12, do not force a side detail panel when list and detail need independent filters or exports; a modal or a dedicated route fits better.
 - Reference apps:
   - `apps/budget/src/views/gruppi/GruppiPage.tsx`
   - `apps/listini-e-sconti/src/pages/GruppiScontoPage.tsx`
+  - `apps/kit-products/src/views/settings/ProductGroupsPage.tsx` (compact settings registry: selection-driven `Modifica`, modal create/edit, explicit empty/error states)
 
 ## `data_workspace`
 
-- Use when: a screen coordinates multiple related data panels, filters, tabs, or secondary inspectors
+- Use when: a screen coordinates multiple related data panels, filters, tabs, or secondary inspectors — including tabbed multi-surface apps migrated from sources with 4–5 peer tabs
 - Default composition:
   - compact page header
   - clear primary workspace area
   - secondary cards or panels only when they support the main task
   - filters and actions close to the data they affect
+- Notes:
+  - for 4–5 peer surfaces with mixed filter/chart/table behavior, keep the source tab mental model but implement it as app-shell sub-routes plus `TabNav`, so deep links, refreshes, and shell consistency stay repo-fit; with five routes, plan a horizontally scrollable narrow-viewport nav wrapper
+  - a multi-view app can stay within one declared `data_workspace` even when individual routes resemble `report_explorer` or master-detail screens — keep the app shell unified and document the mixed internal surfaces instead of silently mixing archetypes
 - Forbidden defaults:
   - dashboard-style KPI shells unless the feature is actually metric-led
   - marketing-style banner introductions
 - Reference apps:
+  - `apps/energia-dc/src/routes.tsx` (five-route workspace; e.g. `apps/energia-dc/src/pages/SituazioneRackPage.tsx`)
   - `apps/reports/src/pages/OrdiniPage.tsx`
 
 ## `report_explorer`
@@ -47,6 +53,7 @@ Pick the smallest archetype that fits the user task. Reuse the repo family befor
   - placeholder metrics unrelated to report data
   - decorative panels that duplicate visible information
 - Reference apps:
+  - `apps/coperture/src/pages/CoverageLookupPage.tsx` (approved compact shape: title, cascading `SingleSelect` filters, explicit `Cerca`/`Reimposta filtri`, one results table — no KPI cards or export CTA unless real)
   - `apps/reports/src/pages/OrdiniPage.tsx`
 
 ## `wizard_flow`
@@ -59,6 +66,9 @@ Pick the smallest archetype that fits the user task. Reuse the repo family befor
 - Forbidden defaults:
   - flattening a real multi-step process into a single overstuffed screen
   - padding the first step with decorative banner content
+- Reference apps:
+  - `apps/rda/src/pages/NewRdaWizardPage.tsx` (with `WizardStepper`)
+  - `apps/quotes/src/pages/QuoteCreatePage.tsx` (with `Stepper`/`WizardNav`)
 
 ## `settings_form`
 
@@ -70,6 +80,7 @@ Pick the smallest archetype that fits the user task. Reuse the repo family befor
 - Forbidden defaults:
   - fake dashboards around a simple form
   - extra narrative copy that repeats obvious form intent
+- Reference apps: no clean exemplar in the repo yet — cite the two closest form-heavy screens during planning and record composition deviations in `Exceptions`
 
 ## Selection rule
 

@@ -987,3 +987,12 @@ Alyante ERP ID
 - Evidence: verified Appsmith query `update MG87_ARTDESC set MG87_DESCART = {{this.params.descr}} where MG87_DITTA_CG18 = 1 and MG87_OPZIONE_MG5E = '                    ' and MG87_LINGUA_MG52 = {{this.params.lang}} AND MG87_CODART_MG66 = {{this.params.code}}`; backend adapter in `backend/internal/kitproducts/alyante.go`.
 - Used by: `apps/kit-products` product translation sync.
 - Open questions: none for this environment; if another Alyante tenant exposes different column names, verify its datasource query before generalizing.
+
+### `common.vocabulary` Is Not Universally Read-Only for Mini-Apps
+
+- Context: mini-apps reading or administering entries in Mistra `common.vocabulary`.
+- Discovery: `kit_product_group` entries are admin-managed from `apps/kit-products`, while runtime consumers may intentionally keep reading `common.vocabulary.name`, with translations staying administrative-only for that feature slice. Vocabulary is therefore not a uniformly read-only reference table.
+- Practical rule: per feature, decide and document which side owns writes (admin mini-app vs upstream system) and which field consumers actually read; do not assume read-only semantics or translated fields without checking the consuming code path.
+- Evidence: `apps/kit-products/src/views/settings/ProductGroupsPage.tsx`, kit-products backend module.
+- Used by: `apps/kit-products`; any future app touching `common.vocabulary`.
+- Open questions: none.

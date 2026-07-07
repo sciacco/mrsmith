@@ -3,7 +3,7 @@ name: portal-miniapp-generator
 description: Use this skill for MrSmith portal mini-app generation and implementation planning. It turns a feature request or an approved migration spec from Appsmith or another legacy source into a repo-fit implementation plan, selects an approved screen archetype, and prepares the UI review gates that must pass before coding and before signoff.
 user-invocable: true
 disable-model-invocation: true
-allowed-tools: Read Grep Glob Bash
+allowed-tools: Read Grep Glob Bash Write
 ---
 
 # Purpose
@@ -32,6 +32,7 @@ Do not use this skill when:
 - extracting business behavior from a legacy source without an approved migration spec
 - working on the Matrix-style launcher UI instead of a mini-app workspace
 - performing the blocking UI review of a planned or implemented mini-app screen
+- doing scoped UI/styling work on an existing mini-app (a screen, a component, a table/form/drawer) — use `tintoretto` (`.agents/skills/tintoretto/`)
 
 Use these companion skills first when needed:
 - `legacy-app-auditor` for reverse engineering non-Appsmith source applications
@@ -41,6 +42,10 @@ Use these companion skills first when needed:
 Use this companion skill next when needed:
 - `portal-miniapp-ui-fixer` for implementing the app UI once the plan and pre-gate are clear
 - `portal-miniapp-ui-review` for blocking UI approval before coding and before signoff
+
+Pipeline order:
+- generic legacy: `legacy-app-auditor -> legacy-migration-spec -> this skill -> ui-review pre-gate -> ui-fixer -> ui-review post-gate`
+- Appsmith: `appsmith-audit -> appsmith-migration-spec -> this skill -> ui-review pre-gate -> ui-fixer -> ui-review post-gate`
 
 # Required inputs
 
@@ -87,6 +92,8 @@ If no archetype fits cleanly, document the mismatch explicitly as an exception i
 ## Step 3: Draft the implementation plan
 
 Use `templates/implementation-plan.md`.
+
+Save the plan as `apps/<app>/docs/IMPLEMENTATION-PLAN.md` (create the directory for a new app). This file is the per-app contract and the handoff artifact for both the fixer and the blocking reviewer — a plan that lives only in conversation is not a deliverable.
 
 The plan must always include:
 - `Comparable Apps Audit`
