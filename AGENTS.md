@@ -28,6 +28,7 @@
 ## UI/UX
 - [`docs/UI-UX.md`](docs/UI-UX.md) — Mandatory reference for all UI, frontend, and mini-app work. Agents must read it before planning or implementing UI changes and treat it as the canonical design-system source unless the user explicitly overrides it.
 - For any new portal mini-app or mini-app UI review, use `.agents/skills/portal-miniapp-generator/` as the canonical workflow.
+- For scoped UI/styling work on an existing mini-app (a screen, a component, a table/form/drawer), use the `tintoretto` skill (`.agents/skills/tintoretto/`) — self-contained: it applies `docs/UI-UX.md`, embeds the visual-design and copy craft, and mandates the type-check + smoke-test verification.
 
 ## TODOs
 - [`docs/TODO.md`](docs/TODO.md) — project-wide open items, deferred decisions, and out-of-scope work tracked for future implementation
