@@ -1,9 +1,21 @@
 # MrSmith — Development & Build Commands
 
-# Load backend/.env if it exists
-ifneq (,$(wildcard backend/.env))
-  include backend/.env
-  export
+# Env di sviluppo da backend/.env. RUN_ENV è un runner che riceve il comando
+# come singola stringa quotata: $(RUN_ENV) 'comando args'.
+#  - file in chiaro  -> include + export (comportamento storico, sops non richiesto)
+#  - file cifrato con sops (formato dotenv) -> `sops exec-env` decifra solo in memoria
+#  - file cifrato ma sops assente -> errore chiaro, limitato ai target che usano l'env
+ENV_FILE := backend/.env
+RUN_ENV := sh -c
+ifneq (,$(wildcard $(ENV_FILE)))
+  ifeq (,$(shell grep -m1 '^sops_version=' $(ENV_FILE) 2>/dev/null))
+    include $(ENV_FILE)
+    export
+  else ifeq (,$(shell command -v sops 2>/dev/null))
+    RUN_ENV := sh -c 'echo "ERRORE: $(ENV_FILE) è cifrato con sops ma sops non è nel PATH (brew install sops)" >&2; exit 1'
+  else
+    RUN_ENV := sops exec-env $(abspath $(ENV_FILE))
+  endif
 endif
 
 # Dev ──────────────────────────────────────────
@@ -17,15 +29,20 @@ bootstrap: install    ## Alias di install
 
 .PHONY: dev
 dev:                  ## Avvia backend (air) + frontend (vite) dopo `make install`
-	pnpm dev
+	$(RUN_ENV) 'pnpm dev'
 
 .PHONY: dev-docker
 dev-docker:           ## Avvia tutto via Docker Compose
+	@if grep -q '^sops_version=' $(ENV_FILE) 2>/dev/null; then \
+		echo "ERRORE: $(ENV_FILE) è cifrato con sops: docker compose lo legge via env_file e riceverebbe ciphertext." >&2; \
+		echo "Decifra prima il file (sops -d) oppure usa 'make dev'." >&2; \
+		exit 1; \
+	fi
 	docker compose -f docker-compose.dev.yaml up --build
 
 .PHONY: dev-backend
 dev-backend:          ## Solo backend con air
-	cd backend && air
+	cd backend && $(RUN_ENV) 'air'
 
 .PHONY: dev-portal
 dev-portal:           ## Solo portal
@@ -160,12 +177,12 @@ rollback-prod:        ## Retag + restart di una release remota con RELEASE_TS=YY
 
 .PHONY: test
 test:                 ## Tutti i test
-	cd backend && go test ./...
+	cd backend && $(RUN_ENV) 'go test ./...'
 	pnpm -r --if-present test
 
 .PHONY: test-backend
 test-backend:         ## Solo test Go
-	cd backend && go test ./...
+	cd backend && $(RUN_ENV) 'go test ./...'
 
 .PHONY: test-frontend
 test-frontend:        ## Solo test frontend
@@ -207,7 +224,7 @@ BINOCOLO_LLM_EVAL_CONCURRENCY ?= 10
 
 .PHONY: binocolo-llm-eval
 binocolo-llm-eval:    ## Test varianza LLM Binocolo ma_deep_brief (ARGS="--dry-run" per solo manifest)
-	cd backend && go run ./cmd/binocolo-llm-eval --sample-size $(BINOCOLO_LLM_EVAL_SAMPLE_SIZE) --iterations $(BINOCOLO_LLM_EVAL_ITERATIONS) --concurrency $(BINOCOLO_LLM_EVAL_CONCURRENCY) $(ARGS)
+	cd backend && $(RUN_ENV) 'go run ./cmd/binocolo-llm-eval --sample-size $(BINOCOLO_LLM_EVAL_SAMPLE_SIZE) --iterations $(BINOCOLO_LLM_EVAL_ITERATIONS) --concurrency $(BINOCOLO_LLM_EVAL_CONCURRENCY) $(ARGS)'
 
 .PHONY: help
 help:                 ## Mostra questo help
