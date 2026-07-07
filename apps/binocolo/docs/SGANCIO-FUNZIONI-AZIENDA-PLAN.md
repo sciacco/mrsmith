@@ -44,12 +44,23 @@
    l'anagrafica lascia il posto alla decisione. Solo dati già presenti nel
    sistema, zero nuove fonti.
 
+6. **Convergenza delle superfici di rendering deep (F6)**, ratificata
+   2026-07-07: un solo modulo condiviso di componenti (promozione di
+   `inspector/deep/`), consumato da card-dossier (saldo del debito
+   documentato nel piano inspector), drawer (F5) e inspector. Politica
+   varianti: le superfici possono divergere solo per **densità e selezione**,
+   MAI per semantica e formato (numeri, arrotondamenti, colori RAG,
+   etichette, ordine dei blocchi: identici ovunque). Su `/azienda` **non si
+   investe**: è un tampone in via di pensionamento (vedi
+   `AGGIUNTA-MANUALE-AZIENDE-PLAN.md`) — adotta il modulo solo se lo swap è
+   banale, altrimenti resta com'è.
+
 ## Fuori perimetro (in agenda brainstorming, NON eseguire)
 
-- Convergenza delle superfici di rendering deep (inspector/deep/ vs
-  card-dossier vs `/azienda`) — non ratificata.
 - La "pagina analista" che sostituirà l'inspector.
 - Navigazione Ricerche/Iniziative.
+- Pensionamento di `/azienda` (dopo l'adozione dell'aggiunta manuale —
+  `AGGIUNTA-MANUALE-AZIENDE-PLAN.md`).
 
 ## Repo-fit (checklist `docs/IMPLEMENTATION-PLANNING.md`)
 
@@ -108,6 +119,8 @@ B1 (endpoint deep-dive per azienda) ──→ F1 (drawer target: sezione analisi
 B2 (rimozione gate costo /azienda)     [indipendente, piccolo]
 B3 (mig 105 + thesis-reading per sessione) ──→ F4 (thesis-reading nel funnel)
 F5 (redesign contenuto drawer) [dopo F1 e F4: ne ingloba le sezioni]
+F6 (modulo deep condiviso + swap card-dossier) [indipendente da F5; prima
+    di F5 se possibile, così la sintesi drawer nasce già sul modulo]
 B1 prima di B3 (B3 riusa lo stato deep esposto da B1 nel drawer).
 ```
 
@@ -380,3 +393,44 @@ esistente (sola lettura): aprire il drawer su (a) un target confermato con
 dati ricchi, (b) uno con kill criteria accesi, (c) uno con deep pronto —
 verificare gerarchia, collassabili, assenza di costi/telemetria. Screenshot
 in `artifacts/claude/`.
+
+---
+
+## F6 — Modulo deep condiviso + saldo del debito card-dossier
+
+> Attua la decisione 6. Frontend-only. Contesto: il dato deep è globale e
+> unico (`ma_deep_analysis`) ma oggi ha tre rendering indipendenti —
+> `inspector/deep/DeepComponents.tsx` (il più ricco: `DeepScorecard`,
+> `DeepReconciliation`, `DeepQualityFlags`, `DeepValuation`, `DeepBrief` +
+> 4 stati), `IniziativaCardDossierPage.tsx` (versione basilare: lo swap ai
+> componenti ricchi fu **posticipato** in
+> `TARGET-INSPECTOR-IMPLEMENTATION-PLAN.md` F5 per rischio regressione — quel
+> debito si salda qui), `CompanyDossierPage.tsx` (`/azienda`, tampone, non
+> investire).
+
+**Passi:**
+1. Promuovere i componenti di `inspector/deep/DeepComponents.tsx` a modulo
+   condiviso (posizione: `apps/binocolo/src/components/deep/` o equivalente
+   coerente con la struttura esistente — decidere guardando come sono
+   organizzati gli altri condivisi dell'app). L'inspector li importa dalla
+   nuova posizione (nessun cambiamento visivo per l'inspector).
+2. Introdurre le varianti di densità come prop (`full` / `compact` /
+   `summary`): differenze SOLO di selezione e compattezza; formattazione
+   numerica, arrotondamenti, colori RAG, etichette e ordine dei blocchi
+   vivono in un unico punto del modulo. Nessuna superficie può ridefinirli.
+3. **Swap del card-dossier**: `IniziativaCardDossierPage.tsx` sostituisce il
+   proprio rendering deep con il modulo (variante `full`). Il card-dossier
+   cambia aspetto: è ratificato. Attenzione a non perdere contenuti che il
+   card-dossier mostra e l'inspector no (es. sezioni finanziarie/azionisti
+   aggiunte con commit `2dd6d90`): censirli prima dello swap e, se
+   deep-derivati, integrarli nel modulo; se non deep-derivati, restano fuori
+   dal modulo e al loro posto nella pagina.
+4. La sintesi deep del drawer (F1/F5) usa la variante `summary` del modulo.
+5. `/azienda`: adottare il modulo SOLO se lo swap è meccanico (import +
+   props); qualunque adattamento non banale è vietato — resta com'è.
+
+**Verifica**: `tsc --noEmit`; smoke playwright-cli (sola lettura): stessa
+azienda con deep pronto aperta in inspector T4, card-dossier e drawer —
+verificare che numeri, colori ed etichette coincidano tra le tre superfici
+(è il criterio di accettazione del task). Screenshot comparativi in
+`artifacts/claude/`.

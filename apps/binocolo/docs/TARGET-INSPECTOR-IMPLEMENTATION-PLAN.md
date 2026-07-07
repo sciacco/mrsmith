@@ -15,6 +15,8 @@
 
 **Verifica globale**: `pnpm --filter mrsmith-binocolo exec tsc --noEmit` verde. Tutti i tab T1–T8 popolati + 2 entry point (modal + riga target). Nessun backend toccato. Rotte smoke: `/ricerche/e95445c4-.../target/cc7dc7b0-.../inspect` (deep ready), `/ricerche/5d2b043d-.../target/8b717a73-.../inspect` (deep nil, web validation ricca).
 
+**Emendamento**: 2026-07-07 — emendato il read-only (PRD §2/§5): unica mutazione ammessa il lancio dell'analisi approfondita da T4, decisione brainstorming sgancio funzioni.
+
 ---
 
 > Esegue la specifica di `TARGET-INSPECTOR-PLAN.md` (iterazione 1, tutta [DECISO]) col wireframe `target-inspector-wireframe.html` (T1–T8 + stati A/B/C/D per T4). Frontend-only: l'endpoint `GET /binocolo/v1/ma/sessions/{id}/targets/{targetId}` torna già il `MATarget` completo (`vendorPayload`, `evidence`, `adjustments`, `flags`, `webValidation` intero, `deep` cached, `outcomes`) — verificato in `backend/internal/binocolo/ma_service.go:342` (`sessionTargetDetail`) e `ma_store.go:1990` (`GetMATargetByID`). Ogni task è pensato per essere eseguito **da solo, in ordine**, da un LLM esecutore. Riferimenti a simboli/file verificati sul codice al 2026-07-05: usarli, non inventarne. Se un simbolo citato non esiste più, fermarsi e segnalarlo.
