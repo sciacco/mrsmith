@@ -34,9 +34,10 @@ conversazione); questo piano ne implementa la sintesi.
    struttura (`SCHEDA-AZIENDA-PLAN.md`), le lenti restano in URL, le stelle
    restano session-scoped con lente ricerca. Cambia come li si naviga.
 5. Bonifiche incluse (parte integrante della Plancia): dedup anagrafica,
-   disclosure con etichetta di densità, rimozione dataviz decorativa,
-   rimozione banner passivi (sostituiti da controlli), rimozione
-   dell'auto-apertura `open={!deep?.status}`.
+   disclosure con etichetta di densità, rimozione delle sole progress bar
+   quote soci (i grafici dei bilanci camerali si CONSERVANO — rettifica
+   2026-07-08), rimozione banner passivi (sostituiti da controlli),
+   rimozione dell'auto-apertura `open={!deep?.status}`.
 6. **Fuori perimetro**: tab al posto dello scroll (proposta «Dossier a due
    riquadri», scartata: uccide la simultaneità); ⌘K palette (evoluzione
    futura, non ora); fix selezione apparizione advanced-first e registro
@@ -233,14 +234,13 @@ condiviso).
    sparisce. I bilanci sono chiusi di default; il caso "deep assente"
    è già coperto dalla striscia numeri della LensBar (tile a «—» +
    micro-stato spina) e dall'etichetta di densità.
-4. **Rimuovere la dataviz decorativa** (viola `docs/UI-UX.md` e le regole di
-   progetto): il bar chart SVG «Andamento fatturato»
-   (`VendorFinancials.tsx:95-164`) — la serie resta nella tabella e nei
-   trend testuali; le progress bar delle quote
+4. **Dataviz** — RETTIFICA proprietario 2026-07-08: i grafici dei bilanci
+   da dati camerali NON si toccano — il bar chart SVG «Andamento
+   fatturato» (`VendorFinancials.tsx:95-164`) **resta com'è**. Si
+   rimuovono solo le progress bar delle quote
    (`ShareholdersDetail.tsx:83-87`) — restano percentuali numeriche.
-   Attenzione: entrambi i componenti sono condivisi col card-dossier — la
-   rimozione vale per entrambe le superfici (politica varianti: mai due
-   semantiche).
+   Attenzione: componente condiviso col card-dossier — la rimozione vale
+   per entrambe le superfici (politica varianti: mai due semantiche).
 5. **Le apparizioni cambiano lente, non pagina**: in `HistorySection`
    (:770-801) il link primario di ogni apparizione diventa
    `/aziende/{companyKey}?ricerca={sessionId}` (stessa scheda, lente

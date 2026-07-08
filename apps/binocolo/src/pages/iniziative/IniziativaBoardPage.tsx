@@ -17,6 +17,7 @@ import type {
   MASessionSummary,
 } from '../../api/types';
 import { dateLabel, relativeDate, shortAuthor, errorLabel } from '../ricerche/helpers';
+import { writeCohort } from '../../components/scheda/cohort';
 import styles from './Iniziative.module.css';
 
 const STATES: Array<{ key: string; label: string }> = [
@@ -365,6 +366,14 @@ export function IniziativaBoardPage() {
     });
   }, [board, tableStateFilter, tableEsitoFilter, tableQuery]);
 
+  // Coorte visibile per la Staffetta: nella vista tabella è l'elenco filtrato,
+  // nella kanban è l'ordine delle colonne appiattito. Viaggia verso la scheda
+  // via sessionStorage quando si apre un link scheda (nuovo tab).
+  const boardCohortKeys = useMemo(() => {
+    if (view === 'tabella') return filteredTableCards.map((card) => card.companyKey);
+    return STATES.flatMap((state) => (cardsByState.get(state.key) ?? []).map((card) => card.companyKey));
+  }, [view, filteredTableCards, cardsByState]);
+
   if (loading && !board) {
     return (
       <main className={styles.boardPage}>
@@ -653,7 +662,14 @@ export function IniziativaBoardPage() {
                           href={schedaAziendaHref(card.companyKey, board.initiative.id)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            writeCohort({ lensType: 'iniziativa', lensId: board.initiative.id, companyKeys: boardCohortKeys });
+                          }}
+                          onAuxClick={(e) => {
+                            e.stopPropagation();
+                            writeCohort({ lensType: 'iniziativa', lensId: board.initiative.id, companyKeys: boardCohortKeys });
+                          }}
                         >
                           Apri scheda ↗
                         </a>
@@ -722,6 +738,7 @@ export function IniziativaBoardPage() {
         <CardDrawer
           initiativeId={board.initiative.id}
           card={selectedCard}
+          cohortKeys={boardCohortKeys}
           sessions={board.sessions}
           onClose={() => setSelectedCard(null)}
           onChanged={() => void load()}
@@ -825,6 +842,7 @@ function DossierButton({
 function CardDrawer({
   initiativeId,
   card,
+  cohortKeys,
   onClose,
   onChanged,
   onSetState,
@@ -837,6 +855,7 @@ function CardDrawer({
 }: {
   initiativeId: string;
   card: MAInitiativeCardView;
+  cohortKeys: string[];
   onClose: () => void;
   onChanged: () => void;
   onSetState: (companyKey: string, state: string) => Promise<void>;
@@ -943,6 +962,8 @@ function CardDrawer({
             href={schedaAziendaHref(card.companyKey, initiativeId)}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => writeCohort({ lensType: 'iniziativa', lensId: initiativeId, companyKeys: cohortKeys })}
+            onAuxClick={() => writeCohort({ lensType: 'iniziativa', lensId: initiativeId, companyKeys: cohortKeys })}
           >
             Apri scheda ↗
           </a>

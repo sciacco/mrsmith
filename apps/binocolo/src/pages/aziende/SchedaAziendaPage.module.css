@@ -7,6 +7,20 @@
   gap: var(--space-6);
 }
 
+.layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
 .header {
   display: flex;
   justify-content: space-between;
@@ -82,6 +96,29 @@
   border-radius: var(--radius-xl);
   background: var(--color-bg-elevated);
   box-shadow: var(--shadow-sm);
+  scroll-margin-top: calc(var(--scheda-lensbar-bottom, 128px) + 12px);
+}
+
+/* S3 — pulse one-shot quando il deep passa a "pronta" (§8.3). Nessun loop. */
+@keyframes schedaDeepArrived {
+  0% {
+    box-shadow: var(--shadow-sm), 0 0 0 0 var(--color-accent-glow);
+    border-color: var(--color-accent);
+  }
+  100% {
+    box-shadow: var(--shadow-sm), 0 0 0 6px transparent;
+    border-color: var(--color-border);
+  }
+}
+
+.blockPulse {
+  animation: schedaDeepArrived 1.2s var(--ease-out) 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .blockPulse {
+    animation: none;
+  }
 }
 
 .blockHeader {
@@ -275,49 +312,6 @@
 .actionState > span {
   color: var(--color-text-muted);
   font-size: 0.8125rem;
-}
-
-.detailDisclosure {
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-lg);
-  background: var(--color-bg-elevated);
-  box-shadow: var(--shadow-xs);
-}
-
-.detailDisclosure summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  color: var(--color-text);
-  cursor: pointer;
-  font-size: 0.9375rem;
-  font-weight: 700;
-  list-style: none;
-}
-
-.detailDisclosure summary::-webkit-details-marker {
-  display: none;
-}
-
-.detailDisclosure summary:focus-visible {
-  outline: 1px solid transparent;
-  box-shadow: 0 0 0 3px var(--color-accent-glow);
-}
-
-.detailDisclosure summary svg {
-  flex: none;
-  color: var(--color-text-muted);
-  transition: transform 160ms ease;
-}
-
-.detailDisclosure[open] summary svg {
-  transform: rotate(180deg);
-}
-
-.detailDisclosureBody {
-  padding: 0 var(--space-4) var(--space-4);
 }
 
 .angleGrid {
@@ -542,6 +536,17 @@
   display: flex;
   justify-content: flex-end;
   gap: var(--space-2);
+}
+
+@media (max-width: 1000px) {
+  .layout {
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
+  }
+
+  .block {
+    scroll-margin-top: calc(var(--scheda-lensbar-bottom, 128px) + 52px);
+  }
 }
 
 @media (max-width: 900px) {

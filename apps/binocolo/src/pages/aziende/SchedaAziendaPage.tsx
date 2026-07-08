@@ -1,8 +1,8 @@
 import { ApiError } from '@mrsmith/api-client';
-import { Button, Icon, Modal, Skeleton, useToast } from '@mrsmith/ui';
+import { Button, Icon, Modal, Skeleton, StatusBadge, useToast, type StatusBadgeVariant } from '@mrsmith/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useApiClient } from '../../api/client';
 import type {
   CandidateMatchAnalysisResponse,
@@ -15,10 +15,14 @@ import type {
 } from '../../api/types';
 import { IRLPanel } from '../../components/company/IRLPanel';
 import { ShareholdersDetail, hasShareholdersDetail } from '../../components/company/ShareholdersDetail';
-import { VendorFinancials, hasVendorFinancialsData } from '../../components/company/VendorFinancials';
+import { VendorFinancials, hasVendorFinancialsData, vendorFinancialSheetsCount } from '../../components/company/VendorFinancials';
 import { WebVerificationDetail, hasWebVerificationDetail } from '../../components/company/WebVerificationDetail';
-import { DeepAnalysisContent } from '../../components/deep/DeepComponents';
-import { RatingStars } from '../../components/RatingStars';
+import { DeepAnalysisContent, formatDeepCompactEuro } from '../../components/deep/DeepComponents';
+import { LabeledDisclosure } from '../../components/scheda/LabeledDisclosure';
+import { resolveCohortPosition, readCohort } from '../../components/scheda/cohort';
+import { LensBar, type LensKeyNumber, type LensOption } from '../../components/scheda/LensBar';
+import { SpineNav, type SpineItem } from '../../components/scheda/SpineNav';
+import { useSectionSpy } from '../../components/scheda/useSectionSpy';
 import { ThesisReadingPanel } from '../../components/ThesisReadingPanel/ThesisReadingPanel';
 import { CompanyRegistrySection } from '../iniziative/CompanyRegistrySection';
 import { bucketLabel, dateLabel, errorLabel, sessionStatusLabel } from '../ricerche/helpers';
@@ -40,6 +44,8 @@ type OwnershipSummary =
   | { kind: 'majority'; label: 'Socio di maggioranza'; shareholders: Shareholder[]; residualNote: string }
   | { kind: 'tie'; label: 'Soci principali' | 'Soci'; shareholders: Shareholder[]; residualNote?: string }
   | { kind: 'singleTop'; label: 'Socio principale'; shareholders: Shareholder[]; residualNote?: string };
+
+const SPINE_IDS = ['scheda-identita-title', 'scheda-deep-title', 'scheda-controllo-title', 'scheda-storia-title'] as const;
 
 const CARD_STATE_LABELS: Record<string, string> = {
   da_contattare: 'Da contattare',
@@ -273,9 +279,10 @@ function EmptyPanel({ icon, title, text }: { icon: 'file-text' | 'target' | 'bar
 
 export function SchedaAziendaPage() {
   const { companyKey } = useParams<{ companyKey: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const lens = useMemo(() => resolveLens(searchParams), [searchParams]);
   const api = useApiClient();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [excludeReason, setExcludeReason] = useState('');
@@ -322,8 +329,9 @@ export function SchedaAziendaPage() {
 
   const target = targetQuery.data;
   const deep = target?.deep ?? overview?.deep;
-  const deepBusy = deep?.status === 'queued' || deep?.status === 'running';
-  const deepReady = deep?.status === 'ready';
+  const deepStatus = deep?.status;
+  const deepBusy = deepStatus === 'queued' || deepStatus === 'running';
+  const deepReady = deepStatus === 'ready';
 
   useEffect(() => {
     if (!deepBusy) return;
@@ -333,6 +341,100 @@ export function SchedaAziendaPage() {
     }, 5000);
     return () => window.clearInterval(handle);
   }, [deepBusy, overviewQuery, targetQuery]);
+
+  // S3 — annuncio del deep che arriva. Reagisce SOLO alla transizione di stato
+  // (busy → ready|failed), mai a ogni poll. Il valore precedente è tenuto in un
+  // ref insieme al companyKey: alla prima resa di una scheda (o dopo un cambio
+  // azienda con la staffetta) la baseline è "fresca" e nessun toast scatta —
+  // così una scheda aperta con il deep già pronto resta silenziosa.
+  const prevDeepRef = useRef<{ companyKey?: string; status?: MADeepAnalysis['status'] }>({});
+  const [deepArrivedPulse, setDeepArrivedPulse] = useState(false);
+
+  useEffect(() => {
+    const prev = prevDeepRef.current;
+    const sameCompany = prev.companyKey === companyKey;
+    const prevStatus = sameCompany ? prev.status : undefined;
+    prevDeepRef.current = { companyKey, status: deepStatus };
+    if (!sameCompany) return; // baseline per una nuova azienda: mai annunciare
+    const wasBusy = prevStatus === 'queued' || prevStatus === 'running';
+    if (!wasBusy) return;
+    if (deepStatus === 'ready') {
+      toast('Analisi pronta', 'success');
+      setDeepArrivedPulse(true);
+    } else if (deepStatus === 'failed') {
+      toast('Analisi non riuscita', 'error');
+    }
+  }, [companyKey, deepStatus, toast]);
+
+  // Pulse one-shot (§8.3): il flag si spegne da solo, così la classe di
+  // animazione non resta appesa e non si ri-triggera sui poll successivi.
+  // Il timeout copre anche prefers-reduced-motion (nessun onAnimationEnd).
+  useEffect(() => {
+    if (!deepArrivedPulse) return;
+    const handle = window.setTimeout(() => setDeepArrivedPulse(false), 1500);
+    return () => window.clearTimeout(handle);
+  }, [deepArrivedPulse]);
+
+  const contentReady = Boolean(overview && identity);
+  const { activeId: activeSpineId, scrollTo: scrollToSection } = useSectionSpy(SPINE_IDS, contentReady);
+
+  // Staffetta: la coorte è usata solo se coerente con la lente attiva e con il
+  // companyKey corrente; altrimenti degradazione elegante (niente frecce, niente
+  // «N di M»). Ri-letta a ogni cambio di lente/azienda (la storage è stabile).
+  const cohortPosition = useMemo(
+    () => resolveCohortPosition(readCohort(), lens.type, lens.type === 'globale' ? undefined : lens.id, companyKey),
+    [lens, companyKey],
+  );
+
+  const goToCohortKey = useCallback(
+    (key: string | undefined) => {
+      if (!key || !cohortPosition) return;
+      navigate(`/aziende/${encodeURIComponent(key)}?${cohortPosition.lensType}=${encodeURIComponent(cohortPosition.lensId)}`);
+    },
+    [navigate, cohortPosition],
+  );
+
+  // Prefetch della vicina successiva (stessa queryKey/fetch dell'overview della
+  // scheda) al mount e a ogni navigazione: la transizione con `j` è istantanea.
+  useEffect(() => {
+    const key = cohortPosition?.nextKey;
+    if (!key) return;
+    void queryClient.prefetchQuery({
+      queryKey: ['ma-company-overview', key],
+      queryFn: () => api.get<MACompanyOverview>(`/binocolo/v1/ma/companies/${encodeURIComponent(key)}/overview`),
+    });
+  }, [cohortPosition?.nextKey, api, queryClient]);
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (excludeOpen) return;
+      const node = event.target as HTMLElement | null;
+      if (node) {
+        const tag = node.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || node.isContentEditable) return;
+      }
+      if (event.key === 'j') {
+        if (!cohortPosition?.nextKey) return;
+        event.preventDefault();
+        goToCohortKey(cohortPosition.nextKey);
+        return;
+      }
+      if (event.key === 'k') {
+        if (!cohortPosition?.prevKey) return;
+        event.preventDefault();
+        goToCohortKey(cohortPosition.prevKey);
+        return;
+      }
+      const index = ['1', '2', '3', '4'].indexOf(event.key);
+      const targetId = SPINE_IDS[index];
+      if (!targetId) return;
+      event.preventDefault();
+      scrollToSection(targetId);
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [excludeOpen, scrollToSection, cohortPosition, goToCohortKey]);
 
   const thesisQuery = useQuery({
     queryKey: ['ma-company-scheda-thesis', lens.type === 'ricerca' ? lens.id : undefined, ricercaAppearance?.targetId],
@@ -447,43 +549,154 @@ export function SchedaAziendaPage() {
   const showWebVerification = hasWebVerificationDetail(target);
   const showVendorFinancials = hasVendorFinancialsData(target);
   const showShareholdersDetail = hasShareholdersDetail(target);
+  const verificationDensity = target?.webValidation?.selectedDomain ? 'dominio confermato' : undefined;
+  const financialSheetsCount = vendorFinancialSheetsCount(target);
   const showIRL = lens.type === 'iniziativa' && Boolean(initiativeCard && identity.companyKey);
+  const companyName = identity.companyName || identity.companyKey;
+
+  const lensOptions: LensOption[] = [];
+  const seenSessions = new Set<string>();
+  for (const appearance of overview.appearances) {
+    if (seenSessions.has(appearance.sessionId)) continue;
+    seenSessions.add(appearance.sessionId);
+    lensOptions.push({ value: `ricerca:${appearance.sessionId}`, label: appearance.sessionTitle || appearance.sessionId });
+  }
+  const seenInitiatives = new Set<string>();
+  for (const card of overview.cards) {
+    if (seenInitiatives.has(card.initiativeId)) continue;
+    seenInitiatives.add(card.initiativeId);
+    lensOptions.push({ value: `iniziativa:${card.initiativeId}`, label: card.initiativeTitle || card.initiativeId });
+  }
+  lensOptions.push({ value: 'globale', label: 'Vista globale' });
+
+  const selectedLens = lens.type === 'ricerca' ? `ricerca:${lens.id}` : lens.type === 'iniziativa' ? `iniziativa:${lens.id}` : 'globale';
+  const notInLens = lens.type === 'ricerca' && !ricercaAppearance;
+  if (!lensOptions.some((option) => option.value === selectedLens)) {
+    lensOptions.unshift({ value: selectedLens, label: lens.type === 'ricerca' ? 'Ricerca selezionata' : 'Iniziativa selezionata' });
+  }
+
+  function changeLens(value: string) {
+    if (value === 'globale') {
+      setSearchParams({});
+      return;
+    }
+    const idx = value.indexOf(':');
+    const type = value.slice(0, idx);
+    const id = value.slice(idx + 1);
+    setSearchParams(type === 'ricerca' ? { ricerca: id } : { iniziativa: id });
+  }
+
+  let originLabel: string;
+  let originTo: string | undefined;
+  if (lens.type === 'ricerca') {
+    const title = ricercaAppearance?.sessionTitle || overview.appearances.find((item) => item.sessionId === lens.id)?.sessionTitle || lens.id;
+    originLabel = `Ricerca «${title}»`;
+    originTo = `/ricerche/${lens.id}`;
+  } else if (lens.type === 'iniziativa') {
+    const title = initiativeCard?.initiativeTitle || overview.cards.find((item) => item.initiativeId === lens.id)?.initiativeTitle || lens.id;
+    originLabel = `Iniziativa «${title}»`;
+    originTo = `/iniziative/${lens.id}`;
+  } else {
+    originLabel = 'Vista globale';
+    originTo = undefined;
+  }
+
+  const lensVerdict =
+    lens.type === 'ricerca' && ricercaAppearance
+      ? { label: verdictLabel(analysis?.verdict), bucket: bucketLabel(ricercaAppearance.bucket) }
+      : undefined;
+  const lensRating =
+    lens.type === 'ricerca' && ricercaAppearance ? { value: ricercaAppearance.rating ?? 0, onRate: rateCurrent } : undefined;
+
+  const scorecard = deep?.scorecard;
+  const valuation = deep?.valuation;
+  const turnoverValue = scorecard?.turnover ?? target?.turnover;
+  const ebitdaValue = scorecard?.ebitda;
+  const equityLow = valuation?.equityLow ?? valuation?.bridge?.equityLow;
+  const equityHigh = valuation?.equityHigh ?? valuation?.bridge?.equityHigh;
+  const redFlagsCount = deep?.brief?.redFlags?.length;
+  const equityValue =
+    equityLow != null && equityHigh != null
+      ? `${formatDeepCompactEuro(equityLow)}–${formatDeepCompactEuro(equityHigh)}`
+      : equityLow != null || equityHigh != null
+        ? formatDeepCompactEuro(equityLow ?? equityHigh)
+        : '—';
+  const showKeyStrip = Boolean(deep?.status) || turnoverValue != null;
+  const keyNumbers: LensKeyNumber[] | undefined = showKeyStrip
+    ? [
+        { key: 'turnover', label: 'Fatturato', value: formatDeepCompactEuro(turnoverValue ?? undefined), targetId: 'scheda-deep-title' },
+        { key: 'ebitda', label: 'EBITDA', value: formatDeepCompactEuro(ebitdaValue ?? undefined), targetId: 'scheda-deep-title' },
+        { key: 'equity', label: 'Equity', value: equityValue, targetId: 'scheda-deep-title' },
+        { key: 'redflags', label: 'Red flag', value: redFlagsCount != null ? String(redFlagsCount) : '—', targetId: 'scheda-deep-title' },
+      ]
+    : undefined;
+
+  const deepBadgeVariant: StatusBadgeVariant =
+    deepStatus === 'ready' ? 'success' : deepStatus === 'running' ? 'accent' : deepStatus === 'failed' ? 'danger' : 'neutral';
+  const controlAbsent =
+    !targetQuery.isLoading &&
+    shareholders.length === 0 &&
+    !groupLabel(target) &&
+    !companySeniority(target) &&
+    successionFlags.length === 0;
+  const spineItems: SpineItem[] = [
+    { id: SPINE_IDS[0], index: 1, title: 'Cosa fa ed è in tesi' },
+    {
+      id: SPINE_IDS[1],
+      index: 2,
+      title: 'È sana e quanto vale',
+      meta: <StatusBadge value={deepStatusLabel(deepStatus)} variant={deepBadgeVariant} dot={false} />,
+    },
+    { id: SPINE_IDS[2], index: 3, title: 'Chi la controlla', meta: controlAbsent ? '—' : undefined },
+    {
+      id: SPINE_IDS[3],
+      index: 4,
+      title: 'Cosa ne sappiamo',
+      meta: `${overview.appearances.length} apparizioni · ${overview.cards.length} iniziative`,
+    },
+  ];
 
   return (
     <main className={styles.page}>
+      <LensBar
+        companyName={companyName}
+        originLabel={originLabel}
+        originTo={originTo}
+        lensOptions={lensOptions}
+        selectedLens={selectedLens}
+        onLensChange={changeLens}
+        notInLensNote={notInLens ? 'Azienda non presente in questa ricerca' : undefined}
+        verdict={lensVerdict}
+        rating={lensRating}
+        keyNumbers={keyNumbers}
+        onKeyNumberClick={scrollToSection}
+        staffetta={
+          cohortPosition
+            ? {
+                position: cohortPosition.position,
+                total: cohortPosition.total,
+                onPrev: cohortPosition.prevKey ? () => goToCohortKey(cohortPosition.prevKey) : undefined,
+                onNext: cohortPosition.nextKey ? () => goToCohortKey(cohortPosition.nextKey) : undefined,
+              }
+            : undefined
+        }
+      />
+
+      <div className={styles.layout}>
+        <SpineNav items={spineItems} activeId={activeSpineId} onNavigate={scrollToSection} />
+
+        <div className={styles.content}>
       <header className={styles.header}>
         <div>
           <p className={styles.eyebrow}>Scheda azienda</p>
-          <h1>{identity.companyName || identity.companyKey}</h1>
+          <h1>{companyName}</h1>
           <div className={styles.headerMeta}>
             {identity.vatCode ? <span>P.IVA {identity.vatCode}</span> : null}
             {identity.taxCode ? <span>CF {identity.taxCode}</span> : null}
             {[identity.town, identity.province].filter(Boolean).length > 0 ? <span>{[identity.town, identity.province].filter(Boolean).join(' · ')}</span> : null}
-            {lens.type === 'ricerca' ? <span>Lente ricerca</span> : null}
-            {lens.type === 'iniziativa' ? <span>Lente iniziativa</span> : null}
           </div>
         </div>
-        {lens.type === 'ricerca' && ricercaAppearance ? (
-          <div className={styles.ratingBox}>
-            <span>Giudizio nella ricerca</span>
-            <RatingStars rating={ricercaAppearance.rating ?? 0} onRate={rateCurrent} />
-          </div>
-        ) : null}
       </header>
-
-      {lens.ambiguous ? (
-        <div className={styles.warning} role="status">
-          <Icon name="info" size={16} />
-          <span>Sono presenti sia ricerca sia iniziativa: la pagina usa la lente ricerca per evitare ambiguità.</span>
-        </div>
-      ) : null}
-
-      {lens.type === 'ricerca' && !ricercaAppearance ? (
-        <div className={styles.warning} role="status">
-          <Icon name="info" size={16} />
-          <span>Questa azienda non compare nella ricerca indicata. La scheda mostra i dati azienda senza giudizio di tesi.</span>
-        </div>
-      ) : null}
 
       {targetQuery.isError ? (
         <div className={styles.warning} role="status">
@@ -502,24 +715,12 @@ export function SchedaAziendaPage() {
         </div>
         <dl className={styles.identityGrid}>
           <div>
-            <dt>Ragione sociale</dt>
-            <dd>{identity.companyName || identity.companyKey}</dd>
-          </div>
-          <div>
             <dt>Forma</dt>
             <dd>{legalForm ?? 'n.d.'}</dd>
           </div>
           <div>
-            <dt>Identificativi</dt>
-            <dd>{[identity.vatCode ? `P.IVA ${identity.vatCode}` : undefined, identity.taxCode ? `CF ${identity.taxCode}` : undefined].filter(Boolean).join(' · ') || 'n.d.'}</dd>
-          </div>
-          <div>
             <dt>ATECO</dt>
             <dd>{[identity.atecoCode, identity.atecoDescription].filter(Boolean).join(' · ') || 'n.d.'}</dd>
-          </div>
-          <div>
-            <dt>Sede</dt>
-            <dd>{[identity.town, identity.province].filter(Boolean).join(' · ') || 'n.d.'}</dd>
           </div>
           <div>
             <dt>Dominio</dt>
@@ -566,19 +767,17 @@ export function SchedaAziendaPage() {
         ) : null}
 
         {target && showWebVerification ? (
-          <details className={styles.detailDisclosure}>
-            <summary>
-              <span>Dettaglio della verifica</span>
-              <Icon name="chevron-down" size={16} />
-            </summary>
-            <div className={styles.detailDisclosureBody}>
-              <WebVerificationDetail target={target} />
-            </div>
-          </details>
+          <LabeledDisclosure title="Dettaglio della verifica" density={verificationDensity}>
+            <WebVerificationDetail target={target} />
+          </LabeledDisclosure>
         ) : null}
       </section>
 
-      <section className={styles.block} aria-labelledby="scheda-deep-title">
+      <section
+        className={`${styles.block} ${deepArrivedPulse ? styles.blockPulse : ''}`}
+        aria-labelledby="scheda-deep-title"
+        onAnimationEnd={deepArrivedPulse ? () => setDeepArrivedPulse(false) : undefined}
+      >
         <div className={styles.blockHeader}>
           <span className={styles.blockIndex}>2</span>
           <div>
@@ -611,15 +810,12 @@ export function SchedaAziendaPage() {
         )}
 
         {target && showVendorFinancials ? (
-          <details className={styles.detailDisclosure} open={!deep?.status}>
-            <summary>
-              <span>Bilanci (fonte camerale)</span>
-              <Icon name="chevron-down" size={16} />
-            </summary>
-            <div className={styles.detailDisclosureBody}>
-              <VendorFinancials target={target} />
-            </div>
-          </details>
+          <LabeledDisclosure
+            title="Bilanci (fonte camerale)"
+            density={financialSheetsCount > 0 ? `${financialSheetsCount} ${financialSheetsCount === 1 ? 'esercizio' : 'esercizi'}` : undefined}
+          >
+            <VendorFinancials target={target} />
+          </LabeledDisclosure>
         ) : null}
       </section>
 
@@ -680,15 +876,9 @@ export function SchedaAziendaPage() {
         )}
 
         {target && showShareholdersDetail ? (
-          <details className={styles.detailDisclosure}>
-            <summary>
-              <span>Tutti i soci</span>
-              <Icon name="chevron-down" size={16} />
-            </summary>
-            <div className={styles.detailDisclosureBody}>
-              <ShareholdersDetail target={target} />
-            </div>
-          </details>
+          <LabeledDisclosure title="Tutti i soci" density={String(shareholders.length)}>
+            <ShareholdersDetail target={target} />
+          </LabeledDisclosure>
         ) : null}
       </section>
 
@@ -709,9 +899,11 @@ export function SchedaAziendaPage() {
             <IRLPanel initiativeId={lens.type === 'iniziativa' ? lens.id : ''} companyKey={identity.companyKey} companyName={identity.companyName || identity.companyKey} />
           </div>
         ) : null}
-        <HistorySection appearances={overview.appearances} />
-        <CardsSection cards={overview.cards} activeInitiativeId={lens.type === 'iniziativa' ? lens.id : undefined} />
+        <HistorySection appearances={overview.appearances} companyKey={identity.companyKey} />
+        <CardsSection cards={overview.cards} companyKey={identity.companyKey} activeInitiativeId={lens.type === 'iniziativa' ? lens.id : undefined} />
       </section>
+        </div>
+      </div>
 
       <Modal open={excludeOpen} onClose={() => setExcludeOpen(false)} title="Escludi target" size="sm">
         <div className={styles.excludeModalBody}>
@@ -767,7 +959,7 @@ function EvidenceList({ title, items }: { title: string; items?: string[] }) {
   );
 }
 
-function HistorySection({ appearances }: { appearances: MACompanyOverviewAppearance[] }) {
+function HistorySection({ appearances, companyKey }: { appearances: MACompanyOverviewAppearance[]; companyKey: string }) {
   return (
     <div className={styles.subSection}>
       <h3>Storia nelle ricerche</h3>
@@ -778,9 +970,17 @@ function HistorySection({ appearances }: { appearances: MACompanyOverviewAppeara
           {appearances.map((appearance) => (
             <article key={`${appearance.sessionId}-${appearance.targetId}`} className={styles.timelineItem}>
               <div>
-                <Link to={`/ricerche/${appearance.sessionId}`} className={styles.rowTitle}>{appearance.sessionTitle || appearance.sessionId}</Link>
+                <Link
+                  to={`/aziende/${encodeURIComponent(companyKey)}?ricerca=${encodeURIComponent(appearance.sessionId)}`}
+                  className={styles.rowTitle}
+                >
+                  {appearance.sessionTitle || appearance.sessionId}
+                </Link>
                 <p>{sessionStatusLabel(appearance.sessionStatus as any)} · {bucketLabel(appearance.bucket)} · punteggio {formatScore(appearance.score)}</p>
                 {appearance.initiativeTitle ? <p>Iniziativa: {appearance.initiativeTitle}</p> : null}
+                <Link to={`/ricerche/${appearance.sessionId}`} className={styles.externalLink}>
+                  Apri ricerca <Icon name="external-link" size={13} />
+                </Link>
               </div>
               <div className={styles.historyFacts}>
                 <span>{ratingLabel(appearance.rating)}</span>
@@ -800,7 +1000,7 @@ function HistorySection({ appearances }: { appearances: MACompanyOverviewAppeara
   );
 }
 
-function CardsSection({ cards, activeInitiativeId }: { cards: MACompanyOverviewCard[]; activeInitiativeId?: string }) {
+function CardsSection({ cards, companyKey, activeInitiativeId }: { cards: MACompanyOverviewCard[]; companyKey: string; activeInitiativeId?: string }) {
   const sorted = [...cards].sort((a, b) => Number(b.initiativeId === activeInitiativeId) - Number(a.initiativeId === activeInitiativeId));
   return (
     <div className={styles.subSection}>
@@ -812,7 +1012,12 @@ function CardsSection({ cards, activeInitiativeId }: { cards: MACompanyOverviewC
           {sorted.map((card) => (
             <article key={`${card.initiativeId}-${card.companyKey}`} className={`${styles.linkedCard} ${card.initiativeId === activeInitiativeId ? styles.linkedCardActive : ''}`}>
               <div>
-                <Link to={`/iniziative/${card.initiativeId}`} className={styles.rowTitle}>{card.initiativeTitle || card.initiativeId}</Link>
+                <Link
+                  to={`/aziende/${encodeURIComponent(companyKey)}?iniziativa=${encodeURIComponent(card.initiativeId)}`}
+                  className={styles.rowTitle}
+                >
+                  {card.initiativeTitle || card.initiativeId}
+                </Link>
                 {card.initiativeId === activeInitiativeId ? <span className={styles.statusPill}>Lente attiva</span> : null}
               </div>
               <dl>

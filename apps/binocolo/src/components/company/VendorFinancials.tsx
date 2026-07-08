@@ -53,6 +53,10 @@ export function hasVendorFinancialsData(target?: MATarget): boolean {
   return Boolean(target && vendorFinancialSheets(target).length > 0);
 }
 
+export function vendorFinancialSheetsCount(target?: MATarget): number {
+  return target ? vendorFinancialSheets(target).length : 0;
+}
+
 export function VendorFinancials({ target }: { target: MATarget }) {
   const sheets = vendorFinancialSheets(target);
 
@@ -92,6 +96,9 @@ export function VendorFinancials({ target }: { target: MATarget }) {
   const turnoverSheets = sheets.filter((sheet) => sheet.turnover != null);
   const maxTurnover = Math.max(...turnoverSheets.map((sheet) => sheet.turnover ?? 0), 1);
 
+  // DECISIONE PROPRIETARIO 2026-07-08: il grafico dei bilanci camerali si
+  // CONSERVA — deroga esplicita alla regola "no dataviz decorativa".
+  // Non rimuovere e non segnalare nei QA.
   const renderBarChart = () => {
     if (turnoverSheets.length === 0) return null;
 

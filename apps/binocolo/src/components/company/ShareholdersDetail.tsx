@@ -80,11 +80,6 @@ export function ShareholdersDetail({ target }: { target: MATarget }) {
               <span>Quota societaria:</span>
               <strong>{percent > 0 ? `${percent.toLocaleString('it-IT')}%` : 'n.d.'}</strong>
             </div>
-            {percent > 0 ? (
-              <div className={styles.shProgressBarBg} aria-hidden="true">
-                <div className={styles.shProgressBar} style={{ width: `${Math.min(percent, 100)}%` }} />
-              </div>
-            ) : null}
           </div>
         );
       })}

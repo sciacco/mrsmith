@@ -101,6 +101,9 @@
   font-weight: 600;
 }
 
+/* DECISIONE PROPRIETARIO 2026-07-08: il grafico dei bilanci camerali si
+   CONSERVA — deroga esplicita alla regola "no dataviz decorativa".
+   Non rimuovere queste classi. */
 .chartContainer {
   padding: var(--space-4);
   margin-bottom: var(--space-5);
@@ -241,21 +244,6 @@
 
 .shShare strong {
   font-variant-numeric: tabular-nums;
-}
-
-.shProgressBarBg {
-  width: 100%;
-  height: 6px;
-  margin-top: var(--space-1);
-  overflow: hidden;
-  border-radius: var(--radius-full);
-  background: var(--color-surface);
-}
-
-.shProgressBar {
-  height: 100%;
-  border-radius: var(--radius-full);
-  background: var(--color-accent);
 }
 
 .webStack {

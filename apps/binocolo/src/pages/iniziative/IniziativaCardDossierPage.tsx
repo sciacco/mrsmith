@@ -10,6 +10,7 @@ import { ShareholdersDetail } from '../../components/company/ShareholdersDetail'
 import { ThesisReadingPanel } from '../../components/ThesisReadingPanel/ThesisReadingPanel';
 import { VendorFinancials } from '../../components/company/VendorFinancials';
 import { WebVerificationDetail } from '../../components/company/WebVerificationDetail';
+import { writeCohort } from '../../components/scheda/cohort';
 import type {
   MACardDossier,
   MACardProvenance,
@@ -138,6 +139,20 @@ export function IniziativaCardDossierPage() {
             href={schedaAziendaHref(target.companyKey ?? companyKey ?? '', id ?? '')}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() =>
+              writeCohort({
+                lensType: 'iniziativa',
+                lensId: id ?? '',
+                companyKeys: [target.companyKey ?? companyKey ?? ''],
+              })
+            }
+            onAuxClick={() =>
+              writeCohort({
+                lensType: 'iniziativa',
+                lensId: id ?? '',
+                companyKeys: [target.companyKey ?? companyKey ?? ''],
+              })
+            }
           >
             Apri scheda ↗
           </a>

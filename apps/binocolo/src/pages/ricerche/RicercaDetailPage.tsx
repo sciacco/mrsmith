@@ -6,6 +6,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useApiClient } from '../../api/client';
 import { DeepAnalysisContent } from '../../components/deep/DeepComponents';
 import { RatingStars } from '../../components/RatingStars';
+import { writeCohort } from '../../components/scheda/cohort';
 import { ThesisReadingPanel } from '../../components/ThesisReadingPanel/ThesisReadingPanel';
 import type {
   MAGatedProgressResponse,
@@ -158,6 +159,9 @@ export function RicercaDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>('results');
   const [selectedRow, setSelectedRow] = useState<MATargetRow | null>(null);
+  // Coorte visibile della tabella funnel (post filtri/ordinamento) catturata
+  // all'apertura del dettaglio: alimenta il link scheda del modal (Staffetta).
+  const [selectedCohortKeys, setSelectedCohortKeys] = useState<string[]>([]);
   const [targetCache, setTargetCache] = useState<Record<string, MATarget>>({});
   const [targetLoading, setTargetLoading] = useState(false);
   const [targetError, setTargetError] = useState<string | null>(null);
@@ -745,7 +749,10 @@ export function RicercaDetailPage() {
                   rows={resultTargets}
                   loading={rowsLoading}
                   sessionId={id}
-                  onOpen={setSelectedRow}
+                  onOpen={(target, cohortKeys) => {
+                    setSelectedRow(target);
+                    setSelectedCohortKeys(cohortKeys);
+                  }}
                   onRate={(target, rating) => void rateTarget(target, rating)}
                   onAdd={() => setManualAddOpen(true)}
                   manualAddDisabled={manualAddInFlight}
@@ -794,6 +801,7 @@ export function RicercaDetailPage() {
         loading={targetLoading}
         error={targetError}
         sessionId={id}
+        cohortKeys={selectedCohortKeys}
         deepLaunchBusy={deepLaunchFor !== null}
         deepLaunchError={deepLaunchError}
         onStartDeepAnalysis={(row, target) => void startTargetDeepAnalysis(row, target)}
@@ -1237,7 +1245,7 @@ function ResultsTable({
   rows: MATargetRow[];
   loading: boolean;
   sessionId?: string;
-  onOpen: (target: MATargetRow) => void;
+  onOpen: (target: MATargetRow, cohortKeys: string[]) => void;
   onRate: (target: MATargetRow, rating: number) => void;
   onAdd: () => void;
   manualAddDisabled: boolean;
@@ -1301,7 +1309,7 @@ function ResultsTable({
             </thead>
             <tbody>
               {filtered.map((target) => (
-                <tr key={target.id} className={`${styles.clickRow} ${(target.rating ?? 0) === -1 ? styles.rowExcluded : ''}`} onClick={() => onOpen(target)}>
+                <tr key={target.id} className={`${styles.clickRow} ${(target.rating ?? 0) === -1 ? styles.rowExcluded : ''}`} onClick={() => onOpen(target, filtered.map(targetKey))}>
               <td>
                 <span className={styles.cellStack}>
                   <b>{target.companyName}</b>
@@ -1357,7 +1365,14 @@ function ResultsTable({
                       href={schedaAziendaHref(targetKey(target), 'ricerca', sessionId)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        writeCohort({ lensType: 'ricerca', lensId: sessionId, companyKeys: filtered.map(targetKey) });
+                      }}
+                      onAuxClick={(e) => {
+                        e.stopPropagation();
+                        writeCohort({ lensType: 'ricerca', lensId: sessionId, companyKeys: filtered.map(targetKey) });
+                      }}
                     >
                       Apri scheda ↗
                     </a>
@@ -1551,6 +1566,7 @@ function TargetDetailModal({
   loading,
   error,
   sessionId,
+  cohortKeys,
   deepLaunchBusy,
   deepLaunchError,
   onStartDeepAnalysis,
@@ -1561,6 +1577,7 @@ function TargetDetailModal({
   loading: boolean;
   error: string | null;
   sessionId?: string;
+  cohortKeys: string[];
   deepLaunchBusy: boolean;
   deepLaunchError: string | null;
   onStartDeepAnalysis: (row: MATargetRow, target: MATarget) => void;
@@ -1612,6 +1629,8 @@ function TargetDetailModal({
                 href={schedaAziendaHref(targetKey(row), 'ricerca', sessionId)}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => writeCohort({ lensType: 'ricerca', lensId: sessionId, companyKeys: cohortKeys })}
+                onAuxClick={() => writeCohort({ lensType: 'ricerca', lensId: sessionId, companyKeys: cohortKeys })}
               >
                 Apri scheda ↗
               </a>

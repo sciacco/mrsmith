@@ -1,0 +1,67 @@
+.disclosure {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-xs);
+}
+
+.disclosure summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  list-style: none;
+}
+
+.disclosure summary::-webkit-details-marker {
+  display: none;
+}
+
+.disclosure summary:focus-visible {
+  outline: 1px solid transparent;
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
+}
+
+.label {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.title {
+  color: var(--color-text);
+}
+
+.density {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.disclosure summary svg {
+  flex: none;
+  color: var(--color-text-muted);
+  transition: transform 160ms ease;
+}
+
+.disclosure[open] summary svg {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .disclosure summary svg {
+    transition: none;
+  }
+}
+
+.body {
+  padding: 0 var(--space-4) var(--space-4);
+}
