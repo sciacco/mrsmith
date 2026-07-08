@@ -277,6 +277,49 @@
   font-size: 0.8125rem;
 }
 
+.detailDisclosure {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-xs);
+}
+
+.detailDisclosure summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  list-style: none;
+}
+
+.detailDisclosure summary::-webkit-details-marker {
+  display: none;
+}
+
+.detailDisclosure summary:focus-visible {
+  outline: 1px solid transparent;
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
+}
+
+.detailDisclosure summary svg {
+  flex: none;
+  color: var(--color-text-muted);
+  transition: transform 160ms ease;
+}
+
+.detailDisclosure[open] summary svg {
+  transform: rotate(180deg);
+}
+
+.detailDisclosureBody {
+  padding: 0 var(--space-4) var(--space-4);
+}
+
 .angleGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -13,6 +13,10 @@ import type {
   MASessionThesisReading,
   MATarget,
 } from '../../api/types';
+import { IRLPanel } from '../../components/company/IRLPanel';
+import { ShareholdersDetail, hasShareholdersDetail } from '../../components/company/ShareholdersDetail';
+import { VendorFinancials, hasVendorFinancialsData } from '../../components/company/VendorFinancials';
+import { WebVerificationDetail, hasWebVerificationDetail } from '../../components/company/WebVerificationDetail';
 import { DeepAnalysisContent } from '../../components/deep/DeepComponents';
 import { RatingStars } from '../../components/RatingStars';
 import { ThesisReadingPanel } from '../../components/ThesisReadingPanel/ThesisReadingPanel';
@@ -440,6 +444,10 @@ export function SchedaAziendaPage() {
       .filter((item) => /successione|titolare|propriet|soci/i.test(`${item.label} ${item.criterion}`))
       .map((item) => `${item.label}${item.value ? `: ${item.value}` : ''}`),
   ];
+  const showWebVerification = hasWebVerificationDetail(target);
+  const showVendorFinancials = hasVendorFinancialsData(target);
+  const showShareholdersDetail = hasShareholdersDetail(target);
+  const showIRL = lens.type === 'iniziativa' && Boolean(initiativeCard && identity.companyKey);
 
   return (
     <main className={styles.page}>
@@ -556,6 +564,18 @@ export function SchedaAziendaPage() {
             />
           </div>
         ) : null}
+
+        {target && showWebVerification ? (
+          <details className={styles.detailDisclosure}>
+            <summary>
+              <span>Dettaglio della verifica</span>
+              <Icon name="chevron-down" size={16} />
+            </summary>
+            <div className={styles.detailDisclosureBody}>
+              <WebVerificationDetail target={target} />
+            </div>
+          </details>
+        ) : null}
       </section>
 
       <section className={styles.block} aria-labelledby="scheda-deep-title">
@@ -589,6 +609,18 @@ export function SchedaAziendaPage() {
             <p>Analisi pronta, dettaglio non disponibile in questa risposta.</p>
           </div>
         )}
+
+        {target && showVendorFinancials ? (
+          <details className={styles.detailDisclosure} open={!deep?.status}>
+            <summary>
+              <span>Bilanci (fonte camerale)</span>
+              <Icon name="chevron-down" size={16} />
+            </summary>
+            <div className={styles.detailDisclosureBody}>
+              <VendorFinancials target={target} />
+            </div>
+          </details>
+        ) : null}
       </section>
 
       <section className={styles.block} aria-labelledby="scheda-controllo-title">
@@ -646,6 +678,18 @@ export function SchedaAziendaPage() {
             </div>
           </div>
         )}
+
+        {target && showShareholdersDetail ? (
+          <details className={styles.detailDisclosure}>
+            <summary>
+              <span>Tutti i soci</span>
+              <Icon name="chevron-down" size={16} />
+            </summary>
+            <div className={styles.detailDisclosureBody}>
+              <ShareholdersDetail target={target} />
+            </div>
+          </details>
+        ) : null}
       </section>
 
       <section className={styles.block} aria-labelledby="scheda-storia-title">
@@ -659,6 +703,12 @@ export function SchedaAziendaPage() {
         <div className={styles.registryWrap}>
           <CompanyRegistrySection companyKey={identity.companyKey} vatCode={identity.vatCode} companyName={identity.companyName} readOnly={false} />
         </div>
+        {showIRL ? (
+          <div className={styles.subSection}>
+            <h3>IRL</h3>
+            <IRLPanel initiativeId={lens.type === 'iniziativa' ? lens.id : ''} companyKey={identity.companyKey} companyName={identity.companyName || identity.companyKey} />
+          </div>
+        ) : null}
         <HistorySection appearances={overview.appearances} />
         <CardsSection cards={overview.cards} activeInitiativeId={lens.type === 'iniziativa' ? lens.id : undefined} />
       </section>
