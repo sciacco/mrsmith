@@ -1,6 +1,6 @@
 import { Button, Icon, Modal, MultiSelect, Skeleton, useToast } from '@mrsmith/ui';
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApiClient } from '../../api/client';
 import type {
   MAAtecoCandidate,
@@ -46,6 +46,8 @@ type InitiativeMode = 'auto' | 'manual' | 'existing';
 export function NuovaRicercaPage() {
   const api = useApiClient();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const requestedInitiativeId = searchParams.get('iniziativa')?.trim() ?? '';
   const { toast } = useToast();
   const [catalog, setCatalog] = useState<MAProvinceCatalogItem[]>([]);
   const [detail, setDetail] = useState<MASessionDetail | null>(null);
@@ -63,18 +65,31 @@ export function NuovaRicercaPage() {
   const [initiativeId, setInitiativeId] = useState('');
   const [manualInitiativeTitle, setManualInitiativeTitle] = useState('');
   const [initiativeError, setInitiativeError] = useState<string | null>(null);
+  const appliedInitiativeParamRef = useRef(false);
+  const initiativeSelectionTouchedRef = useRef(false);
 
   const loadInitiatives = useCallback(async () => {
     setInitiativesLoading(true);
     try {
       const data = await api.get<MAInitiativeListResponse>('/binocolo/v1/ma/initiatives');
       setInitiatives(data.items);
+      if (!appliedInitiativeParamRef.current && requestedInitiativeId) {
+        appliedInitiativeParamRef.current = true;
+        const requested = data.items.find(
+          (item) => item.id === requestedInitiativeId && !item.archivedAt && !item.deletedAt && !item.purgedAt,
+        );
+        if (requested && !initiativeSelectionTouchedRef.current) {
+          setInitiativeMode('existing');
+          setInitiativeId(requested.id);
+          setInitiativeError(null);
+        }
+      }
     } catch (err) {
       setError(errorLabel(err));
     } finally {
       setInitiativesLoading(false);
     }
-  }, [api]);
+  }, [api, requestedInitiativeId]);
 
   useEffect(() => {
     let active = true;
@@ -117,7 +132,10 @@ export function NuovaRicercaPage() {
     return () => clearInterval(handle);
   }, [api, detail?.session.id, detail?.session.status]);
 
-  const activeInitiatives = useMemo(() => initiatives.filter((item) => !item.archivedAt), [initiatives]);
+  const activeInitiatives = useMemo(
+    () => initiatives.filter((item) => !item.archivedAt && !item.deletedAt && !item.purgedAt),
+    [initiatives],
+  );
   const blocker = strategy ? sectorBlocker(strategy) : null;
   const preview = estimateFresh ? expandedEstimatePreview(detail?.estimates ?? []) : null;
   const estimating = busy === 'estimate' || detail?.session.status === 'estimating';
@@ -267,6 +285,7 @@ export function NuovaRicercaPage() {
                     value="auto"
                     checked={initiativeMode === 'auto'}
                     onChange={() => {
+                      initiativeSelectionTouchedRef.current = true;
                       setInitiativeMode('auto');
                       setInitiativeError(null);
                     }}
@@ -283,6 +302,7 @@ export function NuovaRicercaPage() {
                     value="manual"
                     checked={initiativeMode === 'manual'}
                     onChange={() => {
+                      initiativeSelectionTouchedRef.current = true;
                       setInitiativeMode('manual');
                       setInitiativeError(null);
                     }}
@@ -299,6 +319,7 @@ export function NuovaRicercaPage() {
                     value="existing"
                     checked={initiativeMode === 'existing'}
                     onChange={() => {
+                      initiativeSelectionTouchedRef.current = true;
                       setInitiativeMode('existing');
                       setInitiativeError(null);
                       if (!initiativeId && activeInitiatives[0]) setInitiativeId(activeInitiatives[0].id);
@@ -318,6 +339,7 @@ export function NuovaRicercaPage() {
                     className={`${styles.input} ${initiativeError ? styles.inputError : ''}`}
                     value={manualInitiativeTitle}
                     onChange={(event) => {
+                      initiativeSelectionTouchedRef.current = true;
                       setManualInitiativeTitle(event.target.value);
                       if (initiativeError) setInitiativeError(null);
                     }}
@@ -336,6 +358,7 @@ export function NuovaRicercaPage() {
                     className={`${styles.select} ${initiativeError ? styles.inputError : ''}`}
                     value={initiativeId}
                     onChange={(event) => {
+                      initiativeSelectionTouchedRef.current = true;
                       setInitiativeId(event.target.value);
                       if (initiativeError) setInitiativeError(null);
                     }}

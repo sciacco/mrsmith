@@ -426,6 +426,14 @@ export function IniziativaBoardPage() {
               {session.title}
             </span>
           ))}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => navigate(`/ricerche/nuova?iniziativa=${encodeURIComponent(board.initiative.id)}`)}
+            leftIcon={<Icon name="plus" size={14} />}
+          >
+            Nuova ricerca
+          </Button>
           <button type="button" className={styles.linkBtn} onClick={() => void openAttachModal()}>
             + Collega ricerca
           </button>

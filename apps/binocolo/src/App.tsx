@@ -1,16 +1,27 @@
 import { useRoutes } from 'react-router-dom';
 import { APP_ACCESS_ROLES, getAppAccessState } from '@mrsmith/auth-client';
-import { AccessNotice, AppShell, TabNav } from '@mrsmith/ui';
+import { AccessNotice, AppShell, TabNavGroup, type TabGroup } from '@mrsmith/ui';
 import { routes } from './routes';
 import { useOptionalAuth } from './hooks/useOptionalAuth';
 
-const navItems = [
-  { label: 'Ricerche', path: '/ricerche' },
-  { label: 'Iniziative', path: '/iniziative' },
-  { label: 'Dossier azienda', path: '/azienda' },
-  { label: 'Ricerca web', path: '/ricerca-web' },
-  { label: 'Configurazione', path: '/config' },
-  { label: 'Test', path: '/test' },
+const navGroups: TabGroup[] = [
+  {
+    label: 'Iniziative',
+    items: [{ label: 'Iniziative', path: '/iniziative' }],
+  },
+  {
+    label: 'Ricerche',
+    items: [{ label: 'Ricerche', path: '/ricerche' }],
+  },
+  {
+    label: 'Strumenti',
+    items: [
+      { label: 'Dossier azienda', path: '/azienda' },
+      { label: 'Ricerca web', path: '/ricerca-web' },
+      { label: 'Configurazione', path: '/config' },
+      { label: 'Test', path: '/test' },
+    ],
+  },
 ];
 
 function AppRoutes() {
@@ -36,7 +47,7 @@ export function App() {
   return (
     <AppShell appName="Binocolo" userName={user?.name ?? 'John Doe'} onLogout={logout} support={auth}>
       <AppShell.Nav>
-        <TabNav items={navItems} />
+        <TabNavGroup groups={navGroups} />
       </AppShell.Nav>
       <AppShell.Content>
         <AppRoutes />
