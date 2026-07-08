@@ -22,7 +22,7 @@ Self-contained design skill for scoped UI work. **System rules** live in `docs/U
 4. **Implement** with token discipline: CSS Modules, theme tokens only, documented recipes for the two allowed literal exceptions (page background, entrance keyframes).
 5. **Verify** — both are mandatory:
    - `pnpm --filter <app> exec tsc --noEmit` (never bare `npx tsc`).
-   - UI smoke test in a real browser: reuse the already-running dev server (`make dev` / Vite) — never kill or restart it. If browser automation is needed, use the `playwright-cli` skill with cwd `artifacts/claude/`. A passing build is not a rendering guarantee.
+   - UI smoke test in a real browser: reuse the already-running dev server (`make dev` / Vite) — never kill or restart it. If browser automation is needed, use `playwright-cli` from `artifacts/claude/`: first check `command -v playwright-cli`, then fall back to `npx playwright-cli` if needed. Do **not** report browser automation unavailable merely because `require('playwright')` or `pnpm exec playwright` fails; those are different from the harness CLI. A passing build is not a rendering guarantee.
 6. **Self-check** against `docs/UI-UX.md` §19 and the *rejected patterns* list before declaring done.
 
 ## Design craft

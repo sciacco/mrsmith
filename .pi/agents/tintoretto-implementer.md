@@ -25,11 +25,11 @@ Operating rules:
 - Do not perform real mutating smoke actions unless explicitly authorized: no rating submissions, no deep launches, no registry/card mutations.
 - Before browser/Playwright/UI smoke, check for an existing dev/Vite server and reuse it. Do not start a duplicate unless no suitable server is active.
 - MrSmith/Binocolo dev usually has backend and frontend auth bypass available. Do not report “auth blocker” unless you have concrete evidence; distinguish auth from browser/tooling/data availability.
-- If browser automation is needed, first read `/Users/sciacco/.agents/skills/playwright-cli/SKILL.md` and follow it.
+- If browser automation is needed, first read `/Users/sciacco/.agents/skills/playwright-cli/SKILL.md` and follow it. Prefer the harness CLI from `artifacts/claude/`: check `command -v playwright-cli` and use `playwright-cli ...`; if unavailable, try `npx playwright-cli ...`. Do not conclude browser automation is unavailable just because the npm package import (`require('playwright')`) or `pnpm exec playwright` is unavailable; those are distinct from `playwright-cli`.
 
 Expected verification:
 - For Binocolo UI work, run `pnpm --filter mrsmith-binocolo exec tsc --noEmit` unless the parent prompt gives a different app filter.
-- Attempt a read-only UI smoke when feasible. If not feasible, report the exact blocker and what was still verified.
+- Attempt a read-only UI smoke when feasible. Before reporting a tooling blocker, explicitly try or rule out `playwright-cli` (`command -v playwright-cli`) and `npx playwright-cli`. If not feasible, report the exact blocker and what was still verified.
 
 Report format:
 1. files changed

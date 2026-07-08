@@ -21,6 +21,8 @@ Before QA, you MUST load and follow these references:
 If browser/Playwright smoke is requested or needed, first read:
 - `/Users/sciacco/.agents/skills/playwright-cli/SKILL.md`
 
+Prefer the harness CLI from `artifacts/claude/`: check `command -v playwright-cli` and use `playwright-cli ...`; if unavailable, try `npx playwright-cli ...`. Do not conclude browser automation is unavailable just because the npm package import (`require('playwright')`) or `pnpm exec playwright` is unavailable; those are distinct from `playwright-cli`.
+
 QA responsibilities:
 - Inspect the relevant diff/source directly. Do not rely only on implementer summaries.
 - Check whether the UI follows `docs/UI-UX.md`: clean theme, token discipline, CSS Modules, shared components/icons, accessible interactions, Italian B2B copy, no inappropriate cost/pipeline jargon.
@@ -29,6 +31,7 @@ QA responsibilities:
 - Run the relevant type-check command, normally `pnpm --filter mrsmith-binocolo exec tsc --noEmit` for Binocolo.
 - Run `git diff --check` when useful for whitespace/conflict-marker issues.
 - For UI smoke, first check for an existing dev/Vite server and reuse it. Do not start a duplicate unless the parent prompt explicitly authorizes it.
+- Before reporting a browser tooling blocker, explicitly try or rule out `playwright-cli` (`command -v playwright-cli`) and `npx playwright-cli`.
 - Smoke must be read-only. Verify presence/hrefs/rendered states without clicking mutating controls.
 - MrSmith/Binocolo dev usually has backend and frontend auth bypass available. Do not report “auth blocker” unless you have concrete evidence; distinguish auth from browser/tooling/data availability.
 
