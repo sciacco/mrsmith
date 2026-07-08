@@ -55,8 +55,9 @@ export interface DossierTarget {
   companyKey?: string;
 }
 
-// Costruisce l'URL del card-dossier (valido solo se la sessione ha initiativeId).
+// Costruisce l'URL della Scheda azienda con lente iniziativa (il card-dossier
+// è stato assorbito dalla scheda, FUSIONE F5).
 export function dossierHref(t: DossierTarget): string | null {
   if (!t.initiativeId || !t.companyKey) return null;
-  return `/iniziative/${t.initiativeId}/dossier/${encodeURIComponent(t.companyKey)}`;
+  return `/aziende/${encodeURIComponent(t.companyKey)}?iniziativa=${encodeURIComponent(t.initiativeId)}`;
 }

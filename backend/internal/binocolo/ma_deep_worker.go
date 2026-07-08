@@ -426,6 +426,10 @@ func curateITFullForBrief(payload json.RawMessage) any {
 		"productionCosts", "productionValue", "annualResult", "revenuesFinancialCharges",
 		"adjustments", "creditsToShareholders", "incomeStatementAggregateValues",
 		"cashEquivalents",
+		// webAndSocial: il "website" vendor non è verificato (es. id.atlassian.com
+		// per NETX64) e il brief non ha mandato di valutarlo — lo trascriverebbe
+		// come fatto. La presenza web non è una priorità FDD: si rimuove e basta.
+		"webAndSocial",
 	} {
 		delete(obj, key)
 	}

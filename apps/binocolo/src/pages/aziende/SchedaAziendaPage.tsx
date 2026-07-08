@@ -652,7 +652,7 @@ export function SchedaAziendaPage() {
       id: SPINE_IDS[3],
       index: 4,
       title: 'Cosa ne sappiamo',
-      meta: `${overview.appearances.length} apparizioni · ${overview.cards.length} iniziative`,
+      meta: `${overview.appearances.length} ricerche · ${overview.cards.length} iniziative`,
     },
   ];
 
@@ -823,7 +823,7 @@ export function SchedaAziendaPage() {
         <div className={styles.blockHeader}>
           <span className={styles.blockIndex}>3</span>
           <div>
-            <h2 id="scheda-controllo-title">Chi la controlla e qual è l’angolo</h2>
+            <h2 id="scheda-controllo-title">Chi la controlla e qual è la leva di approccio</h2>
             <p>Compagine, controllo e segnali utili per impostare l’approccio.</p>
           </div>
         </div>
@@ -865,7 +865,7 @@ export function SchedaAziendaPage() {
               </dl>
             </div>
             <div className={styles.angleCardWide}>
-              <h3>Segnali di angolo</h3>
+              <h3>Leve di approccio</h3>
               {successionFlags.length > 0 ? (
                 <ul className={styles.bulletList}>{successionFlags.slice(0, 6).map((item) => <li key={item}>{item}</li>)}</ul>
               ) : (
@@ -887,7 +887,7 @@ export function SchedaAziendaPage() {
           <span className={styles.blockIndex}>4</span>
           <div>
             <h2 id="scheda-storia-title">Cosa ne sappiamo e cosa ne abbiamo fatto</h2>
-            <p>Registro azienda, apparizioni nelle ricerche e iniziative collegate.</p>
+            <p>Registro azienda, ricerche e iniziative collegate.</p>
           </div>
         </div>
         <div className={styles.registryWrap}>
@@ -1026,7 +1026,7 @@ function CardsSection({ cards, companyKey, activeInitiativeId }: { cards: MAComp
                 {card.lastEvent ? <div><dt>Ultimo evento</dt><dd>{card.lastEvent}</dd></div> : null}
                 <div><dt>Aggiornata</dt><dd>{dateLabel(card.updatedAt)}</dd></div>
               </dl>
-              <Link to={`/iniziative/${card.initiativeId}/dossier/${encodeURIComponent(card.companyKey)}`} className={styles.externalLink}>Dossier card <Icon name="external-link" size={13} /></Link>
+              <Link to={`/iniziative/${encodeURIComponent(card.initiativeId)}`} className={styles.externalLink}>Apri iniziativa <Icon name="external-link" size={13} /></Link>
             </article>
           ))}
         </div>

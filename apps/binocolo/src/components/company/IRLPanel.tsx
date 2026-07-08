@@ -140,7 +140,7 @@ export function IRLPanel({
     <div>
       <div className={styles.irlToolbar}>
         <Button onClick={() => seed.mutate()} loading={seed.isPending}>
-          Semina dalle fonti
+          Precompila dalle fonti
         </Button>
         <Button variant="secondary" onClick={() => exportIRL.mutate()} loading={exportIRL.isPending} disabled={items.length === 0}>
           Export XLSX
@@ -151,13 +151,13 @@ export function IRLPanel({
             {seedReport.inserted < seedReport.proposed ? ' (le altre erano già in lista)' : ''}
           </span>
         ) : null}
-        {seed.isError ? <span className={styles.irlSeedNote}>Seed non riuscito: riprova.</span> : null}
+        {seed.isError ? <span className={styles.irlSeedNote}>Precompilazione non riuscita: riprova.</span> : null}
       </div>
 
       {items.length === 0 ? (
         <EmptyState
           title="IRL vuota"
-          text="Semina dalle fonti disponibili (flag, brief, lettura di tesi, template della famiglia) o aggiungi le voci manualmente."
+          text="Precompila dalle fonti disponibili (flag, brief, lettura di tesi, template della famiglia) o aggiungi le voci manualmente."
         />
       ) : (
         categories.map((category) => (

@@ -261,6 +261,9 @@ export function TargetInspectorPage() {
             }
             void targetQuery.refetch();
           }}
+          onBriefRegenerated={() => {
+            void targetQuery.refetch();
+          }}
         />
       ) : tab === 'punteggio' ? (
         <PunteggioTab target={target} />

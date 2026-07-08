@@ -79,6 +79,12 @@ F4 (rimozione voce Dossier)  ── SOLO dopo AGGIUNTA-MANUALE in produzione
 - Index: `<Navigate to="/iniziative" replace />`.
 - Ordine voci: **Iniziative · Ricerche · Dossier azienda · Strumenti**
   («Dossier azienda» resta finché F4 non scatta).
+  > **DEVIAZIONE RATIFICATA 2026-07-08**: «Dossier azienda» è stato
+  > collocato *dentro* il gruppo Strumenti (prima voce, `App.tsx`) invece
+  > che top-level. Il proprietario l'ha confermata: /azienda è un tampone
+  > in pensionamento e il declassamento anticipa lo spirito di F4. Con
+  > questa ratifica F1 è COMPLETATA; F4 si riduce a rimuovere la voce dal
+  > gruppo Strumenti.
 - «Strumenti» raggruppa Ricerca web, Configurazione, Test: dropdown o voce
   con sotto-nav secondo il pattern del design system (verificare se la nav
   dell'app/portale ha già un pattern di gruppo; non inventarne uno nuovo se

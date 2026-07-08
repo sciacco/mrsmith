@@ -1819,7 +1819,7 @@ function TargetAcquisitionAngle({ row, target }: { row: MATargetRow | null; targ
     <section className={styles.targetSection} aria-labelledby="target-acquisition-title">
       <div className={styles.targetSectionHeader}>
         <div>
-          <p className={styles.eyebrow}>Angolo d'acquisto</p>
+          <p className={styles.eyebrow}>Leva d'approccio</p>
           <h3 id="target-acquisition-title">Segnali proprietari</h3>
         </div>
       </div>

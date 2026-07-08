@@ -341,7 +341,7 @@ export function IniziativaBoardPage() {
   };
 
   const openDossier = (card: MAInitiativeCardView) => {
-    navigate(`/iniziative/${id}/dossier/${encodeURIComponent(card.companyKey)}`);
+    navigate(`/aziende/${encodeURIComponent(card.companyKey)}?iniziativa=${encodeURIComponent(id ?? '')}`);
   };
 
   const cardsByState = useMemo(() => {

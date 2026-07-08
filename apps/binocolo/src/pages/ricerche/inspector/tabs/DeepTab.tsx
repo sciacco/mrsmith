@@ -20,6 +20,7 @@ export function DeepTab({
   companyKey,
   optimisticStatus,
   onAnalysisStarted,
+  onBriefRegenerated,
 }: {
   deep?: MADeepAnalysis;
   initiativeId?: string;
@@ -27,12 +28,32 @@ export function DeepTab({
   companyKey?: string;
   optimisticStatus?: LaunchStatus | null;
   onAnalysisStarted?: (status: MADeepAnalysis['status']) => void | Promise<unknown>;
+  onBriefRegenerated?: () => void | Promise<unknown>;
 }) {
   const api = useApiClient();
   const dossier = dossierHref({ initiativeId, companyKey });
   const [launching, setLaunching] = useState(false);
   const [launchError, setLaunchError] = useState<string | null>(null);
   const [launchStatus, setLaunchStatus] = useState<LaunchStatus | null>(null);
+  const [regenerating, setRegenerating] = useState(false);
+  const [regenError, setRegenError] = useState<string | null>(null);
+
+  // Rigenera SOLO il brief LLM di questa azienda dal payload IT-full già in
+  // cache: nessuna chiamata vendor, nessuna spesa oltre i token. Serve a
+  // ripulire brief prodotti da un prompt/curatore precedente.
+  async function regenerateBrief() {
+    if (!companyKey) return;
+    setRegenerating(true);
+    setRegenError(null);
+    try {
+      await api.post(`/binocolo/v1/ma/deep/regenerate-briefs`, { companyKey });
+      void Promise.resolve(onBriefRegenerated?.()).catch(() => undefined);
+    } catch (err) {
+      setRegenError(launchErrorLabel(err));
+    } finally {
+      setRegenerating(false);
+    }
+  }
 
   useEffect(() => {
     if (!launchStatus) return;
@@ -127,12 +148,29 @@ export function DeepTab({
       <div className={styles.deepFooter}>
         <span>Analisi aggiornata il {formatDateTime(deep.updatedAt)}</span>
         {deep.errorCode ? <><span>·</span><span>Codice errore: {deep.errorCode}</span></> : null}
+        <Button
+          size="sm"
+          variant="secondary"
+          loading={regenerating}
+          disabled={!companyKey || regenerating}
+          onClick={() => void regenerateBrief()}
+          leftIcon={<Icon name="refresh-cw" size={14} />}
+          style={{ marginLeft: 'auto' }}
+        >
+          Rigenera brief
+        </Button>
         {dossier ? (
-          <Link className={styles.dossierLink} to={dossier} style={{ marginLeft: 'auto' }}>
+          <Link className={styles.dossierLink} to={dossier}>
             Apri dossier <Icon name="external-link" size={14} />
           </Link>
         ) : null}
       </div>
+      {regenError ? (
+        <div className={styles.dangerBox} role="alert">
+          <Icon name="triangle-alert" size={16} />
+          <span>{regenError}</span>
+        </div>
+      ) : null}
     </div>
   );
 }

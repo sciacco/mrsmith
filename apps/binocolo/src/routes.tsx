@@ -1,4 +1,4 @@
-import { Navigate, type RouteObject } from 'react-router-dom';
+import { Navigate, useParams, type RouteObject } from 'react-router-dom';
 import { TestPage } from './pages/TestPage';
 import { ConfigPage } from './pages/ConfigPage';
 import { CompanyDossierPage } from './pages/CompanyDossierPage';
@@ -9,8 +9,14 @@ import { RicercaDetailPage } from './pages/ricerche/RicercaDetailPage';
 import { TargetInspectorPage } from './pages/ricerche/TargetInspectorPage';
 import { IniziativePage } from './pages/iniziative/IniziativePage';
 import { IniziativaBoardPage } from './pages/iniziative/IniziativaBoardPage';
-import { IniziativaCardDossierPage } from './pages/iniziative/IniziativaCardDossierPage';
 import { SchedaAziendaPage } from './pages/aziende/SchedaAziendaPage';
+
+// Il card-dossier è stato assorbito dalla Scheda azienda (FUSIONE F5): i
+// vecchi URL restano validi e atterrano sulla scheda con lente iniziativa.
+function CardDossierRedirect() {
+  const { id, companyKey } = useParams();
+  return <Navigate to={`/aziende/${encodeURIComponent(companyKey ?? '')}?iniziativa=${encodeURIComponent(id ?? '')}`} replace />;
+}
 
 export const routes: RouteObject[] = [
   { index: true, element: <Navigate to="/iniziative" replace /> },
@@ -20,7 +26,7 @@ export const routes: RouteObject[] = [
   { path: 'ricerche/:id/target/:targetId/inspect', element: <TargetInspectorPage /> },
   { path: 'iniziative', element: <IniziativePage /> },
   { path: 'iniziative/:id', element: <IniziativaBoardPage /> },
-  { path: 'iniziative/:id/dossier/:companyKey', element: <IniziativaCardDossierPage /> },
+  { path: 'iniziative/:id/dossier/:companyKey', element: <CardDossierRedirect /> },
   { path: 'aziende/:companyKey', element: <SchedaAziendaPage /> },
   { path: 'azienda', element: <CompanyDossierPage /> },
   { path: 'ricerca-web', element: <WebSearchPage /> },
