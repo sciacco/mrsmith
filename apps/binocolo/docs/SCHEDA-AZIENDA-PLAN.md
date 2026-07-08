@@ -252,15 +252,13 @@ si rompe (campo additivo, `omitempty`).
 
 ---
 
-## T2 — Tempo 2: il card-dossier diventa la scheda (GATED)
+## T2 — Tempo 2: il card-dossier diventa la scheda
 
-> **NON eseguire senza conferma esplicita dell'utente**, da chiedere dopo
-> l'uso reale del tempo 1. Direzione ratificata, esecuzione subordinata.
-
-Perimetro (da dettagliare alla ratifica): `IniziativaCardDossierPage` viene
-sostituita dalla scheda con lente iniziativa; il blocco 4 passa in modalità
-attiva (azioni card: stato, chiusura, riapertura, note, IRL — oggi sul
-card-dossier); la rotta `iniziative/:id/dossier/:companyKey` reindirizza a
-`aziende/:companyKey?iniziativa=:id`; thesis-reading e IRL della card
-raggiungibili dalla scheda. A quel punto le destinazioni per un'azienda sono
-una sola.
+> **STATO 2026-07-08**: B1/B2/F1/F2/F3 di questo piano risultano
+> implementate (HEAD `ee21c06`). Il T2 è stato **esplicitato in un piano
+> dedicato**: [`FUSIONE-CARD-DOSSIER-PLAN.md`](./FUSIONE-CARD-DOSSIER-PLAN.md)
+> — include il principio inspector (mai la casa di un dato per l'analista),
+> il censimento verificato dei contenuti da assorbire (IRL, finanziari
+> vendor, soci completi, web detail, razionale) e la rettifica sulle azioni
+> di ciclo vita card (vivono sul board, non migrano). L'avvio della fusione
+> lo decide l'utente.
