@@ -736,6 +736,65 @@ func (s *maService) getCompanyRegistry(ctx context.Context, companyKey string) (
 	return s.store.GetMACompanyRegistry(ctx, companyKey)
 }
 
+func (s *maService) getCompanyOverview(ctx context.Context, companyKey string) (MACompanyOverview, error) {
+	if s.store == nil {
+		return MACompanyOverview{}, errMAStoreUnavailable
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey == "" {
+		return MACompanyOverview{}, fmt.Errorf("%w: companyKey", errMAStrategyInvalid)
+	}
+	overview := MACompanyOverview{
+		Identity:    MACompanyOverviewIdentity{CompanyKey: companyKey},
+		Appearances: []MACompanyOverviewAppearance{},
+		Cards:       []MACompanyOverviewCard{},
+	}
+	identity, err := s.store.GetMACompanyOverviewIdentity(ctx, companyKey)
+	if err != nil {
+		return MACompanyOverview{}, err
+	}
+	if identity != nil {
+		overview.Identity = *identity
+	}
+	deep, err := s.store.ListMADeepAnalysis(ctx, []string{companyKey})
+	if err != nil {
+		return MACompanyOverview{}, err
+	}
+	if analysis, ok := deep[companyKey]; ok {
+		analysisCopy := analysis
+		overview.Deep = &analysisCopy
+	}
+	overview.Appearances, err = s.store.ListMACompanyOverviewAppearances(ctx, companyKey)
+	if err != nil {
+		return MACompanyOverview{}, err
+	}
+	overview.Cards, err = s.store.ListMACompanyOverviewCards(ctx, companyKey)
+	if err != nil {
+		return MACompanyOverview{}, err
+	}
+	cardsByInitiative := make(map[string][]string)
+	for _, card := range overview.Cards {
+		if card.InitiativeID == "" || card.CompanyKey == "" {
+			continue
+		}
+		cardsByInitiative[card.InitiativeID] = append(cardsByInitiative[card.InitiativeID], card.CompanyKey)
+	}
+	latestEventsByInitiative := make(map[string]map[string]string, len(cardsByInitiative))
+	for initiativeID, keys := range cardsByInitiative {
+		latestEvents, err := s.store.ListMALatestCardEvents(ctx, initiativeID, keys)
+		if err != nil {
+			return MACompanyOverview{}, err
+		}
+		latestEventsByInitiative[initiativeID] = latestEvents
+	}
+	for i := range overview.Cards {
+		if latestEvents := latestEventsByInitiative[overview.Cards[i].InitiativeID]; latestEvents != nil {
+			overview.Cards[i].LastEvent = latestEvents[overview.Cards[i].CompanyKey]
+		}
+	}
+	return overview, nil
+}
+
 // maPricing holds the business pricing/budget levers, sourced from the
 // ma_parameter table (migration 038) with the compiled constants as fallback.
 type maPricing struct {
@@ -1926,10 +1985,11 @@ var errMACardDossierNotFound = errors.New("ma card dossier target not found")
 // (vendor payload + deep + web validation) risolto per (iniziativa,
 // companyKey), più il riferimento alla sessione di provenienza.
 type MACardDossier struct {
-	Target       MATarget         `json:"target"`
-	SessionID    string           `json:"sessionId"`
-	SessionTitle string           `json:"sessionTitle"`
-	Card         MAInitiativeCard `json:"card"`
+	Target       MATarget           `json:"target"`
+	SessionID    string             `json:"sessionId"`
+	SessionTitle string             `json:"sessionTitle"`
+	Card         MAInitiativeCard   `json:"card"`
+	Provenances  []MACardProvenance `json:"provenances,omitempty"`
 }
 
 // getCardDossier risolve il target più recente per (iniziativa, companyKey)
@@ -1967,7 +2027,11 @@ func (s *maService) getCardDossier(ctx context.Context, initiativeID, companyKey
 	if err != nil {
 		return MACardDossier{}, err
 	}
-	return MACardDossier{Target: target, SessionID: sessionID, SessionTitle: session.Title, Card: *card}, nil
+	provenances, err := s.store.ListMACardProvenances(ctx, initiativeID, []string{companyKey})
+	if err != nil {
+		return MACardDossier{}, err
+	}
+	return MACardDossier{Target: target, SessionID: sessionID, SessionTitle: session.Title, Card: *card, Provenances: provenances[companyKey]}, nil
 }
 
 // getInitiativeBoard assembles the board (B4 passo 1): l'Iniziativa, le

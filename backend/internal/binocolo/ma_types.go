@@ -473,6 +473,61 @@ type MACompanyRegistry struct {
 	Notes []MACompanyNote `json:"notes"`
 }
 
+// MACompanyOverview is the read-only aggregate for the future Scheda azienda:
+// identity from the latest target, deep-dive lifecycle reference, cross-session
+// appearances, and existing initiative cards. Registry facts/notes intentionally
+// stay in the dedicated registry endpoint.
+type MACompanyOverview struct {
+	Identity    MACompanyOverviewIdentity     `json:"identity"`
+	Deep        *MADeepAnalysis               `json:"deep,omitempty"`
+	Appearances []MACompanyOverviewAppearance `json:"appearances"`
+	Cards       []MACompanyOverviewCard       `json:"cards"`
+}
+
+type MACompanyOverviewIdentity struct {
+	CompanyKey       string `json:"companyKey"`
+	CompanyName      string `json:"companyName,omitempty"`
+	VATCode          string `json:"vatCode,omitempty"`
+	TaxCode          string `json:"taxCode,omitempty"`
+	Province         string `json:"province,omitempty"`
+	Town             string `json:"town,omitempty"`
+	AtecoCode        string `json:"atecoCode,omitempty"`
+	AtecoDescription string `json:"atecoDescription,omitempty"`
+	Domain           string `json:"domain,omitempty"`
+}
+
+type MACompanyOverviewAppearance struct {
+	SessionID          string            `json:"sessionId"`
+	SessionTitle       string            `json:"sessionTitle"`
+	SessionStatus      string            `json:"sessionStatus"`
+	InitiativeID       string            `json:"initiativeId,omitempty"`
+	InitiativeTitle    string            `json:"initiativeTitle,omitempty"`
+	TargetID           string            `json:"targetId"`
+	Score              int               `json:"score"`
+	Bucket             string            `json:"bucket,omitempty"`
+	Rating             *int              `json:"rating,omitempty"`
+	ScoreAtRating      *int              `json:"scoreAtRating,omitempty"`
+	ConfidenceAtRating string            `json:"confidenceAtRating,omitempty"`
+	RatedAt            *time.Time        `json:"ratedAt,omitempty"`
+	ExclusionReason    string            `json:"exclusionReason,omitempty"`
+	Outcomes           []MATargetOutcome `json:"outcomes,omitempty"`
+	CreatedAt          time.Time         `json:"createdAt"`
+}
+
+type MACompanyOverviewCard struct {
+	InitiativeID       string     `json:"initiativeId"`
+	InitiativeTitle    string     `json:"initiativeTitle"`
+	CompanyKey         string     `json:"companyKey"`
+	CompanyName        string     `json:"companyName"`
+	State              string     `json:"state"`
+	Esito              string     `json:"esito,omitempty"`
+	LastEvent          string     `json:"lastEvent,omitempty"`
+	CreatedFromSession string     `json:"createdFromSession,omitempty"`
+	CreatedAt          time.Time  `json:"createdAt"`
+	UpdatedAt          time.Time  `json:"updatedAt"`
+	ClosedAt           *time.Time `json:"closedAt,omitempty"`
+}
+
 type MATargetOutcomeRequest struct {
 	CompanyKey string `json:"companyKey"`
 	Event      string `json:"event"`
@@ -491,11 +546,12 @@ type MACardMarker struct {
 // carry multiple provenances (ripescaggi da sessioni diverse della stessa
 // iniziativa); nessuna aggregazione delle stelle.
 type MACardProvenance struct {
-	SessionID     string    `json:"sessionId"`
-	SessionTitle  string    `json:"sessionTitle"`
-	Rating        int       `json:"rating"`
-	ScoreAtRating *int      `json:"scoreAtRating,omitempty"`
-	RatedAt       time.Time `json:"ratedAt"`
+	SessionID          string    `json:"sessionId"`
+	SessionTitle       string    `json:"sessionTitle"`
+	Rating             int       `json:"rating"`
+	ScoreAtRating      *int      `json:"scoreAtRating,omitempty"`
+	ConfidenceAtRating string    `json:"confidenceAtRating,omitempty"`
+	RatedAt            time.Time `json:"ratedAt"`
 }
 
 // MAInitiativeCardView is one row of the board (B4): the card plus everything

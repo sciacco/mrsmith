@@ -601,6 +601,22 @@
   border: 1px solid var(--color-border);
 }
 
+.ratingChip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-full);
+  background: var(--color-warning-subtle);
+  color: var(--color-warning-strong);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .kcardFoot {
   margin-top: var(--space-2);
   padding-top: var(--space-3);
@@ -649,11 +665,85 @@
   align-self: flex-start;
 }
 
+.actionLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  box-shadow: var(--shadow-xs);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.actionLink:hover {
+  background: var(--color-surface);
+}
+
 .actionsRow {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   flex-wrap: wrap;
+}
+
+.judgementPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.judgementMain {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.judgementStars {
+  color: var(--color-warning-strong);
+  font-size: 1.125rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.judgementMeta,
+.judgementHistoryRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.judgementHistory {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--color-border);
+}
+
+.judgementStarsSmall {
+  color: var(--color-warning-strong);
+  font-size: 0.8125rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
 }
 
 .analysisPanel {

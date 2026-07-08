@@ -1743,6 +1743,18 @@ func (f *fakeMAWorkspaceStore) GetMACompanyRegistry(context.Context, string) (MA
 	return MACompanyRegistry{}, nil
 }
 
+func (f *fakeMAWorkspaceStore) GetMACompanyOverviewIdentity(context.Context, string) (*MACompanyOverviewIdentity, error) {
+	return nil, nil
+}
+
+func (f *fakeMAWorkspaceStore) ListMACompanyOverviewAppearances(context.Context, string) ([]MACompanyOverviewAppearance, error) {
+	return nil, nil
+}
+
+func (f *fakeMAWorkspaceStore) ListMACompanyOverviewCards(context.Context, string) ([]MACompanyOverviewCard, error) {
+	return nil, nil
+}
+
 func (f *fakeMAWorkspaceStore) ListMACompanyFactsActive(context.Context, []string) (map[string][]string, error) {
 	return nil, nil
 }

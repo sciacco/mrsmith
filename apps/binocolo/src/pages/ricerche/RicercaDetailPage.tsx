@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApiClient } from '../../api/client';
 import { DeepAnalysisContent } from '../../components/deep/DeepComponents';
+import { RatingStars } from '../../components/RatingStars';
 import { ThesisReadingPanel } from '../../components/ThesisReadingPanel/ThesisReadingPanel';
 import type {
   MAGatedProgressResponse,
@@ -95,6 +96,10 @@ function validateManualVat(value: string): string | null {
   if (!normalized) return 'Inserisci una P.IVA o un codice fiscale.';
   if (/^\d{11}$/.test(normalized) || /^[A-Z0-9]{16}$/.test(normalized)) return null;
   return 'Usa 11 cifre oppure 16 caratteri alfanumerici.';
+}
+
+function schedaAziendaHref(companyKey: string, lens: 'ricerca' | 'iniziativa', lensId: string): string {
+  return `/aziende/${encodeURIComponent(companyKey)}?${lens}=${encodeURIComponent(lensId)}`;
 }
 
 function isValidManualDomainInput(value: string): boolean {
@@ -1346,16 +1351,27 @@ function ResultsTable({
                   onRate={(rating) => onRate(target, rating)}
                 />
                 {sessionId ? (
-                  <a
-                    className={styles.inspectLink}
-                    href={`/ricerche/${sessionId}/target/${target.id}/inspect`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    title="Ispezione completa (nuova tab)"
-                  >
-                    <Icon name="external-link" size={14} />
-                  </a>
+                  <>
+                    <a
+                      className={styles.inspectLink}
+                      href={schedaAziendaHref(targetKey(target), 'ricerca', sessionId)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      Apri scheda ↗
+                    </a>
+                    <a
+                      className={styles.inspectLink}
+                      href={`/ricerche/${sessionId}/target/${target.id}/inspect`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      title="Ispezione completa (nuova tab)"
+                    >
+                      <Icon name="external-link" size={14} />
+                    </a>
+                  </>
                 ) : null}
               </td>
             </tr>
@@ -1365,36 +1381,6 @@ function ResultsTable({
     </div>
       )}
     </div>
-  );
-}
-
-function RatingStars({ rating, onRate }: { rating: number; onRate: (rating: number) => void }) {
-  const excluded = rating === -1;
-  return (
-    <span className={styles.ratingControl} onClick={(event) => event.stopPropagation()}>
-      <span className={styles.stars}>
-        {[1, 2, 3].map((value) => (
-          <button
-            key={value}
-            type="button"
-            className={`${styles.starButton} ${!excluded && rating >= value ? styles.starOn : ''}`}
-            onClick={() => onRate(value)}
-            aria-label={`${value} stelle`}
-          >
-            ★
-          </button>
-        ))}
-      </span>
-      <button
-        type="button"
-        className={`${styles.excludeButton} ${excluded ? styles.excludeOn : ''}`}
-        onClick={() => onRate(excluded ? 0 : -1)}
-        title={excluded ? 'Rimuovi esclusione' : 'Escludi'}
-        aria-label="Escludi"
-      >
-        <Icon name="x-circle" size={15} />
-      </button>
-    </span>
   );
 }
 
@@ -1619,6 +1605,18 @@ function TargetDetailModal({
         </div>
       ) : target ? (
         <div className={styles.detailModalBody}>
+          {sessionId && row ? (
+            <div className={styles.deepActions}>
+              <a
+                className={styles.inspectLink}
+                href={schedaAziendaHref(targetKey(row), 'ricerca', sessionId)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Apri scheda ↗
+              </a>
+            </div>
+          ) : null}
           <TargetPriorityMarkers row={row} />
           <TargetIdentitySection target={target} />
           <TargetNumbersSection target={target} />

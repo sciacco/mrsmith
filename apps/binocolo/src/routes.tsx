@@ -11,6 +11,7 @@ import { TargetInspectorPage } from './pages/ricerche/TargetInspectorPage';
 import { IniziativePage } from './pages/iniziative/IniziativePage';
 import { IniziativaBoardPage } from './pages/iniziative/IniziativaBoardPage';
 import { IniziativaCardDossierPage } from './pages/iniziative/IniziativaCardDossierPage';
+import { SchedaAziendaPage } from './pages/aziende/SchedaAziendaPage';
 
 export const routes: RouteObject[] = [
   { index: true, element: <Navigate to="/ricerche" replace /> },
@@ -21,6 +22,7 @@ export const routes: RouteObject[] = [
   { path: 'iniziative', element: <IniziativePage /> },
   { path: 'iniziative/:id', element: <IniziativaBoardPage /> },
   { path: 'iniziative/:id/dossier/:companyKey', element: <IniziativaCardDossierPage /> },
+  { path: 'aziende/:companyKey', element: <SchedaAziendaPage /> },
   { path: 'target', element: <TargetPage /> },
   { path: 'azienda', element: <CompanyDossierPage /> },
   { path: 'ricerca-web', element: <WebSearchPage /> },

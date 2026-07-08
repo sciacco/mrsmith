@@ -370,6 +370,7 @@ export interface MACardDossier {
   sessionId: string;
   sessionTitle: string;
   card: MAInitiativeCard;
+  provenances?: MACardProvenance[];
 }
 
 export interface MACardMarker {
@@ -382,6 +383,7 @@ export interface MACardProvenance {
   sessionTitle: string;
   rating: number;
   scoreAtRating?: number;
+  confidenceAtRating?: string;
   ratedAt: string;
 }
 
@@ -478,9 +480,12 @@ export type MATargetBucket = 'principale' | 'da_verificare' | 'azionabile' | 'so
 // Evento del log esiti (ground truth reale, append-only).
 export interface MATargetOutcome {
   id: string;
+  sessionId?: string;
+  initiativeId?: string;
   companyKey: string;
-  event: 'contattato' | 'buon_lead' | 'no_go';
+  event: 'contattato' | 'buon_lead' | 'no_go' | string;
   note?: string;
+  payload?: unknown;
   createdByEmail?: string;
   createdAt: string;
 }
@@ -692,6 +697,57 @@ export interface MACompanyNote {
 export interface MACompanyRegistry {
   facts: MACompanyFact[];
   notes: MACompanyNote[];
+}
+
+export interface MACompanyOverview {
+  identity: MACompanyOverviewIdentity;
+  deep?: MADeepAnalysis;
+  appearances: MACompanyOverviewAppearance[];
+  cards: MACompanyOverviewCard[];
+}
+
+export interface MACompanyOverviewIdentity {
+  companyKey: string;
+  companyName?: string;
+  vatCode?: string;
+  taxCode?: string;
+  province?: string;
+  town?: string;
+  atecoCode?: string;
+  atecoDescription?: string;
+  domain?: string;
+}
+
+export interface MACompanyOverviewAppearance {
+  sessionId: string;
+  sessionTitle: string;
+  sessionStatus: MASessionStatus | string;
+  initiativeId?: string;
+  initiativeTitle?: string;
+  targetId: string;
+  score: number;
+  bucket?: MATargetBucket | string;
+  rating?: number;
+  scoreAtRating?: number;
+  confidenceAtRating?: string;
+  ratedAt?: string;
+  exclusionReason?: string;
+  outcomes?: MATargetOutcome[];
+  createdAt: string;
+}
+
+export interface MACompanyOverviewCard {
+  initiativeId: string;
+  initiativeTitle: string;
+  companyKey: string;
+  companyName: string;
+  state: string;
+  esito?: string;
+  lastEvent?: string;
+  createdFromSession?: string;
+  createdAt: string;
+  updatedAt: string;
+  closedAt?: string;
 }
 
 export type MASessionStatus = 'draft' | 'estimating' | 'estimated' | 'running' | 'completed' | 'failed';

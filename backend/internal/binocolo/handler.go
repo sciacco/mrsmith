@@ -143,6 +143,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/irl/reorder", h.handleReorderCardIRL)
 	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/irl/export", h.handleExportCardIRL)
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/deep-dive", h.handleDeepDiveMACompany)
+	handle("GET /binocolo/v1/ma/companies/{companyKey}/overview", h.handleGetMACompanyOverview)
 	handle("GET /binocolo/v1/ma/companies/{companyKey}/registry", h.handleGetMACompanyRegistry)
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/registry/facts", h.handleCreateMACompanyFact)
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/registry/facts/{factId}/revoke", h.handleRevokeMACompanyFact)
@@ -1026,6 +1027,19 @@ func (h *Handler) handleDeepDiveMACompany(w http.ResponseWriter, r *http.Request
 	}
 	h.completeMATraceSuccess(r, http.StatusOK)
 	httputil.JSON(w, http.StatusOK, result)
+}
+
+func (h *Handler) handleGetMACompanyOverview(w http.ResponseWriter, r *http.Request) {
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	overview, err := h.ma.getCompanyOverview(r.Context(), companyKey)
+	if err != nil {
+		h.maFailure(w, r, "ma_company_overview_get", err, "company_key", companyKey)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, overview)
 }
 
 func (h *Handler) handleGetMACompanyRegistry(w http.ResponseWriter, r *http.Request) {

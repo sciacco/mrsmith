@@ -8,6 +8,7 @@ import type {
   MACardCloseResponse,
   MACardEvent,
   MACardEventListResponse,
+  MACardProvenance,
   MACardRemoveResponse,
   MAInitiativeBoard,
   MAInitiativeCardView,
@@ -47,6 +48,10 @@ const ESITI: Array<{ key: string; label: string; description: string; bridge: bo
   { key: 'sfumata', label: 'Sfumata', description: 'decisione della controparte o di terzi', bridge: false },
   { key: 'rimandata', label: 'Rimandata', description: 'condizioni non mature, da riprendere', bridge: true },
 ];
+
+function schedaAziendaHref(companyKey: string, initiativeId: string): string {
+  return `/aziende/${encodeURIComponent(companyKey)}?iniziativa=${encodeURIComponent(initiativeId)}`;
+}
 
 function stateDisplayLabel(key: string): string {
   return STATES.find((s) => s.key === key)?.label ?? key;
@@ -104,6 +109,27 @@ function stateTableLabel(key: string): string {
 
 function stateBadgeClass(state: string) {
   return `${styles.statusBadge} ${STATE_COLORS[state] ?? styles.statusGrey ?? ''}`;
+}
+
+function latestProvenance(card: { provenances?: MACardProvenance[] }): MACardProvenance | undefined {
+  return card.provenances?.[0];
+}
+
+function ratingStars(rating: number): string {
+  return '★'.repeat(Math.max(0, Math.min(3, rating)));
+}
+
+function confidenceLabel(confidence?: string): string | null {
+  return confidence ? `Confidenza: ${confidence}` : null;
+}
+
+function RatingChip({ provenance }: { provenance?: MACardProvenance }) {
+  if (!provenance) return null;
+  return (
+    <span className={styles.ratingChip} title={`${provenance.sessionTitle} · ${dateLabel(provenance.ratedAt)}`}>
+      {ratingStars(provenance.rating)}
+    </span>
+  );
 }
 
 type AnalysisState = 'none' | 'working' | 'ready' | 'failed' | 'unknown';
@@ -470,6 +496,7 @@ export function IniziativaBoardPage() {
                         onClick={() => setSelectedCard(card)}
                       >
                         <span className={styles.kcardName} title={card.companyName}>{card.companyName}</span>
+                        <RatingChip provenance={latestProvenance(card)} />
                         {card.esito ? (
                           <span className={`${styles.badge} ${styles.badgeEsito}`}>{ESITO_LABELS[card.esito] ?? card.esito}</span>
                         ) : null}
@@ -488,6 +515,7 @@ export function IniziativaBoardPage() {
                         </div>
                         <div className={styles.kcardMeta}>
                           <span className={styles.provinceBadge}>{card.province}</span>
+                          <RatingChip provenance={latestProvenance(card)} />
                           {(card.registryFacts ?? []).map((kind) => {
                             const info = registryLabel(kind);
                             return (
@@ -556,6 +584,7 @@ export function IniziativaBoardPage() {
                 <th>Azienda</th>
                 <th>Prov.</th>
                 <th>Stato Lavorazione</th>
+                <th>Giudizio</th>
                 <th>Dossier & Analisi</th>
                 <th>Registro Fatti</th>
                 <th>Aggiornamento</th>
@@ -564,7 +593,7 @@ export function IniziativaBoardPage() {
             <tbody>
               {filteredTableCards.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: '48px 0' }}>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '48px 0' }}>
                     <p className={styles.hint}>Nessuna azienda corrisponde ai filtri impostati.</p>
                   </td>
                 </tr>
@@ -591,10 +620,24 @@ export function IniziativaBoardPage() {
                       </div>
                     </td>
                     <td>
-                      <DossierButton
-                        card={card}
-                        onOpen={() => openDossier(card)}
-                      />
+                      <RatingChip provenance={latestProvenance(card)} />
+                    </td>
+                    <td>
+                      <div className={styles.actionsRow}>
+                        <a
+                          className={styles.actionLink}
+                          href={schedaAziendaHref(card.companyKey, board.initiative.id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          Apri scheda ↗
+                        </a>
+                        <DossierButton
+                          card={card}
+                          onOpen={() => openDossier(card)}
+                        />
+                      </div>
                     </td>
                     <td>
                       <div className={styles.registryCell}>
@@ -653,7 +696,7 @@ export function IniziativaBoardPage() {
 
       {selectedCard ? (
         <CardDrawer
-          initiativeId={id ?? ''}
+          initiativeId={board.initiative.id}
           card={selectedCard}
           sessions={board.sessions}
           onClose={() => setSelectedCard(null)}
@@ -843,6 +886,8 @@ function CardDrawer({
   const currentAnalysisState = analysisState(card.dossierStatus);
   const analysisCopy = analysisStatusCopy(currentAnalysisState);
   const canLaunchAnalysis = currentAnalysisState === 'none' || currentAnalysisState === 'failed';
+  const latestJudgement = latestProvenance(card);
+  const previousJudgements = (card.provenances ?? []).slice(1);
 
   const launchAnalysis = async () => {
     setLaunchingAnalysis(true);
@@ -869,6 +914,14 @@ function CardDrawer({
       }
       headerExtra={
         <div className={styles.drawerActions}>
+          <a
+            className={styles.actionLink}
+            href={schedaAziendaHref(card.companyKey, initiativeId)}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Apri scheda ↗
+          </a>
           <Button variant="secondary" size="sm" onClick={() => onOpenDossier(card)}>
             Dossier ↗
           </Button>
@@ -921,6 +974,41 @@ function CardDrawer({
           )}
 
           <div className={styles.drawerSec}>
+            <p className={styles.lab}>Giudizio</p>
+            {latestJudgement ? (
+              <div className={styles.judgementPanel}>
+                <div className={styles.judgementMain}>
+                  <span className={styles.judgementStars}>{ratingStars(latestJudgement.rating)}</span>
+                  {latestJudgement.scoreAtRating != null ? (
+                    <span>Score al giudizio: {latestJudgement.scoreAtRating}</span>
+                  ) : null}
+                  {confidenceLabel(latestJudgement.confidenceAtRating) ? (
+                    <span>{confidenceLabel(latestJudgement.confidenceAtRating)}</span>
+                  ) : null}
+                </div>
+                <div className={styles.judgementMeta}>
+                  <span>{dateLabel(latestJudgement.ratedAt)}</span>
+                  <span>{latestJudgement.sessionTitle}</span>
+                </div>
+                {previousJudgements.length > 0 ? (
+                  <div className={styles.judgementHistory}>
+                    {previousJudgements.map((prov) => (
+                      <div key={`${prov.sessionId}-${prov.ratedAt}`} className={styles.judgementHistoryRow}>
+                        <span className={styles.judgementStarsSmall}>{ratingStars(prov.rating)}</span>
+                        <span>{prov.sessionTitle}</span>
+                        {prov.scoreAtRating != null ? <span>Score {prov.scoreAtRating}</span> : null}
+                        <span>{dateLabel(prov.ratedAt)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <p className={styles.hint}>Nessun giudizio disponibile.</p>
+            )}
+          </div>
+
+          <div className={styles.drawerSec}>
             <p className={styles.lab}>Analisi approfondita</p>
             <div className={styles.analysisPanel}>
               <div>
@@ -954,22 +1042,6 @@ function CardDrawer({
           </div>
 
           <Accordion title="Provenienze e Dettagli" initialOpen={false}>
-            {(card.provenances ?? []).length > 0 && (
-              <div className={styles.drawerSec}>
-                <p className={styles.lab}>Provenienze</p>
-                {card.provenances!.map((prov) => (
-                  <div key={`${prov.sessionId}-${prov.ratedAt}`} className={styles.provRow}>
-                    <span className={styles.provSess}>{prov.sessionTitle}</span>
-                    <span className={styles.stars}>
-                      {'★'.repeat(Math.max(prov.rating, 0))}
-                      <span className={styles.starsOff}>{'☆'.repeat(Math.max(3 - prov.rating, 0))}</span>
-                    </span>
-                    {prov.scoreAtRating != null ? <span className={styles.provScore}>score {prov.scoreAtRating}</span> : null}
-                  </div>
-                ))}
-              </div>
-            )}
-
             <div className={styles.drawerSec}>
               <p className={styles.lab}>Scheda azienda</p>
               {(card.registryFacts ?? []).length > 0 ? (

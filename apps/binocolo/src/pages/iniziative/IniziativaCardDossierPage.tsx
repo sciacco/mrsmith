@@ -9,6 +9,7 @@ import { ThesisReadingPanel } from '../../components/ThesisReadingPanel/ThesisRe
 import type {
   MACardDossier,
   MACardIRLItem,
+  MACardProvenance,
   MACardThesisReading,
   MAIRLSeedReport,
   MAIRLStatus,
@@ -40,6 +41,10 @@ const CARD_STATE_LABELS: Record<string, string> = {
   rimossa: 'Rimossa',
 };
 
+function schedaAziendaHref(companyKey: string, initiativeId: string): string {
+  return `/aziende/${encodeURIComponent(companyKey)}?iniziativa=${encodeURIComponent(initiativeId)}`;
+}
+
 function errorLabel(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status === 404) return 'Nessun dettaglio disponibile per questa card.';
@@ -48,6 +53,19 @@ function errorLabel(error: unknown): string {
     return `Richiesta non riuscita (${error.status}).`;
   }
   return 'Richiesta non riuscita.';
+}
+
+function dateLabel(value?: string): string {
+  if (!value) return '—';
+  return new Intl.DateTimeFormat('it-IT').format(new Date(value));
+}
+
+function ratingStars(rating: number): string {
+  return '★'.repeat(Math.max(0, Math.min(3, rating)));
+}
+
+function latestProvenance(provenances: MACardProvenance[] | undefined): MACardProvenance | undefined {
+  return provenances?.[0];
 }
 
 type TabKey = 'overview' | 'deep' | 'tesi' | 'irl' | 'financials' | 'shareholders' | 'registry' | 'web';
@@ -109,6 +127,7 @@ export function IniziativaCardDossierPage() {
 
   const target = dossier.target;
   const card = dossier.card;
+  const latestJudgement = latestProvenance(dossier.provenances);
 
   return (
     <main className={styles.page}>
@@ -122,6 +141,14 @@ export function IniziativaCardDossierPage() {
           {card ? (
             <span className={styles.statePill}>{CARD_STATE_LABELS[card.state] ?? card.state}</span>
           ) : null}
+          <a
+            className={styles.actionLink}
+            href={schedaAziendaHref(target.companyKey ?? companyKey ?? '', id ?? '')}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Apri scheda ↗
+          </a>
         </div>
         <div className={styles.meta}>
           {target.vatCode ? <span className={styles.mono}>P.IVA {target.vatCode}</span> : null}
@@ -129,6 +156,15 @@ export function IniziativaCardDossierPage() {
           {target.town ? <span>{[target.town, target.province].filter(Boolean).join(' · ')}</span> : null}
           {dossier.sessionTitle ? <span>Ricerca: {dossier.sessionTitle}</span> : null}
         </div>
+        {latestJudgement ? (
+          <div className={styles.judgementSummary}>
+            <span className={styles.judgementStars}>{ratingStars(latestJudgement.rating)}</span>
+            {latestJudgement.sessionTitle ? <span>Ricerca: {latestJudgement.sessionTitle}</span> : null}
+            {latestJudgement.scoreAtRating != null ? <span>Score al giudizio: {latestJudgement.scoreAtRating}</span> : null}
+            {latestJudgement.confidenceAtRating ? <span>Confidenza: {latestJudgement.confidenceAtRating}</span> : null}
+            <span>{dateLabel(latestJudgement.ratedAt)}</span>
+          </div>
+        ) : null}
       </header>
 
       <div className={styles.section}>

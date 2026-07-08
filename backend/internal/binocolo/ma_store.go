@@ -99,6 +99,9 @@ type maWorkspaceStore interface {
 	RevokeMACompanyFact(ctx context.Context, id, subject, email, note string) (bool, error)
 	InsertMACompanyNote(ctx context.Context, note MACompanyNote) (MACompanyNote, error)
 	GetMACompanyRegistry(ctx context.Context, companyKey string) (MACompanyRegistry, error)
+	GetMACompanyOverviewIdentity(ctx context.Context, companyKey string) (*MACompanyOverviewIdentity, error)
+	ListMACompanyOverviewAppearances(ctx context.Context, companyKey string) ([]MACompanyOverviewAppearance, error)
+	ListMACompanyOverviewCards(ctx context.Context, companyKey string) ([]MACompanyOverviewCard, error)
 	ListMACompanyFactsActive(ctx context.Context, companyKeys []string) (map[string][]string, error)
 	ListMASessionsByInitiative(ctx context.Context, initiativeID string) ([]MASessionSummary, error)
 	ListMACardProvenances(ctx context.Context, initiativeID string, companyKeys []string) (map[string][]MACardProvenance, error)
@@ -3066,6 +3069,256 @@ ORDER BY created_at DESC
 	return out, nil
 }
 
+func (s *SQLStore) GetMACompanyOverviewIdentity(ctx context.Context, companyKey string) (*MACompanyOverviewIdentity, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey == "" {
+		return nil, nil
+	}
+	row := s.db.QueryRowContext(ctx, `
+WITH latest AS (
+  SELECT
+    COALESCE(NULLIF(upper(btrim(vendor_id)), ''), NULLIF(upper(btrim(vat_code)), ''), NULLIF(upper(btrim(tax_code)), ''), upper(btrim(company_name))) AS company_key,
+    COALESCE(company_name, '') AS company_name,
+    COALESCE(vat_code, '') AS vat_code,
+    COALESCE(tax_code, '') AS tax_code,
+    COALESCE(province, '') AS province,
+    COALESCE(town, '') AS town,
+    COALESCE(ateco_code, '') AS ateco_code,
+    COALESCE(ateco_description, '') AS ateco_description,
+    created_at AS created_at
+  FROM binocolo.ma_target
+)
+SELECT company_key, company_name, vat_code, tax_code, province, town, ateco_code, ateco_description
+FROM latest
+WHERE company_key = $1
+ORDER BY created_at DESC
+LIMIT 1
+`, companyKey)
+	var identity MACompanyOverviewIdentity
+	if err := row.Scan(&identity.CompanyKey, &identity.CompanyName, &identity.VATCode, &identity.TaxCode, &identity.Province, &identity.Town, &identity.AtecoCode, &identity.AtecoDescription); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get ma company overview identity: %w", err)
+	}
+	domain, err := s.getMACompanyOverviewDomain(ctx, identity.CompanyKey, identity.VATCode, identity.TaxCode)
+	if err != nil {
+		return nil, err
+	}
+	identity.Domain = domain
+	return &identity, nil
+}
+
+func (s *SQLStore) getMACompanyOverviewDomain(ctx context.Context, companyKey, vatCode, taxCode string) (string, error) {
+	if companyKey == "" && vatCode == "" && taxCode == "" {
+		return "", nil
+	}
+	row := s.db.QueryRowContext(ctx, `
+SELECT COALESCE(domain, '')
+FROM binocolo.ma_company_domain
+WHERE ($1 <> '' AND company_key = $1)
+   OR ($2 <> '' AND vat_code = $2)
+   OR ($3 <> '' AND tax_code = $3)
+ORDER BY (method IN ('manual', 'no_website')) DESC, (company_key = $1) DESC, verified_at DESC
+LIMIT 1
+`, companyKey, vatCode, taxCode)
+	var domain string
+	if err := row.Scan(&domain); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", nil
+		}
+		return "", fmt.Errorf("get ma company overview domain: %w", err)
+	}
+	return domain, nil
+}
+
+func (s *SQLStore) ListMACompanyOverviewAppearances(ctx context.Context, companyKey string) ([]MACompanyOverviewAppearance, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey == "" {
+		return []MACompanyOverviewAppearance{}, nil
+	}
+	rows, err := s.db.QueryContext(ctx, `
+WITH target_rows AS (
+  SELECT
+    t.*,
+    COALESCE(NULLIF(upper(btrim(t.vendor_id)), ''), NULLIF(upper(btrim(t.vat_code)), ''), NULLIF(upper(btrim(t.tax_code)), ''), upper(btrim(t.company_name))) AS resolved_company_key
+  FROM binocolo.ma_target t
+), outcome_rows AS (
+  SELECT session_id, company_key, jsonb_agg(jsonb_build_object(
+    'id', id::text,
+    'sessionId', COALESCE(session_id::text, ''),
+    'initiativeId', COALESCE(initiative_id::text, ''),
+    'companyKey', company_key,
+    'event', event,
+    'note', COALESCE(note, ''),
+    'payload', COALESCE(payload, '{}'::jsonb),
+    'createdByEmail', COALESCE(created_by_email, ''),
+    'createdAt', created_at
+  ) ORDER BY created_at DESC) AS outcomes
+  FROM binocolo.ma_target_outcome
+  WHERE company_key = $1 AND session_id IS NOT NULL
+  GROUP BY session_id, company_key
+)
+SELECT
+  session.id::text, COALESCE(session.title, ''), session.status,
+  COALESCE(session.initiative_id::text, ''), COALESCE(initiative.title, ''),
+  t.id::text, t.run_id::text, t.score, t.score_version, COALESCE(t.match_state, ''), COALESCE(t.confidence, ''), COALESCE(t.origin, 'search'),
+  COALESCE(t.company_name, ''), COALESCE(t.vat_code, ''), COALESCE(t.province, ''), COALESCE(t.town, ''), COALESCE(t.ateco_code, ''),
+  t.flags, COALESCE(t.enrichment_level, 'advanced'), r.rating, r.score_at_rating, COALESCE(r.confidence_at_rating, ''),
+  r.rated_at, COALESCE(r.reason, ''), COALESCE(outcome_rows.outcomes, '[]'::jsonb), t.created_at,
+  COALESCE(strategy.strategy->>'thesis', ''),
+  wv.company_key IS NOT NULL AS has_validation,
+  COALESCE(wv.web_validation_state, ''),
+  COALESCE(wv.final_action, ''),
+  COALESCE(wv.selected_domain, ''),
+  COALESCE(wv.final_decision->>'reason', ''),
+  COALESCE(wv.domain_response->'groupSiteHint'->>'domain', ''),
+  COALESCE(wv.domain_response->'groupSiteHint'->>'identifier', ''),
+  COALESCE(jsonb_array_length(
+    CASE
+      WHEN jsonb_typeof(wv.domain_response->'candidates') = 'array' THEN wv.domain_response->'candidates'
+      ELSE '[]'::jsonb
+    END
+  ), 0),
+  EXISTS (
+    SELECT 1
+    FROM binocolo.ma_evidence evidence
+    WHERE evidence.target_id = t.id
+      AND evidence.status = $2
+      AND evidence.criterion IN ($3, $4)
+  ) AS has_outside_post_filter
+FROM target_rows t
+JOIN binocolo.ma_session session ON session.id = t.session_id
+LEFT JOIN binocolo.ma_strategy_version strategy ON strategy.id = session.active_strategy_id
+LEFT JOIN binocolo.ma_initiative initiative ON initiative.id = session.initiative_id
+LEFT JOIN binocolo.ma_target_web_validation wv ON wv.session_id = t.session_id AND wv.company_key = t.resolved_company_key
+LEFT JOIN binocolo.ma_target_rating r ON r.session_id = t.session_id AND r.company_key = t.resolved_company_key
+LEFT JOIN outcome_rows ON outcome_rows.session_id = t.session_id AND outcome_rows.company_key = t.resolved_company_key
+WHERE t.resolved_company_key = $1
+ORDER BY t.created_at DESC, session.id DESC, t.id DESC
+`, companyKey, maEvidenceOutside, maPostFilterRevenuePerEmployeeMin, maPostFilterMaxShareholders)
+	if err != nil {
+		return nil, fmt.Errorf("list ma company overview appearances: %w", err)
+	}
+	defer rows.Close()
+	out := []MACompanyOverviewAppearance{}
+	for rows.Next() {
+		var item MACompanyOverviewAppearance
+		var targetRow MATargetRow
+		var score sql.NullInt64
+		var scoreVersion sql.NullInt64
+		var rating sql.NullInt64
+		var scoreAt sql.NullInt64
+		var ratedAt sql.NullTime
+		var thesis string
+		var flagsRaw []byte
+		var outcomesRaw []byte
+		var hasValidation bool
+		var webState, finalAction, selectedDomain, reason string
+		var groupDomain, groupIdentifier string
+		var candidateCount int
+		if err := rows.Scan(&item.SessionID, &item.SessionTitle, &item.SessionStatus, &item.InitiativeID, &item.InitiativeTitle,
+			&item.TargetID, &targetRow.RunID, &score, &scoreVersion, &targetRow.MatchState, &targetRow.Confidence, &targetRow.Origin,
+			&targetRow.CompanyName, &targetRow.VATCode, &targetRow.Province, &targetRow.Town, &targetRow.AtecoCode,
+			&flagsRaw, &targetRow.EnrichmentLevel, &rating, &scoreAt,
+			&item.ConfidenceAtRating, &ratedAt, &item.ExclusionReason, &outcomesRaw, &item.CreatedAt,
+			&thesis, &hasValidation, &webState, &finalAction, &selectedDomain, &reason, &groupDomain, &groupIdentifier,
+			&candidateCount, &targetRow.HasOutsidePostFilter); err != nil {
+			return nil, fmt.Errorf("scan ma company overview appearance: %w", err)
+		}
+		targetRow.ID = item.TargetID
+		if score.Valid {
+			item.Score = int(score.Int64)
+			targetRow.Score = int(score.Int64)
+		}
+		if scoreVersion.Valid {
+			value := int(scoreVersion.Int64)
+			targetRow.ScoreVersion = &value
+		}
+		if rating.Valid {
+			v := int(rating.Int64)
+			item.Rating = &v
+			targetRow.Rating = &v
+		}
+		if scoreAt.Valid {
+			v := int(scoreAt.Int64)
+			item.ScoreAtRating = &v
+		}
+		if ratedAt.Valid {
+			item.RatedAt = &ratedAt.Time
+		}
+		if len(flagsRaw) > 0 {
+			_ = json.Unmarshal(flagsRaw, &targetRow.Flags)
+		}
+		if hasValidation {
+			targetRow.WebValidation = &MATargetRowWeb{
+				WebValidationState:  webState,
+				FinalAction:         finalAction,
+				SelectedDomain:      selectedDomain,
+				FinalDecision:       MATargetRowFinalDecision{Reason: reason},
+				GroupSiteDomain:     groupDomain,
+				GroupSiteIdentifier: groupIdentifier,
+				CandidateCount:      candidateCount,
+			}
+		}
+		item.Bucket = maRouteTarget(rowAsTarget(targetRow), thesis)
+		if len(outcomesRaw) > 0 {
+			_ = json.Unmarshal(outcomesRaw, &item.Outcomes)
+		}
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma company overview appearances: %w", err)
+	}
+	return out, nil
+}
+
+func (s *SQLStore) ListMACompanyOverviewCards(ctx context.Context, companyKey string) ([]MACompanyOverviewCard, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey == "" {
+		return []MACompanyOverviewCard{}, nil
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT c.initiative_id::text, COALESCE(i.title, ''), c.company_key, c.company_name, c.state, COALESCE(c.esito, ''),
+       COALESCE(c.created_from_session::text, ''), c.created_at, c.updated_at, c.closed_at
+FROM binocolo.ma_initiative_card c
+JOIN binocolo.ma_initiative i ON i.id = c.initiative_id
+WHERE c.company_key = $1
+  AND i.deleted_at IS NULL
+ORDER BY c.updated_at DESC, c.created_at DESC
+`, companyKey)
+	if err != nil {
+		return nil, fmt.Errorf("list ma company overview cards: %w", err)
+	}
+	defer rows.Close()
+	out := []MACompanyOverviewCard{}
+	for rows.Next() {
+		var item MACompanyOverviewCard
+		var closedAt sql.NullTime
+		if err := rows.Scan(&item.InitiativeID, &item.InitiativeTitle, &item.CompanyKey, &item.CompanyName, &item.State, &item.Esito,
+			&item.CreatedFromSession, &item.CreatedAt, &item.UpdatedAt, &closedAt); err != nil {
+			return nil, fmt.Errorf("scan ma company overview card: %w", err)
+		}
+		if closedAt.Valid {
+			item.ClosedAt = &closedAt.Time
+		}
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma company overview cards: %w", err)
+	}
+	return out, nil
+}
+
 // ListMACompanyFactsActive batches the badge lookup (B5): for each company
 // key, the kinds of every currently active fact.
 func (s *SQLStore) ListMACompanyFactsActive(ctx context.Context, companyKeys []string) (map[string][]string, error) {
@@ -3204,7 +3457,7 @@ func (s *SQLStore) ListMACardProvenances(ctx context.Context, initiativeID strin
 		args = append(args, key)
 	}
 	query := fmt.Sprintf(`
-SELECT r.session_id::text, COALESCE(session.title, ''), r.company_key, r.rating, r.score_at_rating, r.rated_at
+SELECT r.session_id::text, COALESCE(session.title, ''), r.company_key, r.rating, r.score_at_rating, r.confidence_at_rating, r.rated_at
 FROM binocolo.ma_target_rating r
 JOIN binocolo.ma_session session ON session.id = r.session_id
 WHERE session.initiative_id = $1::uuid
@@ -3221,13 +3474,15 @@ ORDER BY r.rated_at DESC
 		var item MACardProvenance
 		var companyKey string
 		var scoreAt sql.NullInt64
-		if err := rows.Scan(&item.SessionID, &item.SessionTitle, &companyKey, &item.Rating, &scoreAt, &item.RatedAt); err != nil {
+		var confidenceAt sql.NullString
+		if err := rows.Scan(&item.SessionID, &item.SessionTitle, &companyKey, &item.Rating, &scoreAt, &confidenceAt, &item.RatedAt); err != nil {
 			return nil, fmt.Errorf("scan ma card provenance: %w", err)
 		}
 		if scoreAt.Valid {
 			v := int(scoreAt.Int64)
 			item.ScoreAtRating = &v
 		}
+		item.ConfidenceAtRating = confidenceAt.String
 		out[companyKey] = append(out[companyKey], item)
 	}
 	if err := rows.Err(); err != nil {
