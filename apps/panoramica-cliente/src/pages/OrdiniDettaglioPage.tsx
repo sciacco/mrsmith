@@ -45,7 +45,7 @@ const csvColumns: CsvColumn<OrderDetailRow>[] = [
   { key: 'quantita', label: 'Qta' },
   { key: 'setup', label: 'NRC' },
   { key: 'mrc', label: 'MRC' },
-  { key: 'stato_riga', label: 'Stato Riga' },
+  { key: 'stato_riga', label: 'Stato Riga', value: row => isSpotRow(row) && row.stato_riga === 'Attiva' ? 'SPOT' : row.stato_riga },
   { key: 'serialnumber', label: 'Serialnumber' },
   { key: 'codice_prodotto', label: 'Codice Prodotto' },
 ];
@@ -58,6 +58,15 @@ function statoBadge(stato: string) {
     'Bloccata': s.badgeRed,
   };
   return <span className={`${s.badge} ${map[stato] ?? s.badgeGray}`}>{stato}</span>;
+}
+
+/** Per le righe degli ordini spot con stato "Attiva" mostra "SPOT". */
+function statoRigaBadge(row: OrderDetailRow) {
+  let label = row.stato_riga;
+  if (isSpotRow(row) && label === 'Attiva') {
+    label = 'SPOT';
+  }
+  return statoBadge(label);
 }
 
 type TabId = 'testata' | 'riga' | 'righe' | 'storico';
@@ -333,7 +342,7 @@ export function OrdiniDettaglioPage() {
                           <td className={s.numCol}>{row.quantita}</td>
                           <td className={s.numCol}>{formatMoneyEUR(row.setup)}</td>
                           <td className={s.numCol}>{formatMoneyEUR(row.mrc)}</td>
-                          <td>{statoBadge(row.stato_riga)}</td>
+                          <td>{statoRigaBadge(row)}</td>
                           <td className={s.mono}>{row.serialnumber ?? ''}</td>
                           <td className={s.mono}>{row.codice_prodotto ?? ''}</td>
                         </tr>
@@ -457,7 +466,7 @@ export function OrdiniDettaglioPage() {
                 </Section>
                 <Section title="Stato">
                   <DL>
-                    <DI label="Stato riga">{statoBadge(selectedRow.stato_riga)}</DI>
+                    <DI label="Stato riga">{statoRigaBadge(selectedRow)}</DI>
                     <DI label="Annullato">{selectedRow.annullato ? 'Si' : 'No'}</DI>
                     <DI label="Serialnumber">{selectedRow.serialnumber ?? '-'}</DI>
                   </DL>
@@ -494,7 +503,7 @@ export function OrdiniDettaglioPage() {
                           </td>
                           <td className={s.numCol}>{formatMoneyEUR(r.setup)}</td>
                           <td className={s.numCol}>{formatMoneyEUR(r.mrc)}</td>
-                          <td>{statoBadge(r.stato_riga)}</td>
+                          <td>{statoRigaBadge(r)}</td>
                           <td className={s.mono}>{r.serialnumber ?? ''}</td>
                         </tr>
                       ))}

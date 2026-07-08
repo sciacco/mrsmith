@@ -314,7 +314,7 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 		{
 			ID:            BinocoloAppID,
 			Name:          "Binocolo",
-			Description:   "Verifiche OpenAPI.it.",
+			Description:   "M&A scouting",
 			Icon:          "database",
 			Href:          BinocoloAppHref,
 			Status:        "test",
