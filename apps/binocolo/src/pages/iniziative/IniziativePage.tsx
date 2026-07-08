@@ -21,10 +21,10 @@ const visibilityTitle: Record<InitiativeVisibility, string> = {
 };
 
 const STATE_ORDER: Array<{ key: string; label: string }> = [
+  { key: 'approfondimento', label: 'Approfondimento' },
   { key: 'da_contattare', label: 'Da contattare' },
   { key: 'contattata', label: 'Contattata' },
   { key: 'in_dialogo', label: 'In dialogo' },
-  { key: 'approfondimento', label: 'Approfondimento' },
   { key: 'offerta', label: 'Offerta' },
   { key: 'chiusa', label: 'Chiuse' },
 ];
