@@ -422,7 +422,23 @@ export function IniziativaBoardPage() {
         <div className={styles.sessChips}>
           <span className={styles.hint}>Ricerche:</span>
           {board.sessions.map((session) => (
-            <span key={session.id} className={styles.sessChip}>
+            <span
+              key={session.id}
+              className={`${styles.sessChip} ${styles.sessChipLink}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                navigate(`/ricerche/${session.id}`);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  navigate(`/ricerche/${session.id}`);
+                }
+              }}
+              role="button"
+              tabIndex={0}
+            >
               {session.title}
             </span>
           ))}

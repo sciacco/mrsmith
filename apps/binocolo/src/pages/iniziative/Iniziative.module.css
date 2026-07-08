@@ -463,6 +463,19 @@
   padding: var(--space-1) var(--space-3);
 }
 
+.sessChipLink {
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
+}
+
+.sessChipLink:hover,
+.sessChipLink:focus-visible {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  border-color: var(--color-accent-muted);
+  outline: none;
+}
+
 /* Kanban */
 
 .kanban {
