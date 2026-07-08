@@ -262,6 +262,10 @@ export function isGateReject(target: MATargetListItem): boolean {
   );
 }
 
+export function isOperationalGateReject(target: MATargetListItem): boolean {
+  return target.origin !== 'manual' && isGateReject(target);
+}
+
 export function bucketLabel(bucket?: string): string {
   switch (bucket) {
     case 'azionabile':

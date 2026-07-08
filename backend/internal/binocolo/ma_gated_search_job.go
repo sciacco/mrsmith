@@ -580,6 +580,7 @@ func (s *maService) enrichTargetAdvanced(ctx context.Context, target MATarget) (
 	enriched.VATCode = target.VATCode
 	enriched.TaxCode = target.TaxCode
 	enriched.CompanyName = target.CompanyName
+	enriched.Origin = target.Origin
 	enriched.EnrichmentLevel = maEnrichmentAdvanced
 	// Carry the gate verdict onto the enriched row: scoring reads it for the
 	// sector-mismatch rescue (a gate-confirmed survivor with an off-division
@@ -854,10 +855,12 @@ func (s *maService) associateDomainWork(ctx context.Context, job maJob) error {
 	return s.enrichAssociatedAndRescore(ctx, detail.Targets, strategy, job.SessionID, runID, companyKey)
 }
 
-// releaseAssociateSession flips a session left in 'running' by a failed/abandoned association
-// back to 'completed', re-completing its run with the current scored count. The prior results
-// are intact, so 'completed' — not 'failed' — is the honest state. Called by the worker on a
-// final give-up; derives the run from the session's targets.
+// releaseAssociateSession flips a session left in 'running' by a failed/abandoned per-target
+// remedy back to 'completed', re-completing its run with the current scored count. The prior
+// results are intact, so 'completed' — not 'failed' — is the honest state. Called by the worker
+// on a final give-up; derives the run from targets first and falls back to a targetless run.
+// If a manual_add failed before creating any run/target, mark only that targetless session
+// failed so it cannot remain stuck in 'running'.
 func (s *maService) releaseAssociateSession(ctx context.Context, sessionID string) {
 	detail, err := s.store.GetMASession(ctx, sessionID)
 	if err != nil {
@@ -874,6 +877,15 @@ func (s *maService) releaseAssociateSession(ctx context.Context, sessionID strin
 		}
 	}
 	if runID == "" {
+		for _, run := range detail.Runs {
+			if strings.TrimSpace(run.ID) != "" {
+				runID = run.ID
+				break
+			}
+		}
+	}
+	if runID == "" {
+		_ = s.store.MarkMASessionExecuteFailed(ctx, sessionID)
 		return
 	}
 	_ = s.store.CompleteMAExecutionRun(ctx, runID, maRunStatusCompleted, scored, "")

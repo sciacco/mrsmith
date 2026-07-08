@@ -80,6 +80,7 @@ type sectorReplayInput struct {
 	label                string
 	concepts             []maConceptScore
 	deterministicVerdict string
+	origin               string
 }
 
 type sectorReplayBests struct {
@@ -209,9 +210,11 @@ func sectorReplayDistractorByLabel(inputs []sectorReplayInput) map[string]Sector
 	return out
 }
 
-// computeSectorReplay runs R1/R3/R2 over the labeled rows. Returns nil when there is
-// nothing labeled (so the report omits the section).
+// computeSectorReplay runs R1/R3/R2 over the labeled automatic-search rows. Returns nil
+// when there is nothing labeled (so the report omits the section). Manual-origin rows are
+// excluded because their gate verdict is informational, not an operational survivor/drop.
 func computeSectorReplay(inputs []sectorReplayInput) *SectorReplayReport {
+	inputs = automaticSectorReplayInputs(inputs)
 	if len(inputs) == 0 {
 		return nil
 	}
@@ -265,4 +268,15 @@ func computeSectorReplay(inputs []sectorReplayInput) *SectorReplayReport {
 		}
 	}
 	return rep
+}
+
+func automaticSectorReplayInputs(inputs []sectorReplayInput) []sectorReplayInput {
+	out := make([]sectorReplayInput, 0, len(inputs))
+	for _, in := range inputs {
+		if in.origin == maTargetOriginManual {
+			continue
+		}
+		out = append(out, in)
+	}
+	return out
 }

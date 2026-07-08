@@ -161,6 +161,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/sessions/{id}/rating", h.handleRateMATarget)
 	handle("POST /binocolo/v1/ma/sessions/{id}/outcome", h.handleAddMATargetOutcome)
 	handle("POST /binocolo/v1/ma/sessions/{id}/rescore", h.handleRescoreMASession)
+	handle("POST /binocolo/v1/ma/sessions/{id}/targets/manual", h.handleManualAddMATarget)
 	handle("POST /binocolo/v1/ma/sessions/{id}/associate-domain", h.handleAssociateMATargetDomain)
 	handle("POST /binocolo/v1/ma/sessions/{id}/confirm-group-site", h.handleConfirmMAGroupSite)
 	handle("POST /binocolo/v1/ma/sessions/{id}/no-website", h.handleDeclareMANoWebsite)
@@ -1226,6 +1227,39 @@ func (h *Handler) handleRescoreMASession(w http.ResponseWriter, r *http.Request)
 	httputil.JSON(w, http.StatusOK, detail)
 }
 
+// handleManualAddMATarget enqueues an analyst-driven insertion of one company by
+// VAT/tax code into an existing MA session. The worker fetches Advanced, validates
+// the web/domain path, and re-scores the session.
+func (h *Handler) handleManualAddMATarget(w http.ResponseWriter, r *http.Request) {
+	id, ok := maSessionID(w, r)
+	if !ok {
+		return
+	}
+	if !h.requireOpenAPIIT(w) {
+		return
+	}
+	var body MAManualAddTargetRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	detail, err := h.ma.enqueueManualAdd(r.Context(), id, body.VATCode, body.Domain, subject, email, wantsMATargetsNone(r))
+	if err != nil {
+		if errors.Is(err, errMATargetAlreadyPresent) {
+			httputil.Error(w, http.StatusConflict, errMATargetAlreadyPresent.Error())
+			return
+		}
+		if errors.Is(err, errMAManualAddInFlight) {
+			httputil.Error(w, http.StatusConflict, errMAManualAddInFlight.Error())
+			return
+		}
+		h.maFailure(w, r, "ma_target_manual_add", err, "session_id", id)
+		return
+	}
+	httputil.JSON(w, http.StatusAccepted, detail)
+}
+
 // handleAssociateMATargetDomain is the manual-review remedy: the operator supplies an
 // official domain for a company the gate held as domain-unresolved. It enqueues a durable
 // associate_domain job that re-gates that one company with the forced domain and, if it now
@@ -1595,12 +1629,20 @@ func (h *Handler) handleCreateCompanyDossier(w http.ResponseWriter, r *http.Requ
 // maVATParam reads and validates the {vat} path segment: an 11-digit partita IVA /
 // codice fiscale, or a 16-char individual codice fiscale.
 func maVATParam(w http.ResponseWriter, r *http.Request) (string, bool) {
-	vat := strings.ToUpper(strings.TrimSpace(r.PathValue("vat")))
-	if !isValidVATOrTax(vat) {
+	vat := normalizeMAVATOrTax(r.PathValue("vat"))
+	if vat == "" {
 		httputil.Error(w, http.StatusBadRequest, "invalid_vat")
 		return "", false
 	}
 	return vat, true
+}
+
+func normalizeMAVATOrTax(v string) string {
+	v = strings.ToUpper(strings.TrimSpace(v))
+	if !isValidVATOrTax(v) {
+		return ""
+	}
+	return v
 }
 
 func isValidVATOrTax(v string) bool {

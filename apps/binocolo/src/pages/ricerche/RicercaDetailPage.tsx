@@ -9,6 +9,7 @@ import { ThesisReadingPanel } from '../../components/ThesisReadingPanel/ThesisRe
 import type {
   MAGatedProgressResponse,
   MASessionDetail,
+  MAManualAddTargetRequest,
   MADeepAnalysis,
   MATarget,
   MATargetListResponse,
@@ -27,6 +28,7 @@ import {
   errorLabel,
   gatedBucketCounts,
   isGateReject,
+  isOperationalGateReject,
   normalizeSearchLimit,
   numberFormat,
   safeFilename,
@@ -60,6 +62,83 @@ const moneyFormat = new Intl.NumberFormat('it-IT', {
 
 type ActiveTab = 'results' | 'queue' | 'outside';
 
+type ManualAddErrors = Partial<Record<'vatCode' | 'domain' | 'form', string>>;
+type ManualAddLocalState = { vatCode: string; domain?: string; submittedAt: string };
+
+const manualAddActiveStatuses = new Set(['queued', 'pending', 'running', 'processing']);
+
+function isManualAddActive(job?: MAGatedProgressResponse['manualAdd'] | null): boolean {
+  return Boolean(job?.status && manualAddActiveStatuses.has(job.status));
+}
+
+function manualAddJobErrorCopy(errorCode?: string): { title: string; detail: string } {
+  switch (errorCode) {
+    case 'vat_not_found':
+      return { title: 'P.IVA non trovata nel registro', detail: 'Verifica l’identificativo e riprova con una P.IVA o un codice fiscale valido.' };
+    case 'openapiit_unavailable':
+      return { title: 'Registro aziende temporaneamente non disponibile', detail: 'Riprova tra poco: l’inserimento non è stato completato.' };
+    case 'brave_unavailable':
+      return { title: 'Verifica dominio temporaneamente non disponibile', detail: 'Riprova tra poco oppure indica il dominio ufficiale se lo conosci.' };
+    case 'manual_add_failed':
+      return { title: 'Inserimento non completato', detail: 'Verifica i dati inseriti e riprova.' };
+    default:
+      return { title: 'Inserimento non completato', detail: 'Controlla P.IVA, codice fiscale o dominio e riprova.' };
+  }
+}
+
+function normalizeManualVat(value: string): string {
+  return value.trim().toUpperCase();
+}
+
+function validateManualVat(value: string): string | null {
+  const normalized = normalizeManualVat(value);
+  if (!normalized) return 'Inserisci una P.IVA o un codice fiscale.';
+  if (/^\d{11}$/.test(normalized) || /^[A-Z0-9]{16}$/.test(normalized)) return null;
+  return 'Usa 11 cifre oppure 16 caratteri alfanumerici.';
+}
+
+function isValidManualDomainInput(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return true;
+  if (/\s/.test(trimmed)) return false;
+  const withoutProtocol = trimmed.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '');
+  const hostPart = withoutProtocol.split(/[/?#]/)[0] ?? '';
+  const host = (hostPart.split('@').pop() ?? '').split(':')[0]?.replace(/^www\./i, '') ?? '';
+  if (!host || host.startsWith('.') || host.endsWith('.') || host.includes('..') || !/^[a-z0-9.-]+$/i.test(host)) return false;
+  const labels = host.split('.');
+  if (labels.length < 2) return false;
+  return labels.every((label) => label.length > 0 && !label.startsWith('-') && !label.endsWith('-'));
+}
+
+function validateManualDomain(value: string): string | null {
+  if (isValidManualDomainInput(value)) return null;
+  return 'Inserisci un dominio valido, es. azienda.it.';
+}
+
+function apiBodyMessage(error: ApiError): string | undefined {
+  const body = error.body;
+  if (body && typeof body === 'object' && 'error' in body && typeof body.error === 'string') return body.error;
+  if (body && typeof body === 'object' && 'message' in body && typeof body.message === 'string') return body.message;
+  return undefined;
+}
+
+function manualAddErrorLabel(error: unknown): string {
+  if (error instanceof ApiError) {
+    const message = apiBodyMessage(error);
+    if (error.status === 409 && message?.includes('già presente')) return 'Azienda già presente nella ricerca';
+    if (message?.includes('P.IVA non trovata')) return 'P.IVA non trovata nel registro';
+    if (message?.includes('Inserimento manuale già in corso')) return 'Inserimento manuale già in corso per questa ricerca.';
+    if (message === 'invalid_domain' || message?.includes('domain')) return 'Dominio non valido.';
+    if (message === 'invalid_vat' || message === 'invalid_ma_request' || message?.includes('vat')) return 'P.IVA o codice fiscale non valido.';
+  }
+  return errorLabel(error);
+}
+
+function describedBy(...ids: Array<string | false | null | undefined>): string | undefined {
+  const value = ids.filter(Boolean).join(' ');
+  return value || undefined;
+}
+
 export function RicercaDetailPage() {
   const { id } = useParams<{ id: string }>();
   const api = useApiClient();
@@ -88,7 +167,14 @@ export function RicercaDetailPage() {
   const [forceRerun, setForceRerun] = useState(false);
   const [excludeCandidate, setExcludeCandidate] = useState<MATargetRow | null>(null);
   const [excludeReason, setExcludeReason] = useState('');
+  const [manualAddOpen, setManualAddOpen] = useState(false);
+  const [manualAddVat, setManualAddVat] = useState('');
+  const [manualAddDomain, setManualAddDomain] = useState('');
+  const [manualAddErrors, setManualAddErrors] = useState<ManualAddErrors>({});
+  const [manualAddSubmitting, setManualAddSubmitting] = useState(false);
+  const [manualAddLocal, setManualAddLocal] = useState<ManualAddLocalState | null>(null);
   const rowsTerminalKey = useRef('');
+  const manualAddTerminalKey = useRef('');
 
   const loadStatus = useCallback(async () => {
     if (!id) return;
@@ -143,13 +229,16 @@ export function RicercaDetailPage() {
       detail.session.status === 'running' ||
       progress.stage === 'address' ||
       progress.stage === 'gate' ||
-      progress.stage === 'enrich';
+      progress.stage === 'enrich' ||
+      isManualAddActive(progress.manualAdd) ||
+      manualAddSubmitting;
     if (!shouldPoll) return;
+    const refreshRows = detail.session.status === 'running' && (progress.stage === 'ready' || progress.stage === 'failed');
     const handle = setInterval(() => {
-      void loadAll(false);
+      void loadAll(refreshRows);
     }, 4000);
     return () => clearInterval(handle);
-  }, [detail, loadAll, progress]);
+  }, [detail, loadAll, manualAddSubmitting, progress]);
 
   useEffect(() => {
     if (!progress) return;
@@ -163,6 +252,24 @@ export function RicercaDetailPage() {
     rowsTerminalKey.current = key;
     void loadRows().catch((err) => setError(errorLabel(err)));
   }, [loadRows, progress]);
+
+  useEffect(() => {
+    const job = progress?.manualAdd;
+    if (!job) return;
+    if (isManualAddActive(job)) {
+      manualAddTerminalKey.current = '';
+      return;
+    }
+    if (job.status !== 'ready' && job.status !== 'failed') return;
+    const key = `${job.status}:${job.updatedAt}:${job.errorCode ?? ''}`;
+    if (manualAddTerminalKey.current === key) return;
+    manualAddTerminalKey.current = key;
+    if (job.status === 'ready') {
+      setManualAddLocal(null);
+      setManualAddErrors({});
+    }
+    void loadRows().catch((err) => setError(errorLabel(err)));
+  }, [loadRows, progress?.manualAdd]);
 
   const selectedTarget = selectedRow ? targetCache[selectedRow.id] ?? null : null;
 
@@ -208,11 +315,11 @@ export function RicercaDetailPage() {
     return () => clearInterval(handle);
   }, [refetchTargetDetail, selectedDeepRunning, selectedRow]);
 
-  const outsideTargets = useMemo(() => rows.filter(isGateReject), [rows]);
+  const outsideTargets = useMemo(() => rows.filter(isOperationalGateReject), [rows]);
   const resultTargets = useMemo(
     () =>
       rows
-        .filter((target) => !isGateReject(target))
+        .filter((target) => !isOperationalGateReject(target))
         .sort((a, b) => {
           // Le soppresse non hanno rango tra le vive: sempre in coda alla lista.
           const suppressedDelta = Number(a.bucket === 'soppresso') - Number(b.bucket === 'soppresso');
@@ -240,6 +347,20 @@ export function RicercaDetailPage() {
   );
   const isRunning = detail?.session.status === 'running' || progress?.stage === 'address' || progress?.stage === 'gate' || progress?.stage === 'enrich';
   const isFailed = detail?.session.status === 'failed' || progress?.stage === 'failed';
+  const manualAddJob = progress?.manualAdd ?? null;
+  const manualAddInFlight = manualAddSubmitting || isManualAddActive(manualAddJob);
+  const manualAddFailed = manualAddJob?.status === 'failed';
+  const showManualAddNotice = manualAddInFlight || manualAddFailed || Boolean(manualAddLocal && !manualAddJob);
+
+  function openManualAddRetry() {
+    if (manualAddInFlight) return;
+    if (manualAddLocal) {
+      setManualAddVat(manualAddLocal.vatCode);
+      setManualAddDomain(manualAddLocal.domain ?? '');
+    }
+    setManualAddErrors({});
+    setManualAddOpen(true);
+  }
 
   async function resumeSearch(force = false) {
     if (!detail?.session.id) return;
@@ -298,6 +419,54 @@ export function RicercaDetailPage() {
     downloadBlob(blob, `ricerca-${safeFilename(detail.session.title)}.csv`);
   }
 
+  function closeManualAddModal() {
+    if (manualAddSubmitting) return;
+    setManualAddOpen(false);
+    setManualAddVat('');
+    setManualAddDomain('');
+    setManualAddErrors({});
+  }
+
+  async function submitManualAdd(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const vatCode = normalizeManualVat(manualAddVat);
+    const domain = manualAddDomain.trim();
+    const nextErrors: ManualAddErrors = {};
+    const vatError = validateManualVat(manualAddVat);
+    const domainError = validateManualDomain(manualAddDomain);
+    if (vatError) nextErrors.vatCode = vatError;
+    if (domainError) nextErrors.domain = domainError;
+    if (nextErrors.vatCode || nextErrors.domain) {
+      setManualAddErrors(nextErrors);
+      return;
+    }
+    const sessionId = detail?.session.id ?? id;
+    if (!sessionId) return;
+    if (manualAddInFlight) {
+      setManualAddErrors({ form: 'Inserimento manuale già in corso per questa ricerca.' });
+      return;
+    }
+    const payload: MAManualAddTargetRequest = domain ? { vatCode, domain } : { vatCode };
+    setManualAddSubmitting(true);
+    setManualAddErrors({});
+    try {
+      const data = await api.post<MASessionDetail>(`/binocolo/v1/ma/sessions/${sessionId}/targets/manual?targets=none`, payload);
+      setDetail(data);
+      setManualAddLocal({ vatCode, ...(domain ? { domain } : {}), submittedAt: new Date().toISOString() });
+      setManualAddOpen(false);
+      setManualAddVat('');
+      setManualAddDomain('');
+      toast('Azienda in inserimento.', 'success');
+      await loadAll();
+    } catch (err) {
+      const message = manualAddErrorLabel(err);
+      if (message.includes('Dominio')) setManualAddErrors({ domain: message });
+      else if (message.includes('P.IVA') || message.includes('codice fiscale')) setManualAddErrors({ vatCode: message });
+      else setManualAddErrors({ form: message });
+    } finally {
+      setManualAddSubmitting(false);
+    }
+  }
 
   async function rateTarget(target: MATargetRow, rating: number) {
     if (!detail?.session.id) return;
@@ -474,6 +643,15 @@ export function RicercaDetailPage() {
             />
           ) : null}
 
+          {showManualAddNotice ? (
+            <ManualAddJobNotice
+              job={manualAddJob}
+              local={manualAddLocal}
+              inFlight={manualAddInFlight}
+              onRetry={openManualAddRetry}
+            />
+          ) : null}
+
           {isRunning ? (
             <section className={styles.panel} aria-labelledby="queue-ghost-title">
               <div className={styles.panelHeader}>
@@ -534,6 +712,9 @@ export function RicercaDetailPage() {
                       <option key={item.value} value={item.value}>{item.label}</option>
                     ))}
                   </select>
+                  <Button onClick={() => setManualAddOpen(true)} leftIcon={<Icon name="plus" />} disabled={manualAddInFlight}>
+                    Aggiungi azienda
+                  </Button>
                   <Button variant="secondary" onClick={() => void rescore()} loading={busy === 'rescore'} leftIcon={<Icon name="refresh-cw" />}>
                     Cambia tesi e ricalcola
                   </Button>
@@ -555,7 +736,15 @@ export function RicercaDetailPage() {
                 </button>
               </div>
               {activeTab === 'results' ? (
-                <ResultsTable rows={resultTargets} loading={rowsLoading} sessionId={id} onOpen={setSelectedRow} onRate={(target, rating) => void rateTarget(target, rating)} />
+                <ResultsTable
+                  rows={resultTargets}
+                  loading={rowsLoading}
+                  sessionId={id}
+                  onOpen={setSelectedRow}
+                  onRate={(target, rating) => void rateTarget(target, rating)}
+                  onAdd={() => setManualAddOpen(true)}
+                  manualAddDisabled={manualAddInFlight}
+                />
               ) : null}
               {activeTab === 'queue' ? (
                 <QueueTab
@@ -608,6 +797,37 @@ export function RicercaDetailPage() {
           setTargetError(null);
           setDeepLaunchError(null);
         }}
+      />
+
+      <ManualAddCompanyModal
+        open={manualAddOpen}
+        vatCode={manualAddVat}
+        domain={manualAddDomain}
+        errors={manualAddErrors}
+        submitting={manualAddSubmitting}
+        onVatCodeChange={(value) => {
+          const nextValue = value.toUpperCase();
+          setManualAddVat(nextValue);
+          if (manualAddErrors.vatCode || manualAddErrors.form) {
+            setManualAddErrors((current) => ({
+              ...current,
+              vatCode: current.vatCode ? validateManualVat(nextValue) ?? undefined : current.vatCode,
+              form: undefined,
+            }));
+          }
+        }}
+        onDomainChange={(value) => {
+          setManualAddDomain(value);
+          if (manualAddErrors.domain || manualAddErrors.form) {
+            setManualAddErrors((current) => ({
+              ...current,
+              domain: current.domain ? validateManualDomain(value) ?? undefined : current.domain,
+              form: undefined,
+            }));
+          }
+        }}
+        onSubmit={(event) => void submitManualAdd(event)}
+        onClose={closeManualAddModal}
       />
 
       <Modal
@@ -866,18 +1086,156 @@ function BucketLegend({ className, label, count, hint }: { className: string; la
   );
 }
 
+function ManualAddJobNotice({
+  job,
+  local,
+  inFlight,
+  onRetry,
+}: {
+  job?: MAGatedProgressResponse['manualAdd'] | null;
+  local: ManualAddLocalState | null;
+  inFlight: boolean;
+  onRetry: () => void;
+}) {
+  const failed = job?.status === 'failed';
+  const copy = failed ? manualAddJobErrorCopy(job?.errorCode) : null;
+  const subject = local?.vatCode ? `P.IVA / CF ${local.vatCode}` : 'azienda richiesta';
+
+  return (
+    <section className={`${styles.manualAddNotice} ${failed ? styles.manualAddNoticeError : styles.manualAddNoticeActive}`} role={failed ? 'alert' : 'status'}>
+      <div className={styles.manualAddNoticeIcon} aria-hidden="true">
+        <Icon name={failed ? 'triangle-alert' : 'clock'} size={18} />
+      </div>
+      <div className={styles.manualAddNoticeBody}>
+        <strong>{failed ? copy?.title : 'Azienda in inserimento'}</strong>
+        <p>
+          {failed
+            ? copy?.detail
+            : `${subject}: il sistema sta completando registro, verifica dominio e ricalcolo. La riga comparirà al termine.`}
+        </p>
+      </div>
+      {failed ? (
+        <Button variant="secondary" onClick={onRetry} disabled={inFlight} leftIcon={<Icon name="refresh-cw" />}>
+          Riprova
+        </Button>
+      ) : (
+        <span className={`${styles.statusPill} ${styles.statusRunning}`}>
+          <span className={styles.pulse} />
+          In elaborazione
+        </span>
+      )}
+    </section>
+  );
+}
+
+function ManualAddCompanyModal({
+  open,
+  vatCode,
+  domain,
+  errors,
+  submitting,
+  onVatCodeChange,
+  onDomainChange,
+  onSubmit,
+  onClose,
+}: {
+  open: boolean;
+  vatCode: string;
+  domain: string;
+  errors: ManualAddErrors;
+  submitting: boolean;
+  onVatCodeChange: (value: string) => void;
+  onDomainChange: (value: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onClose: () => void;
+}) {
+  const vatHintId = 'manual-add-vat-hint';
+  const vatErrorId = 'manual-add-vat-error';
+  const domainHintId = 'manual-add-domain-hint';
+  const domainErrorId = 'manual-add-domain-error';
+
+  return (
+    <Modal open={open} onClose={onClose} title="Aggiungi azienda" size="md" dismissible={!submitting}>
+      <form className={styles.manualAddForm} onSubmit={onSubmit} noValidate>
+        <p className={styles.modalCopy}>
+          Inserisci un identificativo azienda. Il dominio è opzionale: usalo solo quando conosci il sito ufficiale.
+        </p>
+
+        <div className={styles.field}>
+          <label htmlFor="manual-add-vat" className={styles.requiredLabel}>
+            <span className={styles.dotRequired} aria-hidden="true" />
+            <span>P.IVA / codice fiscale</span>
+            <span className={styles.srOnly}>obbligatorio</span>
+          </label>
+          <input
+            id="manual-add-vat"
+            className={`${styles.input} ${errors.vatCode ? styles.inputError : ''}`}
+            value={vatCode}
+            onChange={(event) => onVatCodeChange(event.target.value)}
+            placeholder="01234567890"
+            autoComplete="off"
+            inputMode="text"
+            required
+            aria-invalid={Boolean(errors.vatCode) || undefined}
+            aria-describedby={describedBy(vatHintId, errors.vatCode && vatErrorId)}
+          />
+          <p id={vatHintId} className={styles.fieldHint}>11 cifre oppure 16 caratteri alfanumerici.</p>
+          {errors.vatCode ? <p id={vatErrorId} className={styles.fieldError}>{errors.vatCode}</p> : null}
+        </div>
+
+        <div className={styles.field}>
+          <label htmlFor="manual-add-domain">Dominio</label>
+          <input
+            id="manual-add-domain"
+            className={`${styles.input} ${errors.domain ? styles.inputError : ''}`}
+            value={domain}
+            onChange={(event) => onDomainChange(event.target.value)}
+            placeholder="azienda.it"
+            autoComplete="off"
+            inputMode="url"
+            aria-invalid={Boolean(errors.domain) || undefined}
+            aria-describedby={describedBy(domainHintId, errors.domain && domainErrorId)}
+          />
+          <p id={domainHintId} className={styles.fieldHint}>Se lo conosci, l’inserimento è più affidabile.</p>
+          {errors.domain ? <p id={domainErrorId} className={styles.fieldError}>{errors.domain}</p> : null}
+        </div>
+
+        {errors.form ? (
+          <div className={styles.deepInlineError} role="alert">
+            <Icon name="triangle-alert" size={16} />
+            <span>{errors.form}</span>
+          </div>
+        ) : null}
+
+        <div className={`${styles.modalActions} ${styles.manualAddActions}`}>
+          <Button variant="secondary" onClick={onClose} disabled={submitting}>
+            Annulla
+          </Button>
+          <Button type="submit" loading={submitting} leftIcon={<Icon name="plus" />}>
+            Aggiungi azienda
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 function ResultsTable({
   rows,
   loading,
   sessionId,
   onOpen,
   onRate,
+  onAdd,
+  manualAddDisabled,
 }: {
   rows: MATargetRow[];
   loading: boolean;
   sessionId?: string;
   onOpen: (target: MATargetRow) => void;
   onRate: (target: MATargetRow, rating: number) => void;
+  onAdd: () => void;
+  manualAddDisabled: boolean;
 }) {
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [hideExcluded, setHideExcluded] = useState(false);
@@ -914,7 +1272,16 @@ function ResultsTable({
         </div>
       ) : null}
       {filtered.length === 0 ? (
-        <div className={styles.emptyState}><span className={styles.emptyIcon}><Icon name="file-text" size={28} /></span><strong>Nessun risultato</strong></div>
+        <div className={styles.emptyState}>
+          <span className={styles.emptyIcon}><Icon name="file-text" size={28} /></span>
+          <strong>{rows.length === 0 ? 'Nessun risultato — esegui la ricerca o aggiungi aziende' : 'Nessun risultato con i filtri correnti'}</strong>
+          <p>{rows.length === 0 ? 'Puoi mantenere la ricerca come contenitore e inserire aziende manualmente.' : 'Puoi aggiungere manualmente un’azienda anche con i filtri attivi.'}</p>
+          <div className={styles.emptyActions}>
+            <Button onClick={onAdd} leftIcon={<Icon name="plus" />} disabled={manualAddDisabled}>
+              Aggiungi azienda
+            </Button>
+          </div>
+        </div>
       ) : (
         <div className={styles.tableWrap}>
           <table className={styles.table}>
@@ -933,6 +1300,9 @@ function ResultsTable({
               <td>
                 <span className={styles.cellStack}>
                   <b>{target.companyName}</b>
+                  {target.origin === 'manual' ? (
+                    <span className={`${styles.badge} ${styles.badgeManual}`}>Inserita manualmente</span>
+                  ) : null}
                   {target.webValidation?.webValidationState === 'no_website_declared' ? (
                     <span className={styles.badge}>nessuna evidenza web</span>
                   ) : null}
@@ -1300,10 +1670,12 @@ function TargetDetailModal({
 function TargetPriorityMarkers({ row }: { row: MATargetRow | null }) {
   const registryFacts = row?.registryFacts ?? [];
   const workMarkers = row?.inLavorazione ?? [];
-  if (registryFacts.length === 0 && workMarkers.length === 0) return null;
+  const isManual = row?.origin === 'manual';
+  if (!isManual && registryFacts.length === 0 && workMarkers.length === 0) return null;
 
   return (
     <div className={styles.targetPriorityMarkers} aria-label="Segnali prioritari">
+      {isManual ? <span className={`${styles.badge} ${styles.badgeManual}`}>Inserita manualmente</span> : null}
       {registryFacts.map((kind) => {
         const meta = registryFactLabels[kind] ?? { label: humanizeCode(kind), tone: 'info' as const };
         return (

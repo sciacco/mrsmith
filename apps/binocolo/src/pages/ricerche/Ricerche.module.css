@@ -275,6 +275,26 @@
   color: var(--color-text-faint);
 }
 
+.emptyState strong {
+  max-width: 520px;
+  color: var(--color-text-secondary);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.emptyState p {
+  max-width: 520px;
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.emptyActions {
+  margin-top: var(--space-5);
+}
+
 .textarea {
   width: 100%;
   min-height: 180px;
@@ -661,6 +681,91 @@
   font-weight: 700;
 }
 
+.requiredLabel {
+  display: inline-flex;
+  align-items: center;
+}
+
+.fieldHint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.manualAddNotice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-sm);
+}
+
+.manualAddNoticeActive {
+  border-color: var(--color-accent-muted);
+  background: var(--color-accent-subtle);
+}
+
+.manualAddNoticeError {
+  border-color: var(--color-danger);
+  background: var(--color-danger-subtle);
+}
+
+.manualAddNoticeIcon {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: var(--color-bg-elevated);
+  color: var(--color-accent);
+}
+
+.manualAddNoticeError .manualAddNoticeIcon {
+  color: var(--color-danger-hover);
+}
+
+.manualAddNoticeBody {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.manualAddNoticeBody strong {
+  color: var(--color-text);
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.manualAddNoticeBody p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.manualAddForm {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.modalCopy {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.manualAddActions {
+  justify-content: flex-end;
+  padding-top: var(--space-2);
+}
+
 .input,
 .select {
   width: 100%;
@@ -908,6 +1013,12 @@
   border: 1px solid var(--color-border);
   background: var(--color-surface);
   color: var(--color-text-secondary);
+}
+
+.badgeManual {
+  border: 1px solid var(--color-info-subtle);
+  background: var(--color-info-subtle);
+  color: var(--color-info-strong);
 }
 
 .initiativeBadge {
@@ -1535,6 +1646,7 @@ td .inspectLink { margin-left: var(--space-1); }
 
   .queueRow,
   .rowCard,
+  .manualAddNotice,
   .deepAnalysisHeader {
     grid-template-columns: 1fr;
   }

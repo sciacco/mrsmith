@@ -209,7 +209,6 @@ func (s *maService) sectorEvalReport(ctx context.Context, sessionID string) (Sec
 	}
 
 	metrics := SectorEvalMetrics{
-		Labeled:            len(labels),
 		Domain:             SectorEvalDomainMetrics{IdentityStates: map[string]int{}, RejectByIdentity: map[string]int{}},
 		Deterministic:      SectorEvalPredictorMetrics{Confusion: newSectorConfusion()},
 		LLM:                SectorEvalPredictorMetrics{Confusion: newSectorConfusion()},
@@ -220,6 +219,7 @@ func (s *maService) sectorEvalReport(ctx context.Context, sessionID string) (Sec
 	replayInputs := make([]sectorReplayInput, 0, len(labels))
 
 	for _, t := range detail.Targets {
+		metricTarget := t.Origin != maTargetOriginManual
 		item := SectorEvalItem{
 			CompanyKey:       t.CompanyKey,
 			CompanyName:      t.CompanyName,
@@ -229,11 +229,18 @@ func (s *maService) sectorEvalReport(ctx context.Context, sessionID string) (Sec
 			item.Label = lbl.Label
 			item.Note = lbl.Note
 		}
-		metrics.Targets++
+		if metricTarget {
+			metrics.Targets++
+			if item.Label != "" {
+				metrics.Labeled++
+			}
+		}
 
 		if wv := t.WebValidation; wv != nil {
 			item.Validated = true
-			metrics.Validated++
+			if metricTarget {
+				metrics.Validated++
+			}
 			item.Domain = wv.SelectedDomain
 			item.SelfDescription = wv.Summary.CompanyDescription
 
@@ -245,17 +252,23 @@ func (s *maService) sectorEvalReport(ctx context.Context, sessionID string) (Sec
 				if wv.DomainScore != nil {
 					item.DomainScore = *wv.DomainScore
 				}
-				metrics.Domain.Resolved++
+				if metricTarget {
+					metrics.Domain.Resolved++
+				}
 			case item.DomainCandidateCount == 0:
 				item.DomainOutcome = "retrieval_fail"
-				metrics.Domain.RetrievalFail++
+				if metricTarget {
+					metrics.Domain.RetrievalFail++
+				}
 			default:
 				item.DomainOutcome = "acceptance_fail"
 				best := wv.DomainResponse.Candidates[0] // sorted desc by score
 				item.BestCandidateDomain = best.Domain
 				item.BestCandidateScore = best.Score
 				item.BestCandidateConfidence = best.Confidence
-				metrics.Domain.AcceptanceFail++
+				if metricTarget {
+					metrics.Domain.AcceptanceFail++
+				}
 			}
 
 			item.DeterministicVerdict = wv.Summary.DeterministicVerdict
@@ -279,26 +292,32 @@ func (s *maService) sectorEvalReport(ctx context.Context, sessionID string) (Sec
 				if identityKey == "" {
 					identityKey = "legacy"
 				}
-				metrics.Domain.IdentityStates[identityKey]++
-				if item.FinalBucket == maGatedBucketReject {
-					metrics.Domain.RejectByIdentity[identityKey]++
+				if metricTarget {
+					metrics.Domain.IdentityStates[identityKey]++
+					if item.FinalBucket == maGatedBucketReject {
+						metrics.Domain.RejectByIdentity[identityKey]++
+					}
 				}
 			}
 			// Group-site suspicion (policy B1): counted OUTSIDE the resolved guard —
 			// the hint matters most on unresolved rows, which are the queue.
 			if hint := wv.DomainResponse.GroupSiteHint; hint != nil {
 				item.GroupSiteHint = hint
-				metrics.Domain.GroupSiteSuspected++
+				if metricTarget {
+					metrics.Domain.GroupSiteSuspected++
+				}
 			}
 
 			item.Escalated = sectorVerdictNeedsLLM(maSectorVerdict(wv.Summary.DeterministicVerdict))
-			if item.Escalated {
+			if metricTarget && item.Escalated {
 				metrics.Escalations++
 			}
 			item.TopConcepts = topSectorConcepts(wv.Summary.Concepts, 5)
 			if sectorDistractorBeatsTarget(wv.Summary.Concepts) {
 				item.DistractorBeatsTarget = true
-				metrics.DistractorBeatsTarget++
+				if metricTarget {
+					metrics.DistractorBeatsTarget++
+				}
 			}
 			// Collect the FULL concept set (not the capped TopConcepts) for the offline
 			// replay analysis — only for labeled rows, which are the only ones it scores.
@@ -307,11 +326,12 @@ func (s *maService) sectorEvalReport(ctx context.Context, sessionID string) (Sec
 					label:                item.Label,
 					concepts:             wv.Summary.Concepts,
 					deterministicVerdict: wv.Summary.DeterministicVerdict,
+					origin:               t.Origin,
 				})
 			}
 		}
 
-		if item.Label != "" && item.Validated {
+		if metricTarget && item.Label != "" && item.Validated {
 			scoreSectorPredictor(&metrics.Deterministic, item.Label, item.DeterministicBucket)
 			scoreSectorPredictor(&metrics.LLM, item.Label, item.LLMBucket)
 			scoreSectorPredictor(&metrics.Final, item.Label, item.FinalBucket)

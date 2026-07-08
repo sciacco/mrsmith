@@ -40,6 +40,9 @@ var (
 	errMAInitiativeDeleted     = errors.New("ma initiative deleted")
 	errMAInitiativePurged      = errors.New("ma initiative purged")
 	errMAInitiativeNotFound    = errors.New("ma initiative not found")
+	errMATargetAlreadyPresent  = errors.New("Azienda già presente nella ricerca")
+	errMAManualAddInFlight     = errors.New("Inserimento manuale già in corso per questa ricerca")
+	errMAVATNotFound           = errors.New("P.IVA non trovata nel registro")
 	// errMAEstimateSuperseded is returned by ReplaceMAEstimates when the active
 	// strategy version changed mid-estimate (the user re-submitted). The estimate
 	// worker loops on it to re-run against the now-active version, so the latest

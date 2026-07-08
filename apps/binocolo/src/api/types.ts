@@ -700,6 +700,7 @@ export type MAStrategyType = 'ateco' | 'expanded';
 export type MAMatchState = 'match' | 'match_parziale' | 'fuori_criterio';
 export type MAEstimateSurfaceStatus = 'exact' | 'too_broad';
 export type MAThesis = 'successione' | 'crescita' | 'consolidamento' | 'tuck_in' | 'generico';
+export type MATargetOrigin = 'search' | 'manual';
 export type MAConfidence = 'alta' | 'media' | 'bassa';
 export type MAFlagSeverity = 'neutral' | 'warning';
 
@@ -848,6 +849,7 @@ export interface MATarget {
   vendorId?: string;
   companyKey?: string;
   companyName: string;
+  origin?: MATargetOrigin;
   vatCode?: string;
   taxCode?: string;
   province?: string;
@@ -892,6 +894,7 @@ export interface MATargetRow {
   runId: string;
   companyKey?: string;
   companyName: string;
+  origin?: MATargetOrigin;
   vatCode?: string;
   province?: string;
   town?: string;
@@ -911,6 +914,11 @@ export interface MATargetRow {
 
 export interface MATargetListResponse {
   items: MATargetRow[];
+}
+
+export interface MAManualAddTargetRequest {
+  vatCode: string;
+  domain?: string;
 }
 
 export interface MATargetFlag {
@@ -1077,6 +1085,14 @@ export interface MAGatedProgressResponse {
     completedAt?: string | null;
     errorCode: string;
   };
+  manualAdd?: MAManualAddJobProgress | null;
+}
+
+export interface MAManualAddJobProgress {
+  status: 'queued' | 'pending' | 'running' | 'processing' | 'ready' | 'failed' | string;
+  errorCode?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface MAVerificationQueueResponse {

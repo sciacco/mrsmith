@@ -1444,11 +1444,19 @@ func (f *fakeMAWorkspaceStore) EnqueueMAJob(context.Context, maJobEnqueue) (stri
 	return "", false, errors.New("not implemented")
 }
 
+func (f *fakeMAWorkspaceStore) LatestMAManualAddJob(context.Context, string) (*MAManualAddJobProgress, error) {
+	return nil, nil
+}
+
 func (f *fakeMAWorkspaceStore) SetMASessionEstimateStatus(context.Context, string, string, string) error {
 	return errors.New("not implemented")
 }
 
 func (f *fakeMAWorkspaceStore) MarkMASessionExecuting(context.Context, string) error {
+	return errors.New("not implemented")
+}
+
+func (f *fakeMAWorkspaceStore) MarkMASessionExecuteFailed(context.Context, string) error {
 	return errors.New("not implemented")
 }
 
@@ -1469,6 +1477,10 @@ func (f *fakeMAWorkspaceStore) CompleteMAExecutionRun(context.Context, string, s
 }
 
 func (f *fakeMAWorkspaceStore) ReplaceMATargets(context.Context, string, string, []MATarget) error {
+	return errors.New("not implemented")
+}
+
+func (f *fakeMAWorkspaceStore) InsertMATarget(context.Context, string, string, MATarget) error {
 	return errors.New("not implemented")
 }
 

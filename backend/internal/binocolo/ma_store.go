@@ -28,13 +28,16 @@ type maWorkspaceStore interface {
 	GetMAStrategyVersion(ctx context.Context, sessionID, versionID string) (MAStrategyVersion, error)
 	ReplaceMAEstimates(ctx context.Context, sessionID, strategyVersionID, selectedStrategy string, estimates []MAEstimate) error
 	EnqueueMAJob(ctx context.Context, input maJobEnqueue) (jobID string, created bool, err error)
+	LatestMAManualAddJob(ctx context.Context, sessionID string) (*MAManualAddJobProgress, error)
 	SetMASessionEstimateStatus(ctx context.Context, sessionID, strategyVersionID, status string) error
 	MarkMASessionExecuting(ctx context.Context, sessionID string) error
+	MarkMASessionExecuteFailed(ctx context.Context, sessionID string) error
 	HasRunningMAExecution(ctx context.Context, sessionID string) (bool, error)
 	AbandonMASessionExecution(ctx context.Context, sessionID, errorCode string) error
 	CreateMAExecutionRun(ctx context.Context, input maExecutionRunCreate) (MAExecutionRun, error)
 	CompleteMAExecutionRun(ctx context.Context, runID, status string, resultCount int, errorCode string) error
 	ReplaceMATargets(ctx context.Context, sessionID, runID string, targets []MATarget) error
+	InsertMATarget(ctx context.Context, sessionID, runID string, target MATarget) error
 	MarkMATargetAdvancedEnriched(ctx context.Context, targetID string, vendorPayload json.RawMessage) error
 	UpsertMATargetRating(ctx context.Context, sessionID string, input MATargetRatingRequest, subject, email string) error
 	InsertMATargetOutcome(ctx context.Context, outcome MATargetOutcome) error
@@ -1308,6 +1311,10 @@ WHERE target_id IN (SELECT id FROM binocolo.ma_target WHERE session_id = $1::uui
 			matchVal = nil
 			scoreVersionVal = nil
 		}
+		origin := target.Origin
+		if origin == "" {
+			origin = maTargetOriginSearch
+		}
 		if _, err := tx.ExecContext(ctx, `
 INSERT INTO binocolo.ma_target (
   id,
@@ -1315,6 +1322,7 @@ INSERT INTO binocolo.ma_target (
   run_id,
   vendor_id,
   company_name,
+  origin,
   vat_code,
   tax_code,
   province,
@@ -1336,14 +1344,15 @@ INSERT INTO binocolo.ma_target (
   score_version
 ) VALUES (
   $1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9, $10,
-  $11, $12, $13, $14, $15, $16, $17, $18, $19::jsonb, $20,
-  $21::jsonb, $22::jsonb, $23, $24
+  $11, $12, $13, $14, $15, $16, $17, $18, $19, $20::jsonb, $21,
+  $22::jsonb, $23::jsonb, $24, $25
 )
 `, targetID,
 			sessionID,
 			runID,
 			nullString(target.VendorID),
 			target.CompanyName,
+			origin,
 			nullString(target.VATCode),
 			nullString(target.TaxCode),
 			nullString(target.Province),
@@ -1395,6 +1404,181 @@ INSERT INTO binocolo.ma_evidence (
 			); err != nil {
 				return fmt.Errorf("insert ma evidence: %w", err)
 			}
+		}
+	}
+	return tx.Commit()
+}
+
+// InsertMATarget appends one target to an existing session/run without replacing the
+// current set. It serializes per session by locking ma_session and re-checks the
+// same VAT/tax/vendor/company-key semantics used by maTargetDedupeKey, so a racing
+// manual insertion cannot create duplicate rows.
+func (s *SQLStore) InsertMATarget(ctx context.Context, sessionID, runID string, target MATarget) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin ma target insert: %w", err)
+	}
+	defer tx.Rollback()
+	var locked string
+	if err := tx.QueryRowContext(ctx, `SELECT id::text FROM binocolo.ma_session WHERE id = $1::uuid FOR UPDATE`, sessionID).Scan(&locked); err != nil {
+		return fmt.Errorf("lock ma session for target insert: %w", err)
+	}
+	rows, err := tx.QueryContext(ctx, `
+SELECT COALESCE(vendor_id, ''), COALESCE(vat_code, ''), COALESCE(tax_code, ''), company_name
+FROM binocolo.ma_target
+WHERE session_id = $1::uuid
+FOR UPDATE
+`, sessionID)
+	if err != nil {
+		return fmt.Errorf("check ma target duplicate: %w", err)
+	}
+	for rows.Next() {
+		var existing MATarget
+		if err := rows.Scan(&existing.VendorID, &existing.VATCode, &existing.TaxCode, &existing.CompanyName); err != nil {
+			rows.Close()
+			return fmt.Errorf("scan ma target duplicate: %w", err)
+		}
+		if maManualAddSameTarget(existing, target) {
+			rows.Close()
+			return errMATargetAlreadyPresent
+		}
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return fmt.Errorf("iterate ma target duplicates: %w", err)
+	}
+	rows.Close()
+
+	targetID := target.ID
+	if targetID == "" {
+		targetID = uuid.NewString()
+	}
+	missingRaw, err := json.Marshal(target.MissingCriteria)
+	if err != nil {
+		return fmt.Errorf("marshal ma target missing criteria: %w", err)
+	}
+	flagsRaw := []byte("[]")
+	if len(target.Flags) > 0 {
+		raw, err := json.Marshal(target.Flags)
+		if err != nil {
+			return fmt.Errorf("marshal ma target flags: %w", err)
+		}
+		flagsRaw = raw
+	}
+	payload := json.RawMessage(`{}`)
+	if len(target.VendorPayload) > 0 {
+		payload = target.VendorPayload
+	}
+	level := target.EnrichmentLevel
+	if level == "" {
+		level = maEnrichmentAdvanced
+	}
+	var scoreVal any = target.Score
+	var matchVal any = nullString(target.MatchState)
+	var scoreVersionVal any
+	if target.ScoreVersion != nil {
+		scoreVersionVal = *target.ScoreVersion
+	}
+	if strings.TrimSpace(target.MatchState) == "" || level == maEnrichmentAddress {
+		scoreVal = nil
+		matchVal = nil
+		scoreVersionVal = nil
+	}
+	origin := target.Origin
+	if origin == "" {
+		origin = maTargetOriginSearch
+	}
+	if _, err := tx.ExecContext(ctx, `
+INSERT INTO binocolo.ma_target (
+  id,
+  session_id,
+  run_id,
+  vendor_id,
+  company_name,
+  origin,
+  vat_code,
+  tax_code,
+  province,
+  town,
+  activity_status,
+  turnover,
+  turnover_year,
+  employees,
+  ateco_code,
+  ateco_description,
+  score,
+  match_state,
+  confidence,
+  flags,
+  rationale,
+  missing_criteria,
+  vendor_payload,
+  enrichment_level,
+  score_version
+) VALUES (
+  $1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9, $10,
+  $11, $12, $13, $14, $15, $16, $17, $18, $19, $20::jsonb, $21,
+  $22::jsonb, $23::jsonb, $24, $25
+)
+`, targetID,
+		sessionID,
+		runID,
+		nullString(target.VendorID),
+		target.CompanyName,
+		origin,
+		nullString(target.VATCode),
+		nullString(target.TaxCode),
+		nullString(target.Province),
+		nullString(target.Town),
+		nullString(target.ActivityStatus),
+		nullInt(target.Turnover),
+		nullInt(target.TurnoverYear),
+		nullInt(target.Employees),
+		nullString(target.AtecoCode),
+		nullString(target.AtecoDescription),
+		scoreVal,
+		matchVal,
+		nullString(target.Confidence),
+		flagsRaw,
+		target.Rationale,
+		missingRaw,
+		[]byte(payload),
+		level,
+		scoreVersionVal,
+	); err != nil {
+		return fmt.Errorf("insert ma target: %w", err)
+	}
+	for _, evidence := range target.Evidence {
+		if _, err := tx.ExecContext(ctx, `
+INSERT INTO binocolo.ma_evidence (
+  id,
+  target_id,
+  criterion,
+  status,
+  family,
+  label,
+  value,
+  points,
+  weight,
+  source_path
+) VALUES (
+  $1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $10
+)
+`, uuid.NewString(),
+			targetID,
+			evidence.Criterion,
+			evidence.Status,
+			nullString(evidence.Family),
+			evidence.Label,
+			nullString(evidence.Value),
+			evidence.Points,
+			evidence.Weight,
+			nullString(evidence.SourcePath),
+		); err != nil {
+			return fmt.Errorf("insert ma evidence: %w", err)
 		}
 	}
 	return tx.Commit()
@@ -1883,6 +2067,7 @@ func scanMATargetBase(row maTargetScanner) (MATarget, error) {
 		&item.RunID,
 		&item.VendorID,
 		&item.CompanyName,
+		&item.Origin,
 		&item.VATCode,
 		&item.TaxCode,
 		&item.Province,
@@ -1939,7 +2124,7 @@ func scanMATargetBase(row maTargetScanner) (MATarget, error) {
 func (s *SQLStore) loadMATargets(ctx context.Context, sessionID string) ([]MATarget, error) {
 	rows, err := s.db.QueryContext(ctx, `
 SELECT id::text, session_id::text, run_id::text, COALESCE(vendor_id, ''), company_name,
-       COALESCE(vat_code, ''), COALESCE(tax_code, ''), COALESCE(province, ''), COALESCE(town, ''),
+       COALESCE(origin, 'search'), COALESCE(vat_code, ''), COALESCE(tax_code, ''), COALESCE(province, ''), COALESCE(town, ''),
        COALESCE(activity_status, ''), turnover, turnover_year, employees, COALESCE(ateco_code, ''),
        COALESCE(ateco_description, ''), score, COALESCE(match_state, ''), COALESCE(confidence, ''), flags,
        rationale, missing_criteria, vendor_payload, COALESCE(enrichment_level, 'advanced'), score_version, created_at
@@ -2033,6 +2218,7 @@ SELECT
   t.run_id::text,
   COALESCE(t.company_key, ''),
   t.company_name,
+  COALESCE(t.origin, 'search'),
   COALESCE(t.vat_code, ''),
   COALESCE(t.province, ''),
   COALESCE(t.town, ''),
@@ -2094,6 +2280,7 @@ ORDER BY t.score DESC NULLS LAST, t.company_name
 			&item.RunID,
 			&item.CompanyKey,
 			&item.CompanyName,
+			&item.Origin,
 			&item.VATCode,
 			&item.Province,
 			&item.Town,
@@ -2193,7 +2380,7 @@ func (s *SQLStore) GetMATargetByID(ctx context.Context, sessionID, targetID stri
 	}
 	row := s.db.QueryRowContext(ctx, `
 SELECT id::text, session_id::text, run_id::text, COALESCE(vendor_id, ''), company_name,
-       COALESCE(vat_code, ''), COALESCE(tax_code, ''), COALESCE(province, ''), COALESCE(town, ''),
+       COALESCE(origin, 'search'), COALESCE(vat_code, ''), COALESCE(tax_code, ''), COALESCE(province, ''), COALESCE(town, ''),
        COALESCE(activity_status, ''), turnover, turnover_year, employees, COALESCE(ateco_code, ''),
        COALESCE(ateco_description, ''), score, COALESCE(match_state, ''), COALESCE(confidence, ''), flags,
        rationale, missing_criteria, vendor_payload, COALESCE(enrichment_level, 'advanced'), score_version, created_at

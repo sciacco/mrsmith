@@ -21,21 +21,31 @@ func (s *maService) gatedProgress(ctx context.Context, sessionID string) (MAGate
 	if err != nil {
 		return MAGatedProgressResponse{}, err
 	}
+	manualAddJob, err := s.store.LatestMAManualAddJob(ctx, sessionID)
+	if err != nil {
+		return MAGatedProgressResponse{}, err
+	}
 
 	run := latestMAGatedRun(runs)
 	targets := targetRowsForRun(rows, run.ID)
+	automaticTargets := automaticMATargetRows(targets)
+	surfaceExpected := run.EstimatedCount
+	if maManualOnlyProgressSurface(run, targets, automaticTargets, manualAddJob) {
+		surfaceExpected = 0
+	}
 	out := MAGatedProgressResponse{
 		Stage:   "ready",
-		Surface: MAGatedProgressSurface{Expected: run.EstimatedCount, Fetched: len(targets)},
-		Gate:    MAGatedProgressGate{Total: len(targets)},
+		Surface: MAGatedProgressSurface{Expected: surfaceExpected, Fetched: len(automaticTargets)},
+		Gate:    MAGatedProgressGate{Total: len(automaticTargets)},
 		Run: MAGatedProgressRunSummary{
 			StartedAt:   run.StartedAt,
 			CompletedAt: run.CompletedAt,
 			ErrorCode:   run.ErrorCode,
 		},
+		ManualAdd: manualAddJob,
 	}
 
-	for _, row := range targets {
+	for _, row := range automaticTargets {
 		target := rowAsTarget(row)
 		if target.WebValidation == nil {
 			continue
@@ -56,7 +66,7 @@ func (s *maService) gatedProgress(ctx context.Context, sessionID string) (MAGate
 			out.Gate.Buckets.ManualReview++
 		}
 	}
-	for _, row := range targets {
+	for _, row := range automaticTargets {
 		if row.EnrichmentLevel == maEnrichmentAdvanced {
 			out.Enrich.Enriched++
 		}
@@ -67,7 +77,7 @@ func (s *maService) gatedProgress(ctx context.Context, sessionID string) (MAGate
 		out.Stage = "failed"
 	case run.Status == maRunStatusCompleted || session.Status == maSessionStatusCompleted:
 		out.Stage = "ready"
-	case session.Status == maSessionStatusRunning && len(targets) == 0:
+	case session.Status == maSessionStatusRunning && len(automaticTargets) == 0:
 		out.Stage = "address"
 	case session.Status == maSessionStatusRunning && out.Gate.Processed < out.Gate.Total:
 		out.Stage = "gate"
@@ -123,6 +133,7 @@ func rowAsTarget(row MATargetRow) MATarget {
 		RunID:           row.RunID,
 		CompanyKey:      row.CompanyKey,
 		CompanyName:     row.CompanyName,
+		Origin:          row.Origin,
 		VATCode:         row.VATCode,
 		Province:        row.Province,
 		Town:            row.Town,
@@ -211,4 +222,31 @@ func targetRowsForRun(rows []MATargetRow, runID string) []MATargetRow {
 		}
 	}
 	return out
+}
+
+func automaticMATargetRows(rows []MATargetRow) []MATargetRow {
+	out := make([]MATargetRow, 0, len(rows))
+	for _, row := range rows {
+		if row.Origin == maTargetOriginManual {
+			continue
+		}
+		out = append(out, row)
+	}
+	return out
+}
+
+func maManualOnlyProgressSurface(run MAExecutionRun, targets, automaticTargets []MATargetRow, manualAddJob *MAManualAddJobProgress) bool {
+	if len(automaticTargets) > 0 {
+		return false
+	}
+	if len(targets) > 0 {
+		return true
+	}
+	if manualAddJob == nil {
+		return false
+	}
+	if maManualAddJobActive(manualAddJob) {
+		return true
+	}
+	return run.ID == "" || !manualAddJob.UpdatedAt.Before(run.StartedAt) || !manualAddJob.CreatedAt.Before(run.StartedAt)
 }

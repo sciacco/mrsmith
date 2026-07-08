@@ -35,6 +35,10 @@ const (
 //     regole dure che l'analista stesso ha impostato, fuori settore senza
 //     conferma semantica. Solo conteggio.
 func maRouteTarget(target MATarget, thesis string) string {
+	if maManualGateDissent(target) {
+		return maBucketDaVerificare
+	}
+
 	// Righe identity-only (score/matchState NULL): instradate dal verdetto gate.
 	if target.MatchState == "" {
 		switch gatedTargetBucket(target) {
@@ -74,6 +78,34 @@ func maRouteTarget(target MATarget, thesis string) string {
 		return maBucketDaVerificare
 	}
 	return maBucketPrincipale
+}
+
+func maManualGateDissent(target MATarget) bool {
+	if target.Origin != maTargetOriginManual || target.WebValidation == nil {
+		return false
+	}
+	return maGateDissentAction(target.WebValidation.FinalAction) ||
+		maGateDissentAction(target.WebValidation.FinalDecision.FinalAction) ||
+		maGateDissentState(target.WebValidation.WebValidationState) ||
+		maGateDissentState(target.WebValidation.FinalDecision.WebValidationState)
+}
+
+func maGateDissentAction(action string) bool {
+	switch strings.TrimSpace(action) {
+	case "reject", "deprioritize":
+		return true
+	default:
+		return false
+	}
+}
+
+func maGateDissentState(state string) bool {
+	switch strings.TrimSpace(state) {
+	case "rejected", "deprioritized":
+		return true
+	default:
+		return false
+	}
 }
 
 func maHasFlag(target MATarget, code string) bool {

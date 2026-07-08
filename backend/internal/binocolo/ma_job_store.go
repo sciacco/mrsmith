@@ -94,6 +94,28 @@ RETURNING id::text
 	return returnedID, true, nil
 }
 
+// LatestMAManualAddJob returns the newest durable manual-add job for a session,
+// including terminal failure codes that happen after the submit request returned.
+func (s *SQLStore) LatestMAManualAddJob(ctx context.Context, sessionID string) (*MAManualAddJobProgress, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	var out MAManualAddJobProgress
+	if err := s.db.QueryRowContext(ctx, `
+SELECT status, COALESCE(error_code, ''), created_at, updated_at
+FROM binocolo.ma_job
+WHERE session_id = $1::uuid AND job_type = 'manual_add'
+ORDER BY updated_at DESC, created_at DESC
+LIMIT 1
+`, sessionID).Scan(&out.Status, &out.ErrorCode, &out.CreatedAt, &out.UpdatedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("latest ma manual add job: %w", err)
+	}
+	return &out, nil
+}
+
 // ListMAJobs returns pending jobs of the types this binary can process. The
 // job-type filter is part of the rollout contract: during progressive deploys,
 // older workers must ignore job types introduced by newer versions instead of

@@ -75,6 +75,9 @@ const (
 	// re-scores it. Durable/queued (production remedy for the manual_review bucket, not
 	// inline) so a crash resumes and the pre-leased row can't be stolen on the shared DB.
 	maJobTypeAssociateDomain = "associate_domain"
+	// maJobTypeManualAdd inserts one analyst-specified company into an existing MA
+	// session by VAT/tax code, then web-validates and re-scores it asynchronously.
+	maJobTypeManualAdd = "manual_add"
 
 	maJobStatusQueued  = "queued"
 	maJobStatusRunning = "running"
@@ -178,6 +181,12 @@ const (
 	// These are also the OpenAPI.it DataEnrichment values passed to IT-search.
 	maEnrichmentAddress  = "address"
 	maEnrichmentAdvanced = "advanced"
+
+	// Target origin marks whether a target came from the search funnel or was
+	// explicitly inserted by an analyst. Search is the default for all existing
+	// and funnel-created rows.
+	maTargetOriginSearch = "search"
+	maTargetOriginManual = "manual"
 
 	// Gated-search verdict buckets. Survivors = keep+forse pay Advanced. scarta (rejected)
 	// and manual_review (official domain unresolved → held for manual domain association)
@@ -586,6 +595,13 @@ type MAAssociateDomainRequest struct {
 	Domain     string `json:"domain"`
 }
 
+// MAManualAddTargetRequest is the analyst-driven insertion of one company into an
+// existing MA session by VAT/tax code, optionally forcing the official domain.
+type MAManualAddTargetRequest struct {
+	VATCode string `json:"vatCode"`
+	Domain  string `json:"domain,omitempty"`
+}
+
 type MACompanyKeyRequest struct {
 	CompanyKey string `json:"companyKey"`
 }
@@ -852,11 +868,12 @@ type MAStrategyConcept struct {
 }
 
 type MAGatedProgressResponse struct {
-	Stage   string                    `json:"stage"`
-	Surface MAGatedProgressSurface    `json:"surface"`
-	Gate    MAGatedProgressGate       `json:"gate"`
-	Enrich  MAGatedProgressEnrich     `json:"enrich"`
-	Run     MAGatedProgressRunSummary `json:"run"`
+	Stage     string                    `json:"stage"`
+	Surface   MAGatedProgressSurface    `json:"surface"`
+	Gate      MAGatedProgressGate       `json:"gate"`
+	Enrich    MAGatedProgressEnrich     `json:"enrich"`
+	Run       MAGatedProgressRunSummary `json:"run"`
+	ManualAdd *MAManualAddJobProgress   `json:"manualAdd,omitempty"`
 }
 
 type MAGatedProgressSurface struct {
@@ -886,6 +903,13 @@ type MAGatedProgressRunSummary struct {
 	StartedAt   time.Time  `json:"startedAt"`
 	CompletedAt *time.Time `json:"completedAt"`
 	ErrorCode   string     `json:"errorCode"`
+}
+
+type MAManualAddJobProgress struct {
+	Status    string    `json:"status"`
+	ErrorCode string    `json:"errorCode,omitempty"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }
 
 type MAVerificationQueueResponse struct {
@@ -1072,6 +1096,7 @@ type MATarget struct {
 	VendorID         string `json:"vendorId,omitempty"`
 	CompanyKey       string `json:"companyKey,omitempty"`
 	CompanyName      string `json:"companyName"`
+	Origin           string `json:"origin,omitempty"`
 	VATCode          string `json:"vatCode,omitempty"`
 	TaxCode          string `json:"taxCode,omitempty"`
 	Province         string `json:"province,omitempty"`
@@ -1114,6 +1139,7 @@ type MATargetRow struct {
 	RunID           string          `json:"runId"`
 	CompanyKey      string          `json:"companyKey,omitempty"`
 	CompanyName     string          `json:"companyName"`
+	Origin          string          `json:"origin,omitempty"`
 	VATCode         string          `json:"vatCode,omitempty"`
 	Province        string          `json:"province,omitempty"`
 	Town            string          `json:"town,omitempty"`
