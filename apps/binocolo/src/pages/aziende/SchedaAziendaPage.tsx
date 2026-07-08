@@ -32,6 +32,11 @@ type Shareholder = {
   age?: number;
 };
 
+type OwnershipSummary =
+  | { kind: 'majority'; label: 'Socio di maggioranza'; shareholders: Shareholder[]; residualNote: string }
+  | { kind: 'tie'; label: 'Soci principali' | 'Soci'; shareholders: Shareholder[]; residualNote?: string }
+  | { kind: 'singleTop'; label: 'Socio principale'; shareholders: Shareholder[]; residualNote?: string };
+
 const CARD_STATE_LABELS: Record<string, string> = {
   da_contattare: 'Da contattare',
   contattata: 'Contattata',
@@ -112,15 +117,40 @@ function getLegalForm(target?: MATarget): string | undefined {
   );
 }
 
+const ITALIAN_TAX_CODE_MONTHS = { A: 0, B: 1, C: 2, D: 3, E: 4, H: 5, L: 6, M: 7, P: 8, R: 9, S: 10, T: 11 } as const;
+
 function calcAgeFromDate(value?: string): number | undefined {
   if (!value) return undefined;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return undefined;
+  return calcAgeFromBirthDate(date);
+}
+
+function calcAgeFromBirthDate(date: Date): number | undefined {
   const now = new Date();
   let age = now.getFullYear() - date.getFullYear();
   const monthDelta = now.getMonth() - date.getMonth();
   if (monthDelta < 0 || (monthDelta === 0 && now.getDate() < date.getDate())) age -= 1;
-  return age > 0 ? age : undefined;
+  return age > 0 && age <= 120 ? age : undefined;
+}
+
+function ageFromItalianTaxCode(taxCode?: string): number | undefined {
+  const code = taxCode?.trim().toUpperCase();
+  if (!code || code.length !== 16) return undefined;
+  const yearPart = Number.parseInt(code.slice(6, 8), 10);
+  const rawDay = Number.parseInt(code.slice(9, 11), 10);
+  const month = ITALIAN_TAX_CODE_MONTHS[code[8] as keyof typeof ITALIAN_TAX_CODE_MONTHS];
+  if (!Number.isFinite(yearPart) || !Number.isFinite(rawDay) || month == null) return undefined;
+  const day = rawDay > 40 ? rawDay - 40 : rawDay;
+  if (day < 1 || day > 31) return undefined;
+  const currentYear = new Date().getFullYear();
+  let year = Math.floor(currentYear / 100) * 100 + yearPart;
+  if (year > currentYear) year -= 100;
+  return calcAgeFromBirthDate(new Date(year, month, day));
+}
+
+function shareholderAge(item: any): number | undefined {
+  return item.age ?? item.personAge ?? calcAgeFromDate(item.birthDate) ?? ageFromItalianTaxCode(item.taxCode);
 }
 
 function extractShareholders(target?: MATarget): Shareholder[] {
@@ -132,7 +162,7 @@ function extractShareholders(target?: MATarget): Shareholder[] {
       name: [item.name, item.surname].filter(Boolean).join(' ') || item.companyName || 'Socio non nominato',
       taxCode: item.taxCode,
       percentShare: item.percentShare,
-      age: item.age ?? item.personAge ?? calcAgeFromDate(item.birthDate),
+      age: shareholderAge(item),
     }));
   }
   if (!Array.isArray(raw.shareholders)) return [];
@@ -146,7 +176,7 @@ function extractShareholders(target?: MATarget): Shareholder[] {
           name: [sub.name, sub.surname].filter(Boolean).join(' ') || sub.companyName || 'Socio non nominato',
           taxCode: sub.taxCode,
           percentShare: sub.percentShare ?? percent,
-          age: sub.age ?? sub.personAge ?? calcAgeFromDate(sub.birthDate),
+          age: shareholderAge(sub),
         });
       }
     } else {
@@ -154,11 +184,48 @@ function extractShareholders(target?: MATarget): Shareholder[] {
         name: [item.name, item.surname].filter(Boolean).join(' ') || item.companyName || 'Socio non nominato',
         taxCode: item.taxCode,
         percentShare: percent,
-        age: item.age ?? item.personAge ?? calcAgeFromDate(item.birthDate),
+        age: shareholderAge(item),
       });
     }
   }
   return list;
+}
+
+function buildOwnershipSummary(shareholders: Shareholder[]): OwnershipSummary | undefined {
+  if (shareholders.length === 0) return undefined;
+
+  const sorted = [...shareholders].sort((a, b) => (b.percentShare ?? 0) - (a.percentShare ?? 0));
+  const topShare = sorted[0]?.percentShare ?? 0;
+  const topShareholders = sorted.filter((item) => (item.percentShare ?? 0) === topShare);
+  const knownTotal = shareholders.reduce((sum, item) => sum + (item.percentShare ?? 0), 0);
+
+  const formatPercent = (value: number) => `${value.toLocaleString('it-IT')}%`;
+  const residual = sorted.filter((item) => !topShareholders.includes(item));
+  const residualKnownTotal = residual.reduce((sum, item) => sum + (item.percentShare ?? 0), 0);
+  const residualParts = residual
+    .filter((item) => item.percentShare != null && item.percentShare > 0)
+    .map((item) => `${item.name} ${formatPercent(item.percentShare ?? 0)}`);
+  const residualNote = residualKnownTotal > 0
+    ? `Quote residue note: ${residualParts.join(' · ')}.`
+    : knownTotal < 100
+      ? `Quote residue non dettagliate: ${formatPercent(Math.max(0, 100 - knownTotal))}.`
+      : '';
+
+  if (topShareholders.length === 1 && topShare > 50) {
+    return { kind: 'majority', label: 'Socio di maggioranza', shareholders: topShareholders, residualNote };
+  }
+
+  if (topShareholders.length > 1) {
+    const tieTotal = topShareholders.reduce((sum, item) => sum + (item.percentShare ?? 0), 0);
+    return {
+      kind: 'tie',
+      label: tieTotal < 100 ? 'Soci principali' : 'Soci',
+      shareholders: topShareholders,
+      residualNote: residualNote || undefined,
+    };
+  }
+
+  return { kind: 'singleTop', label: 'Socio principale', shareholders: topShareholders, residualNote: residualNote || undefined };
 }
 
 function companySeniority(target?: MATarget): string | undefined {
@@ -366,10 +433,7 @@ export function SchedaAziendaPage() {
   const thesisNotGenerated = thesisQuery.isError && thesisQuery.error instanceof ApiError && thesisQuery.error.status === 404;
   const thesisQueryError = thesisQuery.isError && !thesisNotGenerated ? errorLabel(thesisQuery.error) : null;
   const shareholders = extractShareholders(target);
-  const controllingShareholder = shareholders.reduce<Shareholder | undefined>((best, item) => {
-    if (!best) return item;
-    return (item.percentShare ?? 0) > (best.percentShare ?? 0) ? item : best;
-  }, undefined);
+  const ownershipSummary = buildOwnershipSummary(shareholders);
   const successionFlags = [
     ...(target?.flags ?? []).map((flag) => flag.label),
     ...(target?.evidence ?? [])
@@ -543,12 +607,26 @@ export function SchedaAziendaPage() {
           <div className={styles.angleGrid}>
             <div className={styles.angleCard}>
               <h3>Controllo</h3>
-              {controllingShareholder ? (
-                <dl>
-                  <div><dt>Socio principale</dt><dd>{controllingShareholder.name}</dd></div>
-                  <div><dt>Quota</dt><dd>{controllingShareholder.percentShare != null && controllingShareholder.percentShare > 0 ? `${controllingShareholder.percentShare.toLocaleString('it-IT')}%` : 'n.d.'}</dd></div>
-                  <div><dt>Età</dt><dd>{controllingShareholder.age ? `${controllingShareholder.age} anni` : 'n.d.'}</dd></div>
-                </dl>
+              {ownershipSummary ? (
+                <>
+                  <dl>
+                    <div>
+                      <dt>{ownershipSummary.label}</dt>
+                      <dd>
+                        <ul className={styles.shareholderList}>
+                          {ownershipSummary.shareholders.map((shareholder) => (
+                            <li key={`${shareholder.taxCode ?? shareholder.name}-${shareholder.percentShare ?? 'nd'}`}>
+                              <span>{shareholder.name}</span>
+                              <span>{shareholder.percentShare != null && shareholder.percentShare > 0 ? `${shareholder.percentShare.toLocaleString('it-IT')}%` : 'n.d.'}</span>
+                              {shareholder.age ? <span>{shareholder.age} anni</span> : null}
+                            </li>
+                          ))}
+                        </ul>
+                      </dd>
+                    </div>
+                  </dl>
+                  {ownershipSummary.residualNote ? <p className={styles.shareholderNote}>{ownershipSummary.residualNote}</p> : null}
+                </>
               ) : <p className={styles.muted}>Socio di controllo non identificato.</p>}
             </div>
             <div className={styles.angleCard}>
