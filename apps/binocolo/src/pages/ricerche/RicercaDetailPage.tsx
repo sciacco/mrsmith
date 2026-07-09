@@ -2,7 +2,7 @@ import { ApiError } from '@mrsmith/api-client';
 import { Button, Icon, Modal, Skeleton, Tooltip, useToast } from '@mrsmith/ui';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useApiClient } from '../../api/client';
 import { DeepAnalysisContent } from '../../components/deep/DeepComponents';
 import { RatingStars } from '../../components/RatingStars';
@@ -1360,9 +1360,9 @@ function ResultsTable({
                 />
                 {sessionId ? (
                   <>
-                    <a
+                    <Link
                       className={styles.inspectLink}
-                      href={schedaAziendaHref(targetKey(target), 'ricerca', sessionId)}
+                      to={schedaAziendaHref(targetKey(target), 'ricerca', sessionId)}
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => {
@@ -1375,17 +1375,17 @@ function ResultsTable({
                       }}
                     >
                       Apri scheda ↗
-                    </a>
-                    <a
+                    </Link>
+                    <Link
                       className={styles.inspectLink}
-                      href={`/ricerche/${sessionId}/target/${target.id}/inspect`}
+                      to={`/ricerche/${sessionId}/target/${target.id}/inspect`}
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
                       title="Ispezione completa (nuova tab)"
                     >
                       <Icon name="external-link" size={14} />
-                    </a>
+                    </Link>
                   </>
                 ) : null}
               </td>
@@ -1624,16 +1624,16 @@ function TargetDetailModal({
         <div className={styles.detailModalBody}>
           {sessionId && row ? (
             <div className={styles.deepActions}>
-              <a
+              <Link
                 className={styles.inspectLink}
-                href={schedaAziendaHref(targetKey(row), 'ricerca', sessionId)}
+                to={schedaAziendaHref(targetKey(row), 'ricerca', sessionId)}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => writeCohort({ lensType: 'ricerca', lensId: sessionId, companyKeys: cohortKeys })}
                 onAuxClick={() => writeCohort({ lensType: 'ricerca', lensId: sessionId, companyKeys: cohortKeys })}
               >
                 Apri scheda ↗
-              </a>
+              </Link>
             </div>
           ) : null}
           <TargetPriorityMarkers row={row} />
@@ -1667,14 +1667,14 @@ function TargetDetailModal({
           ) : null}
 
           {sessionId && row && target.deep?.status !== 'ready' ? (
-            <a
+            <Link
               className={styles.inspectLink}
-              href={`/ricerche/${sessionId}/target/${row.id}/inspect`}
+              to={`/ricerche/${sessionId}/target/${row.id}/inspect`}
               target="_blank"
               rel="noopener noreferrer"
             >
               Ispezione completa <Icon name="external-link" size={14} />
-            </a>
+            </Link>
           ) : null}
 
           <TargetScoreSection target={target} />
@@ -2140,9 +2140,9 @@ function TargetDeepAnalysisSection({
           <div className={styles.deepActions}>
             {deep?.updatedAt ? <span className={styles.deepAnalysisMeta}>Aggiornata {dateLabel(deep.updatedAt)}</span> : null}
             {inspectorHref ? (
-              <a className={styles.inspectLink} href={inspectorHref} target="_blank" rel="noopener noreferrer">
+              <Link className={styles.inspectLink} to={inspectorHref} target="_blank" rel="noopener noreferrer">
                 Ispezione completa ↗
-              </a>
+              </Link>
             ) : null}
           </div>
         </div>

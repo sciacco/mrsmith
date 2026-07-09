@@ -2,7 +2,7 @@ import { ApiError } from '@mrsmith/api-client';
 import { Button, Drawer, Icon, Modal, Skeleton, useToast } from '@mrsmith/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useApiClient } from '../../api/client';
 import type {
   MACardCloseResponse,
@@ -657,9 +657,9 @@ export function IniziativaBoardPage() {
                     </td>
                     <td>
                       <div className={styles.actionsRow}>
-                        <a
+                        <Link
                           className={styles.actionLink}
-                          href={schedaAziendaHref(card.companyKey, board.initiative.id)}
+                          to={schedaAziendaHref(card.companyKey, board.initiative.id)}
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => {
@@ -672,7 +672,7 @@ export function IniziativaBoardPage() {
                           }}
                         >
                           Apri scheda ↗
-                        </a>
+                        </Link>
                         <DossierButton
                           card={card}
                           onOpen={() => openDossier(card)}
@@ -957,16 +957,16 @@ function CardDrawer({
       }
       headerExtra={
         <div className={styles.drawerActions}>
-          <a
+          <Link
             className={styles.actionLink}
-            href={schedaAziendaHref(card.companyKey, initiativeId)}
+            to={schedaAziendaHref(card.companyKey, initiativeId)}
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => writeCohort({ lensType: 'iniziativa', lensId: initiativeId, companyKeys: cohortKeys })}
             onAuxClick={() => writeCohort({ lensType: 'iniziativa', lensId: initiativeId, companyKeys: cohortKeys })}
           >
             Apri scheda ↗
-          </a>
+          </Link>
           <Button variant="secondary" size="sm" onClick={() => onOpenDossier(card)}>
             Dossier ↗
           </Button>
