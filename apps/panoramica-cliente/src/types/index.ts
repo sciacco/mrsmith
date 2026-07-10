@@ -88,16 +88,12 @@ export interface OrderDetailRow {
 
 // ── Invoices ──
 export interface InvoiceLine {
-  documento: string | null;
-  descrizione_riga: string;
-  qta: number;
-  prezzo_unitario: number;
-  prezzo_totale_netto: number;
-  codice_articolo: string | null;
-  data_documento: string | null;
-  num_documento: string | null;
-  id_cliente: number;
   progressivo_riga: number;
+  descrizione_riga: string | null;
+  qta: number | null;
+  prezzo_unitario: number | null;
+  prezzo_totale_netto: number | null;
+  codice_articolo: string | null;
   serialnumber: string | null;
   riferimento_ordine_cliente: string | null;
   condizione_pagamento: string | null;
@@ -105,7 +101,28 @@ export interface InvoiceLine {
   desc_conto_ricavo: string | null;
   gruppo: string | null;
   sottogruppo: string | null;
-  rn: number;
+}
+
+export interface InvoiceDocument {
+  id: string;
+  anno_documento: number;
+  mese_documento: number;
+  tipo_documento: string;
+  num_documento: string;
+  doc: string;
+  data_documento: string | null;
+  id_cliente: number;
+  segno: number;
+  line_count: number;
+  totale_netto: number | null;
+  lines: InvoiceLine[];
+}
+
+export interface InvoiceDocumentsResponse {
+  items: InvoiceDocument[];
+  total_documents: number;
+  page: number;
+  page_size: number;
 }
 
 // ── Access Lines ──

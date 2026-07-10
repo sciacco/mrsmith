@@ -35,6 +35,7 @@ func RegisterRoutes(mux *http.ServeMux, mistraDB, grappaDB, anisettaDB *sql.DB) 
 
 	// ── Mistra: Invoices ──
 	handle("GET /panoramica/v1/invoices", h.handleListInvoices)
+	handle("GET /panoramica/v1/invoices/export", h.handleExportInvoices)
 
 	// ── Mistra: Access Lines ──
 	handle("GET /panoramica/v1/connection-types", h.handleListConnectionTypes)

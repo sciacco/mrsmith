@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
+import type { ApiClient } from '@mrsmith/api-client';
 import { useApiClient } from './client';
 import type {
   CustomerWithInvoices,
   CustomerWithOrders,
   CustomerWithAccessLines,
   OrderDetailRow,
-  InvoiceLine,
+  InvoiceDocumentsResponse,
   AccessLine,
   IaaSAccount,
   ChargeSeriesPoint,
@@ -64,16 +65,50 @@ export function useOrdersDetail(cliente: number | null, stati: string[]) {
 
 // ── Invoices ──
 
-export function useInvoices(cliente: number | null, mesi: number | null) {
+export interface InvoiceQueryParams {
+  cliente: number | null;
+  mesi: number | null;
+  q: string;
+  sort: 'data_documento' | 'documento' | 'totale_netto';
+  dir: 'asc' | 'desc';
+  page: number;
+  pageSize: number;
+}
+
+function invoiceSearch(params: InvoiceQueryParams, paginated = true) {
+  const search = new URLSearchParams();
+  if (params.cliente !== null) search.set('cliente', String(params.cliente));
+  if (params.mesi !== null && params.mesi > 0) search.set('mesi', String(params.mesi));
+  if (params.q.trim()) search.set('q', params.q.trim());
+  search.set('sort', params.sort);
+  search.set('dir', params.dir);
+  if (paginated) {
+    search.set('page', String(params.page));
+    search.set('page_size', String(params.pageSize));
+  }
+  return search.toString();
+}
+
+export function useInvoices(params: InvoiceQueryParams) {
   const api = useApiClient();
-  const params = new URLSearchParams();
-  if (cliente !== null) params.set('cliente', String(cliente));
-  if (mesi !== null && mesi > 0) params.set('mesi', String(mesi));
   return useQuery({
-    queryKey: ['panoramica', 'invoices', cliente, mesi],
-    queryFn: () => api.get<InvoiceLine[]>(`/panoramica/v1/invoices?${params}`),
-    enabled: cliente !== null,
+    queryKey: ['panoramica', 'invoices', params],
+    queryFn: () => api.get<InvoiceDocumentsResponse>(`/panoramica/v1/invoices?${invoiceSearch(params)}`),
+    enabled: params.cliente !== null,
+    placeholderData: previous => previous,
   });
+}
+
+export async function downloadInvoicesExcel(api: ApiClient, params: InvoiceQueryParams) {
+  const blob = await api.getBlob(`/panoramica/v1/invoices/export?${invoiceSearch(params, false)}`);
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `fatture_${params.cliente ?? 'cliente'}.xlsx`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }
 
 // ── Access Lines ──

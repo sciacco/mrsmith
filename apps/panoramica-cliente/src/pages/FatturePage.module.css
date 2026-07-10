@@ -1,0 +1,41 @@
+.page { padding: var(--space-6); animation: pageEnter 0.5s var(--ease-out) both; }
+.pageHeader { margin-bottom: var(--space-6); }
+.pageHeader h1 { margin: 0; font-size: 1.75rem; line-height: 1.2; letter-spacing: -0.04em; color: var(--color-text); }
+.pageHeader p { margin: var(--space-1) 0 0; color: var(--color-text-muted); font-size: 0.9375rem; }
+.filters { display: flex; align-items: flex-end; flex-wrap: wrap; gap: var(--space-3); padding: var(--space-4); margin-bottom: var(--space-5); border: 1px solid var(--color-border-subtle); border-radius: var(--radius-lg); background: var(--color-bg-elevated); box-shadow: var(--shadow-xs); }
+.field, .customerField, .searchField { display: flex; flex-direction: column; gap: var(--space-1); min-width: 180px; }
+.customerField { min-width: 280px; }
+.searchField { flex: 1; min-width: 240px; }
+.field label, .customerField label, .searchField label { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-muted); }
+.field select { min-height: 44px; padding: 0 var(--space-3); border: 1.5px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-elevated); color: var(--color-text); font: inherit; cursor: pointer; }
+.field select:focus-visible { outline: 2px solid transparent; box-shadow: 0 0 0 3px var(--color-accent-glow); border-color: var(--color-accent); }
+.documents { display: grid; gap: var(--space-3); opacity: 1; transition: opacity var(--duration-fast) var(--ease-out); }
+.documents[aria-busy='true'] { opacity: 0.65; }
+.documentCard { overflow: hidden; border: 1px solid var(--color-border-subtle); border-radius: var(--radius-lg); background: var(--color-bg-elevated); box-shadow: var(--shadow-xs); }
+.documentHeader { width: 100%; min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: var(--space-3) var(--space-4); border: 0; background: transparent; color: var(--color-text); text-align: left; cursor: pointer; transition: background var(--duration-fast) var(--ease-out); }
+.documentHeader:hover { background: var(--color-accent-subtle); }
+.documentHeader:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -3px; box-shadow: inset 0 0 0 3px var(--color-accent-glow); }
+.documentIdentity, .documentSummary { display: flex; align-items: center; gap: var(--space-3); }
+.documentIdentity strong { font-size: 1rem; font-variant-numeric: tabular-nums; }
+.documentIdentity > span:last-child, .documentSummary > span { color: var(--color-text-muted); font-size: 0.8125rem; }
+.documentSummary strong { min-width: 110px; text-align: right; font-variant-numeric: tabular-nums; }
+.invoiceBadge, .creditBadge { display: inline-flex; align-items: center; min-height: 24px; padding: 0 var(--space-2); border-radius: var(--radius-full); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.invoiceBadge { color: var(--color-info-strong); background: var(--color-info-subtle); }
+.creditBadge { color: var(--color-danger-hover); background: var(--color-danger-subtle); }
+.lineTableWrap { overflow-x: auto; border-top: 1px solid var(--color-border-subtle); }
+.lineTable { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+.lineTable th { padding: var(--space-2) var(--space-3); color: var(--color-text-muted); background: var(--color-surface); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; text-align: left; text-transform: uppercase; white-space: nowrap; }
+.lineTable td { padding: var(--space-3); border-top: 1px solid var(--color-border-subtle); color: var(--color-text-secondary); line-height: 1.5; vertical-align: top; }
+.lineTable tbody tr:hover { background: var(--color-accent-subtle); }
+.numeric { text-align: right !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mono { font-family: var(--font-mono); font-size: 0.75rem; }
+.mobileLabel { display: none; }
+.pagination { display: flex; justify-content: space-between; align-items: center; gap: var(--space-4); margin-top: var(--space-5); color: var(--color-text-muted); font-size: 0.8125rem; }
+.pagination div { display: flex; gap: var(--space-2); }
+.state { display: flex; flex-direction: column; align-items: center; padding: var(--space-16) var(--space-8); text-align: center; color: var(--color-text-muted); }
+.state h2 { margin: 0; color: var(--color-text-secondary); font-size: 0.9375rem; font-weight: 600; letter-spacing: -0.01em; }
+.state p { margin: var(--space-1) 0 var(--space-4); font-size: 0.8125rem; }
+.loading { padding: var(--space-4); border: 1px solid var(--color-border-subtle); border-radius: var(--radius-lg); background: var(--color-bg-elevated); }
+.error { margin-bottom: var(--space-4); padding: var(--space-3) var(--space-4); border: 1px solid var(--color-danger); border-radius: var(--radius-md); background: var(--color-danger-subtle); color: var(--color-danger-hover); font-size: 0.8125rem; }
+.srOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+@media (max-width: 720px) { .page { padding: var(--space-4); } .filters { align-items: stretch; } .field, .customerField, .searchField { width: 100%; min-width: 0; } .filters > button { width: 100%; } .documentHeader { align-items: flex-start; } .documentIdentity, .documentSummary { align-items: flex-start; flex-direction: column; gap: var(--space-1); } .documentSummary { align-items: flex-end; } .documentSummary strong { min-width: 0; } .lineTable thead { display: none; } .lineTable, .lineTable tbody, .lineTable tr, .lineTable td { display: block; width: 100%; } .lineTable tr { padding: var(--space-3); border-top: 1px solid var(--color-border-subtle); } .lineTable td { display: flex; justify-content: space-between; gap: var(--space-4); padding: var(--space-1) 0; border: 0; text-align: right !important; white-space: normal; } .mobileLabel { display: inline; color: var(--color-text-muted); font-family: var(--font-sans); font-size: 0.75rem; font-weight: 600; text-align: left; } .pagination { align-items: stretch; flex-direction: column; } .pagination div { display: grid; grid-template-columns: 1fr 1fr; } }
