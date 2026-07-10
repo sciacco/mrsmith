@@ -30,7 +30,7 @@ import { PoTabs } from '../components/PoTabs';
 import { ProviderRequestModal } from '../components/ProviderRequestModal';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
 import { countQuoteAttachments } from '../lib/attachments';
-import { apiErrorMessage } from '../lib/api-error';
+import { apiErrorMessage, conformityConfirmationErrorMessage } from '../lib/api-error';
 import { coerceID, downloadBlob, isRequester, parseMistraMoney } from '../lib/format';
 import { canDownloadPOPDF } from '../lib/po-pdf';
 import { buildPatchPOPayload } from '../lib/po-payload';
@@ -80,6 +80,7 @@ export function PoDetailPage() {
   const [cloneModalOpen, setCloneModalOpen] = useState(false);
   const [editHeader, setEditHeader] = useState<HeaderFormState | null>(null);
   const [budgetIncrementOpen, setBudgetIncrementOpen] = useState(false);
+  const [transitionError, setTransitionError] = useState<string | null>(null);
 
   const po = usePODetail(poId);
   const comments = usePOComments(poId);
@@ -311,13 +312,19 @@ export function PoDetailPage() {
       setBudgetIncrementOpen(true);
       return;
     }
+    setTransitionError(null);
     try {
       await transition.mutateAsync({ id: detail.id, action });
       toast('Operazione completata');
       const next = afterTransitionRoute(action);
       if (next) navigate(next);
-    } catch {
-      toast('Operazione non riuscita', 'error');
+    } catch (error) {
+      const message =
+        action === 'conformity/confirm'
+          ? conformityConfirmationErrorMessage(error)
+          : apiErrorMessage(error, 'Operazione non riuscita');
+      setTransitionError(message);
+      toast(message, 'error');
     }
   }
 
@@ -385,6 +392,11 @@ export function PoDetailPage() {
         onTransition={(action) => void runTransition(action)}
         onPDF={() => void downloadPDF()}
       />
+      {transitionError ? (
+        <div className="detailActionError" role="alert">
+          {transitionError}
+        </div>
+      ) : null}
       <div className="detailLayout">
         <div className="detailMain">
           <PoHeaderSummary
