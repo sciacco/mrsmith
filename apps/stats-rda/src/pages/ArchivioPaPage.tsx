@@ -2,12 +2,14 @@ import { useCallback, useMemo } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ApiError } from '@mrsmith/api-client';
 import { Icon, SearchInput, SingleSelect, Skeleton } from '@mrsmith/ui';
+import { useApiClient } from '../api/client';
 import {
   useFilters,
   useIssueDetail,
   useIssueList,
   type IssueListParams,
 } from '../api/queries';
+import type { AutocompleteResponse } from '../api/types';
 import { AutocompleteFilter } from '../components/AutocompleteFilter';
 import { IssueDetailPanel } from '../components/IssueDetailPanel';
 import { formatEUR, nz, shortDate, statusBadgeClass } from '../lib/format';
@@ -57,6 +59,7 @@ export function ArchivioPaPage() {
   const hasAnyFilter = Boolean(q || budget || stato || tipo || fornitore || richiedente || valuta || from || to);
   const listQ = useIssueList(listParams, hasAnyFilter);
   const detailQ = useIssueDetail(issueKey ?? null);
+  const api = useApiClient();
 
   const updateParam = useCallback(
     (key: string, value: string) => {
@@ -116,23 +119,30 @@ export function ArchivioPaPage() {
 
   const loadFornitori = useCallback(
     async (query: string) => {
-      const res = await fetch(`/api/stats-rda/v1/pa/fornitori?q=${encodeURIComponent(query)}&limit=20`, {
-        headers: { Accept: 'application/json' },
-      });
-      if (!res.ok) return [];
-      const data = await res.json();
-      return data.items ?? [];
+      try {
+        const data = await api.get<AutocompleteResponse>(
+          `/stats-rda/v1/pa/fornitori?q=${encodeURIComponent(query)}&limit=20`,
+        );
+        return data.items ?? [];
+      } catch {
+        return [];
+      }
     },
-    [],
+    [api],
   );
-  const loadRichiedenti = useCallback(async (query: string) => {
-    const res = await fetch(`/api/stats-rda/v1/pa/richiedenti?q=${encodeURIComponent(query)}&limit=20`, {
-      headers: { Accept: 'application/json' },
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return data.items ?? [];
-  }, []);
+  const loadRichiedenti = useCallback(
+    async (query: string) => {
+      try {
+        const data = await api.get<AutocompleteResponse>(
+          `/stats-rda/v1/pa/richiedenti?q=${encodeURIComponent(query)}&limit=20`,
+        );
+        return data.items ?? [];
+      } catch {
+        return [];
+      }
+    },
+    [api],
+  );
 
   const list = listQ.data;
   const items = list?.items ?? [];
