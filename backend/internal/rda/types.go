@@ -7,6 +7,7 @@ import (
 
 	"github.com/sciacco/mrsmith/internal/notifications"
 	"github.com/sciacco/mrsmith/internal/platform/arak"
+	"github.com/sciacco/mrsmith/internal/platform/emailledger"
 )
 
 type Deps struct {
@@ -16,6 +17,7 @@ type Deps struct {
 	QuoteThreshold     float64
 	Notifier           notifications.Notifier
 	NotifySelfMentions bool
+	EmailLedger        *emailledger.Service
 	RDAAppURL          string
 	StaticDir          string
 }
@@ -27,6 +29,7 @@ type Handler struct {
 	quoteThreshold     float64
 	notifier           notifications.Notifier
 	notifySelfMentions bool
+	emailLedger        *emailledger.Service
 	rdaAppURL          string
 	staticDir          string
 }

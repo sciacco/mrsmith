@@ -46,6 +46,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 		quoteThreshold:     normalizeQuoteThreshold(deps.QuoteThreshold),
 		notifier:           deps.Notifier,
 		notifySelfMentions: deps.NotifySelfMentions,
+		emailLedger:        deps.EmailLedger,
 		rdaAppURL:          deps.RDAAppURL,
 		staticDir:          deps.StaticDir,
 	}

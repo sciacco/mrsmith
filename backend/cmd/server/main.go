@@ -39,6 +39,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/config"
 	"github.com/sciacco/mrsmith/internal/platform/database"
 	"github.com/sciacco/mrsmith/internal/platform/email"
+	"github.com/sciacco/mrsmith/internal/platform/emailledger"
 	"github.com/sciacco/mrsmith/internal/platform/health"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 	"github.com/sciacco/mrsmith/internal/platform/hubspot"
@@ -316,6 +317,15 @@ func main() {
 		logger.Info("smtp email client disabled", "component", "email")
 	}
 
+	// Tracked send path for direct, user-triggered emails: every attempt is
+	// recorded in mrsmith.email_send, correlated to the originating app entity.
+	emailLedger := emailledger.New(anisettaDB, mailer, logger)
+	if emailLedger.Enabled() {
+		logger.Info("email ledger configured", "component", "email")
+	} else {
+		logger.Info("email ledger degraded (smtp disabled or anisetta database missing)", "component", "email")
+	}
+
 	var notificationStore notifications.Store
 	var notificationNotifier notifications.Notifier
 	if anisettaDB != nil {
@@ -581,6 +591,7 @@ func main() {
 		QuoteThreshold:     cfg.RDAQuoteThreshold,
 		Notifier:           notificationNotifier,
 		NotifySelfMentions: cfg.NotifySelfMentions,
+		EmailLedger:        emailLedger,
 		RDAAppURL:          cfg.RDAAppURL,
 		StaticDir:          cfg.StaticDir,
 	})

@@ -65,6 +65,10 @@ type Message struct {
 	Text        string
 	HTML        string
 	Attachments []Attachment
+	// MessageID overrides the auto-generated Message-ID header. Callers that
+	// need to correlate the sent message (e.g. the email ledger) generate it
+	// up front via NewMessageID and set it here.
+	MessageID string
 }
 
 type Attachment struct {
@@ -461,9 +465,15 @@ func prepareMessage(defaultFrom string, msg Message) (smtpMessage, error) {
 		}
 	}
 
-	messageID, err := generateMessageID(fromAddr.Address)
-	if err != nil {
-		return smtpMessage{}, err
+	messageID := strings.TrimSpace(msg.MessageID)
+	if hasHeaderBreak(messageID) {
+		return smtpMessage{}, errors.New("email message id contains invalid newline")
+	}
+	if messageID == "" {
+		messageID, err = generateMessageID(fromAddr.Address)
+		if err != nil {
+			return smtpMessage{}, err
+		}
 	}
 
 	return smtpMessage{
@@ -483,6 +493,18 @@ func prepareMessage(defaultFrom string, msg Message) (smtpMessage, error) {
 		html:         msg.HTML,
 		attachments:  attachments,
 	}, nil
+}
+
+// NewMessageID generates a Message-ID header value for the given From address
+// (display-name form accepted; the domain falls back to "localhost" when the
+// address has none). Exposed so callers can pin the ID before Send and record
+// it alongside the message.
+func NewMessageID(from string) (string, error) {
+	address := strings.TrimSpace(from)
+	if addr, err := mail.ParseAddress(address); err == nil {
+		address = addr.Address
+	}
+	return generateMessageID(address)
 }
 
 func generateMessageID(fromAddress string) (string, error) {

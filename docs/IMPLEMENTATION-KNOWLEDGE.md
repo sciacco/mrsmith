@@ -156,6 +156,15 @@ Alyante ERP ID
 
 ## API and Backend Contract Quirks
 
+### Direct User-Triggered Emails Go Through the Email Ledger
+
+- Context: any mini-app that sends an email as a user action tied to a domain object (e.g. RDA sending a PO email to a supplier) and needs "sent N times, last on … by … to …" before offering a resend.
+- Discovery: the shared SMTP client (`backend/internal/platform/email`) does not track sends; the notifications worker tracks only its own deliveries. A global ledger was introduced: `emailledger.Send(ctx, msg, Correlation, Actor)` sends synchronously and always records the attempt in `mrsmith.email_send`, keyed by `app + entity_type + entity_id + purpose`. `status = 'accepted'` means the SMTP relay (Postal) accepted the message, not that it was delivered. The subject is stored, the body is not. Failures (SMTP or insert) are logged with `component=email` and flow into `mrsmith.diagnostic_event` automatically.
+- Practical rule: user-triggered direct emails must go through `backend/internal/platform/emailledger`, never through the raw `email.Client`. Read counts/history via the Go API (`Count`, `List`) inside the owning app's endpoints, which keep their own authz; there is no shared HTTP read surface. Policy-driven notification emails stay on `internal/notifications` and are outside the ledger (future convergence possible by making the worker a ledger producer).
+- Evidence: `backend/internal/platform/emailledger/emailledger.go`, migration `deploy/migrations/108_anisetta_mrsmith_email_ledger.sql`, wiring in `backend/cmd/server/main.go`.
+- Used by: `backend/internal/rda` (injected as `Deps.EmailLedger` for the in-progress PO email feature).
+- Open questions: none.
+
 ### OpenAPI.it Wrappers Stay Backend-Side
 
 - Context: any MrSmith app that needs OpenAPI.it services such as CAP or Company.
