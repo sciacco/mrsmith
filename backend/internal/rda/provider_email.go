@@ -22,6 +22,7 @@ import (
 
 const (
 	providerEmailPurpose = "provider-email"
+	providerEmailFrom    = "CDLAN - Ufficio Acquisti <acquisti@cdlan.it>"
 
 	codeInvalidRequest      = "INVALID_REQUEST"
 	codePONotFound          = "PO_NOT_FOUND"
@@ -500,7 +501,7 @@ func (h *Handler) handleProviderEmailSend(w http.ResponseWriter, r *http.Request
 	for _, attachment := range attachments {
 		mailAttachments = append(mailAttachments, attachment.emailAttachment())
 	}
-	msg := platformemail.Message{To: recipients.To, Cc: recipients.CC, Subject: req.Subject, Text: rendered.Text, HTML: rendered.HTML, Attachments: mailAttachments}
+	msg := platformemail.Message{From: providerEmailFrom, To: recipients.To, Cc: recipients.CC, Subject: req.Subject, Text: rendered.Text, HTML: rendered.HTML, Attachments: mailAttachments}
 	// Once this request has closed the PO (or authorized an already CLOSED PO),
 	// finish the bounded send even if the caller disconnects.
 	sendCtx, cancelSend := context.WithTimeout(context.WithoutCancel(r.Context()), 30*time.Second)
