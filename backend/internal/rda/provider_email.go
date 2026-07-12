@@ -207,6 +207,33 @@ func validProviderEmailAddress(value string) bool {
 	return err == nil && strings.EqualFold(a.Address, strings.TrimSpace(value))
 }
 
+func (h *Handler) resolveRequester(ctx context.Context, requester userRef) (userRef, error) {
+	if strings.TrimSpace(requester.FirstName) != "" || strings.TrimSpace(requester.LastName) != "" || strings.TrimSpace(requester.Email) == "" {
+		return requester, nil
+	}
+	var raw json.RawMessage
+	err := h.arakDB.QueryRowContext(ctx, `SELECT users_int.user_get_by_email($1, false)`, strings.TrimSpace(requester.Email)).Scan(&raw)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "T0JZ0" {
+			return requester, nil
+		}
+		return userRef{}, newProviderEmailError(http.StatusServiceUnavailable, codeDependencyUnavailable, "Servizio RDA temporaneamente non disponibile", fmt.Errorf("resolve requester: %w", err))
+	}
+	var resolved userRef
+	if err := json.Unmarshal(raw, &resolved); err != nil {
+		return userRef{}, newProviderEmailError(http.StatusServiceUnavailable, codeDependencyUnavailable, "Servizio RDA temporaneamente non disponibile", fmt.Errorf("decode requester: %w", err))
+	}
+	if strings.TrimSpace(resolved.Email) == "" {
+		resolved.Email = requester.Email
+	}
+	return resolved, nil
+}
+
+func providerEmailRequesterName(requester userRef) string {
+	return strings.TrimSpace(strings.Join([]string{requester.FirstName, requester.LastName}, " "))
+}
+
 func (h *Handler) resolveArakUserID(ctx context.Context, email string) (int64, error) {
 	if h.arakDB == nil {
 		return 0, newProviderEmailError(503, codeDependencyUnavailable, "Servizio RDA temporaneamente non disponibile", nil)
@@ -275,7 +302,12 @@ func (h *Handler) handleProviderEmailPreparation(w http.ResponseWriter, r *http.
 		h.writeProviderEmailError(w, r, newProviderEmailError(http.StatusConflict, codePOStateChanged, "Numero ordine non disponibile", nil))
 		return
 	}
-	data := providerEmailTemplateData{CustomerName: po.Provider.CompanyName, OrderNumber: po.Code, OrderDate: po.Created, RequesterFirstName: po.Requester.FirstName, RequesterLastName: po.Requester.LastName}
+	requester, err := h.resolveRequester(r.Context(), po.Requester)
+	if err != nil {
+		h.writeProviderEmailError(w, r, err)
+		return
+	}
+	data := providerEmailTemplateData{CustomerName: po.Provider.CompanyName, OrderNumber: po.Code, OrderDate: po.Created, RequesterFirstName: requester.FirstName, RequesterLastName: requester.LastName}
 	templates, err := providerEmailInitialTemplates(data)
 	if err != nil {
 		h.writeProviderEmailError(w, r, err)
@@ -329,7 +361,7 @@ func (h *Handler) handleProviderEmailPreparation(w http.ResponseWriter, r *http.
 		value := latest.SentAt
 		last = &value
 	}
-	response := ProviderEmailPreparation{POID: poID, POCode: po.Code, State: po.State, Language: language, Provider: ProviderEmailProvider{ID: po.Provider.ID, CompanyName: po.Provider.CompanyName}, Contacts: contacts, InitialToIDs: initialTo, InitialCCIDs: []int64{}, Subject: selected.Subject, Introduction: selected.Introduction, Conclusion: selected.Conclusion, Templates: templates, OrderSummary: ProviderEmailOrderSummary{Number: po.Code, Date: po.Created, Requester: strings.TrimSpace(strings.Join([]string{po.Requester.FirstName, po.Requester.LastName}, " "))}, RequiredPDF: ProviderEmailRequiredPDF{Filename: po.Code + ".pdf"}, Documents: documents, AcceptedCount: count, LastAcceptedAt: last}
+	response := ProviderEmailPreparation{POID: poID, POCode: po.Code, State: po.State, Language: language, Provider: ProviderEmailProvider{ID: po.Provider.ID, CompanyName: po.Provider.CompanyName}, Contacts: contacts, InitialToIDs: initialTo, InitialCCIDs: []int64{}, Subject: selected.Subject, Introduction: selected.Introduction, Conclusion: selected.Conclusion, Templates: templates, OrderSummary: ProviderEmailOrderSummary{Number: po.Code, Date: po.Created, Requester: providerEmailRequesterName(requester)}, RequiredPDF: ProviderEmailRequiredPDF{Filename: po.Code + ".pdf"}, Documents: documents, AcceptedCount: count, LastAcceptedAt: last}
 	httputil.JSON(w, http.StatusOK, response)
 }
 
@@ -404,7 +436,12 @@ func (h *Handler) handleProviderEmailSend(w http.ResponseWriter, r *http.Request
 		h.writeProviderEmailError(w, r, err)
 		return
 	}
-	rendered, err := renderProviderEmail(providerEmailTemplateData{Language: req.Language, CustomerName: po.Provider.CompanyName, OrderNumber: po.Code, OrderDate: po.Created, RequesterFirstName: po.Requester.FirstName, RequesterLastName: po.Requester.LastName}, req.Introduction, req.Conclusion)
+	requester, err := h.resolveRequester(r.Context(), po.Requester)
+	if err != nil {
+		h.writeProviderEmailError(w, r, err)
+		return
+	}
+	rendered, err := renderProviderEmail(providerEmailTemplateData{Language: req.Language, CustomerName: po.Provider.CompanyName, OrderNumber: po.Code, OrderDate: po.Created, RequesterFirstName: requester.FirstName, RequesterLastName: requester.LastName}, req.Introduction, req.Conclusion)
 	if err != nil {
 		h.writeProviderEmailError(w, r, newProviderEmailError(http.StatusBadRequest, codeInvalidRequest, "Messaggio non valido", err))
 		return
