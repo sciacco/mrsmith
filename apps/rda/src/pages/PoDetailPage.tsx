@@ -1,5 +1,5 @@
 import { Skeleton, useToast } from '@mrsmith/ui';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { getRdaQuoteThreshold } from '../runtime-config';
 import {
@@ -12,13 +12,15 @@ import {
   usePODetail,
   usePOComments,
   useProvider,
+  useProviderEmailPreparation,
   useProviders,
   useRdaDownloads,
+  useSendProviderEmail,
   useTransitionMutation,
   useUpdatePORecipients,
   type TransitionAction,
 } from '../api/queries';
-import type { ClonePOResponse, ProviderReference, ProviderSummary } from '../api/types';
+import type { ClonePOResponse, ProviderEmailPreparation, ProviderReference, ProviderSummary } from '../api/types';
 import { BudgetIncrementApproveDialog } from '../components/BudgetIncrementApproveDialog';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ClonePoModal } from '../components/ClonePoModal';
@@ -27,6 +29,7 @@ import { headerStateFromPO, PoHeaderEditModal, PoHeaderSummary, type HeaderFormS
 import { POCommandBar } from '../components/POCommandBar';
 import { POReadinessPanel, POWorkflowRail } from '../components/POWorkspacePanels';
 import { PoTabs } from '../components/PoTabs';
+import { ProviderEmailModal } from '../components/ProviderEmailModal';
 import { ProviderRequestModal } from '../components/ProviderRequestModal';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
 import { countQuoteAttachments } from '../lib/attachments';
@@ -81,6 +84,14 @@ export function PoDetailPage() {
   const [editHeader, setEditHeader] = useState<HeaderFormState | null>(null);
   const [budgetIncrementOpen, setBudgetIncrementOpen] = useState(false);
   const [transitionError, setTransitionError] = useState<string | null>(null);
+  const [providerEmailOpen, setProviderEmailOpen] = useState(false);
+  const [providerEmailOrigin, setProviderEmailOrigin] = useState<'PENDING_SEND' | 'CLOSED' | null>(null);
+  const [providerEmailOpenPreparation, setProviderEmailOpenPreparation] = useState<
+    { generation: number; data: ProviderEmailPreparation; error?: never }
+    | { generation: number; data?: never; error: unknown }
+    | null
+  >(null);
+  const providerEmailPreparationGeneration = useRef(0);
 
   const po = usePODetail(poId);
   const comments = usePOComments(poId);
@@ -96,6 +107,11 @@ export function PoDetailPage() {
   const patchPayment = usePatchPaymentMethod(poId);
   const updateRecipients = useUpdatePORecipients(poId);
   const transition = useTransitionMutation();
+  const sendProviderEmail = useSendProviderEmail();
+  const providerEmailPreparation = useProviderEmailPreparation(
+    poId,
+    po.data?.state === PO_STATES.CLOSED,
+  );
   const downloads = useRdaDownloads();
   const canApproveBudgetIncrement =
     po.data?.state === PO_STATES.PENDING_BUDGET_INCREMENT &&
@@ -307,7 +323,68 @@ export function PoDetailPage() {
     }
   }
 
+  async function loadProviderEmailPreparation(generation: number) {
+    const result = await providerEmailPreparation.refetch();
+    if (providerEmailPreparationGeneration.current !== generation) return;
+    if (result.isSuccess) {
+      setProviderEmailOpenPreparation({ generation, data: result.data });
+    } else {
+      setProviderEmailOpenPreparation({ generation, error: result.error });
+    }
+  }
+
+  function openProviderEmail() {
+    if (detail.state !== PO_STATES.PENDING_SEND && detail.state !== PO_STATES.CLOSED) return;
+    const generation = ++providerEmailPreparationGeneration.current;
+    setTransitionError(null);
+    setProviderEmailOrigin(detail.state === PO_STATES.CLOSED ? PO_STATES.CLOSED : PO_STATES.PENDING_SEND);
+    setProviderEmailOpenPreparation(null);
+    setProviderEmailOpen(true);
+    void loadProviderEmailPreparation(generation);
+  }
+
+  function closeProviderEmail() {
+    ++providerEmailPreparationGeneration.current;
+    setProviderEmailOpen(false);
+    setProviderEmailOrigin(null);
+    setProviderEmailOpenPreparation(null);
+  }
+
+  async function refreshProviderEmailContext() {
+    const generation = ++providerEmailPreparationGeneration.current;
+    setProviderEmailOpenPreparation(null);
+    await Promise.allSettled([
+      po.refetch(),
+      loadProviderEmailPreparation(generation),
+    ]);
+  }
+
+  async function sendProviderEmailStandard() {
+    await transition.mutateAsync({ id: detail.id, action: 'send-to-provider' });
+  }
+
+  function handleProviderEmailStandardSent() {
+    closeProviderEmail();
+    toast('Operazione completata');
+    navigate('/rda');
+  }
+
+  async function handleProviderEmailSent() {
+    const initialSend = providerEmailOrigin === PO_STATES.PENDING_SEND;
+    closeProviderEmail();
+    toast('Email inviata al fornitore');
+    if (initialSend) {
+      navigate('/rda');
+      return;
+    }
+    await refreshProviderEmailContext();
+  }
+
   async function runTransition(action: TransitionAction) {
+    if (action === 'send-to-provider') {
+      openProviderEmail();
+      return;
+    }
     if (action === 'budget-increment/approve') {
       setBudgetIncrementOpen(true);
       return;
@@ -390,6 +467,12 @@ export function PoDetailPage() {
         onClone={() => setCloneModalOpen(true)}
         onSubmit={() => setSubmitConfirm(true)}
         onTransition={(action) => void runTransition(action)}
+        onProviderEmailResend={openProviderEmail}
+        providerEmailResendAvailable={
+          detail.state === PO_STATES.CLOSED &&
+          providerEmailPreparation.isSuccess &&
+          providerEmailPreparation.data?.state === PO_STATES.CLOSED
+        }
         onPDF={() => void downloadPDF()}
       />
       {transitionError ? (
@@ -480,6 +563,20 @@ export function PoDetailPage() {
         budgets={budgets.data ?? []}
         onClose={() => setCloneModalOpen(false)}
         onCloned={handleCloned}
+      />
+      <ProviderEmailModal
+        open={providerEmailOpen}
+        poId={detail.id}
+        preparation={providerEmailOpenPreparation?.data}
+        preparationGeneration={providerEmailOpenPreparation?.generation}
+        preparationLoading={providerEmailOpen && providerEmailOpenPreparation == null}
+        preparationError={providerEmailOpenPreparation?.error}
+        onClose={closeProviderEmail}
+        onStandardSend={sendProviderEmailStandard}
+        onStandardSent={handleProviderEmailStandardSent}
+        onCustomSend={(body) => sendProviderEmail.mutateAsync({ id: detail.id, body })}
+        onSent={() => void handleProviderEmailSent()}
+        onRefreshRequested={() => void refreshProviderEmailContext()}
       />
     </main>
   );

@@ -1,0 +1,115 @@
+.form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.field {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.wide {
+  grid-column: 1 / -1;
+}
+
+.field label {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.field input,
+.field select,
+.readonly {
+  width: 100%;
+  min-width: 0;
+  min-height: calc(var(--space-10) + var(--space-1));
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  color: var(--color-text);
+  background: var(--color-bg-elevated);
+}
+
+.field input,
+.field select {
+  outline: 2px solid transparent;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
+}
+
+.field input:focus-visible,
+.field select:focus-visible {
+  border-color: var(--color-accent);
+  background: var(--color-bg-elevated);
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
+}
+
+.field input[aria-invalid='true'] {
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 3px var(--color-danger-subtle);
+}
+
+.field input:disabled,
+.field select:disabled {
+  cursor: not-allowed;
+  color: var(--color-text-faint);
+  background: var(--color-surface);
+}
+
+.readonly {
+  display: flex;
+  align-items: center;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-top: var(--space-4);
+}
+
+.fieldError {
+  color: var(--color-danger-hover);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.requiredMarker {
+  display: inline-block;
+  width: var(--space-1);
+  height: var(--space-1);
+  margin-left: var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--color-danger);
+  vertical-align: middle;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+@media (max-width: 640px) {
+  .form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

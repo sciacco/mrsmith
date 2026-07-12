@@ -170,6 +170,41 @@ WHERE app = $1 AND entity_type = $2 AND entity_id = $3 AND purpose = $4
 	return count, nil
 }
 
+// LatestAccepted returns the newest accepted send for the correlation tuple.
+func (s *Service) LatestAccepted(ctx context.Context, corr Correlation) (SendRecord, bool, error) {
+	corr = corr.normalized()
+	if err := corr.validate(); err != nil {
+		return SendRecord{}, false, err
+	}
+	if s == nil || s.db == nil {
+		return SendRecord{}, false, ErrNotConfigured
+	}
+
+	record := SendRecord{Correlation: corr}
+	var to, cc, bcc pgtype.FlatArray[string]
+	err := s.db.QueryRowContext(ctx, `
+SELECT id, actor_subject, actor_email,
+       recipients_to, recipients_cc, recipients_bcc,
+       subject, message_id, status, error, sent_at
+FROM mrsmith.email_send
+WHERE app = $1 AND entity_type = $2 AND entity_id = $3 AND purpose = $4
+  AND status = $5
+ORDER BY sent_at DESC, id DESC
+LIMIT 1`, corr.App, corr.EntityType, corr.EntityID, corr.Purpose, StatusAccepted).Scan(
+		&record.ID, &record.Actor.Subject, &record.Actor.Email,
+		scanTextArray(&to), scanTextArray(&cc), scanTextArray(&bcc),
+		&record.Subject, &record.MessageID, &record.Status, &record.Error, &record.SentAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return SendRecord{}, false, nil
+	}
+	if err != nil {
+		return SendRecord{}, false, fmt.Errorf("latest accepted email send: %w", err)
+	}
+	record.To, record.Cc, record.Bcc = to, cc, bcc
+	return record, true, nil
+}
+
 // List returns the send history for the correlation tuple, newest first, all
 // statuses included. limit <= 0 falls back to a sane default.
 func (s *Service) List(ctx context.Context, corr Correlation, limit int) ([]SendRecord, error) {

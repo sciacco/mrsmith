@@ -6,7 +6,7 @@ export type ModalSize = 'sm' | 'md' | 'lg' | 'wide' | 'xwide' | 'fluid';
 interface ModalProps {
   open: boolean;
   onClose: () => void;
-  title: string;
+  title: ReactNode;
   children: ReactNode;
   size?: ModalSize;
   /** @deprecated Use `size="wide"` instead. Kept for backward compatibility. */

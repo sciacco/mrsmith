@@ -77,6 +77,8 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	handle("GET /rda/v1/pos/inbox/budget-increment", h.handlePOInbox)
 	handle("POST /rda/v1/pos", h.handleCreatePO)
 	handle("GET /rda/v1/pos/{id}", h.handleGetPO)
+	handle("GET /rda/v1/pos/{id}/provider-email", h.handleProviderEmailPreparation)
+	handle("POST /rda/v1/pos/{id}/provider-email", h.handleProviderEmailSend)
 	handle("POST /rda/v1/pos/{id}/clone", h.handleClonePO)
 	handle("PATCH /rda/v1/pos/{id}", h.handlePatchPO)
 	handle("PATCH /rda/v1/pos/{id}/recipients", h.handleUpdatePORecipients)

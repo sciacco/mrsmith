@@ -61,6 +61,7 @@ type poDetail struct {
 	ID                   any               `json:"id,omitempty"`
 	Code                 string            `json:"code,omitempty"`
 	State                string            `json:"state,omitempty"`
+	Created              string            `json:"created,omitempty"`
 	Type                 string            `json:"type,omitempty"`
 	Project              string            `json:"project,omitempty"`
 	Object               string            `json:"object,omitempty"`
@@ -145,12 +146,14 @@ type rdaPermissions struct {
 }
 
 type providerDetail struct {
-	ID                   int64           `json:"id"`
-	Language             string          `json:"language"`
-	VATNumber            string          `json:"vat_number"`
-	PostalCode           string          `json:"postal_code"`
-	CAP                  string          `json:"cap"`
-	DefaultPaymentMethod json.RawMessage `json:"default_payment_method"`
+	ID                   int64                    `json:"id"`
+	CompanyName          string                   `json:"company_name"`
+	Language             string                   `json:"language"`
+	Refs                 []providerEmailReference `json:"refs"`
+	VATNumber            string                   `json:"vat_number"`
+	PostalCode           string                   `json:"postal_code"`
+	CAP                  string                   `json:"cap"`
+	DefaultPaymentMethod json.RawMessage          `json:"default_payment_method"`
 }
 
 type createPORequest struct {

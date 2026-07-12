@@ -4,6 +4,7 @@ package arak
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -49,7 +50,7 @@ func New(cfg Config) *Client {
 }
 
 // token returns a valid access token, refreshing it if expired or missing.
-func (c *Client) token() (string, error) {
+func (c *Client) token(ctx context.Context) (string, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -64,7 +65,12 @@ func (c *Client) token() (string, error) {
 		"client_secret": {c.cfg.ClientSecret},
 	}
 
-	resp, err := c.httpClient.PostForm(c.cfg.TokenURL, data)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.cfg.TokenURL, strings.NewReader(data.Encode()))
+	if err != nil {
+		return "", fmt.Errorf("arak: failed to create token request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("arak: token request failed: %w", err)
 	}
@@ -109,6 +115,12 @@ func (c *Client) Do(method, path, queryString string, body io.Reader) (*http.Res
 // caller provide request headers. It is used for multipart upload and streaming
 // download paths where the default JSON Content-Type would be incorrect.
 func (c *Client) DoWithHeaders(method, path, queryString string, body io.Reader, headers http.Header) (*http.Response, error) {
+	return c.DoWithHeadersContext(context.Background(), method, path, queryString, body, headers)
+}
+
+// DoWithHeadersContext is DoWithHeaders with caller cancellation propagated to
+// token acquisition and the Arak request.
+func (c *Client) DoWithHeadersContext(ctx context.Context, method, path, queryString string, body io.Reader, headers http.Header) (*http.Response, error) {
 	fullURL := strings.TrimRight(c.cfg.BaseURL, "/") + path
 	if queryString != "" {
 		fullURL += "?" + queryString
@@ -124,7 +136,7 @@ func (c *Client) DoWithHeaders(method, path, queryString string, body io.Reader,
 	}
 
 	for attempt := 0; attempt <= maxUnauthorizedRetries; attempt++ {
-		tok, err := c.token()
+		tok, err := c.token(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -134,7 +146,7 @@ func (c *Client) DoWithHeaders(method, path, queryString string, body io.Reader,
 			requestBody = bytes.NewReader(bodyBytes)
 		}
 
-		req, err := http.NewRequest(method, fullURL, requestBody)
+		req, err := http.NewRequestWithContext(ctx, method, fullURL, requestBody)
 		if err != nil {
 			return nil, fmt.Errorf("arak: failed to create request: %w", err)
 		}
@@ -156,6 +168,7 @@ func (c *Client) DoWithHeaders(method, path, queryString string, body io.Reader,
 			return resp, nil
 		}
 
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
 		resp.Body.Close()
 		c.invalidateToken()
 	}

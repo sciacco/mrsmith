@@ -273,6 +273,75 @@ export interface UpdatePORecipientsPayload {
   recipient_ids: number[];
 }
 
+export type ProviderEmailLanguage = 'it' | 'en';
+
+export interface ProviderEmailContact {
+  id: number;
+  first_name: string;
+  last_name: string;
+  email: string;
+  reference_type: string;
+}
+
+export interface ProviderEmailTemplate {
+  subject: string;
+  introduction: string;
+  conclusion: string;
+}
+
+export interface ProviderEmailPreparation {
+  po_id: number;
+  po_code: string;
+  state: string;
+  language: ProviderEmailLanguage;
+  provider: {
+    id: number;
+    company_name: string;
+  };
+  contacts: ProviderEmailContact[];
+  initial_to_ids: number[];
+  initial_cc_ids: number[];
+  subject: string;
+  introduction: string;
+  conclusion: string;
+  templates: {
+    it: ProviderEmailTemplate;
+    en: ProviderEmailTemplate;
+  };
+  order_summary: {
+    number: string;
+    date: string;
+    requester: string;
+  };
+  required_pdf: {
+    filename: string;
+  };
+  documents: Array<{
+    id: number;
+    filename: string;
+    attachment_type: string;
+  }>;
+  accepted_count: number;
+  last_accepted_at: string | null;
+}
+
+export interface SendProviderEmailPayload {
+  language: ProviderEmailLanguage;
+  to_contact_ids: number[];
+  cc_contact_ids: number[];
+  subject: string;
+  introduction: string;
+  conclusion: string;
+  document_ids: number[];
+}
+
+export interface SendProviderEmailResponse {
+  status: string;
+  po_state: string;
+  accepted_count: number;
+  last_accepted_at: string;
+}
+
 export interface ProviderPayload {
   company_name: string;
   state: string;

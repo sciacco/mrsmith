@@ -10,6 +10,7 @@ export const PO_STATES = {
   PENDING_SEND: 'PENDING_SEND',
   PENDING_VERIFICATION: 'PENDING_VERIFICATION',
   PENDING_DISPUTE: 'PENDING_DISPUTE',
+  CLOSED: 'CLOSED',
 } as const;
 
 const labels: Record<string, string> = {

@@ -1,6 +1,7 @@
 import { Button, Icon, Modal, PhoneInput } from '@mrsmith/ui';
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useId, useMemo, useState, type FormEvent } from 'react';
 import type { ProviderReference } from '../api/types';
+import styles from './ProviderContactModal.module.css';
 import {
   PROVIDER_REFERENCE_PHONE_INVALID_MESSAGE,
   availableReferenceTypes,
@@ -57,31 +58,38 @@ function validateContactDraft(draft: ContactDraft): ContactErrors {
   return errors;
 }
 
-export function ProviderContactModal({
-  open,
-  mode,
+export function ProviderContactForm({
+  mode = 'create',
   contact,
   saving,
-  onClose,
+  submitError,
+  onCancel,
   onSubmit,
 }: {
-  open: boolean;
-  mode: ContactMode;
+  mode?: ContactMode;
   contact?: ProviderReference | null;
   saving?: boolean;
-  onClose: () => void;
+  submitError?: string;
+  onCancel: () => void;
   onSubmit: (body: ProviderReference) => void;
 }) {
   const [draft, setDraft] = useState<ContactDraft>(() => draftFromContact(contact));
   const [errors, setErrors] = useState<ContactErrors>({});
+  const fieldId = useId();
+  const emailId = `${fieldId}-email`;
+  const firstNameId = `${fieldId}-first-name`;
+  const lastNameId = `${fieldId}-last-name`;
+  const phoneId = `${fieldId}-phone`;
+  const typeId = `${fieldId}-type`;
+  const emailErrorId = `${fieldId}-email-error`;
+  const submitErrorId = `${fieldId}-submit-error`;
   const typeOptions = useMemo(() => availableReferenceTypes(), []);
   const editing = mode === 'edit';
 
   useEffect(() => {
-    if (!open) return;
     setDraft(draftFromContact(contact));
     setErrors({});
-  }, [contact, open]);
+  }, [contact]);
 
   function update<K extends keyof ContactDraft>(key: K, value: ContactDraft[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -99,54 +107,91 @@ export function ProviderContactModal({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={editing ? 'Modifica contatto' : 'Nuovo contatto'} size="lg">
-      <form className="contactModalForm" onSubmit={submit} noValidate>
-        <div className="field wide">
-          <label>Email</label>
-          <input
-            value={draft.email}
-            type="email"
-            required
-            aria-invalid={errors.email ? 'true' : undefined}
-            onChange={(event) => update('email', event.target.value)}
-          />
-          {errors.email ? <p className="fieldError">{errors.email}</p> : null}
-        </div>
-        <div className="field">
-          <label>Nome</label>
-          <input value={draft.first_name} onChange={(event) => update('first_name', event.target.value)} />
-        </div>
-        <div className="field">
-          <label>Cognome</label>
-          <input value={draft.last_name} onChange={(event) => update('last_name', event.target.value)} />
-        </div>
-        <PhoneInput
-          value={draft.phone}
-          onChange={(val) => update('phone', val)}
-          label="Telefono"
-          error={errors.phone}
+    <form className={styles.form} onSubmit={submit} noValidate>
+      <div className={`${styles.field} ${styles.wide}`}>
+        <label htmlFor={emailId}>
+          Email
+          <span className={styles.requiredMarker} aria-hidden="true" />
+          <span className={styles.srOnly}> obbligatorio</span>
+        </label>
+        <input
+          id={emailId}
+          value={draft.email}
+          type="email"
+          required
+          disabled={saving}
+          aria-invalid={errors.email ? 'true' : undefined}
+          aria-describedby={errors.email ? emailErrorId : undefined}
+          onChange={(event) => update('email', event.target.value)}
         />
-        <div className="field">
-          <label>Tipo</label>
-          {editing ? (
-            <div className="contactModalReadonly">{referenceTypeLabel(draft.reference_type)}</div>
-          ) : (
-            <select value={draft.reference_type} onChange={(event) => update('reference_type', event.target.value)}>
-              {typeOptions.map((item) => (
-                <option key={item.value} value={item.value}>{item.label}</option>
-              ))}
-            </select>
-          )}
-        </div>
-        <div className="modalActions fullWidth">
-          <Button variant="secondary" onClick={onClose}>
-            Annulla
-          </Button>
-          <Button type="submit" leftIcon={<Icon name={editing ? 'check' : 'plus'} />} loading={saving}>
-            {editing ? 'Salva modifiche' : 'Aggiungi contatto'}
-          </Button>
-        </div>
-      </form>
+        {errors.email ? <p id={emailErrorId} className={styles.fieldError}>{errors.email}</p> : null}
+      </div>
+      <div className={styles.field}>
+        <label htmlFor={firstNameId}>Nome</label>
+        <input id={firstNameId} value={draft.first_name} disabled={saving} onChange={(event) => update('first_name', event.target.value)} />
+      </div>
+      <div className={styles.field}>
+        <label htmlFor={lastNameId}>Cognome</label>
+        <input id={lastNameId} value={draft.last_name} disabled={saving} onChange={(event) => update('last_name', event.target.value)} />
+      </div>
+      <PhoneInput
+        id={phoneId}
+        value={draft.phone}
+        onChange={(val) => update('phone', val)}
+        label="Telefono"
+        error={errors.phone}
+        disabled={saving}
+      />
+      <div className={styles.field}>
+        <label htmlFor={typeId}>Tipo</label>
+        {editing ? (
+          <output id={typeId} className={styles.readonly}>{referenceTypeLabel(draft.reference_type)}</output>
+        ) : (
+          <select id={typeId} value={draft.reference_type} disabled={saving} onChange={(event) => update('reference_type', event.target.value)}>
+            {typeOptions.map((item) => (
+              <option key={item.value} value={item.value}>{item.label}</option>
+            ))}
+          </select>
+        )}
+      </div>
+      {submitError ? <p id={submitErrorId} className={`${styles.fieldError} ${styles.wide}`} role="alert">{submitError}</p> : null}
+      <div className={`${styles.actions} ${styles.wide}`}>
+        <Button variant="secondary" disabled={saving} onClick={onCancel}>
+          Annulla
+        </Button>
+        <Button type="submit" leftIcon={<Icon name={editing ? 'check' : 'plus'} />} loading={saving} aria-describedby={submitError ? submitErrorId : undefined}>
+          {editing ? 'Salva modifiche' : 'Aggiungi contatto'}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+export function ProviderContactModal({
+  open,
+  mode,
+  contact,
+  saving,
+  onClose,
+  onSubmit,
+}: {
+  open: boolean;
+  mode: ContactMode;
+  contact?: ProviderReference | null;
+  saving?: boolean;
+  onClose: () => void;
+  onSubmit: (body: ProviderReference) => void;
+}) {
+  return (
+    <Modal open={open} onClose={onClose} title={mode === 'edit' ? 'Modifica contatto' : 'Nuovo contatto'} size="lg">
+      <ProviderContactForm
+        key={`${mode}-${open ? 'open' : 'closed'}-${contact?.id ?? 'new'}`}
+        mode={mode}
+        contact={contact}
+        saving={saving}
+        onCancel={onClose}
+        onSubmit={onSubmit}
+      />
     </Modal>
   );
 }

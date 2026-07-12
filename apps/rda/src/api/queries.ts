@@ -15,10 +15,13 @@ import type {
   PoComment,
   PoDetail,
   PoPreview,
+  ProviderEmailPreparation,
   ProviderPayload,
   ProviderReference,
   ProviderSummary,
   RdaPermissions,
+  SendProviderEmailPayload,
+  SendProviderEmailResponse,
   RdaUser,
   RowPayload,
   UpdatePORecipientsPayload,
@@ -141,6 +144,28 @@ export function usePOComments(id: number | null) {
     queryKey: ['rda', 'comments', id],
     enabled: id != null,
     queryFn: async () => unwrap(await api.get<PoComment[] | PagedEnvelope<PoComment>>(`${rdaRoot}/pos/${id}/comments`)),
+  });
+}
+
+export function useProviderEmailPreparation(id: number | null, enabled = true) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['rda', 'provider-email', id],
+    enabled: id != null && enabled,
+    queryFn: () => api.get<ProviderEmailPreparation>(`${rdaRoot}/pos/${id}/provider-email`),
+  });
+}
+
+export function useSendProviderEmail() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: SendProviderEmailPayload }) =>
+      api.post<SendProviderEmailResponse>(`${rdaRoot}/pos/${id}/provider-email`, body),
+    onSuccess: (_data, variables) => {
+      invalidatePO(queryClient, variables.id);
+      queryClient.invalidateQueries({ queryKey: ['rda', 'provider-email', variables.id] });
+    },
   });
 }
 
@@ -330,6 +355,7 @@ export function useProviderMutations() {
   const invalidateProviders = () => {
     queryClient.invalidateQueries({ queryKey: ['rda', 'providers'] });
     queryClient.invalidateQueries({ queryKey: ['rda', 'provider'] });
+    queryClient.invalidateQueries({ queryKey: ['rda', 'provider-email'] });
   };
   return {
     createProvider: useMutation({

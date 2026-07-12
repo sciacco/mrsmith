@@ -8,7 +8,7 @@ import { budgetDisplayLabel } from '../lib/budgets';
 import { formatMoney, parseMistraMoney } from '../lib/format';
 import { canDownloadPOPDF } from '../lib/po-pdf';
 import { selectedModeID } from '../lib/po-detail-view-model';
-import { stateLabel } from '../lib/state-labels';
+import { PO_STATES, stateLabel } from '../lib/state-labels';
 import { ConfirmDialog } from './ConfirmDialog';
 
 const transitionActions: readonly TransitionAction[] = [
@@ -40,6 +40,8 @@ interface POCommandBarProps {
   onClone: () => void;
   onSubmit: () => void;
   onTransition: (action: TransitionAction) => void;
+  onProviderEmailResend?: () => void;
+  providerEmailResendAvailable?: boolean;
   onPDF: () => void;
 }
 
@@ -162,6 +164,8 @@ export function POCommandBar({
   onClone,
   onSubmit,
   onTransition,
+  onProviderEmailResend,
+  providerEmailResendAvailable = false,
   onPDF,
 }: POCommandBarProps) {
   const [confirmAction, setConfirmAction] = useState<PoAction | null>(null);
@@ -170,8 +174,10 @@ export function POCommandBar({
   const modeID = selectedModeID(actionModel, selectedMode);
   const mode = modes.find((item) => item.id === modeID);
   const actions = useMemo(
-    () => (actionModel?.actions ?? []).filter((action) => action.mode_id === modeID),
-    [actionModel?.actions, modeID],
+    () => (actionModel?.actions ?? []).filter(
+      (action) => action.mode_id === modeID && !(po.state === PO_STATES.CLOSED && action.id === 'send-to-provider'),
+    ),
+    [actionModel?.actions, modeID, po.state],
   );
   const summary = actionModel?.summary;
   const quoteCount = summary?.quote_count ?? countQuoteAttachments(po.attachments);
@@ -246,6 +252,12 @@ export function POCommandBar({
         <div className="commandActions">
           {pdfDownloadAvailable ? (
             <Button variant="secondary" leftIcon={<Icon name="download" />} onClick={onPDF} loading={transitioning}>Scarica PDF</Button>
+          ) : null}
+
+          {po.state === PO_STATES.CLOSED && providerEmailResendAvailable && onProviderEmailResend ? (
+            <Button variant="secondary" leftIcon={<Icon name="mail" />} disabled={busy} onClick={onProviderEmailResend}>
+              Invia nuovamente email…
+            </Button>
           ) : null}
 
           {modeID === 'requester_draft' ? (
