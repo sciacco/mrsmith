@@ -398,6 +398,9 @@ importers:
       '@mrsmith/vite-config':
         specifier: workspace:*
         version: link:../../packages/vite-config
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.20.1
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
@@ -444,6 +447,9 @@ importers:
       '@mrsmith/vite-config':
         specifier: workspace:*
         version: link:../../packages/vite-config
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.20.1
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
@@ -1020,6 +1026,9 @@ importers:
       '@mrsmith/vite-config':
         specifier: workspace:*
         version: link:../../packages/vite-config
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.20.1
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
