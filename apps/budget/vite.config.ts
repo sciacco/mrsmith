@@ -1,14 +1,3 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+import { defineMrSmithAppConfig } from '@mrsmith/vite-config';
 
-export default defineConfig(({ command }) => ({
-  base: command === 'build' ? '/apps/budget/' : '/',
-  plugins: [react()],
-  server: {
-    port: 5174,
-    proxy: {
-      '/api': 'http://localhost:8080',
-      '/config': 'http://localhost:8080',
-    },
-  },
-}));
+export default defineMrSmithAppConfig({ appSlug: 'budget', port: 5174 });

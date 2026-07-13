@@ -1,16 +1,3 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+import { defineMrSmithAppConfig } from '@mrsmith/vite-config';
 
-const backendTarget = process.env.VITE_DEV_BACKEND_URL || 'http://localhost:8080';
-
-export default defineConfig(({ command }) => ({
-  base: command === 'build' ? '/apps/fornitori/' : '/',
-  plugins: [react()],
-  server: {
-    port: 5189,
-    proxy: {
-      '/api': backendTarget,
-      '/config': backendTarget,
-    },
-  },
-}));
+export default defineMrSmithAppConfig({ appSlug: 'fornitori', port: 5189 });

@@ -15,6 +15,7 @@
 
 ## New App Checklist
 When creating a new mini-app, these files MUST be updated in addition to the app code itself:
+- `apps/{appname}/vite.config.ts` — use `defineMrSmithAppConfig` from `@mrsmith/vite-config` (add it to the app's devDependencies) with a unique dev port; never a raw Vite `defineConfig` (see `packages/vite-config/README.md`)
 - `package.json` (root) — add to the `dev` concurrently command (name + color + filter) AND add a `dev:{appname}` script
 - `Makefile` — add a `dev-{appname}` target AND add it to `.PHONY`
 - `backend/internal/platform/applaunch/catalog.go` — add app ID/href constants, access roles, catalog entry

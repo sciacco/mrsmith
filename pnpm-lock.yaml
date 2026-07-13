@@ -39,6 +39,9 @@ importers:
         specifier: ^7.1.0
         version: 7.14.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
+      '@mrsmith/vite-config':
+        specifier: workspace:*
+        version: link:../../packages/vite-config
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
@@ -47,13 +50,13 @@ importers:
         version: 18.3.7(@types/react@18.3.28)
       '@vitejs/plugin-react':
         specifier: ^4.3.4
-        version: 4.7.0(vite@6.4.1)
+        version: 4.7.0(vite@6.4.1(@types/node@22.20.1))
       typescript:
         specifier: ~5.6.3
         version: 5.6.3
       vite:
         specifier: ^6.0.5
-        version: 6.4.1
+        version: 6.4.1(@types/node@22.20.1)
 
   apps/afc-tools:
     dependencies:
@@ -82,6 +85,9 @@ importers:
         specifier: ^7.1.0
         version: 7.14.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
+      '@mrsmith/vite-config':
+        specifier: workspace:*
+        version: link:../../packages/vite-config
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
@@ -90,13 +96,13 @@ importers:
         version: 18.3.7(@types/react@18.3.28)
       '@vitejs/plugin-react':
         specifier: ^4.3.4
-        version: 4.7.0(vite@6.4.1)
+        version: 4.7.0(vite@6.4.1(@types/node@22.20.1))
       typescript:
         specifier: ~5.6.3
         version: 5.6.3
       vite:
         specifier: ^6.0.5
-        version: 6.4.1
+        version: 6.4.1(@types/node@22.20.1)
 
   apps/binocolo:
     dependencies:
@@ -122,6 +128,9 @@ importers:
         specifier: ^7.1.0
         version: 7.14.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
+      '@mrsmith/vite-config':
+        specifier: workspace:*
+        version: link:../../packages/vite-config
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
@@ -130,13 +139,13 @@ importers:
         version: 18.3.7(@types/react@18.3.28)
       '@vitejs/plugin-react':
         specifier: ^4.3.4
-        version: 4.7.0(vite@6.4.1)
+        version: 4.7.0(vite@6.4.1(@types/node@22.20.1))
       typescript:
         specifier: ~5.6.3
         version: 5.6.3
       vite:
         specifier: ^6.0.5
-        version: 6.4.1
+        version: 6.4.1(@types/node@22.20.1)
 
   apps/budget:
     dependencies:
@@ -162,6 +171,9 @@ importers:
         specifier: ^7.1.0
         version: 7.14.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
+      '@mrsmith/vite-config':
+        specifier: workspace:*
+        version: link:../../packages/vite-config
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
@@ -170,13 +182,13 @@ importers:
         version: 18.3.7(@types/react@18.3.28)
       '@vitejs/plugin-react':
         specifier: ^4.3.4
-        version: 4.7.0(vite@6.4.1)
+        version: 4.7.0(vite@6.4.1(@types/node@22.20.1))
       typescript:
         specifier: ~5.6.3
         version: 5.6.3
       vite:
         specifier: ^6.0.5
-        version: 6.4.1
+        version: 6.4.1(@types/node@22.20.1)
 
   apps/compliance:
     dependencies:
@@ -205,6 +217,9 @@ importers:
         specifier: ^7.1.0
         version: 7.14.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
+      '@mrsmith/vite-config':
+        specifier: workspace:*
+        version: link:../../packages/vite-config
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
@@ -213,13 +228,13 @@ importers:
         version: 18.3.7(@types/react@18.3.28)
       '@vitejs/plugin-react':
         specifier: ^4.3.4
-        version: 4.7.0(vite@6.4.1)
+        version: 4.7.0(vite@6.4.1(@types/node@22.20.1))
       typescript:
         specifier: ~5.6.3
         version: 5.6.3
       vite:
         specifier: ^6.0.5
-        version: 6.4.1
+        version: 6.4.1(@types/node@22.20.1)
 
   apps/coperture:
     dependencies:
@@ -245,6 +260,9 @@ importers:
         specifier: ^7.1.0
         version: 7.14.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
+      '@mrsmith/vite-config':
+        specifier: workspace:*
+        version: link:../../packages/vite-config
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
@@ -253,13 +271,13 @@ importers:
         version: 18.3.7(@types/react@18.3.28)
       '@vitejs/plugin-react':
         specifier: ^4.3.4
-        version: 4.7.0(vite@6.4.1)
+        version: 4.7.0(vite@6.4.1(@types/node@22.20.1))
       typescript:
         specifier: ~5.6.3
         version: 5.6.3
       vite:
         specifier: ^6.0.5
-        version: 6.4.1
+        version: 6.4.1(@types/node@22.20.1)
 
   apps/cp-backoffice:
     dependencies:
@@ -288,6 +306,9 @@ importers:
         specifier: ^7.1.0
         version: 7.14.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
+      '@mrsmith/vite-config':
+        specifier: workspace:*
+        version: link:../../packages/vite-config
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
@@ -296,13 +317,13 @@ importers:
         version: 18.3.7(@types/react@18.3.28)
       '@vitejs/plugin-react':
         specifier: ^4.3.4
-        version: 4.7.0(vite@6.4.1)
+        version: 4.7.0(vite@6.4.1(@types/node@22.20.1))
       typescript:
         specifier: ~5.6.3
         version: 5.6.3
       vite:
         specifier: ^6.0.5
-        version: 6.4.1
+        version: 6.4.1(@types/node@22.20.1)
 
   apps/energia-dc:
     dependencies:
@@ -331,6 +352,9 @@ importers:
         specifier: ^2.15.0
         version: 2.15.4(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
+      '@mrsmith/vite-config':
+        specifier: workspace:*
+        version: link:../../packages/vite-config
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
@@ -339,13 +363,13 @@ importers:
         version: 18.3.7(@types/react@18.3.28)
       '@vitejs/plugin-react':
         specifier: ^4.3.4
-        version: 4.7.0(vite@6.4.1)
+        version: 4.7.0(vite@6.4.1(@types/node@22.20.1))
       typescript:
         specifier: ~5.6.3
         version: 5.6.3
       vite:
         specifier: ^6.0.5
-        version: 6.4.1
+        version: 6.4.1(@types/node@22.20.1)
 
   apps/fornitori:
     dependencies:
@@ -371,6 +395,9 @@ importers:
         specifier: ^7.1.0
         version: 7.14.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
+      '@mrsmith/vite-config':
+        specifier: workspace:*
+        version: link:../../packages/vite-config
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
@@ -379,13 +406,13 @@ importers:
         version: 18.3.7(@types/react@18.3.28)
       '@vitejs/plugin-react':
         specifier: ^4.3.4
-        version: 4.7.0(vite@6.4.1)
+        version: 4.7.0(vite@6.4.1(@types/node@22.20.1))
       typescript:
         specifier: ~5.6.3
         version: 5.6.3
       vite:
         specifier: ^6.0.5
-        version: 6.4.1
+        version: 6.4.1(@types/node@22.20.1)
 
   apps/grappa-dcim:
     dependencies:
@@ -414,6 +441,9 @@ importers:
         specifier: ^0.176.0
         version: 0.176.0
     devDependencies:
+      '@mrsmith/vite-config':
+        specifier: workspace:*
+        version: link:../../packages/vite-config
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
@@ -425,13 +455,13 @@ importers:
         version: 0.176.0
       '@vitejs/plugin-react':
         specifier: ^4.3.4
-        version: 4.7.0(vite@6.4.1)
+        version: 4.7.0(vite@6.4.1(@types/node@22.20.1))
       typescript:
         specifier: ~5.6.3
         version: 5.6.3
       vite:
         specifier: ^6.0.5
-        version: 6.4.1
+        version: 6.4.1(@types/node@22.20.1)
 
   apps/kit-products:
     dependencies:
@@ -466,6 +496,9 @@ importers:
         specifier: ^7.1.0
         version: 7.14.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
+      '@mrsmith/vite-config':
+        specifier: workspace:*
+        version: link:../../packages/vite-config
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
@@ -474,13 +507,13 @@ importers:
         version: 18.3.7(@types/react@18.3.28)
       '@vitejs/plugin-react':
         specifier: ^4.3.4
-        version: 4.7.0(vite@6.4.1)
+        version: 4.7.0(vite@6.4.1(@types/node@22.20.1))
       typescript:
         specifier: ~5.6.3
         version: 5.6.3
       vite:
         specifier: ^6.0.5
-        version: 6.4.1
+        version: 6.4.1(@types/node@22.20.1)
 
   apps/listini-e-sconti:
     dependencies:
@@ -506,6 +539,9 @@ importers:
         specifier: ^7.1.0
         version: 7.14.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
+      '@mrsmith/vite-config':
+        specifier: workspace:*
+        version: link:../../packages/vite-config
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
@@ -514,13 +550,13 @@ importers:
         version: 18.3.7(@types/react@18.3.28)
       '@vitejs/plugin-react':
         specifier: ^4.3.4
-        version: 4.7.0(vite@6.4.1)
+        version: 4.7.0(vite@6.4.1(@types/node@22.20.1))
       typescript:
         specifier: ~5.6.3
         version: 5.6.3
       vite:
         specifier: ^6.0.5
-        version: 6.4.1
+        version: 6.4.1(@types/node@22.20.1)
 
   apps/manutenzioni:
     dependencies:
@@ -555,6 +591,9 @@ importers:
         specifier: ^7.1.0
         version: 7.14.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
+      '@mrsmith/vite-config':
+        specifier: workspace:*
+        version: link:../../packages/vite-config
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
@@ -563,13 +602,13 @@ importers:
         version: 18.3.7(@types/react@18.3.28)
       '@vitejs/plugin-react':
         specifier: ^4.3.4
-        version: 4.7.0(vite@6.4.1)
+        version: 4.7.0(vite@6.4.1(@types/node@22.20.1))
       typescript:
         specifier: ~5.6.3
         version: 5.6.3
       vite:
         specifier: ^6.0.5
-        version: 6.4.1
+        version: 6.4.1(@types/node@22.20.1)
 
   apps/ordini:
     dependencies:
@@ -595,6 +634,9 @@ importers:
         specifier: ^7.1.0
         version: 7.14.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
+      '@mrsmith/vite-config':
+        specifier: workspace:*
+        version: link:../../packages/vite-config
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
@@ -603,13 +645,13 @@ importers:
         version: 18.3.7(@types/react@18.3.28)
       '@vitejs/plugin-react':
         specifier: ^4.3.4
-        version: 4.7.0(vite@6.4.1)
+        version: 4.7.0(vite@6.4.1(@types/node@22.20.1))
       typescript:
         specifier: ~5.6.3
         version: 5.6.3
       vite:
         specifier: ^6.0.5
-        version: 6.4.1
+        version: 6.4.1(@types/node@22.20.1)
 
   apps/panoramica-cliente:
     dependencies:
@@ -641,6 +683,9 @@ importers:
         specifier: ^2.15.0
         version: 2.15.4(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
+      '@mrsmith/vite-config':
+        specifier: workspace:*
+        version: link:../../packages/vite-config
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
@@ -649,13 +694,13 @@ importers:
         version: 18.3.7(@types/react@18.3.28)
       '@vitejs/plugin-react':
         specifier: ^4.3.4
-        version: 4.7.0(vite@6.4.1)
+        version: 4.7.0(vite@6.4.1(@types/node@22.20.1))
       typescript:
         specifier: ~5.6.3
         version: 5.6.3
       vite:
         specifier: ^6.0.5
-        version: 6.4.1
+        version: 6.4.1(@types/node@22.20.1)
 
   apps/portal:
     dependencies:
@@ -675,6 +720,9 @@ importers:
         specifier: ^18.3.1
         version: 18.3.1(react@18.3.1)
     devDependencies:
+      '@mrsmith/vite-config':
+        specifier: workspace:*
+        version: link:../../packages/vite-config
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
@@ -683,13 +731,13 @@ importers:
         version: 18.3.7(@types/react@18.3.28)
       '@vitejs/plugin-react':
         specifier: ^4.3.4
-        version: 4.7.0(vite@6.4.1)
+        version: 4.7.0(vite@6.4.1(@types/node@22.20.1))
       typescript:
         specifier: ~5.6.3
         version: 5.6.3
       vite:
         specifier: ^6.0.5
-        version: 6.4.1
+        version: 6.4.1(@types/node@22.20.1)
 
   apps/quotes:
     dependencies:
@@ -751,6 +799,9 @@ importers:
         specifier: ^7.1.0
         version: 7.14.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
+      '@mrsmith/vite-config':
+        specifier: workspace:*
+        version: link:../../packages/vite-config
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
@@ -759,13 +810,13 @@ importers:
         version: 18.3.7(@types/react@18.3.28)
       '@vitejs/plugin-react':
         specifier: ^4.3.4
-        version: 4.7.0(vite@6.4.1)
+        version: 4.7.0(vite@6.4.1(@types/node@22.20.1))
       typescript:
         specifier: ~5.6.3
         version: 5.6.3
       vite:
         specifier: ^6.0.5
-        version: 6.4.1
+        version: 6.4.1(@types/node@22.20.1)
 
   apps/rda:
     dependencies:
@@ -791,6 +842,9 @@ importers:
         specifier: ^7.1.0
         version: 7.14.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
+      '@mrsmith/vite-config':
+        specifier: workspace:*
+        version: link:../../packages/vite-config
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
@@ -799,13 +853,13 @@ importers:
         version: 18.3.7(@types/react@18.3.28)
       '@vitejs/plugin-react':
         specifier: ^4.3.4
-        version: 4.7.0(vite@6.4.1)
+        version: 4.7.0(vite@6.4.1(@types/node@22.20.1))
       typescript:
         specifier: ~5.6.3
         version: 5.6.3
       vite:
         specifier: ^6.0.5
-        version: 6.4.1
+        version: 6.4.1(@types/node@22.20.1)
 
   apps/rdf-backend:
     dependencies:
@@ -831,6 +885,9 @@ importers:
         specifier: ^7.1.0
         version: 7.14.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
+      '@mrsmith/vite-config':
+        specifier: workspace:*
+        version: link:../../packages/vite-config
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
@@ -839,13 +896,13 @@ importers:
         version: 18.3.7(@types/react@18.3.28)
       '@vitejs/plugin-react':
         specifier: ^4.3.4
-        version: 4.7.0(vite@6.4.1)
+        version: 4.7.0(vite@6.4.1(@types/node@22.20.1))
       typescript:
         specifier: ~5.6.3
         version: 5.6.3
       vite:
         specifier: ^6.0.5
-        version: 6.4.1
+        version: 6.4.1(@types/node@22.20.1)
 
   apps/reports:
     dependencies:
@@ -874,6 +931,9 @@ importers:
         specifier: ^7.1.0
         version: 7.14.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
+      '@mrsmith/vite-config':
+        specifier: workspace:*
+        version: link:../../packages/vite-config
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
@@ -882,13 +942,13 @@ importers:
         version: 18.3.7(@types/react@18.3.28)
       '@vitejs/plugin-react':
         specifier: ^4.3.4
-        version: 4.7.0(vite@6.4.1)
+        version: 4.7.0(vite@6.4.1(@types/node@22.20.1))
       typescript:
         specifier: ~5.6.3
         version: 5.6.3
       vite:
         specifier: ^6.0.5
-        version: 6.4.1
+        version: 6.4.1(@types/node@22.20.1)
 
   apps/richieste-fattibilita:
     dependencies:
@@ -914,6 +974,9 @@ importers:
         specifier: ^7.1.0
         version: 7.14.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
+      '@mrsmith/vite-config':
+        specifier: workspace:*
+        version: link:../../packages/vite-config
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
@@ -922,13 +985,13 @@ importers:
         version: 18.3.7(@types/react@18.3.28)
       '@vitejs/plugin-react':
         specifier: ^4.3.4
-        version: 4.7.0(vite@6.4.1)
+        version: 4.7.0(vite@6.4.1(@types/node@22.20.1))
       typescript:
         specifier: ~5.6.3
         version: 5.6.3
       vite:
         specifier: ^6.0.5
-        version: 6.4.1
+        version: 6.4.1(@types/node@22.20.1)
 
   apps/simulatori-vendita:
     dependencies:
@@ -954,6 +1017,9 @@ importers:
         specifier: ^7.1.0
         version: 7.14.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
+      '@mrsmith/vite-config':
+        specifier: workspace:*
+        version: link:../../packages/vite-config
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
@@ -962,13 +1028,13 @@ importers:
         version: 18.3.7(@types/react@18.3.28)
       '@vitejs/plugin-react':
         specifier: ^4.3.4
-        version: 4.7.0(vite@6.4.1)
+        version: 4.7.0(vite@6.4.1(@types/node@22.20.1))
       typescript:
         specifier: ~5.6.3
         version: 5.6.3
       vite:
         specifier: ^6.0.5
-        version: 6.4.1
+        version: 6.4.1(@types/node@22.20.1)
 
   apps/stats-rda:
     dependencies:
@@ -994,6 +1060,9 @@ importers:
         specifier: ^7.1.0
         version: 7.14.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
+      '@mrsmith/vite-config':
+        specifier: workspace:*
+        version: link:../../packages/vite-config
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
@@ -1002,13 +1071,13 @@ importers:
         version: 18.3.7(@types/react@18.3.28)
       '@vitejs/plugin-react':
         specifier: ^4.3.4
-        version: 4.7.0(vite@6.4.1)
+        version: 4.7.0(vite@6.4.1(@types/node@22.20.1))
       typescript:
         specifier: ~5.6.3
         version: 5.6.3
       vite:
         specifier: ^6.0.5
-        version: 6.4.1
+        version: 6.4.1(@types/node@22.20.1)
 
   apps/training:
     dependencies:
@@ -1034,6 +1103,9 @@ importers:
         specifier: ^7.1.0
         version: 7.14.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
+      '@mrsmith/vite-config':
+        specifier: workspace:*
+        version: link:../../packages/vite-config
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
@@ -1042,13 +1114,13 @@ importers:
         version: 18.3.7(@types/react@18.3.28)
       '@vitejs/plugin-react':
         specifier: ^4.3.4
-        version: 4.7.0(vite@6.4.1)
+        version: 4.7.0(vite@6.4.1(@types/node@22.20.1))
       typescript:
         specifier: ~5.6.3
         version: 5.6.3
       vite:
         specifier: ^6.0.5
-        version: 6.4.1
+        version: 6.4.1(@types/node@22.20.1)
 
   packages/api-client:
     devDependencies:
@@ -1064,9 +1136,6 @@ importers:
       keycloak-js:
         specifier: ^26.0.0
         version: 26.2.3
-      react:
-        specifier: ^18.3.1
-        version: 18.3.1
     devDependencies:
       '@mrsmith/tsconfig':
         specifier: workspace:*
@@ -1074,6 +1143,9 @@ importers:
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
       typescript:
         specifier: ~5.6.3
         version: 5.6.3
@@ -1092,12 +1164,6 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.62.0
         version: 5.96.2(react@18.3.1)
-      react:
-        specifier: ^18.3.1
-        version: 18.3.1
-      react-dom:
-        specifier: ^18.3.1
-        version: 18.3.1(react@18.3.1)
     devDependencies:
       '@mrsmith/tsconfig':
         specifier: workspace:*
@@ -1108,6 +1174,12 @@ importers:
       '@types/react-dom':
         specifier: ^18.3.1
         version: 18.3.7(@types/react@18.3.28)
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.3.1
+        version: 18.3.1(react@18.3.1)
       typescript:
         specifier: ~5.6.3
         version: 5.6.3
@@ -1119,12 +1191,6 @@ importers:
       lucide-react:
         specifier: ^0.468.0
         version: 0.468.0(react@18.3.1)
-      react:
-        specifier: ^18.3.1
-        version: 18.3.1
-      react-dom:
-        specifier: ^18.3.1
-        version: 18.3.1(react@18.3.1)
     devDependencies:
       '@mrsmith/tsconfig':
         specifier: workspace:*
@@ -1135,12 +1201,36 @@ importers:
       '@types/react-dom':
         specifier: ^18.3.1
         version: 18.3.7(@types/react@18.3.28)
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.3.1
+        version: 18.3.1(react@18.3.1)
       react-router-dom:
         specifier: ^7.1.0
         version: 7.14.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       typescript:
         specifier: ~5.6.3
         version: 5.6.3
+
+  packages/vite-config:
+    devDependencies:
+      '@mrsmith/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.20.1
+      '@vitejs/plugin-react':
+        specifier: ^4.3.4
+        version: 4.7.0(vite@6.4.1(@types/node@22.20.1))
+      typescript:
+        specifier: ~5.6.3
+        version: 5.6.3
+      vite:
+        specifier: ^6.0.5
+        version: 6.4.1(@types/node@22.20.1)
 
 packages:
 
@@ -1879,6 +1969,9 @@ packages:
 
   '@types/node@14.18.63':
     resolution: {integrity: sha512-fAtCfv4jJg+ExtXhvCkCqUKZ+4ok/JQk01qDKhL5BDDoS3AxKXhV5/MAVUZyQnSEd2GT92fkgZl0pz0Q0AzcIQ==}
+
+  '@types/node@22.20.1':
+    resolution: {integrity: sha512-EANqOCF9QFyra+4pfxUcX9STKJpCLjMbObVzljIJomAWSnuSIEAvyzEU53GaajbXJEgdh0iEcPL+DGvpUd4k1Q==}
 
   '@types/prop-types@15.7.15':
     resolution: {integrity: sha512-F6bEyamV9jKGAFBEmlQnesRPGOQqS2+Uwi0Em15xenOxHaf2hv6L8YCVn3rPdPJOiJfPiCnLIRyvwVaqMY3MIw==}
@@ -2930,6 +3023,9 @@ packages:
   uc.micro@2.1.0:
     resolution: {integrity: sha512-ARDJmphmdvUk6Glw7y9DQ2bFkKBHwQHLi2lsaH6PPmz/Ka9sFOBsBluozhDltWmnv9u/cF6Rt87znRTPV+yp/A==}
 
+  undici-types@6.21.0:
+    resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
+
   unzipper@0.10.14:
     resolution: {integrity: sha512-ti4wZj+0bQTiX2KmKWuwj7lhV+2n//uXEotUmGuQqrbVZSEGFMbI68+c6JCQ8aAmUWYvtHEz2A8K6wXvueR/6g==}
 
@@ -3685,6 +3781,10 @@ snapshots:
 
   '@types/node@14.18.63': {}
 
+  '@types/node@22.20.1':
+    dependencies:
+      undici-types: 6.21.0
+
   '@types/prop-types@15.7.15': {}
 
   '@types/react-dom@18.3.7(@types/react@18.3.28)':
@@ -3712,7 +3812,7 @@ snapshots:
 
   '@types/webxr@0.5.24': {}
 
-  '@vitejs/plugin-react@4.7.0(vite@6.4.1)':
+  '@vitejs/plugin-react@4.7.0(vite@6.4.1(@types/node@22.20.1))':
     dependencies:
       '@babel/core': 7.29.0
       '@babel/plugin-transform-react-jsx-self': 7.27.1(@babel/core@7.29.0)
@@ -3720,7 +3820,7 @@ snapshots:
       '@rolldown/pluginutils': 1.0.0-beta.27
       '@types/babel__core': 7.20.5
       react-refresh: 0.17.0
-      vite: 6.4.1
+      vite: 6.4.1(@types/node@22.20.1)
     transitivePeerDependencies:
       - supports-color
 
@@ -4809,6 +4909,8 @@ snapshots:
 
   uc.micro@2.1.0: {}
 
+  undici-types@6.21.0: {}
+
   unzipper@0.10.14:
     dependencies:
       big-integer: 1.6.52
@@ -4853,7 +4955,7 @@ snapshots:
       d3-time: 3.1.0
       d3-timer: 3.0.1
 
-  vite@6.4.1:
+  vite@6.4.1(@types/node@22.20.1):
     dependencies:
       esbuild: 0.25.12
       fdir: 6.5.0(picomatch@4.0.4)
@@ -4862,6 +4964,7 @@ snapshots:
       rollup: 4.60.1
       tinyglobby: 0.2.15
     optionalDependencies:
+      '@types/node': 22.20.1
       fsevents: 2.3.3
 
   w3c-keyname@2.2.8: {}

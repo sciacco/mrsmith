@@ -1,13 +1,3 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+import { defineMrSmithAppConfig } from '@mrsmith/vite-config';
 
-export default defineConfig({
-  base: '/',
-  plugins: [react()],
-  server: {
-    proxy: {
-      '/api': 'http://localhost:8080',
-      '/config': 'http://localhost:8080',
-    },
-  },
-});
+export default defineMrSmithAppConfig();
