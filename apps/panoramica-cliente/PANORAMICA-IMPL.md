@@ -69,7 +69,7 @@
 | **Panic recovery** | Existing `middleware.Recover(logger)` on `/api/` mount |
 | **Error sanitization** | `httputil.InternalError` pattern — log real error, return generic 500 to client |
 | **Coexistence** | Read-only — no conflict possible. No schema changes. |
-| **CSV export** | Client-side only (frontend table feature) — no backend export endpoint |
+| **Excel export** | ExcelJS client-side, loaded lazily, for Ordini dettaglio, Accessi, IaaS account/consumi and Timoo. Fatture uses the authenticated backend XLSX endpoint. |
 
 ---
 
@@ -1201,7 +1201,7 @@ Implement these 4 pages first (they are simpler — no Master-Detail Drawer):
 **Table pattern:** Build tables with native HTML `<table>` + CSS Modules (same pattern as listini). Include:
 - Client-side search (use `useTableFilter` from `@mrsmith/ui`)
 - Sort by column (click header)
-- CSV download button
+- Excel download button generated client-side with ExcelJS
 - Staggered row animation
 
 ### Phase 5 — Acceptance Criteria
@@ -1212,7 +1212,7 @@ Implement these 4 pages first (they are simpler — no Master-Detail Drawer):
 - [ ] Accessi page: select clients + click Cerca → access lines load
 - [ ] Licenze Windows page: chart renders with 14 days of data
 - [ ] Timoo page: select tenant → PBX stats load automatically with totals
-- [ ] All tables have CSV export button
+- [ ] Ordini dettaglio, Accessi, IaaS account/consumi and Timoo have an Excel export button; Fatture keeps its backend XLSX export
 - [ ] With a DSN unset, the corresponding page shows "Servizio non disponibile" card instead of a broken state
 
 ---

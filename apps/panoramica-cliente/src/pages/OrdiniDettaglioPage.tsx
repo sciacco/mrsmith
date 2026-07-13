@@ -1,8 +1,8 @@
 import { useState, useCallback, useMemo } from 'react';
-import { SingleSelect, MultiSelect, SearchInput, useTableFilter } from '@mrsmith/ui';
+import { Button, Icon, SingleSelect, MultiSelect, SearchInput, useTableFilter } from '@mrsmith/ui';
 import { ApiError } from '@mrsmith/api-client';
 import { useCustomersWithOrders, useOrderStatuses, useOrdersDetail } from '../api/queries';
-import { useCsvExport, type CsvColumn } from '../hooks/useCsvExport';
+import { localDateStamp, parseExcelDate, useExcelExport, type ExcelColumn } from '../hooks/useExcelExport';
 import { ServiceUnavailable } from '../components/shared/ServiceUnavailable';
 import { SlideOverPanel } from '../components/shared/SlideOverPanel';
 import type { OrderDetailRow } from '../types';
@@ -34,20 +34,20 @@ const moneyFormatter = new Intl.NumberFormat('it-IT', {
   maximumFractionDigits: 2,
 });
 
-const csvColumns: CsvColumn<OrderDetailRow>[] = [
-  { key: 'stato_ordine', label: 'Stato Ordine' },
-  { key: 'nome_testata_ordine', label: 'Ordine' },
-  { key: 'tipo_documento', label: 'Tipo', value: row => tipoOrdineLabel(row) },
-  { key: 'descrizione_long', label: 'Descrizione' },
-  { key: 'tipo_ordine', label: 'Tipo Ordine' },
-  { key: 'commerciale', label: 'Commerciale' },
-  { key: 'data_ordine', label: 'Data Ordine' },
-  { key: 'quantita', label: 'Qta' },
-  { key: 'setup', label: 'NRC' },
-  { key: 'mrc', label: 'MRC' },
-  { key: 'stato_riga', label: 'Stato Riga', value: row => isSpotRow(row) && row.stato_riga === 'Attiva' ? 'SPOT' : row.stato_riga },
-  { key: 'serialnumber', label: 'Serialnumber' },
-  { key: 'codice_prodotto', label: 'Codice Prodotto' },
+const excelColumns: ExcelColumn<OrderDetailRow>[] = [
+  { key: 'stato_ordine', label: 'Stato Ordine', width: 18 },
+  { key: 'nome_testata_ordine', label: 'Ordine', width: 24 },
+  { key: 'tipo_documento', label: 'Tipo', width: 14, value: row => tipoOrdineLabel(row) },
+  { key: 'descrizione_long', label: 'Descrizione', width: 48 },
+  { key: 'tipo_ordine', label: 'Tipo Ordine', width: 18 },
+  { key: 'commerciale', label: 'Commerciale', width: 24 },
+  { key: 'data_ordine', label: 'Data Ordine', width: 14, type: 'date', numFmt: 'dd/mm/yyyy', value: row => parseExcelDate(row.data_ordine) },
+  { key: 'quantita', label: 'Qta', width: 12, type: 'number', numFmt: '#,##0.00' },
+  { key: 'setup', label: 'NRC', width: 14, type: 'number', numFmt: '€ #,##0.00' },
+  { key: 'mrc', label: 'MRC', width: 14, type: 'number', numFmt: '€ #,##0.00' },
+  { key: 'stato_riga', label: 'Stato Riga', width: 18, value: row => isSpotRow(row) && row.stato_riga === 'Attiva' ? 'SPOT' : row.stato_riga },
+  { key: 'serialnumber', label: 'Serialnumber', width: 24 },
+  { key: 'codice_prodotto', label: 'Codice Prodotto', width: 20 },
 ];
 
 function statoBadge(stato: string) {
@@ -159,7 +159,11 @@ export function OrdiniDettaglioPage() {
     searchFields: ['descrizione_long', 'nome_testata_ordine', 'serialnumber', 'codice_prodotto'],
   });
 
-  const exportCsv = useCsvExport(csvColumns, 'ordini-dettaglio');
+  const selectedCustomer = customersQ.data?.find(c => c.numero_azienda === cliente);
+  const { exportExcel, exporting, error: exportError } = useExcelExport(excelColumns, {
+    filename: `ordini-dettaglio_${selectedCustomer?.ragione_sociale ?? cliente ?? 'cliente'}_${localDateStamp()}`,
+    sheetName: 'Ordini dettaglio',
+  });
 
   const allRowsByOrder = useMemo(
     () => groupRowsByOrder(tipoRows),
@@ -256,12 +260,16 @@ export function OrdiniDettaglioPage() {
           <label>Tipo</label>
           <SingleSelect options={tipoOrdineOptions} selected={tipoOrdine} onChange={v => setTipoOrdine(v ?? 'tutti')} placeholder="Tutti" />
         </div>
-        <button className={s.btnPrimary} onClick={handleSearch} disabled={cliente === null || stati.length === 0}>Cerca</button>
+        <Button size="sm" onClick={handleSearch} disabled={cliente === null || stati.length === 0}>Cerca</Button>
         <SearchInput value={search} onChange={setSearch} placeholder="Filtra..." />
         {filtered.length > 0 && (
-          <button className={s.btnSecondary} onClick={() => exportCsv(filtered)}>CSV</button>
+          <Button variant="secondary" size="sm" leftIcon={<Icon name="download" size={16} />} loading={exporting} onClick={() => exportExcel(filtered)}>
+            {exporting ? 'Preparazione file Excel…' : 'Esporta Excel'}
+          </Button>
         )}
       </div>
+
+      {exportError && <div className={s.exportError} role="alert">Non è stato possibile generare il file Excel. Riprova.</div>}
 
       {!searchTriggered && <div className={s.empty}>Seleziona un cliente e gli stati ordine, poi premi Cerca.</div>}
       {searchTriggered && ordersQ.isLoading && <div className={s.loading}>Caricamento...</div>}

@@ -1,25 +1,25 @@
 import { useState, useCallback } from 'react';
-import { MultiSelect, SearchInput, useTableFilter } from '@mrsmith/ui';
+import { Button, Icon, MultiSelect, SearchInput, useTableFilter } from '@mrsmith/ui';
 import { ApiError } from '@mrsmith/api-client';
 import { useCustomersWithAccessLines, useConnectionTypes, useAccessLines } from '../api/queries';
 import { useSortedData } from '../hooks/useSort';
-import { useCsvExport } from '../hooks/useCsvExport';
+import { localDateStamp, useExcelExport, type ExcelColumn } from '../hooks/useExcelExport';
 import { SortableHeader } from '../components/shared/SortableHeader';
 import { ServiceUnavailable } from '../components/shared/ServiceUnavailable';
 import type { AccessLine } from '../types';
 import s from './shared.module.css';
 
-const csvColumns: { key: keyof AccessLine; label: string }[] = [
-  { key: 'tipo_conn', label: 'Tipo Conn.' },
-  { key: 'fornitore', label: 'Fornitore' },
-  { key: 'provincia', label: 'Provincia' },
-  { key: 'comune', label: 'Comune' },
-  { key: 'tipo', label: 'Tipo' },
-  { key: 'profilo_commerciale', label: 'Profilo' },
-  { key: 'intestatario', label: 'Intestatario' },
-  { key: 'ordine', label: 'Ordine' },
-  { key: 'stato', label: 'Stato' },
-  { key: 'serialnumber', label: 'Serialnumber' },
+const excelColumns: ExcelColumn<AccessLine>[] = [
+  { key: 'tipo_conn', label: 'Tipo Conn.', width: 18 },
+  { key: 'fornitore', label: 'Fornitore', width: 24 },
+  { key: 'provincia', label: 'Provincia', width: 14 },
+  { key: 'comune', label: 'Comune', width: 22 },
+  { key: 'tipo', label: 'Tipo', width: 18 },
+  { key: 'profilo_commerciale', label: 'Profilo', width: 28 },
+  { key: 'intestatario', label: 'Intestatario', width: 32 },
+  { key: 'ordine', label: 'Ordine', width: 20 },
+  { key: 'stato', label: 'Stato', width: 18 },
+  { key: 'serialnumber', label: 'Serialnumber', width: 24 },
 ];
 
 const defaultStati = ['Attiva'];
@@ -43,7 +43,14 @@ export function AccessiPage() {
   });
 
   const { sortedData, sort, toggle } = useSortedData(filtered, 'tipo_conn');
-  const exportCsv = useCsvExport(csvColumns, 'accessi');
+  const selectedClientNames = (customersQ.data ?? [])
+    .filter(customer => selectedClients.includes(customer.id))
+    .map(customer => customer.intestazione);
+  const clientContext = selectedClientNames.length === 1 ? selectedClientNames[0] : `${selectedClientNames.length}-clienti`;
+  const { exportExcel, exporting, error: exportError } = useExcelExport(excelColumns, {
+    filename: `accessi_${clientContext}_${localDateStamp()}`,
+    sheetName: 'Accessi',
+  });
 
   const handleSearch = useCallback(() => {
     setSearchTriggered(true);
@@ -77,18 +84,22 @@ export function AccessiPage() {
           <label>Tipo connessione</label>
           <MultiSelect options={tipiOptions} selected={selectedTipi} onChange={setSelectedTipi} placeholder="Tipi..." />
         </div>
-        <button
-          className={s.btnPrimary}
+        <Button
+          size="sm"
           onClick={handleSearch}
           disabled={selectedClients.length === 0 || selectedStati.length === 0 || selectedTipi.length === 0}
         >
           Cerca
-        </button>
+        </Button>
         <SearchInput value={search} onChange={setSearch} placeholder="Filtra risultati..." />
         {sortedData.length > 0 && (
-          <button className={s.btnSecondary} onClick={() => exportCsv(sortedData)}>CSV</button>
+          <Button variant="secondary" size="sm" leftIcon={<Icon name="download" size={16} />} loading={exporting} onClick={() => exportExcel(sortedData)}>
+            {exporting ? 'Preparazione file Excel…' : 'Esporta Excel'}
+          </Button>
         )}
       </div>
+
+      {exportError && <div className={s.exportError} role="alert">Non è stato possibile generare il file Excel. Riprova.</div>}
 
       {!searchTriggered && <div className={s.empty}>Seleziona clienti, stati e tipi, poi premi Cerca.</div>}
       {searchTriggered && accessQ.isLoading && <div className={s.loading}>Caricamento...</div>}

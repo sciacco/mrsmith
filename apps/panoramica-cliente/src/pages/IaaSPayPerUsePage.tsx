@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { SearchInput, useTableFilter } from '@mrsmith/ui';
+import { useState, useEffect, useMemo } from 'react';
+import { Button, Icon, SearchInput, useTableFilter } from '@mrsmith/ui';
 import { ApiError } from '@mrsmith/api-client';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -7,7 +7,7 @@ import {
 } from 'recharts';
 import { useIaaSAccounts, useChargesSeries, useChargesByCategory } from '../api/queries';
 import { useSortedData } from '../hooks/useSort';
-import { useCsvExport } from '../hooks/useCsvExport';
+import { localDateStamp, parseExcelDate, useExcelExport, type ExcelColumn } from '../hooks/useExcelExport';
 import {
   useChargeDrill,
   PERIOD_OPTIONS,
@@ -32,17 +32,12 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 const DEFAULT_CATEGORY_COLOR = '#c7d2fe';
 
-const accountCsvCols: { key: keyof IaaSAccount; label: string }[] = [
-  { key: 'intestazione', label: 'Intestazione' },
-  { key: 'credito', label: 'Credito' },
-  { key: 'abbreviazione', label: 'Abbreviazione' },
-  { key: 'serialnumber', label: 'Serialnumber' },
-  { key: 'data_attivazione', label: 'Data Attivazione' },
-];
-
-const seriesCsvCols: { key: keyof ChargeSeriesPoint; label: string }[] = [
-  { key: 'bucket', label: 'Periodo' },
-  { key: 'total_importo', label: 'Totale' },
+const accountExcelColumns: ExcelColumn<IaaSAccount>[] = [
+  { key: 'intestazione', label: 'Intestazione', width: 34 },
+  { key: 'credito', label: 'Credito', width: 16, type: 'number', numFmt: '€ #,##0.00' },
+  { key: 'abbreviazione', label: 'Abbreviazione', width: 18 },
+  { key: 'serialnumber', label: 'Serialnumber', width: 24 },
+  { key: 'data_attivazione', label: 'Data Attivazione', width: 16, type: 'date', numFmt: 'dd/mm/yyyy', value: row => parseExcelDate(row.data_attivazione) },
 ];
 
 function is503(e: unknown): boolean {
@@ -103,10 +98,20 @@ export function IaaSPayPerUsePage() {
   });
 
   const { sortedData: sortedAccounts } = useSortedData(filteredAccounts, 'intestazione');
-  const exportAccounts = useCsvExport(accountCsvCols, 'iaas-accounts');
-  const exportSeries = useCsvExport(seriesCsvCols, 'iaas-charges');
-
   const selectedAccount = accountsQ.data?.find(a => a.cloudstack_domain === selectedDomain) ?? null;
+  const seriesExcelColumns = useMemo<ExcelColumn<ChargeSeriesPoint>[]>(() => [
+    { key: 'bucket', label: 'Periodo', width: 22, value: row => bucketLabel(row.bucket, drill.currentGroup) },
+    { key: 'total_importo', label: 'Totale', width: 18, type: 'number', numFmt: '€ #,##0.00' },
+  ], [drill.currentGroup]);
+  const accountExport = useExcelExport(accountExcelColumns, {
+    filename: `iaas-accounts_${localDateStamp()}`,
+    sheetName: 'Account IaaS',
+  });
+  const seriesExport = useExcelExport(seriesExcelColumns, {
+    filename: `iaas-charges_${selectedAccount?.intestazione ?? selectedDomain ?? 'account'}_${from}_${to}_${group}`,
+    sheetName: 'Consumi IaaS',
+  });
+
   const categories = categoryQ.data?.categories ?? [];
   const categoryTotal = categoryQ.data?.total ?? 0;
   const series = seriesQ.data ?? [];
@@ -133,9 +138,12 @@ export function IaaSPayPerUsePage() {
           <div className={is.masterHead}>
             <span className={is.masterTitle}>Account</span>
             {sortedAccounts.length > 0 && (
-              <button className={s.btnSecondary} onClick={() => exportAccounts(sortedAccounts)}>CSV</button>
+              <Button variant="secondary" size="sm" leftIcon={<Icon name="download" size={16} />} loading={accountExport.exporting} onClick={() => accountExport.exportExcel(sortedAccounts)}>
+                {accountExport.exporting ? 'Preparazione file Excel…' : 'Esporta Excel'}
+              </Button>
             )}
           </div>
+          {accountExport.error && <div className={s.exportError} role="alert">Non è stato possibile generare il file Excel. Riprova.</div>}
           <div className={is.masterSearch}>
             <SearchInput value={accountSearch} onChange={setAccountSearch} placeholder="Cerca account..." />
           </div>
@@ -324,9 +332,12 @@ export function IaaSPayPerUsePage() {
                 <div className={s.toolbar}>
                   <div className={s.info}>{sortedSeries.length} periodi</div>
                   {sortedSeries.length > 0 && (
-                    <button className={s.btnSecondary} onClick={() => exportSeries(sortedSeries)}>CSV</button>
+                    <Button variant="secondary" size="sm" leftIcon={<Icon name="download" size={16} />} loading={seriesExport.exporting} onClick={() => seriesExport.exportExcel(sortedSeries)}>
+                      {seriesExport.exporting ? 'Preparazione file Excel…' : 'Esporta Excel'}
+                    </Button>
                   )}
                 </div>
+                {seriesExport.error && <div className={s.exportError} role="alert">Non è stato possibile generare il file Excel. Riprova.</div>}
                 <div className={s.tableWrap}>
                   <table className={s.table}>
                     <thead>

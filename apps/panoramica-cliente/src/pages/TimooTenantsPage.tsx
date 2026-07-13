@@ -1,20 +1,20 @@
 import { useState } from 'react';
-import { SingleSelect, SearchInput, useTableFilter } from '@mrsmith/ui';
+import { Button, Icon, SingleSelect, SearchInput, useTableFilter } from '@mrsmith/ui';
 import { ApiError } from '@mrsmith/api-client';
 import { useTimooTenants, usePbxStats } from '../api/queries';
 import { useSortedData } from '../hooks/useSort';
-import { useCsvExport } from '../hooks/useCsvExport';
+import { localDateStamp, useExcelExport, type ExcelColumn } from '../hooks/useExcelExport';
 import { SortableHeader } from '../components/shared/SortableHeader';
 import { ServiceUnavailable } from '../components/shared/ServiceUnavailable';
 import type { PbxRow } from '../types';
 import s from './shared.module.css';
 
-const csvColumns: { key: keyof PbxRow; label: string }[] = [
-  { key: 'pbx_name', label: 'PBX' },
-  { key: 'pbx_id', label: 'PBX ID' },
-  { key: 'users', label: 'Users' },
-  { key: 'service_extensions', label: 'Service Ext.' },
-  { key: 'totale', label: 'Totale' },
+const excelColumns: ExcelColumn<PbxRow>[] = [
+  { key: 'pbx_name', label: 'PBX', width: 30 },
+  { key: 'pbx_id', label: 'PBX ID', width: 14, type: 'number', numFmt: '0' },
+  { key: 'users', label: 'Users', width: 12, type: 'number', numFmt: '0' },
+  { key: 'service_extensions', label: 'Service Ext.', width: 16, type: 'number', numFmt: '0' },
+  { key: 'totale', label: 'Totale', width: 12, type: 'number', numFmt: '0' },
 ];
 
 export function TimooTenantsPage() {
@@ -31,7 +31,11 @@ export function TimooTenantsPage() {
   });
 
   const { sortedData, sort, toggle } = useSortedData(filtered, 'pbx_name');
-  const exportCsv = useCsvExport(csvColumns, 'timoo-pbx');
+  const selectedTenant = tenantsQ.data?.find(tenant => tenant.as7_tenant_id === tenantId);
+  const { exportExcel, exporting, error: exportError } = useExcelExport(excelColumns, {
+    filename: `timoo-pbx_${selectedTenant?.name ?? tenantId ?? 'tenant'}_${localDateStamp()}`,
+    sheetName: 'Timoo PBX',
+  });
 
   if (tenantsQ.error && (tenantsQ.error as ApiError).status === 503) {
     return <ServiceUnavailable service="Anisetta" />;
@@ -51,9 +55,13 @@ export function TimooTenantsPage() {
         </div>
         <SearchInput value={search} onChange={setSearch} placeholder="Cerca PBX..." />
         {sortedData.length > 0 && (
-          <button className={s.btnSecondary} onClick={() => exportCsv(sortedData)}>CSV</button>
+          <Button variant="secondary" size="sm" leftIcon={<Icon name="download" size={16} />} loading={exporting} onClick={() => exportExcel(sortedData)}>
+            {exporting ? 'Preparazione file Excel…' : 'Esporta Excel'}
+          </Button>
         )}
       </div>
+
+      {exportError && <div className={s.exportError} role="alert">Non è stato possibile generare il file Excel. Riprova.</div>}
 
       {!tenantId && <div className={s.empty}>Seleziona un tenant per visualizzare le statistiche PBX.</div>}
       {tenantId && pbxQ.isLoading && <div className={s.loading}>Caricamento...</div>}
