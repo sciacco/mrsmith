@@ -18,6 +18,12 @@ Pick a dev port that is not already taken (`grep -r "port:" apps/*/vite.config.t
 and wire it into `backend/cmd/server/main.go` hrefOverrides per the New App
 Checklist in `CLAUDE.md`.
 
+The package ships plain JavaScript (`src/index.js` + hand-written `.d.ts`),
+not TypeScript source like the other workspace packages: Vite bundles each
+app's `vite.config.ts` with esbuild but externalizes bare imports, so this
+module is loaded at runtime by Node — and the Docker frontend build
+(`node:20-slim`) cannot load `.ts` files. Keep it JS.
+
 App-specific options go through `overrides`, which is deep-merged on top of the
 shared defaults — never bypass the helper by going back to a raw `defineConfig`:
 

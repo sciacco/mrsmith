@@ -704,6 +704,15 @@ Alyante ERP ID
 - Used by: `apps/simulatori-vendita`, `apps/fornitori`.
 - Open questions: none.
 
+### Packages Imported By `vite.config.ts` Must Ship Runnable JavaScript
+
+- Context: shared workspace packages consumed from an app's `vite.config.ts`, such as `@mrsmith/vite-config`.
+- Discovery: workspace packages normally ship TypeScript source (`"main": "src/index.ts"`), which works for app code because Vite transpiles it. Config files are different: Vite bundles `vite.config.ts` with esbuild but externalizes bare imports, so Node itself loads the imported package at config-load time. Locally this can still work by accident (Node ≥ 22.18 strips types natively), but the Docker frontend stage runs `node:20-slim`, which fails with `ERR_UNKNOWN_FILE_EXTENSION` on `.ts`.
+- Practical rule: any workspace package meant to be imported from `vite.config.ts` (or any other Node-executed config) must ship plain ESM JavaScript with a hand-written `.d.ts` for editor types — no `.ts` entry point, no build step. Local success does not prove Docker success; verify with `docker build --target frontend -f deploy/Dockerfile .`.
+- Evidence: `packages/vite-config/src/index.js`; `make deploy-prod` failure on 2026-07-13 (`apps/compliance build: ERR_UNKNOWN_FILE_EXTENSION ... /app/packages/vite-config/src/index.ts`) after the issue #49 migration, local Node 26 vs Docker `node:20-slim`.
+- Used by: `packages/vite-config` and all 24 mini-app `vite.config.ts` files.
+- Open questions: none.
+
 ### Docker Frontend Builds Must Exclude Local Vite Env Files
 
 - Context: Vite mini-app production images built by `deploy/Dockerfile`.
