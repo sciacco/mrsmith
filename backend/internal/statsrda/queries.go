@@ -265,11 +265,13 @@ func (h *Handler) handleIssueList(w http.ResponseWriter, r *http.Request) {
 	where.WriteString(" AND i.issue_type = 'Acquisto'")
 
 	if f.q != "" {
-		// (i.summary ILIKE $1 OR i.numero_ordine ILIKE $2)
 		like := "%" + sanitizeLike(f.q) + "%"
-		where.WriteString(fmt.Sprintf(" AND (i.summary ILIKE $%d OR i.numero_ordine ILIKE $%d)", paramIdx, paramIdx+1))
-		args = append(args, like, like)
-		paramIdx += 2
+		where.WriteString(fmt.Sprintf(
+			" AND (i.issue_key ILIKE $%d OR i.summary ILIKE $%d OR COALESCE(i.numero_ordine, '') ILIKE $%d)",
+			paramIdx, paramIdx+1, paramIdx+2,
+		))
+		args = append(args, like, like, like)
+		paramIdx += 3
 	}
 	if f.budget != "" {
 		addClause(fmt.Sprintf("i.budget_di_riferimento = %s", dollar()), f.budget)

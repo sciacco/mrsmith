@@ -170,7 +170,7 @@ export function ArchivioPaPage() {
               <SearchInput
                 value={q}
                 onChange={(v) => updateParam('q', v)}
-                placeholder="Cerca per codice ordine o oggetto…"
+                placeholder="Cerca per codice, numero ordine o oggetto…"
               />
             </div>
             <div className={s.toolbarField}>
