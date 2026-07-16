@@ -6,6 +6,7 @@ import { useCustomers } from '@mrsmith/features';
 import { useUsersByCustomer } from '../../hooks/useUsersByCustomer';
 import { CustomerSelector } from './CustomerSelector';
 import { NuovoAdminModal } from './NuovoAdminModal';
+import { EliminaUtenteModal } from './EliminaUtenteModal';
 import styles from './GestioneUtenti.module.css';
 
 const HELP_CONTENT = (
@@ -38,6 +39,7 @@ export function GestioneUtentiPage() {
     null,
   );
   const [modalOpen, setModalOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
   const customersQuery = useCustomers();
@@ -53,6 +55,7 @@ export function GestioneUtentiPage() {
   function handleCustomerChange(customerId: number | null) {
     setSelectedCustomerId(customerId);
     setSearchQuery('');
+    setUserToDelete(null);
   }
 
   return (
@@ -137,6 +140,9 @@ export function GestioneUtentiPage() {
                     </th>
                     <th>Creato il</th>
                     <th>last_login</th>
+                    <th className={styles.actionsHeader}>
+                      <span className={styles.visuallyHidden}>Azioni</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -160,8 +166,18 @@ export function GestioneUtentiPage() {
                           }
                         />
                       </td>
-                      <td>{u.created}</td>
-                      <td>{u.last_login ?? ''}</td>
+                      <td>{formatDate(u.created)}</td>
+                      <td>{formatDate(u.last_login)}</td>
+                      <td className={styles.actionsCell}>
+                        <button
+                          type="button"
+                          className={styles.deleteButton}
+                          aria-label={`Elimina utente ${u.email}`}
+                          onClick={() => setUserToDelete(u)}
+                        >
+                          <Icon name="trash" size={16} />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -172,11 +188,18 @@ export function GestioneUtentiPage() {
       )}
 
       {selectionMade && (
-        <NuovoAdminModal
-          open={modalOpen}
-          onClose={() => setModalOpen(false)}
-          customerId={selectedCustomerId}
-        />
+        <>
+          <NuovoAdminModal
+            open={modalOpen}
+            onClose={() => setModalOpen(false)}
+            customerId={selectedCustomerId}
+          />
+          <EliminaUtenteModal
+            user={userToDelete}
+            customerId={selectedCustomerId}
+            onClose={() => setUserToDelete(null)}
+          />
+        </>
       )}
     </section>
   );
@@ -212,12 +235,22 @@ function filterUsers(
       user.first_name,
       user.last_name,
       user.role.name,
-      user.created,
-      user.last_login ?? '',
+      formatDate(user.created),
+      formatDate(user.last_login),
     ].some((value) => normalize(value).includes(normalizedQuery)),
   );
 }
 
 function normalize(value: string) {
   return value.trim().toLocaleLowerCase();
+}
+
+// Upstream timestamps arrive as "YYYY-MM-DD hh:mm:ss" (or ISO). Only the
+// date matters to the operator; the time was pushing the actions column out
+// of view. Unrecognized values pass through untouched.
+function formatDate(value: string | null | undefined): string {
+  if (!value) return '';
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value.trim());
+  if (!match) return value;
+  return `${match[3]}/${match[2]}/${match[1]}`;
 }

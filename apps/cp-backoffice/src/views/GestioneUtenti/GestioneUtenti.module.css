@@ -161,6 +161,49 @@
   pointer-events: none;
 }
 
+.actionsHeader,
+.actionsCell {
+  width: 1%;
+  text-align: right;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.deleteButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  color: var(--color-text-muted, #94a3b8);
+  cursor: pointer;
+  transition: all var(--duration-normal, 250ms) var(--ease-out);
+}
+.deleteButton:hover {
+  border-color: var(--color-danger-subtle, rgba(239, 68, 68, 0.2));
+  background: var(--color-danger-bg, rgba(239, 68, 68, 0.06));
+  color: var(--color-danger, #ef4444);
+}
+.deleteButton:focus-visible {
+  outline: none;
+  border-color: var(--color-danger, #ef4444);
+  box-shadow: 0 0 0 3px var(--color-danger-bg, rgba(239, 68, 68, 0.15));
+}
+
 .emptyState {
   padding: var(--space-8, 32px);
   text-align: center;
@@ -217,6 +260,18 @@
   border-color: var(--color-accent, #635bff);
   background: var(--color-bg-elevated, #fff);
   box-shadow: 0 0 0 3px var(--color-accent-glow, rgba(99, 91, 255, 0.15));
+}
+
+.confirmBody {
+  display: flex;
+  flex-direction: column;
+}
+
+.confirmText {
+  margin: 0 0 var(--space-5, 20px);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--color-text, #0f172a);
 }
 
 .checkboxGroup {

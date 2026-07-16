@@ -278,6 +278,72 @@ func TestListUsersWithValidCustomerIDForwardsBoth(t *testing.T) {
 	}
 }
 
+// ═══ Delete user ═══
+
+func TestDeleteUserProxiesToUpstream(t *testing.T) {
+	fu := newFakeUpstream(t)
+	fu.responseBody = `{"message":"Successfully deleted User"}`
+
+	rec := serveWithRole(t, Deps{Arak: fu.client()},
+		http.MethodDelete, "/cp-backoffice/v1/users/314", nil)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	got := fu.lastRequest(t)
+	if got.Method != http.MethodDelete {
+		t.Errorf("expected DELETE, got %s", got.Method)
+	}
+	if got.Path != "/users/v2/user/314" {
+		t.Errorf("expected path /users/v2/user/314, got %s", got.Path)
+	}
+	if got.Query != "" {
+		t.Errorf("expected empty query, got %q", got.Query)
+	}
+	if got.Body != "" {
+		t.Errorf("expected empty body, got %q", got.Body)
+	}
+}
+
+func TestDeleteUserRejectsInvalidID(t *testing.T) {
+	fu := newFakeUpstream(t)
+
+	for _, id := range []string{"abc", "0", "-5"} {
+		rec := serveWithRole(t, Deps{Arak: fu.client()},
+			http.MethodDelete, "/cp-backoffice/v1/users/"+id, nil)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("id %q: expected 400, got %d: %s", id, rec.Code, rec.Body.String())
+		}
+		if !strings.Contains(rec.Body.String(), "user_id_invalid") {
+			t.Errorf("id %q: expected user_id_invalid error, got %q", id, rec.Body.String())
+		}
+	}
+	if fu.hits.Load() != 0 {
+		t.Fatalf("expected zero upstream hits for invalid ids, got %d", fu.hits.Load())
+	}
+}
+
+func TestDeleteUserForwardsUpstreamBusinessMessage(t *testing.T) {
+	fu := newFakeUpstream(t)
+	fu.responseCode = http.StatusNotFound
+	fu.responseBody = `{"message":"utente non trovato"}`
+
+	rec := serveWithRole(t, Deps{Arak: fu.client()},
+		http.MethodDelete, "/cp-backoffice/v1/users/314", nil)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 forwarded, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var body map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("response is not JSON: %v (%s)", err, rec.Body.String())
+	}
+	if body["message"] != "utente non trovato" {
+		t.Errorf("expected message passed through, got %#v", body)
+	}
+}
+
 // ═══ Admin creation pins skip_keycloak: false ═══
 
 func TestCreateAdminPinsSkipKeycloakFalseEvenWhenClientSendsTrue(t *testing.T) {

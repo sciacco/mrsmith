@@ -365,6 +365,58 @@ func handleListUsers(deps Deps) http.HandlerFunc {
 	}
 }
 
+// ═══ DELETE /cp-backoffice/v1/users/{id} ═══
+// Upstream: DELETE /users/v2/user/{userId}. Irreversible; the SPA gates the
+// call behind a type-to-confirm dialog, the backend only validates the id.
+
+func handleDeleteUser(deps Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !requireArak(deps) {
+			writeUpstreamUnavailable(w)
+			return
+		}
+		const op = "delete_user"
+
+		rawID := strings.TrimSpace(r.PathValue("id"))
+		if rawID == "" {
+			httputil.Error(w, http.StatusBadRequest, "user_id_required")
+			return
+		}
+		userID, err := strconv.ParseInt(rawID, 10, 64)
+		if err != nil || userID <= 0 {
+			httputil.Error(w, http.StatusBadRequest, "user_id_invalid")
+			return
+		}
+
+		path := upstreamUsersPath + "/" + strconv.FormatInt(userID, 10)
+		resp, err := deps.Arak.Do(http.MethodDelete, path, "", nil)
+		if err != nil {
+			upstreamFailure(w, r, err, op)
+			return
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			upstreamFailure(w, r, err, op)
+			return
+		}
+
+		if resp.StatusCode >= http.StatusBadRequest {
+			forwardUpstreamError(w, r, op, resp.StatusCode, body)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(resp.StatusCode)
+		if len(bytes.TrimSpace(body)) == 0 {
+			_, _ = w.Write([]byte(`{"ok":true}`))
+			return
+		}
+		_, _ = w.Write(body)
+	}
+}
+
 // ═══ POST /cp-backoffice/v1/admins ═══
 // Upstream: POST /users/v2/admin with the user-admin-new DTO. The request
 // body assembled for upstream ALWAYS pins `skip_keycloak: false` regardless
