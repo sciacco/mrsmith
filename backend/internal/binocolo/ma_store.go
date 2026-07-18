@@ -3180,7 +3180,7 @@ WITH source_base AS (
   FROM source_rows
   WHERE $1 = 'recent'
      OR ($1 = 'name' AND company_name ILIKE ('%' || $2 || '%') ESCAPE '\')
-     OR ($1 = 'vat' AND (CASE WHEN vat_clean ~ '^IT[0-9]{11}$' THEN substr(vat_clean, 3) ELSE vat_clean END) = $2)
+     OR ($1 = 'vat' AND (stable_key = $2 OR tax_clean = $2))
      OR ($1 = 'tax' AND tax_clean = $2)
   GROUP BY stable_key
 ), selected_keys AS (

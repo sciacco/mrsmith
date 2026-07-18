@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApiClient } from '../../api/client';
 import type { MACompanySearchResponse, MACompanySearchRow } from '../../api/types';
-import { dateTimeLabel, relativeDate } from '../ricerche/helpers';
+import { bucketLabel, dateTimeLabel, relativeDate } from '../ricerche/helpers';
 import styles from './AziendePage.module.css';
 
 const cardStateLabels: Record<string, string> = {
@@ -46,13 +46,13 @@ function statusPresentation(status: MACompanySearchRow['status']): {
     case 'preferred':
       return { label: `Preferita (${status.value ?? '1'}★)`, variant: 'success' };
     case 'thesis':
-      return { label: 'In tesi', variant: 'success' };
+      return { label: bucketLabel('principale'), variant: 'success' };
     case 'review':
-      return { label: 'Da verificare', detail: status.reason, variant: 'warning' };
+      return { label: bucketLabel('da_verificare'), detail: status.reason, variant: 'warning' };
     case 'actionable':
-      return { label: 'Da rivedere', detail: status.reason, variant: 'accent' };
+      return { label: bucketLabel('azionabile'), detail: status.reason, variant: 'accent' };
     case 'suppressed':
-      return { label: 'Soppressa', detail: status.reason, variant: 'danger' };
+      return { label: bucketLabel('soppresso'), detail: status.reason, variant: 'danger' };
     default:
       return { label: 'Solo anagrafica', variant: 'neutral' };
   }
