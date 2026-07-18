@@ -100,10 +100,10 @@ func (s *SQLStore) HasActiveMACardDomainJob(ctx context.Context, initiativeID, c
 SELECT EXISTS (
   SELECT 1 FROM binocolo.ma_job
   WHERE initiative_id = $1::uuid
-    AND job_type = 'card_domain_verify'
+    AND job_type = $3
     AND payload->>'companyKey' = $2
     AND status IN ('pending', 'processing')
-)`, initiativeID, companyKey).Scan(&exists); err != nil {
+)`, initiativeID, companyKey, maJobTypeCardDomainVerify).Scan(&exists); err != nil {
 		return false, fmt.Errorf("check active direct-card domain job: %w", err)
 	}
 	return exists, nil

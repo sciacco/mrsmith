@@ -5,19 +5,21 @@ import styles from './DirectCompanyModal.module.css';
 
 type Errors = Partial<Record<'vatCode' | 'domain' | 'form', string>>;
 
-export function DirectCompanyModal({ open, submitting, onClose, onSubmit }: {
+export function DirectCompanyModal({ open, submitting, onClose, onSubmit, onOpenExisting }: {
   open: boolean;
   submitting: boolean;
   onClose: () => void;
-  onSubmit: (value: { vatCode: string; domain?: string }, setError: (message: string) => void) => Promise<void>;
+  onSubmit: (value: { vatCode: string; domain?: string }, setError: (message: string, companyKey?: string) => void) => Promise<void>;
+  onOpenExisting: (companyKey: string) => void;
 }) {
   const [vatCode, setVatCode] = useState('');
   const [domain, setDomain] = useState('');
   const [errors, setErrors] = useState<Errors>({});
+  const [existingCompanyKey, setExistingCompanyKey] = useState<string | null>(null);
 
   function close() {
     if (submitting) return;
-    setVatCode(''); setDomain(''); setErrors({}); onClose();
+    setVatCode(''); setDomain(''); setErrors({}); setExistingCompanyKey(null); onClose();
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -25,9 +27,10 @@ export function DirectCompanyModal({ open, submitting, onClose, onSubmit }: {
     const next: Errors = { vatCode: validateManualVat(vatCode) ?? undefined, domain: validateManualDomain(domain) ?? undefined };
     if (next.vatCode || next.domain) { setErrors(next); return; }
     setErrors({});
+    setExistingCompanyKey(null);
     await onSubmit(
       { vatCode: normalizeManualVat(vatCode), ...(domain.trim() ? { domain: domain.trim() } : {}) },
-      (message) => setErrors({ form: message }),
+      (message, companyKey) => { setErrors({ form: message }); setExistingCompanyKey(companyKey ?? null); },
     );
   }
 
@@ -47,7 +50,7 @@ export function DirectCompanyModal({ open, submitting, onClose, onSubmit }: {
           <p id="direct-card-domain-hint" className={styles.hint}>Indica il sito ufficiale solo se lo conosci.</p>
           {errors.domain ? <p id="direct-card-domain-error" className={styles.error}>{errors.domain}</p> : null}
         </div>
-        {errors.form ? <div className={styles.formError} role="alert"><Icon name="triangle-alert" size={16} /><span>{errors.form}</span></div> : null}
+        {errors.form ? <div className={styles.formError} role="alert"><Icon name="triangle-alert" size={16} /><span>{errors.form}</span>{existingCompanyKey ? <Button type="button" variant="ghost" size="sm" onClick={() => onOpenExisting(existingCompanyKey)}>Apri card</Button> : null}</div> : null}
         <div className={styles.actions}><Button variant="secondary" onClick={close} disabled={submitting}>Annulla</Button><Button type="submit" loading={submitting} leftIcon={<Icon name="plus" />}>Aggiungi azienda</Button></div>
       </form>
     </Modal>

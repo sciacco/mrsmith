@@ -117,9 +117,14 @@ func (s *maService) recordCardDomainUnverifiable(ctx context.Context, job maJob)
 	if json.Unmarshal(job.Payload, &payload) != nil || payload.InitiativeID == "" || payload.CompanyKey == "" {
 		return
 	}
+	companyKey := normalizeMACompanyKey(payload.CompanyKey)
+	identityState := maIdentityStateVouched
+	if record, err := s.store.GetMACompanyDomain(ctx, companyKey, payload.VATCode, payload.TaxCode); err == nil && record != nil && record.IdentityState != "" {
+		identityState = record.IdentityState
+	}
 	_ = s.store.InsertMATargetOutcome(ctx, MATargetOutcome{
-		InitiativeID: payload.InitiativeID, CompanyKey: normalizeMACompanyKey(payload.CompanyKey), Event: maEventDominioVerificato,
-		Payload:          maTraceJSON(map[string]any{"domain": payload.Domain, "esito": "non_verificabile", "identityState": maIdentityStateVouched}),
+		InitiativeID: payload.InitiativeID, CompanyKey: companyKey, Event: maEventDominioVerificato,
+		Payload:          maTraceJSON(map[string]any{"domain": payload.Domain, "esito": "non_verificabile", "identityState": identityState}),
 		CreatedBySubject: job.CreatedBySubject, CreatedByEmail: job.CreatedByEmail,
 	})
 }

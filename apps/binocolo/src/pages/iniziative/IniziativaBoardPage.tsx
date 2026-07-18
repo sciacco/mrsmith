@@ -67,6 +67,11 @@ function apiErrorCode(error: ApiError): string | undefined {
   return undefined;
 }
 
+function apiErrorCompanyKey(error: ApiError): string | undefined {
+  const body = error.body;
+  return body && typeof body === 'object' && 'companyKey' in body && typeof body.companyKey === 'string' ? body.companyKey : undefined;
+}
+
 function boardErrorLabel(error: unknown): string {
   if (error instanceof ApiError && (error.status === 404 || apiErrorCode(error) === 'ma_initiative_not_found')) {
     return 'Iniziativa nel cestino o non più disponibile.';
@@ -299,7 +304,7 @@ export function IniziativaBoardPage() {
 
   const createDirectCard = async (
     payload: { vatCode: string; domain?: string },
-    setFormError: (message: string) => void,
+    setFormError: (message: string, companyKey?: string) => void,
   ) => {
     if (!id) return;
     setDirectSubmitting(true);
@@ -310,7 +315,7 @@ export function IniziativaBoardPage() {
       toast(result.domainVerification === 'queued' ? 'Azienda aggiunta. Verifica del dominio in corso.' : 'Azienda aggiunta.', 'success');
     } catch (err) {
       if (err instanceof ApiError && (err.status === 409 || apiErrorCode(err) === 'card_already_present')) {
-        setFormError('Azienda già presente in questa iniziativa. Apri la card esistente dalla board.');
+        setFormError('Azienda già presente in questa iniziativa.', apiErrorCompanyKey(err));
       } else if (err instanceof ApiError && apiErrorCode(err) === 'vat_not_found') {
         setFormError('P.IVA non trovata nel registro. Verifica l’identificativo e riprova.');
       } else {
@@ -752,6 +757,13 @@ export function IniziativaBoardPage() {
         submitting={directSubmitting}
         onClose={() => setDirectModalOpen(false)}
         onSubmit={createDirectCard}
+        onOpenExisting={(companyKey) => {
+          const existing = board.cards.find((card) => card.companyKey === companyKey);
+          if (existing) {
+            setDirectModalOpen(false);
+            setSelectedCard(existing);
+          }
+        }}
       />
 
       <Modal open={attachModalOpen} onClose={() => setAttachModalOpen(false)} title="Collega ricerca">
@@ -998,6 +1010,7 @@ function CardDrawer({
         <div className={styles.drawerMeta}>
           {card.vatCode && <span>P.IVA {card.vatCode}</span>}
           {card.province && <span> · {card.province}</span>}
+          <OriginChip origin={card.origin} />
         </div>
       }
       headerExtra={

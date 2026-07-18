@@ -1023,7 +1023,7 @@ function CardsSection({ cards, companyKey, activeInitiativeId }: { cards: MAComp
     enabled: pickerOpen,
     queryFn: () => api.get<MAInitiativeListResponse>('/binocolo/v1/ma/initiatives'),
   });
-  const existingIds = new Set(cards.map((card) => card.initiativeId));
+  const existingIds = new Set(cards.filter((card) => card.state !== 'chiusa' && card.state !== 'rimossa').map((card) => card.initiativeId));
   const available = (initiatives.data?.items ?? []).filter((initiative) => !existingIds.has(initiative.id));
   const sorted = [...cards].sort((a, b) => Number(b.initiativeId === activeInitiativeId) - Number(a.initiativeId === activeInitiativeId));
 

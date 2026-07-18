@@ -1900,6 +1900,11 @@ func (h *Handler) maFailure(w http.ResponseWriter, r *http.Request, operation st
 	} else {
 		logger.Error("binocolo ma request failed", logAttrs...)
 	}
+	var duplicate *maCardAlreadyPresentError
+	if errors.As(err, &duplicate) {
+		httputil.JSON(w, status, map[string]any{"error": code, "companyKey": duplicate.CompanyKey})
+		return
+	}
 	httputil.Error(w, status, code)
 }
 
@@ -1955,7 +1960,7 @@ func maHTTPError(err error) (int, string, string) {
 	if errors.Is(err, errMAVATNotFound) {
 		return http.StatusNotFound, "vat_not_found", "warn"
 	}
-	if errors.Is(err, errMAStrategyInvalid) && strings.Contains(err.Error(), "vatCode") {
+	if errors.Is(err, errMAInvalidVAT) {
 		return http.StatusUnprocessableEntity, "invalid_vat", "warn"
 	}
 	if errors.Is(err, errMACompanyFactActive) {

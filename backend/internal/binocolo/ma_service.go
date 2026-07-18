@@ -43,6 +43,7 @@ var (
 	errMATargetAlreadyPresent  = errors.New("Azienda già presente nella ricerca")
 	errMAManualAddInFlight     = errors.New("Inserimento manuale già in corso per questa ricerca")
 	errMAVATNotFound           = errors.New("P.IVA non trovata nel registro")
+	errMAInvalidVAT            = errors.New("P.IVA o codice fiscale non valido")
 	errMACardAlreadyPresent    = errors.New("Azienda già presente in questa iniziativa")
 	// errMAEstimateSuperseded is returned by ReplaceMAEstimates when the active
 	// strategy version changed mid-estimate (the user re-submitted). The estimate
@@ -50,6 +51,13 @@ var (
 	// strategy is always the one that ends up estimated.
 	errMAEstimateSuperseded = errors.New("ma estimate superseded by newer strategy version")
 )
+
+type maCardAlreadyPresentError struct {
+	CompanyKey string
+}
+
+func (e *maCardAlreadyPresentError) Error() string        { return errMACardAlreadyPresent.Error() }
+func (e *maCardAlreadyPresentError) Is(target error) bool { return target == errMACardAlreadyPresent }
 
 const (
 	maAtecoToolName          = "search_ateco_2025"
@@ -1912,6 +1920,22 @@ func (s *maService) setTargetRating(ctx context.Context, sessionID string, input
 	return nil
 }
 
+func openMAInitiativeCard(initiativeID, companyKey string, snapshot maCompanySnapshot, origin, sessionID string, existing *MAInitiativeCard) (MAInitiativeCard, string) {
+	card := MAInitiativeCard{
+		InitiativeID: initiativeID, CompanyKey: companyKey, CompanyName: snapshot.CompanyName,
+		VATCode: snapshot.VATCode, TaxCode: snapshot.TaxCode, Province: snapshot.Province,
+		Origin: origin, State: maCardStateApprofondimento, CreatedFromSession: sessionID,
+	}
+	if existing == nil {
+		return card, maEventCardCreata
+	}
+	// A reopen always preserves the original card snapshot and provenance. The
+	// trigger belongs in the event payload, not in the card's origin.
+	card.CompanyName, card.VATCode, card.TaxCode, card.Province = existing.CompanyName, existing.VATCode, existing.TaxCode, existing.Province
+	card.Origin, card.CreatedFromSession = existing.Origin, existing.CreatedFromSession
+	return card, maEventCardRiaperta
+}
+
 func (s *maService) createDirectInitiativeCard(ctx context.Context, initiativeID string, input MACreateInitiativeCardRequest, subject, email string) (MACreateInitiativeCardResponse, error) {
 	if s.store == nil {
 		return MACreateInitiativeCardResponse{}, errMAStoreUnavailable
@@ -1930,7 +1954,7 @@ func (s *maService) createDirectInitiativeCard(ctx context.Context, initiativeID
 		return MACreateInitiativeCardResponse{}, fmt.Errorf("%w: vatCode or companyKey", errMAStrategyInvalid)
 	}
 	if vat != "" && !isValidVATOrTax(vat) {
-		return MACreateInitiativeCardResponse{}, fmt.Errorf("%w: vatCode", errMAStrategyInvalid)
+		return MACreateInitiativeCardResponse{}, errMAInvalidVAT
 	}
 	domain := ""
 	if strings.TrimSpace(input.Domain) != "" {
@@ -1974,25 +1998,19 @@ func (s *maService) createDirectInitiativeCard(ctx context.Context, initiativeID
 		return MACreateInitiativeCardResponse{}, err
 	}
 	if existing != nil && existing.State != maCardStateChiusa && existing.State != maCardStateRimossa {
-		return MACreateInitiativeCardResponse{}, errMACardAlreadyPresent
+		return MACreateInitiativeCardResponse{}, &maCardAlreadyPresentError{CompanyKey: companyKey}
 	}
-	card := MAInitiativeCard{
-		InitiativeID: initiativeID, CompanyKey: companyKey, CompanyName: snapshot.CompanyName,
-		VATCode: snapshot.VATCode, TaxCode: snapshot.TaxCode, Province: snapshot.Province,
-		Origin: maCardOriginDirect, State: maCardStateApprofondimento,
-	}
-	event := maEventCardCreata
-	if existing != nil {
-		card.CompanyName, card.VATCode, card.TaxCode, card.Province = existing.CompanyName, existing.VATCode, existing.TaxCode, existing.Province
-		card.Origin, card.CreatedFromSession = existing.Origin, existing.CreatedFromSession
-		event = maEventCardRiaperta
-	}
+	card, event := openMAInitiativeCard(initiativeID, companyKey, *snapshot, maCardOriginDirect, "", existing)
 	if err := s.store.UpsertMAInitiativeCard(ctx, card); err != nil {
 		return MACreateInitiativeCardResponse{}, err
 	}
+	eventPayload := map[string]any{"origin": card.Origin, "domainSupplied": domain != ""}
+	if event == maEventCardRiaperta {
+		eventPayload["reopenedVia"] = maCardOriginDirect
+	}
 	if err := s.store.InsertMATargetOutcome(ctx, MATargetOutcome{
 		InitiativeID: initiativeID, CompanyKey: companyKey, Event: event,
-		Payload:          maTraceJSON(map[string]any{"origin": maCardOriginDirect, "domainSupplied": domain != ""}),
+		Payload:          maTraceJSON(eventPayload),
 		CreatedBySubject: subject, CreatedByEmail: email,
 	}); err != nil {
 		return MACreateInitiativeCardResponse{}, err
@@ -2088,40 +2106,25 @@ func (s *maService) ensureInitiativeCard(ctx context.Context, initiativeID, sess
 		return nil
 	}
 
-	card := MAInitiativeCard{
-		InitiativeID:       initiativeID,
-		CompanyKey:         companyKey,
-		Origin:             maCardOriginSearch,
-		State:              maCardStateApprofondimento,
-		CreatedFromSession: sessionID,
-	}
-	if existing != nil {
-		// Riapertura: preserva lo snapshot già registrato, resetta solo stato/esito.
-		card.CompanyName = existing.CompanyName
-		card.VATCode = existing.VATCode
-		card.TaxCode = existing.TaxCode
-		card.Province = existing.Province
-		card.Origin = existing.Origin
-		card.CreatedFromSession = existing.CreatedFromSession
-	} else if rows, err := s.store.ListMATargetRows(ctx, sessionID); err == nil {
-		for _, row := range rows {
-			if row.CompanyKey == companyKey {
-				card.CompanyName = row.CompanyName
-				card.VATCode = row.VATCode
-				card.Province = row.Province
-				break
+	snapshot := maCompanySnapshot{CompanyKey: companyKey}
+	if existing == nil {
+		if rows, err := s.store.ListMATargetRows(ctx, sessionID); err == nil {
+			for _, row := range rows {
+				if row.CompanyKey == companyKey {
+					snapshot.CompanyName = row.CompanyName
+					snapshot.VATCode = row.VATCode
+					snapshot.Province = row.Province
+					break
+				}
 			}
 		}
 	}
+	card, event := openMAInitiativeCard(initiativeID, companyKey, snapshot, maCardOriginSearch, sessionID, existing)
 
 	if err := s.store.UpsertMAInitiativeCard(ctx, card); err != nil {
 		return err
 	}
 
-	event := maEventCardCreata
-	if existing != nil {
-		event = maEventCardRiaperta
-	}
 	if err := s.store.InsertMATargetOutcome(ctx, MATargetOutcome{
 		SessionID:        sessionID,
 		InitiativeID:     initiativeID,
