@@ -25,6 +25,7 @@ import {
   bucketChipDescription,
   bucketChipLabel,
   bucketLabel,
+  bucketLabelWithSuppressionHistory,
   dateLabel,
   downloadBlob,
   errorLabel,
@@ -35,7 +36,6 @@ import {
   numberFormat,
   safeFilename,
   sessionStatusLabel,
-  suppressedReasonShort,
   targetKey,
   targetsToCSV,
 } from './helpers';
@@ -1346,7 +1346,7 @@ function ResultsTable({
               <td>
                 {bucketChipLabel(target.bucket) ? (
                   <Tooltip content={bucketChipDescription(target.bucket, target.bucketReason ?? target.suppressedReason)}>
-                    <span className={bucketClassName(target.bucket, target.bucketReason?.kind)}>{targetBucketChipLabel(target)}</span>
+                    <span className={bucketClassName(target.bucket, target.bucketReason?.kind)}>{bucketLabelWithSuppressionHistory(target.bucket, target.suppressedReason)}</span>
                   </Tooltip>
                 ) : null}
               </td>
@@ -2189,12 +2189,6 @@ function statusPillClass(status: MASessionDetail['session']['status'], running: 
   if (failed || status === 'failed') return `${styles.statusPill} ${styles.statusFailed}`;
   if (status === 'completed' || status === 'estimated') return `${styles.statusPill} ${styles.statusDone}`;
   return styles.statusPill ?? '';
-}
-
-function targetBucketChipLabel(target: MATargetRow): string | null {
-  const label = bucketChipLabel(target.bucket);
-  if (!label || !target.suppressedReason) return label;
-  return `${label} · era soppressa: ${suppressedReasonShort(target.suppressedReason.code)}`;
 }
 
 function bucketClassName(bucket?: string, reasonKind?: string): string {

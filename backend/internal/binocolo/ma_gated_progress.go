@@ -146,18 +146,18 @@ func rowAsTarget(row MATargetRow) MATarget {
 		Flags:           row.Flags,
 		EnrichmentLevel: row.EnrichmentLevel,
 	}
-	if row.OutsideRevenuePerEmployeeFilter {
+	if row.OutsideRevenuePerEmployeeValue != nil {
 		target.Evidence = append(target.Evidence, MATargetEvidence{
 			Criterion: maPostFilterRevenuePerEmployeeMin,
 			Status:    maEvidenceOutside,
-			Label:     "Ricavo per dipendente minimo",
+			Value:     *row.OutsideRevenuePerEmployeeValue,
 		})
 	}
-	if row.OutsideMaxShareholdersFilter {
+	if row.OutsideMaxShareholdersValue != nil {
 		target.Evidence = append(target.Evidence, MATargetEvidence{
 			Criterion: maPostFilterMaxShareholders,
 			Status:    maEvidenceOutside,
-			Label:     "Numero massimo soci",
+			Value:     *row.OutsideMaxShareholdersValue,
 		})
 	}
 	if row.WebValidation != nil {

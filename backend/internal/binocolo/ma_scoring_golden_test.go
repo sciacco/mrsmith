@@ -366,6 +366,20 @@ func TestGoldenSuppressedRoutingReasonsAndRatingOverride(t *testing.T) {
 		})
 	}
 
+	postFilterFallback := maRouteTarget(cases[0].target, maThesisSuccession)
+	if postFilterFallback.Reason == nil || postFilterFallback.Reason.Label != "Ricavo per dipendente sotto la soglia impostata nella ricerca" {
+		t.Errorf("fallback post-filter = %+v", postFilterFallback.Reason)
+	}
+	projectedValue := "42.000 €/dip anno 2024 (min 50.000)"
+	projected := rowAsTarget(MATargetRow{
+		MatchState:                     maMatchStateOutside,
+		OutsideRevenuePerEmployeeValue: &projectedValue,
+	})
+	projectedDecision := maRouteTarget(projected, maThesisSuccession)
+	if projectedDecision.Reason == nil || !strings.Contains(projectedDecision.Reason.Label, projectedValue) {
+		t.Errorf("motivo post-filter proiettato senza valore: %+v", projectedDecision.Reason)
+	}
+
 	identityOnly := MATarget{
 		Rating: &positive,
 		WebValidation: &MAWebValidation{

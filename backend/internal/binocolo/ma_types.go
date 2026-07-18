@@ -1222,9 +1222,9 @@ type MATargetRow struct {
 	RegistryFacts []string       `json:"registryFacts,omitempty"`
 	InLavorazione []MACardMarker `json:"inLavorazione,omitempty"`
 
-	SortTurnover                    *int `json:"-"`
-	OutsideRevenuePerEmployeeFilter bool `json:"-"`
-	OutsideMaxShareholdersFilter    bool `json:"-"`
+	SortTurnover                   *int    `json:"-"`
+	OutsideRevenuePerEmployeeValue *string `json:"-"`
+	OutsideMaxShareholdersValue    *string `json:"-"`
 }
 
 // MATargetRowWeb replica i soli percorsi JSON consumati dalle liste.

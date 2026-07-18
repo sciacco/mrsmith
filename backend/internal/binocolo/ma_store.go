@@ -2247,15 +2247,18 @@ SELECT
       ELSE '[]'::jsonb
     END
   ), 0),
-  EXISTS (
-    SELECT 1 FROM binocolo.ma_evidence evidence
-    WHERE evidence.target_id = t.id AND evidence.status = $2 AND evidence.criterion = $3
-  ) AS outside_revenue_per_employee_filter,
-  EXISTS (
-    SELECT 1 FROM binocolo.ma_evidence evidence
-    WHERE evidence.target_id = t.id AND evidence.status = $2 AND evidence.criterion = $4
-  ) AS outside_max_shareholders_filter
+  outside_filter.revenue_per_employee_value,
+  outside_filter.max_shareholders_value
 FROM target_rows t
+LEFT JOIN LATERAL (
+  SELECT
+    MAX(COALESCE(evidence.value, '')) FILTER (WHERE evidence.criterion = $3) AS revenue_per_employee_value,
+    MAX(COALESCE(evidence.value, '')) FILTER (WHERE evidence.criterion = $4) AS max_shareholders_value
+  FROM binocolo.ma_evidence evidence
+  WHERE evidence.target_id = t.id
+    AND evidence.status = $2
+    AND evidence.criterion IN ($3, $4)
+) outside_filter ON TRUE
 LEFT JOIN binocolo.ma_target_web_validation wv
   ON wv.session_id = t.session_id AND wv.company_key = t.company_key
 LEFT JOIN binocolo.ma_target_rating r
@@ -2279,6 +2282,7 @@ ORDER BY t.score DESC NULLS LAST, t.company_name
 		var webState, finalAction, selectedDomain, reason string
 		var groupDomain, groupIdentifier string
 		var candidateCount int
+		var outsideRevenue, outsideShareholders sql.NullString
 		if err := rows.Scan(
 			&item.ID,
 			&item.RunID,
@@ -2305,8 +2309,8 @@ ORDER BY t.score DESC NULLS LAST, t.company_name
 			&groupDomain,
 			&groupIdentifier,
 			&candidateCount,
-			&item.OutsideRevenuePerEmployeeFilter,
-			&item.OutsideMaxShareholdersFilter,
+			&outsideRevenue,
+			&outsideShareholders,
 		); err != nil {
 			return nil, fmt.Errorf("scan ma target row: %w", err)
 		}
@@ -2324,6 +2328,14 @@ ORDER BY t.score DESC NULLS LAST, t.company_name
 		if rating.Valid {
 			value := int(rating.Int64)
 			item.Rating = &value
+		}
+		if outsideRevenue.Valid {
+			value := outsideRevenue.String
+			item.OutsideRevenuePerEmployeeValue = &value
+		}
+		if outsideShareholders.Valid {
+			value := outsideShareholders.String
+			item.OutsideMaxShareholdersValue = &value
 		}
 		if len(flagsRaw) > 0 {
 			_ = json.Unmarshal(flagsRaw, &item.Flags)
@@ -3188,16 +3200,19 @@ SELECT
       ELSE '[]'::jsonb
     END
   ), 0),
-  EXISTS (
-    SELECT 1 FROM binocolo.ma_evidence evidence
-    WHERE evidence.target_id = t.id AND evidence.status = $2 AND evidence.criterion = $3
-  ) AS outside_revenue_per_employee_filter,
-  EXISTS (
-    SELECT 1 FROM binocolo.ma_evidence evidence
-    WHERE evidence.target_id = t.id AND evidence.status = $2 AND evidence.criterion = $4
-  ) AS outside_max_shareholders_filter
+  outside_filter.revenue_per_employee_value,
+  outside_filter.max_shareholders_value
 FROM target_rows t
 JOIN binocolo.ma_session session ON session.id = t.session_id
+LEFT JOIN LATERAL (
+  SELECT
+    MAX(COALESCE(evidence.value, '')) FILTER (WHERE evidence.criterion = $3) AS revenue_per_employee_value,
+    MAX(COALESCE(evidence.value, '')) FILTER (WHERE evidence.criterion = $4) AS max_shareholders_value
+  FROM binocolo.ma_evidence evidence
+  WHERE evidence.target_id = t.id
+    AND evidence.status = $2
+    AND evidence.criterion IN ($3, $4)
+) outside_filter ON TRUE
 LEFT JOIN binocolo.ma_strategy_version strategy ON strategy.id = session.active_strategy_id
 LEFT JOIN binocolo.ma_initiative initiative ON initiative.id = session.initiative_id
 LEFT JOIN binocolo.ma_target_web_validation wv ON wv.session_id = t.session_id AND wv.company_key = t.resolved_company_key
@@ -3226,13 +3241,14 @@ ORDER BY t.created_at DESC, session.id DESC, t.id DESC
 		var webState, finalAction, selectedDomain, reason string
 		var groupDomain, groupIdentifier string
 		var candidateCount int
+		var outsideRevenue, outsideShareholders sql.NullString
 		if err := rows.Scan(&item.SessionID, &item.SessionTitle, &item.SessionStatus, &item.InitiativeID, &item.InitiativeTitle,
 			&item.TargetID, &targetRow.RunID, &score, &scoreVersion, &targetRow.MatchState, &targetRow.Confidence, &targetRow.Origin,
 			&targetRow.CompanyName, &targetRow.VATCode, &targetRow.Province, &targetRow.Town, &targetRow.AtecoCode,
 			&flagsRaw, &targetRow.EnrichmentLevel, &rating, &scoreAt,
 			&item.ConfidenceAtRating, &ratedAt, &item.ExclusionReason, &outcomesRaw, &item.CreatedAt,
 			&thesis, &hasValidation, &webState, &finalAction, &selectedDomain, &reason, &groupDomain, &groupIdentifier,
-			&candidateCount, &targetRow.OutsideRevenuePerEmployeeFilter, &targetRow.OutsideMaxShareholdersFilter); err != nil {
+			&candidateCount, &outsideRevenue, &outsideShareholders); err != nil {
 			return nil, fmt.Errorf("scan ma company overview appearance: %w", err)
 		}
 		targetRow.ID = item.TargetID
@@ -3248,6 +3264,14 @@ ORDER BY t.created_at DESC, session.id DESC, t.id DESC
 			v := int(rating.Int64)
 			item.Rating = &v
 			targetRow.Rating = &v
+		}
+		if outsideRevenue.Valid {
+			value := outsideRevenue.String
+			targetRow.OutsideRevenuePerEmployeeValue = &value
+		}
+		if outsideShareholders.Valid {
+			value := outsideShareholders.String
+			targetRow.OutsideMaxShareholdersValue = &value
 		}
 		if scoreAt.Valid {
 			v := int(scoreAt.Int64)

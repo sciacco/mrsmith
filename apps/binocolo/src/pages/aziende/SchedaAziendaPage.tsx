@@ -25,7 +25,7 @@ import { SpineNav, type SpineItem } from '../../components/scheda/SpineNav';
 import { useSectionSpy } from '../../components/scheda/useSectionSpy';
 import { ThesisReadingPanel } from '../../components/ThesisReadingPanel/ThesisReadingPanel';
 import { CompanyRegistrySection } from '../iniziative/CompanyRegistrySection';
-import { bucketLabel, dateLabel, errorLabel, sessionStatusLabel, suppressedReasonShort } from '../ricerche/helpers';
+import { bucketLabelWithSuppressionHistory, dateLabel, errorLabel, sessionStatusLabel } from '../ricerche/helpers';
 import styles from './SchedaAziendaPage.module.css';
 
 type Lens =
@@ -92,9 +92,7 @@ function ratingLabel(rating?: number): string {
 }
 
 function appearanceBucketLabel(appearance: MACompanyOverviewAppearance): string {
-  const label = bucketLabel(appearance.bucket);
-  if (!appearance.suppressedReason) return label;
-  return `${label} · era soppressa: ${suppressedReasonShort(appearance.suppressedReason.code)}`;
+  return bucketLabelWithSuppressionHistory(appearance.bucket, appearance.suppressedReason);
 }
 
 function verdictLabel(verdict?: string): string {

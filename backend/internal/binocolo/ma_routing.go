@@ -66,17 +66,17 @@ func maRouteTargetBase(target MATarget, thesis string) MARouteDecision {
 		if reason := maOutsidePostFilterReason(target); reason != nil {
 			return suppressedMADecision(*reason)
 		}
-		if maHasFlag(target, "cessata_fiscalmente") || maHasFlagPrefix(target, maFlagKnockoutVitalita+"_"+maViabilityReasonCeased) {
-			return suppressedMADecision(maReasonFromFlag(target, "ceased", "Cessata fiscalmente", "cessata_fiscalmente", maFlagKnockoutVitalita+"_"+maViabilityReasonCeased))
+		if reason, found := maReasonFromFlag(target, "ceased", "Cessata fiscalmente", "cessata_fiscalmente", maFlagKnockoutVitalita+"_"+maViabilityReasonCeased); found {
+			return suppressedMADecision(reason)
 		}
-		if maHasFlagPrefix(target, maFlagKnockoutVitalita+"_"+maViabilityReasonInactive) {
-			return suppressedMADecision(maReasonFromFlag(target, "inactive", "Società inattiva", maFlagKnockoutVitalita+"_"+maViabilityReasonInactive))
+		if reason, found := maReasonFromFlag(target, "inactive", "Società inattiva", maFlagKnockoutVitalita+"_"+maViabilityReasonInactive); found {
+			return suppressedMADecision(reason)
 		}
-		if maHasFlagPrefix(target, maFlagKnockoutVitalita+"_"+maViabilityReasonDistress) {
+		if reason, found := maReasonFromFlag(target, "distress", "Distress conclamato nei bilanci; opportunità solo per una tesi di consolidamento", maFlagKnockoutVitalita+"_"+maViabilityReasonDistress); found {
 			if normalizeMAThesis(thesis) == maThesisConsolidation {
 				return MARouteDecision{Bucket: maBucketAzionabile}
 			}
-			return suppressedMADecision(maReasonFromFlag(target, "distress", "Distress conclamato nei bilanci; opportunità solo per una tesi di consolidamento", maFlagKnockoutVitalita+"_"+maViabilityReasonDistress))
+			return suppressedMADecision(reason)
 		}
 		return suppressedMADecision(maOffSectorReason(target))
 	}
@@ -117,17 +117,20 @@ func maOutsidePostFilterReason(target MATarget) *MABucketReason {
 	return nil
 }
 
-func maReasonFromFlag(target MATarget, code, fallback string, prefixes ...string) MABucketReason {
+func maReasonFromFlag(target MATarget, code, fallback string, prefixes ...string) (MABucketReason, bool) {
 	for _, flag := range target.Flags {
 		for _, prefix := range prefixes {
-			if flag.Code == prefix || strings.HasPrefix(flag.Code, prefix) {
-				if label := strings.TrimSpace(flag.Label); label != "" {
-					return MABucketReason{Code: code, Kind: "system", Label: label}
-				}
+			if !strings.HasPrefix(flag.Code, prefix) {
+				continue
 			}
+			label := strings.TrimSpace(flag.Label)
+			if label == "" {
+				label = fallback
+			}
+			return MABucketReason{Code: code, Kind: "system", Label: label}, true
 		}
 	}
-	return MABucketReason{Code: code, Kind: "system", Label: fallback}
+	return MABucketReason{}, false
 }
 
 func maOffSectorReason(target MATarget) MABucketReason {

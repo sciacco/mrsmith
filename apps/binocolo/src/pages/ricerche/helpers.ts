@@ -324,6 +324,12 @@ export function suppressedReasonShort(code?: string): string {
   }
 }
 
+export function bucketLabelWithSuppressionHistory(bucket?: string, reason?: MABucketReason): string {
+  const label = bucketLabel(bucket);
+  if (!reason) return label;
+  return `${label} · era soppressa: ${suppressedReasonShort(reason.code)}`;
+}
+
 export function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
