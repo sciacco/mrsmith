@@ -718,6 +718,12 @@ export interface MACompanyOverviewIdentity {
   domain?: string;
 }
 
+export interface MABucketReason {
+  code: 'post_filter' | 'ceased' | 'inactive' | 'distress' | 'off_sector' | 'gate_reject' | string;
+  kind: 'analyst_rule' | 'system' | string;
+  label: string;
+}
+
 export interface MACompanyOverviewAppearance {
   sessionId: string;
   sessionTitle: string;
@@ -727,6 +733,8 @@ export interface MACompanyOverviewAppearance {
   targetId: string;
   score: number;
   bucket?: MATargetBucket | string;
+  bucketReason?: MABucketReason;
+  suppressedReason?: MABucketReason;
   rating?: number;
   scoreAtRating?: number;
   confidenceAtRating?: string;
@@ -921,6 +929,8 @@ export interface MATarget {
   matchState: MAMatchState;
   confidence?: MAConfidence;
   bucket?: MATargetBucket;
+  bucketReason?: MABucketReason;
+  suppressedReason?: MABucketReason;
   rating?: number;
   outcomes?: MATargetOutcome[];
   flags?: MATargetFlag[];
@@ -960,6 +970,8 @@ export interface MATargetRow {
   matchState: MAMatchState | string;
   confidence?: MAConfidence | string;
   bucket?: MATargetBucket;
+  bucketReason?: MABucketReason;
+  suppressedReason?: MABucketReason;
   rating?: number;
   flags?: MATargetFlag[];
   enrichmentLevel?: string;

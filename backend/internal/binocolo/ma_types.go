@@ -505,6 +505,8 @@ type MACompanyOverviewAppearance struct {
 	TargetID           string            `json:"targetId"`
 	Score              int               `json:"score"`
 	Bucket             string            `json:"bucket,omitempty"`
+	BucketReason       *MABucketReason   `json:"bucketReason,omitempty"`
+	SuppressedReason   *MABucketReason   `json:"suppressedReason,omitempty"`
 	Rating             *int              `json:"rating,omitempty"`
 	ScoreAtRating      *int              `json:"scoreAtRating,omitempty"`
 	ConfidenceAtRating string            `json:"confidenceAtRating,omitempty"`
@@ -1173,42 +1175,46 @@ type MATarget struct {
 	// Bucket è la destinazione di presentazione derivata A LETTURA dai campi
 	// persistiti (mai salvata): principale / da_verificare / azionabile /
 	// soppresso. Vedi maRouteTarget.
-	Bucket          string               `json:"bucket,omitempty"`
-	Rating          *int                 `json:"rating,omitempty"`
-	Outcomes        []MATargetOutcome    `json:"outcomes,omitempty"`
-	Flags           []MATargetFlag       `json:"flags,omitempty"`
-	Rationale       string               `json:"rationale"`
-	MissingCriteria []string             `json:"missingCriteria"`
-	Evidence        []MATargetEvidence   `json:"evidence"`
-	Adjustments     []MATargetAdjustment `json:"adjustments,omitempty"`
-	Deep            *MADeepAnalysis      `json:"deep,omitempty"`
-	WebValidation   *MAWebValidation     `json:"webValidation,omitempty"`
-	VendorPayload   json.RawMessage      `json:"vendorPayload,omitempty"`
-	EnrichmentLevel string               `json:"enrichmentLevel,omitempty"`
-	CreatedAt       time.Time            `json:"createdAt"`
+	Bucket           string               `json:"bucket,omitempty"`
+	BucketReason     *MABucketReason      `json:"bucketReason,omitempty"`
+	SuppressedReason *MABucketReason      `json:"suppressedReason,omitempty"`
+	Rating           *int                 `json:"rating,omitempty"`
+	Outcomes         []MATargetOutcome    `json:"outcomes,omitempty"`
+	Flags            []MATargetFlag       `json:"flags,omitempty"`
+	Rationale        string               `json:"rationale"`
+	MissingCriteria  []string             `json:"missingCriteria"`
+	Evidence         []MATargetEvidence   `json:"evidence"`
+	Adjustments      []MATargetAdjustment `json:"adjustments,omitempty"`
+	Deep             *MADeepAnalysis      `json:"deep,omitempty"`
+	WebValidation    *MAWebValidation     `json:"webValidation,omitempty"`
+	VendorPayload    json.RawMessage      `json:"vendorPayload,omitempty"`
+	EnrichmentLevel  string               `json:"enrichmentLevel,omitempty"`
+	CreatedAt        time.Time            `json:"createdAt"`
 }
 
 // MATargetRow è la proiezione leggera di un target per liste e derivazioni:
 // niente vendor_payload, niente blob di validation, niente evidence.
 type MATargetRow struct {
-	ID              string          `json:"id"`
-	RunID           string          `json:"runId"`
-	CompanyKey      string          `json:"companyKey,omitempty"`
-	CompanyName     string          `json:"companyName"`
-	Origin          string          `json:"origin,omitempty"`
-	VATCode         string          `json:"vatCode,omitempty"`
-	Province        string          `json:"province,omitempty"`
-	Town            string          `json:"town,omitempty"`
-	AtecoCode       string          `json:"atecoCode,omitempty"`
-	Score           int             `json:"score"`
-	ScoreVersion    *int            `json:"scoreVersion,omitempty"`
-	MatchState      string          `json:"matchState"`
-	Confidence      string          `json:"confidence,omitempty"`
-	Bucket          string          `json:"bucket,omitempty"`
-	Rating          *int            `json:"rating,omitempty"`
-	Flags           []MATargetFlag  `json:"flags,omitempty"`
-	EnrichmentLevel string          `json:"enrichmentLevel,omitempty"`
-	WebValidation   *MATargetRowWeb `json:"webValidation,omitempty"`
+	ID               string          `json:"id"`
+	RunID            string          `json:"runId"`
+	CompanyKey       string          `json:"companyKey,omitempty"`
+	CompanyName      string          `json:"companyName"`
+	Origin           string          `json:"origin,omitempty"`
+	VATCode          string          `json:"vatCode,omitempty"`
+	Province         string          `json:"province,omitempty"`
+	Town             string          `json:"town,omitempty"`
+	AtecoCode        string          `json:"atecoCode,omitempty"`
+	Score            int             `json:"score"`
+	ScoreVersion     *int            `json:"scoreVersion,omitempty"`
+	MatchState       string          `json:"matchState"`
+	Confidence       string          `json:"confidence,omitempty"`
+	Bucket           string          `json:"bucket,omitempty"`
+	BucketReason     *MABucketReason `json:"bucketReason,omitempty"`
+	SuppressedReason *MABucketReason `json:"suppressedReason,omitempty"`
+	Rating           *int            `json:"rating,omitempty"`
+	Flags            []MATargetFlag  `json:"flags,omitempty"`
+	EnrichmentLevel  string          `json:"enrichmentLevel,omitempty"`
+	WebValidation    *MATargetRowWeb `json:"webValidation,omitempty"`
 
 	// RegistryFacts/InLavorazione sono decorazioni di sola presentazione
 	// (PRD §6.1, R-D3-7): badge registro azienda + marker di card attive in
@@ -1216,8 +1222,9 @@ type MATargetRow struct {
 	RegistryFacts []string       `json:"registryFacts,omitempty"`
 	InLavorazione []MACardMarker `json:"inLavorazione,omitempty"`
 
-	SortTurnover         *int `json:"-"`
-	HasOutsidePostFilter bool `json:"-"`
+	SortTurnover                    *int `json:"-"`
+	OutsideRevenuePerEmployeeFilter bool `json:"-"`
+	OutsideMaxShareholdersFilter    bool `json:"-"`
 }
 
 // MATargetRowWeb replica i soli percorsi JSON consumati dalle liste.

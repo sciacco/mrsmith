@@ -199,6 +199,16 @@ export function TargetInspectorPage() {
           </div>
           <div className={styles.identPills}>
             {bkt ? <span className={`${styles.pill} ${bucketClass(target.bucket)}`}>{bkt}</span> : null}
+            {target.bucketReason || target.suppressedReason ? (
+              <span
+                className={`${styles.pill} ${styles.pillNeutral} ${styles.reasonPill}`}
+                title={(target.bucketReason ?? target.suppressedReason)?.label}
+              >
+                {target.bucketReason
+                  ? `Motivo: ${target.bucketReason.label}`
+                  : `Era soppressa: ${target.suppressedReason!.label}`}
+              </span>
+            ) : null}
             {conf ? (
               <span className={`${styles.pill} ${confidenceClass(target.confidence)}`}>
                 {conf} <HiddenField label="confidence" />

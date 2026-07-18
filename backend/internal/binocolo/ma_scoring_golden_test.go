@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"strings"
 	"testing"
 	"time"
 )
@@ -124,7 +125,7 @@ func TestGoldenGhostRoutedToVerifyNotHidden(t *testing.T) {
 	if target.MatchState != maMatchStatePartial {
 		t.Errorf("matchState = %q, atteso %q", target.MatchState, maMatchStatePartial)
 	}
-	if bucket := maRouteTarget(target, maThesisSuccession); bucket != maBucketDaVerificare {
+	if bucket := maRouteTarget(target, maThesisSuccession).Bucket; bucket != maBucketDaVerificare {
 		t.Errorf("bucket = %q, atteso %q: il fantasma va in coda di verifica, non in cima alla lista", bucket, maBucketDaVerificare)
 	}
 }
@@ -267,7 +268,7 @@ func TestGoldenSectorMismatchRescue(t *testing.T) {
 	if !maHasFlag(rescued, maFlagAtecoFuoriPerimetro) {
 		t.Errorf("manca il flag %s", maFlagAtecoFuoriPerimetro)
 	}
-	if bucket := maRouteTarget(rescued, maThesisSuccession); bucket != maBucketAzionabile {
+	if bucket := maRouteTarget(rescued, maThesisSuccession).Bucket; bucket != maBucketAzionabile {
 		t.Errorf("bucket = %q, atteso %q (azione: rivedi/override)", bucket, maBucketAzionabile)
 	}
 
@@ -277,7 +278,7 @@ func TestGoldenSectorMismatchRescue(t *testing.T) {
 	if hidden.MatchState != maMatchStateOutside {
 		t.Errorf("senza conferma del gate il fuori-divisione resta fuori_criterio, got %q", hidden.MatchState)
 	}
-	if bucket := maRouteTarget(hidden, maThesisSuccession); bucket != maBucketSoppresso {
+	if bucket := maRouteTarget(hidden, maThesisSuccession).Bucket; bucket != maBucketSoppresso {
 		t.Errorf("bucket = %q, atteso %q", bucket, maBucketSoppresso)
 	}
 }
@@ -304,11 +305,81 @@ func TestGoldenDistressRoutingIsThesisAware(t *testing.T) {
 	if !maHasFlagPrefix(target, maFlagKnockoutVitalita+"_"+maViabilityReasonDistress) {
 		t.Fatalf("manca il flag knockout distress: %+v", target.Flags)
 	}
-	if bucket := maRouteTarget(target, maThesisConsolidation); bucket != maBucketAzionabile {
+	if bucket := maRouteTarget(target, maThesisConsolidation).Bucket; bucket != maBucketAzionabile {
 		t.Errorf("consolidamento: bucket = %q, atteso %q", bucket, maBucketAzionabile)
 	}
-	if bucket := maRouteTarget(target, maThesisSuccession); bucket != maBucketSoppresso {
+	if bucket := maRouteTarget(target, maThesisSuccession).Bucket; bucket != maBucketSoppresso {
 		t.Errorf("successione: bucket = %q, atteso %q", bucket, maBucketSoppresso)
+	}
+}
+
+func TestGoldenSuppressedRoutingReasonsAndRatingOverride(t *testing.T) {
+	positive := 1
+	zero := 0
+	negative := -1
+	base := func() MATarget { return MATarget{MatchState: maMatchStateOutside, AtecoCode: "620100"} }
+
+	cases := []struct {
+		name   string
+		target MATarget
+		code   string
+	}{
+		{name: "post filter", target: func() MATarget {
+			target := base()
+			target.Evidence = []MATargetEvidence{{Criterion: maPostFilterRevenuePerEmployeeMin, Status: maEvidenceOutside}}
+			return target
+		}(), code: "post_filter"},
+		{name: "ceased", target: func() MATarget {
+			target := base()
+			target.Flags = []MATargetFlag{{Code: "cessata_fiscalmente", Label: "Cessata fiscalmente"}}
+			return target
+		}(), code: "ceased"},
+		{name: "inactive", target: func() MATarget {
+			target := base()
+			target.Flags = []MATargetFlag{{Code: maFlagKnockoutVitalita + "_" + maViabilityReasonInactive, Label: "Società dormiente"}}
+			return target
+		}(), code: "inactive"},
+		{name: "distress", target: func() MATarget {
+			target := base()
+			target.Flags = []MATargetFlag{{Code: maFlagKnockoutVitalita + "_" + maViabilityReasonDistress, Label: "Distress conclamato"}}
+			return target
+		}(), code: "distress"},
+		{name: "off sector", target: base(), code: "off_sector"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, rating := range []*int{nil, &zero, &negative} {
+				target := tc.target
+				target.Rating = rating
+				decision := maRouteTarget(target, maThesisSuccession)
+				if decision.Bucket != maBucketSoppresso || decision.Reason == nil || decision.Reason.Code != tc.code {
+					t.Fatalf("decisione senza override = %+v, atteso soppresso/%s", decision, tc.code)
+				}
+			}
+			target := tc.target
+			target.Rating = &positive
+			decision := maRouteTarget(target, maThesisSuccession)
+			if decision.Bucket != maBucketDaVerificare || decision.Reason != nil || decision.SuppressedReason == nil || decision.SuppressedReason.Code != tc.code {
+				t.Fatalf("decisione con override = %+v, atteso da_verificare/%s", decision, tc.code)
+			}
+		})
+	}
+
+	identityOnly := MATarget{
+		Rating: &positive,
+		WebValidation: &MAWebValidation{
+			FinalAction:    "reject",
+			SelectedDomain: "example.it",
+			FinalDecision:  CandidateMatchFinalDecision{Reason: "Attività non coerente"},
+		},
+	}
+	decision := maRouteTarget(identityOnly, maThesisSuccession)
+	if decision.Bucket != maBucketSoppresso || decision.Reason == nil || decision.Reason.Code != "gate_reject" {
+		t.Fatalf("gate reject identity-only = %+v, non deve essere ripristinata", decision)
+	}
+	if !strings.Contains(decision.Reason.Label, "Attività non coerente") || !strings.Contains(decision.Reason.Label, "example.it") {
+		t.Errorf("label gate reject non composta dai fatti: %q", decision.Reason.Label)
 	}
 }
 

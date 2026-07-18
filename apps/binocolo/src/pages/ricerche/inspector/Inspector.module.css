@@ -170,6 +170,13 @@
   text-transform: uppercase;
 }
 
+.reasonPill {
+  max-width: 100%;
+  line-height: 1.4;
+  text-transform: none;
+  white-space: normal;
+}
+
 .pillPrincipale {
   background: var(--color-accent-subtle);
   color: var(--color-accent);

@@ -8,6 +8,7 @@ import type {
   MAStrategyType,
   MATarget,
   MATargetRow,
+  MABucketReason,
 } from '../../api/types';
 
 export const numberFormat = new Intl.NumberFormat('it-IT');
@@ -296,7 +297,8 @@ export function bucketChipLabel(bucket?: string): string | null {
   }
 }
 
-export function bucketChipDescription(bucket?: string): string | null {
+export function bucketChipDescription(bucket?: string, reason?: MABucketReason): string | null {
+  if (bucket === 'soppresso' && reason?.label) return reason.label;
   switch (bucket) {
     case 'azionabile':
       return 'Esclusa da un criterio formale, ma un’azione la rimette in valutazione: settore da rivedere o dominio da associare.';
@@ -306,6 +308,17 @@ export function bucketChipDescription(bucket?: string): string | null {
       return 'Nessuna azione disponibile: società cessata o dormiente, esclusa dalle regole della ricerca o fuori dagli ambiti descritti.';
     default:
       return null;
+  }
+}
+
+export function suppressedReasonShort(code?: string): string {
+  switch (code) {
+    case 'post_filter': return 'soglia della ricerca';
+    case 'ceased': return 'cessata';
+    case 'inactive': return 'inattiva';
+    case 'distress': return 'distress';
+    case 'off_sector': return 'fuori perimetro ATECO';
+    default: return 'motivo di soppressione';
   }
 }
 
@@ -333,7 +346,7 @@ export function targetsToCSV(targets: MATargetListItem[]): string {
         String(target.score ?? ''),
         bucketLabel(target.bucket),
         target.webValidation?.selectedDomain ?? '',
-        target.webValidation?.finalDecision?.reason ?? rationale ?? '',
+        target.webValidation?.finalDecision?.reason || rationale || target.bucketReason?.label || target.suppressedReason?.label || '',
       ];
     }),
   ];

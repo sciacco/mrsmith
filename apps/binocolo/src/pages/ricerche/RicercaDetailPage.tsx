@@ -35,6 +35,7 @@ import {
   numberFormat,
   safeFilename,
   sessionStatusLabel,
+  suppressedReasonShort,
   targetKey,
   targetsToCSV,
 } from './helpers';
@@ -1341,8 +1342,8 @@ function ResultsTable({
               <td>{target.province ?? '-'}</td>
               <td>
                 {bucketChipLabel(target.bucket) ? (
-                  <Tooltip content={bucketChipDescription(target.bucket)}>
-                    <span className={bucketClassName(target.bucket)}>{bucketChipLabel(target.bucket)}</span>
+                  <Tooltip content={bucketChipDescription(target.bucket, target.bucketReason ?? target.suppressedReason)}>
+                    <span className={bucketClassName(target.bucket, target.bucketReason?.kind)}>{targetBucketChipLabel(target)}</span>
                   </Tooltip>
                 ) : null}
               </td>
@@ -1888,6 +1889,13 @@ function TargetScoreSection({ target }: { target: MATarget }) {
           <span className={`${styles.targetChip} ${chipToneClass(target.bucket === 'soppresso' ? 'warning' : 'info')}`}>{bucketLabel(target.bucket)}</span>
         </div>
       </div>
+      {target.bucketReason || target.suppressedReason ? (
+        <p className={styles.bucketReason}>
+          {target.bucketReason
+            ? `Soppressa — ${target.bucketReason.label}`
+            : `Era soppressa: ${target.suppressedReason!.label} · ripristinata dalla valutazione`}
+        </p>
+      ) : null}
       {hasDetails ? (
         <details className={styles.targetDetails}>
           <summary>Dettaglio punteggio</summary>
@@ -2180,8 +2188,15 @@ function statusPillClass(status: MASessionDetail['session']['status'], running: 
   return styles.statusPill ?? '';
 }
 
-function bucketClassName(bucket?: string): string {
+function targetBucketChipLabel(target: MATargetRow): string | null {
+  const label = bucketChipLabel(target.bucket);
+  if (!label || !target.suppressedReason) return label;
+  return `${label} · era soppressa: ${suppressedReasonShort(target.suppressedReason.code)}`;
+}
+
+function bucketClassName(bucket?: string, reasonKind?: string): string {
   if (bucket === 'azionabile') return `${styles.bucketChip} ${styles.bucketAction}`;
+  if (bucket === 'soppresso' && reasonKind === 'analyst_rule') return `${styles.bucketChip} ${styles.bucketAnalystRule}`;
   if (bucket === 'da_verificare') return `${styles.bucketChip} ${styles.bucketReview}`;
   if (bucket === 'soppresso') return `${styles.bucketChip} ${styles.bucketSuppressed}`;
   return styles.bucketChip ?? '';

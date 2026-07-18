@@ -1074,6 +1074,12 @@
   color: var(--color-text-muted);
 }
 
+.bucketAnalystRule {
+  border-color: var(--color-warning-subtle);
+  background: var(--color-warning-subtle);
+  color: var(--color-warning-strong);
+}
+
 .ratingControl {
   display: inline-flex;
   align-items: center;
@@ -1414,6 +1420,13 @@ td .inspectLink { margin-left: var(--space-1); }
   border-color: var(--color-danger-subtle);
   background: var(--color-danger-subtle);
   color: var(--color-danger-hover);
+}
+
+.bucketReason {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.5;
 }
 
 .targetDetails {

@@ -2248,12 +2248,13 @@ SELECT
     END
   ), 0),
   EXISTS (
-    SELECT 1
-    FROM binocolo.ma_evidence evidence
-    WHERE evidence.target_id = t.id
-      AND evidence.status = $2
-      AND evidence.criterion IN ($3, $4)
-  ) AS has_outside_post_filter
+    SELECT 1 FROM binocolo.ma_evidence evidence
+    WHERE evidence.target_id = t.id AND evidence.status = $2 AND evidence.criterion = $3
+  ) AS outside_revenue_per_employee_filter,
+  EXISTS (
+    SELECT 1 FROM binocolo.ma_evidence evidence
+    WHERE evidence.target_id = t.id AND evidence.status = $2 AND evidence.criterion = $4
+  ) AS outside_max_shareholders_filter
 FROM target_rows t
 LEFT JOIN binocolo.ma_target_web_validation wv
   ON wv.session_id = t.session_id AND wv.company_key = t.company_key
@@ -2304,7 +2305,8 @@ ORDER BY t.score DESC NULLS LAST, t.company_name
 			&groupDomain,
 			&groupIdentifier,
 			&candidateCount,
-			&item.HasOutsidePostFilter,
+			&item.OutsideRevenuePerEmployeeFilter,
+			&item.OutsideMaxShareholdersFilter,
 		); err != nil {
 			return nil, fmt.Errorf("scan ma target row: %w", err)
 		}
@@ -3187,12 +3189,13 @@ SELECT
     END
   ), 0),
   EXISTS (
-    SELECT 1
-    FROM binocolo.ma_evidence evidence
-    WHERE evidence.target_id = t.id
-      AND evidence.status = $2
-      AND evidence.criterion IN ($3, $4)
-  ) AS has_outside_post_filter
+    SELECT 1 FROM binocolo.ma_evidence evidence
+    WHERE evidence.target_id = t.id AND evidence.status = $2 AND evidence.criterion = $3
+  ) AS outside_revenue_per_employee_filter,
+  EXISTS (
+    SELECT 1 FROM binocolo.ma_evidence evidence
+    WHERE evidence.target_id = t.id AND evidence.status = $2 AND evidence.criterion = $4
+  ) AS outside_max_shareholders_filter
 FROM target_rows t
 JOIN binocolo.ma_session session ON session.id = t.session_id
 LEFT JOIN binocolo.ma_strategy_version strategy ON strategy.id = session.active_strategy_id
@@ -3229,7 +3232,7 @@ ORDER BY t.created_at DESC, session.id DESC, t.id DESC
 			&flagsRaw, &targetRow.EnrichmentLevel, &rating, &scoreAt,
 			&item.ConfidenceAtRating, &ratedAt, &item.ExclusionReason, &outcomesRaw, &item.CreatedAt,
 			&thesis, &hasValidation, &webState, &finalAction, &selectedDomain, &reason, &groupDomain, &groupIdentifier,
-			&candidateCount, &targetRow.HasOutsidePostFilter); err != nil {
+			&candidateCount, &targetRow.OutsideRevenuePerEmployeeFilter, &targetRow.OutsideMaxShareholdersFilter); err != nil {
 			return nil, fmt.Errorf("scan ma company overview appearance: %w", err)
 		}
 		targetRow.ID = item.TargetID
@@ -3267,7 +3270,10 @@ ORDER BY t.created_at DESC, session.id DESC, t.id DESC
 				CandidateCount:      candidateCount,
 			}
 		}
-		item.Bucket = maRouteTarget(rowAsTarget(targetRow), thesis)
+		decision := maRouteTarget(rowAsTarget(targetRow), thesis)
+		item.Bucket = decision.Bucket
+		item.BucketReason = decision.Reason
+		item.SuppressedReason = decision.SuppressedReason
 		if len(outcomesRaw) > 0 {
 			_ = json.Unmarshal(outcomesRaw, &item.Outcomes)
 		}

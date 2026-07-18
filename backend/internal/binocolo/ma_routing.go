@@ -20,64 +20,139 @@ const (
 	maBucketSoppresso    = "soppresso"
 )
 
-// maRouteTarget assegna la destinazione di presentazione di un target.
-//
-//   - principale: scorato, confidence media/alta — la lista di lavoro.
-//   - da_verificare: scorato ma a evidenza sottile (confidence bassa), oppure
-//     sopravvissuto del gate mai arricchito. Un punteggio alto qui è un invito a
-//     verificare, non un rank di qualità: è la coda di lavoro che impedisce al
-//     fantasma a 3 segnali di travestirsi da 100 documentato.
-//   - azionabile: un click lo rimette in gioco — ATECO fuori perimetro ma
-//     confermato dal gate semantico (override/rivedi), dominio irrisolto
-//     (associa dominio), distress sotto tesi consolidamento (il distress È
-//     l'opportunità).
-//   - soppresso: nessuna azione possibile — cessate/dormienti, escluse dalle
-//     regole dure che l'analista stesso ha impostato, fuori settore senza
-//     conferma semantica. Solo conteggio.
-func maRouteTarget(target MATarget, thesis string) string {
+type MABucketReason struct {
+	Code  string `json:"code"`
+	Kind  string `json:"kind"`
+	Label string `json:"label"`
+}
+
+type MARouteDecision struct {
+	Bucket           string
+	Reason           *MABucketReason
+	SuppressedReason *MABucketReason
+}
+
+// maRouteTarget assegna la destinazione di presentazione di un target. Il
+// verdetto resta derivato a lettura: una valutazione positiva dell'analista
+// rimette una soppressa tra i target da verificare, conservando il motivo
+// controfattuale che la UI deve rendere visibile.
+func maRouteTarget(target MATarget, thesis string) MARouteDecision {
+	decision := maRouteTargetBase(target, thesis)
+	if decision.Bucket == maBucketSoppresso && target.MatchState != "" && target.Rating != nil && *target.Rating >= 1 {
+		return MARouteDecision{Bucket: maBucketDaVerificare, SuppressedReason: decision.Reason}
+	}
+	return decision
+}
+
+func maRouteTargetBase(target MATarget, thesis string) MARouteDecision {
 	if maManualGateDissent(target) {
-		return maBucketDaVerificare
+		return MARouteDecision{Bucket: maBucketDaVerificare}
 	}
 
 	// Righe identity-only (score/matchState NULL): instradate dal verdetto gate.
 	if target.MatchState == "" {
 		switch gatedTargetBucket(target) {
 		case maGatedBucketManualReview:
-			return maBucketAzionabile // azione: associa dominio → processa
+			return MARouteDecision{Bucket: maBucketAzionabile}
 		case maGatedBucketReject:
-			return maBucketSoppresso
+			return suppressedMADecision(maGateRejectReason(target))
 		default:
-			// keep/forse sopravvissuto ma mai arricchito (fetch fallito): visibile
-			// tra i da-verificare, mai perso in silenzio.
-			return maBucketDaVerificare
+			return MARouteDecision{Bucket: maBucketDaVerificare}
 		}
 	}
 
 	if target.MatchState == maMatchStateOutside {
-		// Precedenza: regola dell'analista > morte legale > distress > settore.
-		if maHasOutsidePostFilter(target) {
-			return maBucketSoppresso // esclusione corretta: l'ha chiesta l'analista
+		// Precedenza: regola dell'analista > morte legale > inattività > distress > settore.
+		if reason := maOutsidePostFilterReason(target); reason != nil {
+			return suppressedMADecision(*reason)
 		}
-		if maHasFlag(target, "cessata_fiscalmente") || maHasFlagPrefix(target, maFlagKnockoutVitalita+"_"+maViabilityReasonCeased) ||
-			maHasFlagPrefix(target, maFlagKnockoutVitalita+"_"+maViabilityReasonInactive) {
-			return maBucketSoppresso // entità morte/dormienti: nessuna azione
+		if maHasFlag(target, "cessata_fiscalmente") || maHasFlagPrefix(target, maFlagKnockoutVitalita+"_"+maViabilityReasonCeased) {
+			return suppressedMADecision(maReasonFromFlag(target, "ceased", "Cessata fiscalmente", "cessata_fiscalmente", maFlagKnockoutVitalita+"_"+maViabilityReasonCeased))
+		}
+		if maHasFlagPrefix(target, maFlagKnockoutVitalita+"_"+maViabilityReasonInactive) {
+			return suppressedMADecision(maReasonFromFlag(target, "inactive", "Società inattiva", maFlagKnockoutVitalita+"_"+maViabilityReasonInactive))
 		}
 		if maHasFlagPrefix(target, maFlagKnockoutVitalita+"_"+maViabilityReasonDistress) {
 			if normalizeMAThesis(thesis) == maThesisConsolidation {
-				return maBucketAzionabile // per un consolidatore il distress è il deal
+				return MARouteDecision{Bucket: maBucketAzionabile}
 			}
-			return maBucketSoppresso
+			return suppressedMADecision(maReasonFromFlag(target, "distress", "Distress conclamato nei bilanci; opportunità solo per una tesi di consolidamento", maFlagKnockoutVitalita+"_"+maViabilityReasonDistress))
 		}
-		return maBucketSoppresso // fuori settore non riscattato dal gate, o legacy
+		return suppressedMADecision(maOffSectorReason(target))
 	}
 
 	if maHasFlag(target, maFlagAtecoFuoriPerimetro) {
-		return maBucketAzionabile // probabile mis-codifica: rivedi/override
+		return MARouteDecision{Bucket: maBucketAzionabile}
 	}
 	if target.Confidence == "bassa" {
-		return maBucketDaVerificare
+		return MARouteDecision{Bucket: maBucketDaVerificare}
 	}
-	return maBucketPrincipale
+	return MARouteDecision{Bucket: maBucketPrincipale}
+}
+
+func suppressedMADecision(reason MABucketReason) MARouteDecision {
+	return MARouteDecision{Bucket: maBucketSoppresso, Reason: &reason}
+}
+
+func maOutsidePostFilterReason(target MATarget) *MABucketReason {
+	for _, item := range target.Evidence {
+		if item.Status != maEvidenceOutside {
+			continue
+		}
+		var fallback string
+		switch item.Criterion {
+		case maPostFilterRevenuePerEmployeeMin:
+			fallback = "Ricavo per dipendente sotto la soglia impostata nella ricerca"
+		case maPostFilterMaxShareholders:
+			fallback = "Numero di soci oltre il massimo impostato nella ricerca"
+		default:
+			continue
+		}
+		label := fallback
+		if strings.TrimSpace(item.Value) != "" {
+			label = fmt.Sprintf("%s: %s", fallback, strings.TrimSpace(item.Value))
+		}
+		return &MABucketReason{Code: "post_filter", Kind: "analyst_rule", Label: label}
+	}
+	return nil
+}
+
+func maReasonFromFlag(target MATarget, code, fallback string, prefixes ...string) MABucketReason {
+	for _, flag := range target.Flags {
+		for _, prefix := range prefixes {
+			if flag.Code == prefix || strings.HasPrefix(flag.Code, prefix) {
+				if label := strings.TrimSpace(flag.Label); label != "" {
+					return MABucketReason{Code: code, Kind: "system", Label: label}
+				}
+			}
+		}
+	}
+	return MABucketReason{Code: code, Kind: "system", Label: fallback}
+}
+
+func maOffSectorReason(target MATarget) MABucketReason {
+	ateco := strings.TrimSpace(strings.Join([]string{target.AtecoCode, target.AtecoDescription}, " — "))
+	ateco = strings.Trim(ateco, " —")
+	if ateco != "" {
+		return MABucketReason{Code: "off_sector", Kind: "system", Label: "ATECO " + ateco + ", fuori dal perimetro della ricerca"}
+	}
+	return MABucketReason{Code: "off_sector", Kind: "system", Label: "Attività fuori dagli ambiti descritti: ATECO fuori perimetro, nessun riscontro web nel settore"}
+}
+
+func maGateRejectReason(target MATarget) MABucketReason {
+	fallback := "Le pagine web lette indicano un’attività fuori tesi"
+	if target.WebValidation == nil {
+		return MABucketReason{Code: "gate_reject", Kind: "system", Label: fallback}
+	}
+	reason := strings.TrimSpace(target.WebValidation.FinalDecision.Reason)
+	domain := strings.TrimSpace(target.WebValidation.SelectedDomain)
+	if reason == "" {
+		return MABucketReason{Code: "gate_reject", Kind: "system", Label: fallback}
+	}
+	if domain != "" {
+		reason += " — giudicata su " + domain
+	}
+	return MABucketReason{Code: "gate_reject", Kind: "system", Label: reason}
 }
 
 func maManualGateDissent(target MATarget) bool {
@@ -120,20 +195,6 @@ func maHasFlag(target MATarget, code string) bool {
 func maHasFlagPrefix(target MATarget, prefix string) bool {
 	for _, flag := range target.Flags {
 		if strings.HasPrefix(flag.Code, prefix) {
-			return true
-		}
-	}
-	return false
-}
-
-// maHasOutsidePostFilter reports whether the target was gated out by one of the
-// analyst's own hard rules (post-filter evidence rows with status outside).
-func maHasOutsidePostFilter(target MATarget) bool {
-	for _, item := range target.Evidence {
-		if item.Status != maEvidenceOutside {
-			continue
-		}
-		if item.Criterion == maPostFilterRevenuePerEmployeeMin || item.Criterion == maPostFilterMaxShareholders {
 			return true
 		}
 	}

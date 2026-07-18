@@ -236,7 +236,10 @@ func (s *maService) getSession(ctx context.Context, id string) (MASessionDetail,
 		detail.ScoringPlan = &plan
 	}
 	for i := range detail.Targets {
-		detail.Targets[i].Bucket = maRouteTarget(detail.Targets[i], thesis)
+		decision := maRouteTarget(detail.Targets[i], thesis)
+		detail.Targets[i].Bucket = decision.Bucket
+		detail.Targets[i].BucketReason = decision.Reason
+		detail.Targets[i].SuppressedReason = decision.SuppressedReason
 	}
 	return decorateMACost(detail, s.loadPricing(ctx)), nil
 }
@@ -286,7 +289,10 @@ func (s *maService) sessionTargetRows(ctx context.Context, sessionID string) ([]
 		return nil, err
 	}
 	for index := range rows {
-		rows[index].Bucket = maRouteTarget(rowAsTarget(rows[index]), thesis)
+		decision := maRouteTarget(rowAsTarget(rows[index]), thesis)
+		rows[index].Bucket = decision.Bucket
+		rows[index].BucketReason = decision.Reason
+		rows[index].SuppressedReason = decision.SuppressedReason
 	}
 	if err := s.decorateTargetRowsWithRegistryAndCards(ctx, rows); err != nil {
 		return nil, err
@@ -365,7 +371,10 @@ func (s *maService) sessionTargetDetail(ctx context.Context, sessionID, targetID
 	if err != nil {
 		return MATarget{}, err
 	}
-	target.Bucket = maRouteTarget(target, thesis)
+	decision := maRouteTarget(target, thesis)
+	target.Bucket = decision.Bucket
+	target.BucketReason = decision.Reason
+	target.SuppressedReason = decision.SuppressedReason
 	return target, nil
 }
 

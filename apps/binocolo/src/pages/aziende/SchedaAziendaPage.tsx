@@ -25,7 +25,7 @@ import { SpineNav, type SpineItem } from '../../components/scheda/SpineNav';
 import { useSectionSpy } from '../../components/scheda/useSectionSpy';
 import { ThesisReadingPanel } from '../../components/ThesisReadingPanel/ThesisReadingPanel';
 import { CompanyRegistrySection } from '../iniziative/CompanyRegistrySection';
-import { bucketLabel, dateLabel, errorLabel, sessionStatusLabel } from '../ricerche/helpers';
+import { bucketLabel, dateLabel, errorLabel, sessionStatusLabel, suppressedReasonShort } from '../ricerche/helpers';
 import styles from './SchedaAziendaPage.module.css';
 
 type Lens =
@@ -89,6 +89,12 @@ function ratingLabel(rating?: number): string {
   if (rating === -1) return 'Esclusa';
   if (!rating) return 'Non valutata';
   return `${'★'.repeat(rating)}${'☆'.repeat(Math.max(0, 3 - rating))}`;
+}
+
+function appearanceBucketLabel(appearance: MACompanyOverviewAppearance): string {
+  const label = bucketLabel(appearance.bucket);
+  if (!appearance.suppressedReason) return label;
+  return `${label} · era soppressa: ${suppressedReasonShort(appearance.suppressedReason.code)}`;
 }
 
 function verdictLabel(verdict?: string): string {
@@ -603,7 +609,7 @@ export function SchedaAziendaPage() {
 
   const lensVerdict =
     lens.type === 'ricerca' && ricercaAppearance
-      ? { label: verdictLabel(analysis?.verdict), bucket: bucketLabel(ricercaAppearance.bucket) }
+      ? { label: verdictLabel(analysis?.verdict), bucket: appearanceBucketLabel(ricercaAppearance) }
       : undefined;
   const lensRating =
     lens.type === 'ricerca' && ricercaAppearance ? { value: ricercaAppearance.rating ?? 0, onRate: rateCurrent } : undefined;
@@ -741,7 +747,7 @@ export function SchedaAziendaPage() {
             <div className={styles.contextCard}>
               <div className={styles.cardTopline}>
                 <span className={styles.statusPill}>{verdictLabel(analysis?.verdict)}</span>
-                <span>{bucketLabel(ricercaAppearance.bucket)}</span>
+                <span>{appearanceBucketLabel(ricercaAppearance)}</span>
               </div>
               <h3>Verdetto nella ricerca</h3>
               <p>{analysis?.businessFit || target?.rationale || 'Dettaglio del giudizio non disponibile per questa ricerca.'}</p>
@@ -976,7 +982,7 @@ function HistorySection({ appearances, companyKey }: { appearances: MACompanyOve
                 >
                   {appearance.sessionTitle || appearance.sessionId}
                 </Link>
-                <p>{sessionStatusLabel(appearance.sessionStatus as any)} · {bucketLabel(appearance.bucket)} · punteggio {formatScore(appearance.score)}</p>
+                <p>{sessionStatusLabel(appearance.sessionStatus as any)} · {appearanceBucketLabel(appearance)} · punteggio {formatScore(appearance.score)}</p>
                 {appearance.initiativeTitle ? <p>Iniziativa: {appearance.initiativeTitle}</p> : null}
                 <Link to={`/ricerche/${appearance.sessionId}`} className={styles.externalLink}>
                   Apri ricerca <Icon name="external-link" size={13} />
