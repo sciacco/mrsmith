@@ -534,6 +534,19 @@
   font-weight: 600;
 }
 
+.thesisSummary {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+}
+
+.thesisSummary p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
 .toolbar {
   display: flex;
   align-items: center;
@@ -560,6 +573,37 @@
 .toolbar .thesis {
   flex-shrink: 0;
   white-space: nowrap;
+}
+
+.thesisGuidance {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, auto);
+  gap: var(--space-3) var(--space-5);
+  align-items: start;
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.thesisGuidance p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.thesisGuidance p:last-child {
+  color: var(--color-text-muted);
+}
+
+.thesisGuidance strong {
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+.scoringPlanDisclosure {
+  margin-top: var(--space-3);
 }
 
 .toggleButton,
@@ -1665,7 +1709,8 @@ td .inspectLink { margin-left: var(--space-1); }
     grid-template-columns: 1fr;
   }
 
-  .scoreDetailRow {
+  .scoreDetailRow,
+  .thesisGuidance {
     grid-template-columns: 1fr;
   }
 

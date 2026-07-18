@@ -4,9 +4,12 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useApiClient } from '../../api/client';
+import { THESIS_META, THESIS_OPTIONS, thesisLabel } from '../../api/thesis';
 import { DeepAnalysisContent } from '../../components/deep/DeepComponents';
 import { RatingStars } from '../../components/RatingStars';
+import { ScoringPlanPanel } from '../../components/ScoringPlanPanel/ScoringPlanPanel';
 import { writeCohort } from '../../components/scheda/cohort';
+import { LabeledDisclosure } from '../../components/scheda/LabeledDisclosure';
 import { ThesisReadingPanel } from '../../components/ThesisReadingPanel/ThesisReadingPanel';
 import { normalizeManualVat, validateManualDomain, validateManualVat } from '../../lib/companyIdentifiers';
 import type {
@@ -49,14 +52,6 @@ const registryFactLabels: Record<string, { label: string; tone: 'warn' | 'info' 
   gia_cliente: { label: 'Già cliente', tone: 'info' },
   partner: { label: 'Partner', tone: 'info' },
 };
-
-const thesisOptions: { value: MAThesis; label: string }[] = [
-  { value: 'generico', label: 'Generico' },
-  { value: 'successione', label: 'Successione' },
-  { value: 'crescita', label: 'Crescita' },
-  { value: 'consolidamento', label: 'Consolidamento' },
-  { value: 'tuck_in', label: 'Competenze' },
-];
 
 const moneyFormat = new Intl.NumberFormat('it-IT', {
   style: 'currency',
@@ -693,7 +688,7 @@ export function RicercaDetailPage() {
                 <div className={styles.toolbar}>
                   <span className={styles.thesis}>Tesi</span>
                   <select className={styles.select} value={thesis} onChange={(event) => setThesis(event.target.value as MAThesis)}>
-                    {thesisOptions.map((item) => (
+                    {THESIS_OPTIONS.map((item) => (
                       <option key={item.value} value={item.value}>{item.label}</option>
                     ))}
                   </select>
@@ -708,6 +703,20 @@ export function RicercaDetailPage() {
                   </Button>
                   <Button variant="secondary" onClick={exportCSV}>CSV</Button>
                 </div>
+                <div className={styles.thesisGuidance}>
+                  <p>
+                    <strong>{detail.scoringPlan?.thesis === thesis ? 'Tesi attuale' : 'Da applicare'} — {THESIS_META[thesis].label}.</strong>{' '}
+                    {THESIS_META[thesis].description}
+                  </p>
+                  <p>Ricalcolo dai dati già acquisiti: nessun costo. Reversibile tornando alla tesi precedente.</p>
+                </div>
+                {detail.scoringPlan ? (
+                  <div className={styles.scoringPlanDisclosure}>
+                    <LabeledDisclosure title="Cosa valuta lo score" density={`Tesi ${thesisLabel(detail.scoringPlan.thesis)}`}>
+                      <ScoringPlanPanel plan={detail.scoringPlan} />
+                    </LabeledDisclosure>
+                  </div>
+                ) : null}
               </div>
               <div className={styles.tabs} role="tablist" aria-label="Viste risultati">
                 <button type="button" role="tab" aria-selected={activeTab === 'results'} className={`${styles.tab} ${activeTab === 'results' ? styles.tabActive : ''}`} onClick={() => setActiveTab('results')}>

@@ -2,6 +2,7 @@ import { Button, Icon, Modal, MultiSelect, Skeleton, useToast } from '@mrsmith/u
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApiClient } from '../../api/client';
+import { THESIS_META, thesisLabel } from '../../api/thesis';
 import type {
   MAAtecoCandidate,
   MAEstimate,
@@ -12,7 +13,6 @@ import type {
   MASessionDetail,
   MAStrategyConcept,
   MAStrategySpec,
-  MAThesis,
 } from '../../api/types';
 import {
   errorLabel,
@@ -30,15 +30,6 @@ import {
 import styles from './Ricerche.module.css';
 
 const minPromptLength = 24;
-
-const thesisLabels: Record<MAThesis | 'unknown', string> = {
-  generico: 'Generico',
-  successione: 'Successione',
-  crescita: 'Crescita',
-  consolidamento: 'Consolidamento',
-  tuck_in: 'Competenze',
-  unknown: 'Non definita',
-};
 
 type BusyState = 'create' | 'estimate' | 'execute' | null;
 type InitiativeMode = 'auto' | 'manual' | 'existing';
@@ -598,6 +589,7 @@ export function NuovaRicercaPage() {
 
 function ConceptSummary({ strategy, open, onToggle }: { strategy: MAStrategySpec; open: boolean; onToggle: () => void }) {
   const concepts = strategy.sectorConcepts ?? [];
+  const thesis = strategy.thesis ?? 'generico';
   const divisionGroups = useMemo(() => groupsFromStrategy(strategy), [strategy]);
 
   return (
@@ -641,10 +633,13 @@ function ConceptSummary({ strategy, open, onToggle }: { strategy: MAStrategySpec
         </div>
       ) : null}
 
-      <span className={styles.thesis}>
-        Tesi: {thesisLabels[(strategy.thesis ?? 'unknown') as MAThesis | 'unknown']}
-        <small>· derivata dalla richiesta, modificabile dopo l'esecuzione</small>
-      </span>
+      <div className={styles.thesisSummary}>
+        <span className={styles.thesis}>
+          Tesi: {thesisLabel(strategy.thesis ?? 'unknown')}
+          <small>· derivata dalla richiesta, modificabile dopo l'esecuzione</small>
+        </span>
+        <p>{THESIS_META[thesis].description}</p>
+      </div>
     </div>
   );
 }
