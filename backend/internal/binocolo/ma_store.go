@@ -102,6 +102,7 @@ type maWorkspaceStore interface {
 	RevokeMACompanyFact(ctx context.Context, id, subject, email, note string) (bool, error)
 	InsertMACompanyNote(ctx context.Context, note MACompanyNote) (MACompanyNote, error)
 	GetMACompanyRegistry(ctx context.Context, companyKey string) (MACompanyRegistry, error)
+	SearchMACompanies(ctx context.Context, queryKind, query string, limit int) ([]MACompanySearchRow, error)
 	GetMACompanyOverviewIdentity(ctx context.Context, companyKey string) (*MACompanyOverviewIdentity, error)
 	ListMACompanyOverviewAppearances(ctx context.Context, companyKey string) ([]MACompanyOverviewAppearance, error)
 	ListMACompanyOverviewCards(ctx context.Context, companyKey string) ([]MACompanyOverviewCard, error)
@@ -130,6 +131,17 @@ type maCompanySnapshot struct {
 	VATCode     string
 	TaxCode     string
 	Province    string
+}
+
+type maCompanySearchHydration struct {
+	ActiveCardState      string
+	ActiveCardInitiative string
+	ClosedCardEsito      string
+	ClosedCardInitiative string
+	LatestRating         *int
+	LatestRatingReason   string
+	LatestTarget         *MATargetRow
+	LatestTargetThesis   string
 }
 
 // maCompanyDomain is one row of the cross-session verified-domain registry
@@ -3101,6 +3113,340 @@ ORDER BY created_at DESC
 		return MACompanyRegistry{}, fmt.Errorf("iterate ma company notes: %w", err)
 	}
 	return out, nil
+}
+
+// SearchMACompanies searches and hydrates the cross-session internal company
+// corpus. Fiscal identifiers are the grouping key; company_key remains an
+// opaque navigation key and all sibling keys are returned to the client.
+func (s *SQLStore) SearchMACompanies(ctx context.Context, queryKind, query string, limit int) ([]MACompanySearchRow, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	rows, err := s.db.QueryContext(ctx, `
+WITH source_base AS (
+  SELECT
+    'ricerca'::text AS source_kind,
+    t.id::text AS entity_id,
+    session.id::text AS context_id,
+    COALESCE(session.title, '') AS context_title,
+    COALESCE(NULLIF(upper(btrim(t.vendor_id)), ''), NULLIF(upper(btrim(t.vat_code)), ''), NULLIF(upper(btrim(t.tax_code)), ''), upper(btrim(t.company_name))) AS company_key,
+    COALESCE(t.company_name, '') AS company_name,
+    COALESCE(t.vat_code, '') AS vat_code,
+    COALESCE(t.tax_code, '') AS tax_code,
+    COALESCE(t.province, '') AS province,
+    COALESCE(t.town, '') AS town,
+    ''::text AS domain,
+    t.created_at AS seen_at,
+    ''::text AS card_state,
+    ''::text AS card_esito
+  FROM binocolo.ma_target t
+  JOIN binocolo.ma_session session ON session.id = t.session_id
+  WHERE session.deleted_at IS NULL AND session.purged_at IS NULL
+
+  UNION ALL
+
+  SELECT
+    'iniziativa', c.initiative_id::text || ':' || c.company_key, initiative.id::text,
+    COALESCE(initiative.title, ''), upper(btrim(c.company_key)), COALESCE(c.company_name, ''),
+    COALESCE(c.vat_code, ''), COALESCE(c.tax_code, ''), COALESCE(c.province, ''), '', '',
+    c.updated_at, c.state, COALESCE(c.esito, '')
+  FROM binocolo.ma_initiative_card c
+  JOIN binocolo.ma_initiative initiative ON initiative.id = c.initiative_id
+  WHERE initiative.deleted_at IS NULL AND initiative.purged_at IS NULL
+
+  UNION ALL
+
+  SELECT
+    'registro', d.company_key, '', '', upper(btrim(d.company_key)), COALESCE(d.company_name, ''),
+    COALESCE(d.vat_code, ''), COALESCE(d.tax_code, ''), '', '', COALESCE(d.domain, ''),
+    d.updated_at, '', ''
+  FROM binocolo.ma_company_domain d
+), source_clean AS (
+  SELECT source_base.*,
+         regexp_replace(upper(btrim(vat_code)), '[[:space:].]', '', 'g') AS vat_clean,
+         regexp_replace(upper(btrim(tax_code)), '[[:space:].]', '', 'g') AS tax_clean
+  FROM source_base
+), source_rows AS (
+  SELECT source_clean.*,
+         COALESCE(
+           NULLIF(CASE WHEN vat_clean ~ '^IT[0-9]{11}$' THEN substr(vat_clean, 3) ELSE vat_clean END, ''),
+           NULLIF(tax_clean, ''),
+           company_key
+         ) AS stable_key
+  FROM source_clean
+  WHERE company_key <> ''
+), matched_keys AS (
+  SELECT stable_key, MAX(seen_at) AS max_seen
+  FROM source_rows
+  WHERE $1 = 'recent'
+     OR ($1 = 'name' AND company_name ILIKE ('%' || $2 || '%') ESCAPE '\')
+     OR ($1 = 'vat' AND (CASE WHEN vat_clean ~ '^IT[0-9]{11}$' THEN substr(vat_clean, 3) ELSE vat_clean END) = $2)
+     OR ($1 = 'tax' AND tax_clean = $2)
+  GROUP BY stable_key
+), selected_keys AS (
+  SELECT stable_key, max_seen
+  FROM matched_keys
+  ORDER BY max_seen DESC, stable_key
+  LIMIT $3
+), key_map AS (
+  SELECT DISTINCT sr.stable_key, sr.company_key
+  FROM source_rows sr
+  JOIN selected_keys sk ON sk.stable_key = sr.stable_key
+)
+SELECT
+  identity.company_name, identity.vat_code, identity.tax_code, identity.province, identity.town,
+  COALESCE(domain_row.domain, ''),
+  (SELECT COUNT(DISTINCT sr.context_id) FROM source_rows sr WHERE sr.stable_key = sk.stable_key AND sr.source_kind = 'ricerca'),
+  (SELECT COUNT(DISTINCT sr.context_id) FROM source_rows sr WHERE sr.stable_key = sk.stable_key AND sr.source_kind = 'iniziativa'),
+  COALESCE(last_context.seen_at, identity.seen_at),
+  COALESCE(last_context.source_kind, ''), COALESCE(last_context.context_id, ''), COALESCE(last_context.context_title, ''),
+  COALESCE((
+    SELECT jsonb_agg(keys.company_key ORDER BY keys.last_seen DESC)
+    FROM (
+      SELECT sr.company_key, MAX(sr.seen_at) AS last_seen
+      FROM source_rows sr
+      WHERE sr.stable_key = sk.stable_key
+      GROUP BY sr.company_key
+    ) keys
+  ), '[]'::jsonb),
+  COALESCE(last_context.company_key, identity.company_key),
+  COALESCE(active_card.card_state, ''), COALESCE(active_card.context_title, ''),
+  COALESCE(closed_card.card_esito, ''), COALESCE(closed_card.context_title, ''),
+  latest_rating.rating, COALESCE(latest_rating.reason, ''),
+  latest_target.id, latest_target.run_id, COALESCE(latest_target.company_key, ''), COALESCE(latest_target.company_name, ''),
+  COALESCE(latest_target.origin, ''), COALESCE(latest_target.vat_code, ''), COALESCE(latest_target.province, ''),
+  COALESCE(latest_target.town, ''), COALESCE(latest_target.ateco_code, ''), latest_target.score,
+  latest_target.score_version, COALESCE(latest_target.match_state, ''), COALESCE(latest_target.confidence, ''),
+  COALESCE(latest_target.flags, '[]'::jsonb), COALESCE(latest_target.enrichment_level, ''), latest_target.rating,
+  COALESCE(latest_target.thesis, ''), COALESCE(latest_target.has_validation, false),
+  COALESCE(latest_target.web_validation_state, ''), COALESCE(latest_target.final_action, ''),
+  COALESCE(latest_target.selected_domain, ''), COALESCE(latest_target.final_reason, ''),
+  COALESCE(latest_target.group_domain, ''), COALESCE(latest_target.group_identifier, ''),
+  COALESCE(latest_target.candidate_count, 0), latest_target.outside_revenue, latest_target.outside_shareholders,
+  EXISTS (
+    SELECT 1
+    FROM binocolo.ma_deep_analysis deep
+    WHERE deep.status = 'ready'
+      AND (
+        EXISTS (SELECT 1 FROM key_map km WHERE km.stable_key = sk.stable_key AND km.company_key = upper(btrim(deep.company_key)))
+        OR regexp_replace(upper(btrim(COALESCE(deep.vat_code, ''))), '[[:space:].]', '', 'g') = sk.stable_key
+        OR regexp_replace(upper(btrim(COALESCE(deep.tax_code, ''))), '[[:space:].]', '', 'g') = sk.stable_key
+      )
+  ) AS has_deep
+FROM selected_keys sk
+JOIN LATERAL (
+  SELECT sr.*
+  FROM source_rows sr
+  WHERE sr.stable_key = sk.stable_key
+  ORDER BY CASE WHEN sr.source_kind = 'registro' THEN 2 ELSE 1 END, sr.seen_at DESC,
+           CASE sr.source_kind WHEN 'ricerca' THEN 1 WHEN 'iniziativa' THEN 2 ELSE 3 END
+  LIMIT 1
+) identity ON TRUE
+LEFT JOIN LATERAL (
+  SELECT sr.*
+  FROM source_rows sr
+  WHERE sr.stable_key = sk.stable_key AND sr.source_kind IN ('ricerca', 'iniziativa')
+  ORDER BY sr.seen_at DESC, sr.source_kind
+  LIMIT 1
+) last_context ON TRUE
+LEFT JOIN LATERAL (
+  SELECT sr.domain
+  FROM source_rows sr
+  WHERE sr.stable_key = sk.stable_key AND sr.domain <> ''
+  ORDER BY sr.seen_at DESC
+  LIMIT 1
+) domain_row ON TRUE
+LEFT JOIN LATERAL (
+  SELECT sr.card_state, sr.context_title
+  FROM source_rows sr
+  WHERE sr.stable_key = sk.stable_key AND sr.source_kind = 'iniziativa'
+    AND sr.card_state NOT IN ('chiusa', 'rimossa')
+  ORDER BY sr.seen_at DESC
+  LIMIT 1
+) active_card ON TRUE
+LEFT JOIN LATERAL (
+  SELECT sr.card_esito, sr.context_title
+  FROM source_rows sr
+  WHERE sr.stable_key = sk.stable_key AND sr.source_kind = 'iniziativa' AND sr.card_state = 'chiusa'
+  ORDER BY sr.seen_at DESC
+  LIMIT 1
+) closed_card ON TRUE
+LEFT JOIN LATERAL (
+  SELECT rating.rating, rating.reason
+  FROM binocolo.ma_target_rating rating
+  JOIN binocolo.ma_session session ON session.id = rating.session_id
+  WHERE session.deleted_at IS NULL AND session.purged_at IS NULL
+    AND EXISTS (
+      SELECT 1 FROM key_map km
+      WHERE km.stable_key = sk.stable_key AND km.company_key = upper(btrim(rating.company_key))
+    )
+  ORDER BY rating.rated_at DESC
+  LIMIT 1
+) latest_rating ON TRUE
+LEFT JOIN LATERAL (
+  SELECT
+    target.id::text AS id, target.run_id::text AS run_id, sr.company_key, target.company_name,
+    COALESCE(target.origin, 'search') AS origin, target.vat_code, target.province, target.town, target.ateco_code,
+    target.score, target.score_version, target.match_state, target.confidence, target.flags,
+    COALESCE(target.enrichment_level, 'advanced') AS enrichment_level, rating.rating,
+    COALESCE(strategy.strategy->>'thesis', '') AS thesis,
+    validation.company_key IS NOT NULL AS has_validation,
+    validation.web_validation_state, validation.final_action, validation.selected_domain,
+    validation.final_decision->>'reason' AS final_reason,
+    validation.domain_response->'groupSiteHint'->>'domain' AS group_domain,
+    validation.domain_response->'groupSiteHint'->>'identifier' AS group_identifier,
+    jsonb_array_length(CASE WHEN jsonb_typeof(validation.domain_response->'candidates') = 'array' THEN validation.domain_response->'candidates' ELSE '[]'::jsonb END) AS candidate_count,
+    outside_filter.revenue_per_employee_value AS outside_revenue,
+    outside_filter.max_shareholders_value AS outside_shareholders
+  FROM source_rows sr
+  JOIN binocolo.ma_target target ON target.id::text = sr.entity_id
+  JOIN binocolo.ma_session session ON session.id::text = sr.context_id
+  LEFT JOIN binocolo.ma_strategy_version strategy ON strategy.id = session.active_strategy_id
+  LEFT JOIN binocolo.ma_target_rating rating ON rating.session_id = session.id AND upper(btrim(rating.company_key)) = sr.company_key
+  LEFT JOIN binocolo.ma_target_web_validation validation ON validation.session_id = session.id AND validation.company_key = sr.company_key
+  LEFT JOIN LATERAL (
+    SELECT
+      MAX(COALESCE(evidence.value, '')) FILTER (WHERE evidence.criterion = $4) AS revenue_per_employee_value,
+      MAX(COALESCE(evidence.value, '')) FILTER (WHERE evidence.criterion = $5) AS max_shareholders_value
+    FROM binocolo.ma_evidence evidence
+    WHERE evidence.target_id = target.id AND evidence.status = $6
+      AND evidence.criterion IN ($4, $5)
+  ) outside_filter ON TRUE
+  WHERE sr.stable_key = sk.stable_key AND sr.source_kind = 'ricerca'
+  ORDER BY sr.seen_at DESC
+  LIMIT 1
+) latest_target ON TRUE
+ORDER BY sk.max_seen DESC, identity.company_name
+`, queryKind, query, limit, maPostFilterRevenuePerEmployeeMin, maPostFilterMaxShareholders, maEvidenceOutside)
+	if err != nil {
+		return nil, fmt.Errorf("search ma companies: %w", err)
+	}
+	defer rows.Close()
+
+	out := []MACompanySearchRow{}
+	for rows.Next() {
+		var item MACompanySearchRow
+		var contextType, contextID, contextTitle string
+		var companyKeysRaw, flagsRaw []byte
+		var hydration maCompanySearchHydration
+		var latestRating, targetRating sql.NullInt64
+		var targetID, targetRunID sql.NullString
+		var targetScore, targetScoreVersion sql.NullInt64
+		var targetCompanyKey, targetCompanyName, targetOrigin, targetVAT, targetProvince, targetTown, targetAteco string
+		var targetMatchState, targetConfidence, targetEnrichment, targetThesis string
+		var hasValidation bool
+		var webState, finalAction, selectedDomain, finalReason, groupDomain, groupIdentifier string
+		var candidateCount int
+		var outsideRevenue, outsideShareholders sql.NullString
+		if err := rows.Scan(
+			&item.CompanyName, &item.VATCode, &item.TaxCode, &item.Province, &item.Town, &item.Domain,
+			&item.SessionCount, &item.InitiativeCount, &item.LastSeenAt,
+			&contextType, &contextID, &contextTitle, &companyKeysRaw, &item.PrimaryCompanyKey,
+			&hydration.ActiveCardState, &hydration.ActiveCardInitiative,
+			&hydration.ClosedCardEsito, &hydration.ClosedCardInitiative,
+			&latestRating, &hydration.LatestRatingReason,
+			&targetID, &targetRunID, &targetCompanyKey, &targetCompanyName, &targetOrigin, &targetVAT,
+			&targetProvince, &targetTown, &targetAteco, &targetScore, &targetScoreVersion,
+			&targetMatchState, &targetConfidence, &flagsRaw, &targetEnrichment, &targetRating, &targetThesis,
+			&hasValidation, &webState, &finalAction, &selectedDomain, &finalReason, &groupDomain, &groupIdentifier,
+			&candidateCount, &outsideRevenue, &outsideShareholders, &item.HasDeep,
+		); err != nil {
+			return nil, fmt.Errorf("scan ma company search row: %w", err)
+		}
+		if err := json.Unmarshal(companyKeysRaw, &item.CompanyKeys); err != nil {
+			return nil, fmt.Errorf("decode ma company search keys: %w", err)
+		}
+		if contextID != "" {
+			item.LastContext = &MACompanySearchContext{Type: contextType, ID: contextID, Title: contextTitle}
+		}
+		if latestRating.Valid {
+			value := int(latestRating.Int64)
+			hydration.LatestRating = &value
+		}
+		if targetID.Valid {
+			target := MATargetRow{
+				ID: targetID.String, RunID: targetRunID.String, CompanyKey: targetCompanyKey,
+				CompanyName: targetCompanyName, Origin: targetOrigin, VATCode: targetVAT,
+				Province: targetProvince, Town: targetTown, AtecoCode: targetAteco,
+				MatchState: targetMatchState, Confidence: targetConfidence, EnrichmentLevel: targetEnrichment,
+			}
+			if targetScore.Valid {
+				target.Score = int(targetScore.Int64)
+			}
+			if targetScoreVersion.Valid {
+				value := int(targetScoreVersion.Int64)
+				target.ScoreVersion = &value
+			}
+			if targetRating.Valid {
+				value := int(targetRating.Int64)
+				target.Rating = &value
+			}
+			if len(flagsRaw) > 0 {
+				_ = json.Unmarshal(flagsRaw, &target.Flags)
+			}
+			if outsideRevenue.Valid {
+				value := outsideRevenue.String
+				target.OutsideRevenuePerEmployeeValue = &value
+			}
+			if outsideShareholders.Valid {
+				value := outsideShareholders.String
+				target.OutsideMaxShareholdersValue = &value
+			}
+			if hasValidation {
+				target.WebValidation = &MATargetRowWeb{
+					WebValidationState: webState, FinalAction: finalAction, SelectedDomain: selectedDomain,
+					FinalDecision: MATargetRowFinalDecision{Reason: finalReason}, GroupSiteDomain: groupDomain,
+					GroupSiteIdentifier: groupIdentifier, CandidateCount: candidateCount,
+				}
+			}
+			hydration.LatestTarget = &target
+			hydration.LatestTargetThesis = targetThesis
+		}
+		item.Status = resolveMACompanySearchStatus(hydration)
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma company search rows: %w", err)
+	}
+	return out, nil
+}
+
+func resolveMACompanySearchStatus(row maCompanySearchHydration) MACompanySearchStatus {
+	if row.ActiveCardState != "" {
+		return MACompanySearchStatus{Kind: "working", Value: row.ActiveCardState, ContextTitle: row.ActiveCardInitiative}
+	}
+	if row.ClosedCardEsito != "" {
+		return MACompanySearchStatus{Kind: "closed", Value: row.ClosedCardEsito, ContextTitle: row.ClosedCardInitiative}
+	}
+	if row.LatestRating != nil {
+		if *row.LatestRating == -1 {
+			return MACompanySearchStatus{Kind: "excluded", Reason: row.LatestRatingReason}
+		}
+		return MACompanySearchStatus{Kind: "preferred", Value: fmt.Sprintf("%d", *row.LatestRating)}
+	}
+	if row.LatestTarget != nil {
+		decision := maRouteTarget(rowAsTarget(*row.LatestTarget), row.LatestTargetThesis)
+		status := MACompanySearchStatus{Value: decision.Bucket}
+		switch decision.Bucket {
+		case maBucketPrincipale:
+			status.Kind = "thesis"
+		case maBucketDaVerificare:
+			status.Kind = "review"
+		case maBucketAzionabile:
+			status.Kind = "actionable"
+		case maBucketSoppresso:
+			status.Kind = "suppressed"
+		default:
+			status.Kind = "review"
+		}
+		if decision.Reason != nil {
+			status.Reason = decision.Reason.Label
+		} else if decision.SuppressedReason != nil {
+			status.Reason = decision.SuppressedReason.Label
+		}
+		return status
+	}
+	return MACompanySearchStatus{Kind: "registry"}
 }
 
 func (s *SQLStore) GetMACompanyOverviewIdentity(ctx context.Context, companyKey string) (*MACompanyOverviewIdentity, error) {

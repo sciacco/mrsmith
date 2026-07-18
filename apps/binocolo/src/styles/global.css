@@ -51,6 +51,21 @@ a {
   background: var(--color-text-muted);
 }
 
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes rowEnter {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes sectionEnter {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+
 /* Marker 🔒 "hidden in prod" — Target Inspector (PRD §3 convenzione).
    Puntino discreto ~7px grigio + title nativo. Riusabile cross-tab. */
 .ti-hide {

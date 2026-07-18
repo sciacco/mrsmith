@@ -492,6 +492,42 @@ type MACompanyOverview struct {
 	Cards       []MACompanyOverviewCard       `json:"cards"`
 }
 
+// MACompanySearchResponse is the read-only index of companies already seen by
+// Binocolo. Rows are grouped by stable fiscal identity rather than company_key.
+type MACompanySearchResponse struct {
+	Items []MACompanySearchRow `json:"items"`
+}
+
+type MACompanySearchRow struct {
+	CompanyName       string                  `json:"companyName"`
+	VATCode           string                  `json:"vatCode,omitempty"`
+	TaxCode           string                  `json:"taxCode,omitempty"`
+	Province          string                  `json:"province,omitempty"`
+	Town              string                  `json:"town,omitempty"`
+	Domain            string                  `json:"domain,omitempty"`
+	SessionCount      int                     `json:"sessionCount"`
+	InitiativeCount   int                     `json:"initiativeCount"`
+	LastSeenAt        time.Time               `json:"lastSeenAt"`
+	LastContext       *MACompanySearchContext `json:"lastContext,omitempty"`
+	CompanyKeys       []string                `json:"companyKeys"`
+	PrimaryCompanyKey string                  `json:"primaryCompanyKey"`
+	Status            MACompanySearchStatus   `json:"status"`
+	HasDeep           bool                    `json:"hasDeep"`
+}
+
+type MACompanySearchContext struct {
+	Type  string `json:"type"`
+	ID    string `json:"id"`
+	Title string `json:"title"`
+}
+
+type MACompanySearchStatus struct {
+	Kind         string `json:"kind"`
+	Value        string `json:"value,omitempty"`
+	Reason       string `json:"reason,omitempty"`
+	ContextTitle string `json:"contextTitle,omitempty"`
+}
+
 type MACompanyOverviewIdentity struct {
 	CompanyKey       string `json:"companyKey"`
 	CompanyName      string `json:"companyName,omitempty"`

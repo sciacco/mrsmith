@@ -7,6 +7,7 @@ interface SearchInputProps {
   placeholder?: string;
   className?: string;
   autoFocus?: boolean;
+  ariaLabel?: string;
 }
 
 export function SearchInput({
@@ -15,6 +16,7 @@ export function SearchInput({
   placeholder = 'Cerca...',
   className,
   autoFocus,
+  ariaLabel,
 }: SearchInputProps) {
   return (
     <div className={`${styles.wrap} ${className ?? ''}`}>
@@ -36,6 +38,7 @@ export function SearchInput({
         value={value}
         onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
         autoFocus={autoFocus}
+        aria-label={ariaLabel}
       />
       {value ? (
         <button

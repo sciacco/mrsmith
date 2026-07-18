@@ -754,6 +754,86 @@ func (s *maService) getCompanyRegistry(ctx context.Context, companyKey string) (
 	return s.store.GetMACompanyRegistry(ctx, companyKey)
 }
 
+const (
+	maCompanySearchRecent = "recent"
+	maCompanySearchName   = "name"
+	maCompanySearchVAT    = "vat"
+	maCompanySearchTax    = "tax"
+)
+
+func normalizeMACompanySearch(query string) (kind, value string, err error) {
+	value = strings.TrimSpace(query)
+	if value == "" {
+		return maCompanySearchRecent, "", nil
+	}
+	if len(value) > 200 {
+		return "", "", fmt.Errorf("%w: query", errMAStrategyInvalid)
+	}
+
+	code := strings.ToUpper(value)
+	code = strings.NewReplacer(" ", "", ".", "", "\t", "", "\n", "", "\r", "").Replace(code)
+	if strings.HasPrefix(code, "IT") && len(code) == 13 && isMACompanySearchDigits(code[2:]) {
+		code = code[2:]
+	}
+	if len(code) == 11 && isMACompanySearchDigits(code) {
+		return maCompanySearchVAT, code, nil
+	}
+	if len(code) == 16 && isMACompanySearchAlphanumeric(code) {
+		return maCompanySearchTax, code, nil
+	}
+	if len([]rune(value)) < 2 {
+		return "", "", fmt.Errorf("%w: query", errMAStrategyInvalid)
+	}
+	value = strings.NewReplacer("\\", "\\\\", "%", "\\%", "_", "\\_").Replace(value)
+	return maCompanySearchName, value, nil
+}
+
+func isMACompanySearchDigits(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, char := range value {
+		if char < '0' || char > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func isMACompanySearchAlphanumeric(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, char := range value {
+		if (char < '0' || char > '9') && (char < 'A' || char > 'Z') {
+			return false
+		}
+	}
+	return true
+}
+
+func (s *maService) searchCompanies(ctx context.Context, query string) (MACompanySearchResponse, error) {
+	if s.store == nil {
+		return MACompanySearchResponse{}, errMAStoreUnavailable
+	}
+	kind, value, err := normalizeMACompanySearch(query)
+	if err != nil {
+		return MACompanySearchResponse{}, err
+	}
+	limit := 50
+	if kind == maCompanySearchRecent {
+		limit = 25
+	}
+	items, err := s.store.SearchMACompanies(ctx, kind, value, limit)
+	if err != nil {
+		return MACompanySearchResponse{}, err
+	}
+	if items == nil {
+		items = []MACompanySearchRow{}
+	}
+	return MACompanySearchResponse{Items: items}, nil
+}
+
 func (s *maService) getCompanyOverview(ctx context.Context, companyKey string) (MACompanyOverview, error) {
 	if s.store == nil {
 		return MACompanyOverview{}, errMAStoreUnavailable

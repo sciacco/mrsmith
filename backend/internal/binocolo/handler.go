@@ -143,6 +143,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("DELETE /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/irl/items/{itemId}", h.handleDeleteCardIRLItem)
 	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/irl/reorder", h.handleReorderCardIRL)
 	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/irl/export", h.handleExportCardIRL)
+	handle("GET /binocolo/v1/ma/companies", h.handleSearchMACompanies)
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/deep-dive", h.handleDeepDiveMACompany)
 	handle("GET /binocolo/v1/ma/companies/{companyKey}/overview", h.handleGetMACompanyOverview)
 	handle("GET /binocolo/v1/ma/companies/{companyKey}/registry", h.handleGetMACompanyRegistry)
@@ -1052,6 +1053,15 @@ func (h *Handler) handleDeepDiveMACompany(w http.ResponseWriter, r *http.Request
 		return
 	}
 	h.completeMATraceSuccess(r, http.StatusOK)
+	httputil.JSON(w, http.StatusOK, result)
+}
+
+func (h *Handler) handleSearchMACompanies(w http.ResponseWriter, r *http.Request) {
+	result, err := h.ma.searchCompanies(r.Context(), r.URL.Query().Get("query"))
+	if err != nil {
+		h.maFailure(w, r, "ma_companies_search", err)
+		return
+	}
 	httputil.JSON(w, http.StatusOK, result)
 }
 

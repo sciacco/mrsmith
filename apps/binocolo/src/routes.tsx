@@ -9,6 +9,7 @@ import { RicercaDetailPage } from './pages/ricerche/RicercaDetailPage';
 import { TargetInspectorPage } from './pages/ricerche/TargetInspectorPage';
 import { IniziativePage } from './pages/iniziative/IniziativePage';
 import { IniziativaBoardPage } from './pages/iniziative/IniziativaBoardPage';
+import { AziendePage } from './pages/aziende/AziendePage';
 import { SchedaAziendaPage } from './pages/aziende/SchedaAziendaPage';
 
 // Il card-dossier è stato assorbito dalla Scheda azienda (FUSIONE F5): i
@@ -27,6 +28,7 @@ export const routes: RouteObject[] = [
   { path: 'iniziative', element: <IniziativePage /> },
   { path: 'iniziative/:id', element: <IniziativaBoardPage /> },
   { path: 'iniziative/:id/dossier/:companyKey', element: <CardDossierRedirect /> },
+  { path: 'aziende', element: <AziendePage /> },
   { path: 'aziende/:companyKey', element: <SchedaAziendaPage /> },
   { path: 'azienda', element: <CompanyDossierPage /> },
   { path: 'ricerca-web', element: <WebSearchPage /> },

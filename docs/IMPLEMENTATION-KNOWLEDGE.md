@@ -216,6 +216,15 @@ Alyante ERP ID
 - Used by: every Binocolo surface that links the working dossier of an MA target (D2 search detail, D3 board/drawer, DX target inspector).
 - Open questions: none.
 
+### Binocolo Internal Company Finder Uses Fiscal Identity Groups
+
+- Context: Binocolo entry points that must recognize a company already seen in searches, initiatives, or the verified-domain registry.
+- Discovery: `company_key` is not stable across sessions because target deduplication is vendor-first. `GET /binocolo/v1/ma/companies?query=…` therefore groups the internal corpus by normalized P.IVA, then codice fiscale, falling back to `company_key` only when neither fiscal identifier exists. The endpoint is read-only and never calls the external company vendor.
+- Practical rule: reuse the internal finder for “già vista” checks and navigation from known-company flows. Navigate with `primaryCompanyKey`, but preserve `companyKeys` as the sibling-key signal; the current `/aziende/:companyKey` overview remains key-scoped and can show only one partial sibling history. Do not use `/binocolo/v1/companies/search` for corpus deduplication because that endpoint searches the external registry.
+- Evidence: `backend/internal/binocolo/ma_store.go` `SearchMACompanies`, `backend/internal/binocolo/ma_service.go` `searchCompanies`, and `apps/binocolo/src/pages/aziende/AziendePage.tsx`.
+- Used by: `apps/binocolo` `/aziende`; intended reusable contract for direct initiative-card creation.
+- Open questions: whether the company overview should eventually accept and aggregate sibling keys.
+
 ### Binocolo ATECO 2025 Codes Are Resolver-Gated
 
 - Context: Binocolo M&A ATECO candidate selection and OpenAPI.it Company `IT-search` calls.

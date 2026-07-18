@@ -718,6 +718,36 @@ export interface MACompanyOverview {
   cards: MACompanyOverviewCard[];
 }
 
+export interface MACompanySearchResponse {
+  items: MACompanySearchRow[];
+}
+
+export interface MACompanySearchRow {
+  companyName: string;
+  vatCode?: string;
+  taxCode?: string;
+  province?: string;
+  town?: string;
+  domain?: string;
+  sessionCount: number;
+  initiativeCount: number;
+  lastSeenAt: string;
+  lastContext?: {
+    type: 'ricerca' | 'iniziativa';
+    id: string;
+    title: string;
+  };
+  companyKeys: string[];
+  primaryCompanyKey: string;
+  status: {
+    kind: 'working' | 'closed' | 'excluded' | 'preferred' | 'thesis' | 'review' | 'actionable' | 'suppressed' | 'registry';
+    value?: string;
+    reason?: string;
+    contextTitle?: string;
+  };
+  hasDeep: boolean;
+}
+
 export interface MACompanyOverviewIdentity {
   companyKey: string;
   companyName?: string;
