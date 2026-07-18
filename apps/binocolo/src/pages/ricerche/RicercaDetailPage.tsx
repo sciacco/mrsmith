@@ -510,6 +510,9 @@ export function RicercaDetailPage() {
         ...(rating > 0 ? { scoreAtRating: target.score, confidenceAtRating: target.confidence } : {}),
         ...(reason ? { reason } : {}),
       });
+      // Bucket e motivo sono derivati dal server anche per sessioni completate,
+      // dove non c'è polling: riallinea subito riga, sort, score e drawer.
+      await loadAll();
     } catch (err) {
       toast(errorLabel(err), 'error');
       setRows(previousRows);

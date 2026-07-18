@@ -298,7 +298,9 @@ export function bucketChipLabel(bucket?: string): string | null {
 }
 
 export function bucketChipDescription(bucket?: string, reason?: MABucketReason): string | null {
-  if (bucket === 'soppresso' && reason?.label) return reason.label;
+  if (reason?.label) {
+    return bucket === 'soppresso' ? reason.label : `Era soppressa: ${reason.label}`;
+  }
   switch (bucket) {
     case 'azionabile':
       return 'Esclusa da un criterio formale, ma un’azione la rimette in valutazione: settore da rivedere o dominio da associare.';
