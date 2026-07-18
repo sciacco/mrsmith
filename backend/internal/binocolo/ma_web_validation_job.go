@@ -558,6 +558,12 @@ func (s *maService) registerCompanyDomain(ctx context.Context, target MATarget, 
 	if companyKey == "" || !ok {
 		return
 	}
+	identityState := maIdentityStateAssumed
+	if method == maDomainMethodAutoVerified {
+		identityState = maIdentityStateVerified
+	} else if method == maDomainMethodManual {
+		identityState = maIdentityStateVouched
+	}
 	err := s.store.UpsertMACompanyDomain(ctx, maCompanyDomain{
 		CompanyKey:       companyKey,
 		VATCode:          strings.ToUpper(strings.TrimSpace(target.VATCode)),
@@ -565,6 +571,7 @@ func (s *maService) registerCompanyDomain(ctx context.Context, target MATarget, 
 		CompanyName:      strings.TrimSpace(target.CompanyName),
 		Domain:           normalized,
 		Method:           method,
+		IdentityState:    identityState,
 		CreatedBySubject: subject,
 		CreatedByEmail:   email,
 	})
@@ -594,6 +601,12 @@ func (s *maService) registerCompanyDomainRecord(ctx context.Context, target MATa
 			return
 		}
 	}
+	identityState := maIdentityStateAssumed
+	if method == maDomainMethodAutoVerified {
+		identityState = maIdentityStateVerified
+	} else if method == maDomainMethodManual {
+		identityState = maIdentityStateVouched
+	}
 	err := s.store.UpsertMACompanyDomain(ctx, maCompanyDomain{
 		CompanyKey:       companyKey,
 		VATCode:          strings.ToUpper(strings.TrimSpace(target.VATCode)),
@@ -602,6 +615,7 @@ func (s *maService) registerCompanyDomainRecord(ctx context.Context, target MATa
 		Domain:           normalized,
 		Method:           method,
 		GroupSite:        groupSite,
+		IdentityState:    identityState,
 		CreatedBySubject: subject,
 		CreatedByEmail:   email,
 	})

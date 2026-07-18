@@ -57,6 +57,7 @@ func newMAJobWorker(svc *maService, store maJobWorkerStore, owner string) *maJob
 			maJobTypeGatedSearch,
 			maJobTypeAssociateDomain,
 			maJobTypeManualAdd,
+			maJobTypeCardDomainVerify,
 		},
 	}
 }
@@ -122,6 +123,8 @@ func (w *maJobWorker) process(ctx context.Context, job maJob) {
 		traceID, err = w.svc.runAssociateDomainJob(ctx, job)
 	case maJobTypeManualAdd:
 		traceID, err = w.svc.runManualAddJob(ctx, job)
+	case maJobTypeCardDomainVerify:
+		traceID, err = w.svc.runCardDomainVerifyJob(ctx, job)
 	default:
 		logging.FromContext(ctx).Warn("binocolo job worker skipped unknown job type", "component", "binocolo", "job_id", job.ID, "job_type", job.JobType)
 		return
@@ -169,6 +172,8 @@ func (w *maJobWorker) retryOrFail(ctx context.Context, job maJob, code string) {
 		// The session was 'completed' before the per-target remedy; a failed remedy must not
 		// destroy that — release it back to 'completed' (results intact), not 'failed'.
 		w.svc.releaseAssociateSession(ctx, job.SessionID)
+	case maJobTypeCardDomainVerify:
+		w.svc.recordCardDomainUnverifiable(ctx, job)
 	}
 }
 
@@ -199,6 +204,8 @@ func classifyMAJobError(err error, jobType string) string {
 				return "vat_not_found"
 			}
 			return "manual_add_failed"
+		case maJobTypeCardDomainVerify:
+			return "card_domain_verify_failed"
 		default:
 			return "estimate_failed"
 		}

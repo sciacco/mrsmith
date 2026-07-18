@@ -19,6 +19,7 @@ type maJob struct {
 	JobType           string
 	SessionID         string
 	StrategyVersionID string
+	InitiativeID      string
 	Status            string
 	Attempts          int
 	Payload           json.RawMessage
@@ -32,6 +33,7 @@ type maJobEnqueue struct {
 	JobType           string
 	SessionID         string
 	StrategyVersionID string
+	InitiativeID      string
 	Status            string
 	Subject           string
 	Email             string
@@ -66,25 +68,20 @@ func (s *SQLStore) EnqueueMAJob(ctx context.Context, input maJobEnqueue) (string
 	if status == "" {
 		status = maJobStatusQueued
 	}
-	conflictPredicate := "status IN ('queued', 'running')"
-	if status == maJobStatusPending {
-		conflictPredicate = "status IN ('queued', 'running', 'pending', 'processing')"
-	}
 	jobID := uuid.NewString()
 	// owner AND locked_by are set to input.Owner (a plain string, NOT nullString):
 	// the owning worker's reclaim branch matches on `locked_by = owner`, and
 	// `NULL = NULL` is not true in SQL — a NULL locked_by would lock the owner out
 	// of its own pre-leased row.
 	var returnedID string
-	err := s.db.QueryRowContext(ctx, fmt.Sprintf(`
+	err := s.db.QueryRowContext(ctx, `
 INSERT INTO binocolo.ma_job
-  (id, job_type, session_id, strategy_version_id, status, payload, created_by_subject, created_by_email, owner, locked_by, lease_until)
+  (id, job_type, session_id, strategy_version_id, initiative_id, status, payload, created_by_subject, created_by_email, owner, locked_by, lease_until)
 VALUES
-  ($1::uuid, $2, $3::uuid, $4::uuid, $5, $6::jsonb, $7, $8, $9, $9, now() + ($10::int * interval '1 second'))
-ON CONFLICT (session_id, job_type) WHERE %s
-DO NOTHING
+  ($1::uuid, $2, NULLIF($3, '')::uuid, NULLIF($4, '')::uuid, NULLIF($5, '')::uuid, $6, $7::jsonb, $8, $9, $10, $10, now() + ($11::int * interval '1 second'))
+ON CONFLICT DO NOTHING
 RETURNING id::text
-`, conflictPredicate), jobID, input.JobType, input.SessionID, input.StrategyVersionID, status, []byte(payload), nullString(input.Subject), nullString(input.Email), input.Owner, maJobLeaseSeconds).Scan(&returnedID)
+`, jobID, input.JobType, input.SessionID, input.StrategyVersionID, input.InitiativeID, status, []byte(payload), nullString(input.Subject), nullString(input.Email), input.Owner, maJobLeaseSeconds).Scan(&returnedID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", false, nil // dedup: an in-flight job for this (session, job_type) already exists
 	}
@@ -92,6 +89,24 @@ RETURNING id::text
 		return "", false, fmt.Errorf("enqueue ma job: %w", err)
 	}
 	return returnedID, true, nil
+}
+
+func (s *SQLStore) HasActiveMACardDomainJob(ctx context.Context, initiativeID, companyKey string) (bool, error) {
+	if s == nil || s.db == nil {
+		return false, errors.New("binocolo ma store not configured")
+	}
+	var exists bool
+	if err := s.db.QueryRowContext(ctx, `
+SELECT EXISTS (
+  SELECT 1 FROM binocolo.ma_job
+  WHERE initiative_id = $1::uuid
+    AND job_type = 'card_domain_verify'
+    AND payload->>'companyKey' = $2
+    AND status IN ('pending', 'processing')
+)`, initiativeID, companyKey).Scan(&exists); err != nil {
+		return false, fmt.Errorf("check active direct-card domain job: %w", err)
+	}
+	return exists, nil
 }
 
 // LatestMAManualAddJob returns the newest durable manual-add job for a session,
@@ -143,7 +158,7 @@ func (s *SQLStore) ListMAJobs(ctx context.Context, limit int, owner, workerID st
 		return []maJob{}, nil
 	}
 	query := fmt.Sprintf(`
-SELECT id::text, job_type, session_id::text, strategy_version_id::text, status, attempts,
+SELECT id::text, job_type, COALESCE(session_id::text, ''), COALESCE(strategy_version_id::text, ''), COALESCE(initiative_id::text, ''), status, attempts,
        payload, COALESCE(trace_id::text, ''), COALESCE(created_by_subject, ''), COALESCE(created_by_email, '')
 FROM binocolo.ma_job
 WHERE status IN ('queued', 'running', 'pending', 'processing')
@@ -162,7 +177,7 @@ LIMIT $1
 	for rows.Next() {
 		var job maJob
 		var payload []byte
-		if err := rows.Scan(&job.ID, &job.JobType, &job.SessionID, &job.StrategyVersionID, &job.Status, &job.Attempts, &payload, &job.TraceID, &job.CreatedBySubject, &job.CreatedByEmail); err != nil {
+		if err := rows.Scan(&job.ID, &job.JobType, &job.SessionID, &job.StrategyVersionID, &job.InitiativeID, &job.Status, &job.Attempts, &payload, &job.TraceID, &job.CreatedBySubject, &job.CreatedByEmail); err != nil {
 			return nil, fmt.Errorf("scan ma job: %w", err)
 		}
 		if len(payload) > 0 {

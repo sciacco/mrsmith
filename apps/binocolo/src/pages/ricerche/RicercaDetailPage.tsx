@@ -8,6 +8,7 @@ import { DeepAnalysisContent } from '../../components/deep/DeepComponents';
 import { RatingStars } from '../../components/RatingStars';
 import { writeCohort } from '../../components/scheda/cohort';
 import { ThesisReadingPanel } from '../../components/ThesisReadingPanel/ThesisReadingPanel';
+import { normalizeManualVat, validateManualDomain, validateManualVat } from '../../lib/companyIdentifiers';
 import type {
   MAGatedProgressResponse,
   MASessionDetail,
@@ -89,37 +90,8 @@ function manualAddJobErrorCopy(errorCode?: string): { title: string; detail: str
   }
 }
 
-function normalizeManualVat(value: string): string {
-  return value.trim().toUpperCase();
-}
-
-function validateManualVat(value: string): string | null {
-  const normalized = normalizeManualVat(value);
-  if (!normalized) return 'Inserisci una P.IVA o un codice fiscale.';
-  if (/^\d{11}$/.test(normalized) || /^[A-Z0-9]{16}$/.test(normalized)) return null;
-  return 'Usa 11 cifre oppure 16 caratteri alfanumerici.';
-}
-
 function schedaAziendaHref(companyKey: string, lens: 'ricerca' | 'iniziativa', lensId: string): string {
   return `/aziende/${encodeURIComponent(companyKey)}?${lens}=${encodeURIComponent(lensId)}`;
-}
-
-function isValidManualDomainInput(value: string): boolean {
-  const trimmed = value.trim();
-  if (!trimmed) return true;
-  if (/\s/.test(trimmed)) return false;
-  const withoutProtocol = trimmed.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '');
-  const hostPart = withoutProtocol.split(/[/?#]/)[0] ?? '';
-  const host = (hostPart.split('@').pop() ?? '').split(':')[0]?.replace(/^www\./i, '') ?? '';
-  if (!host || host.startsWith('.') || host.endsWith('.') || host.includes('..') || !/^[a-z0-9.-]+$/i.test(host)) return false;
-  const labels = host.split('.');
-  if (labels.length < 2) return false;
-  return labels.every((label) => label.length > 0 && !label.startsWith('-') && !label.endsWith('-'));
-}
-
-function validateManualDomain(value: string): string | null {
-  if (isValidManualDomainInput(value)) return null;
-  return 'Inserisci un dominio valido, es. azienda.it.';
 }
 
 function apiBodyMessage(error: ApiError): string | undefined {

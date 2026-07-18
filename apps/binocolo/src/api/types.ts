@@ -354,6 +354,7 @@ export interface MAInitiativeCard {
   vatCode?: string;
   taxCode?: string;
   province?: string;
+  origin: 'search' | 'direct';
   state: string;
   esito?: string;
   createdFromSession?: string;
@@ -399,6 +400,17 @@ export interface MAInitiativeBoard {
   initiative: MAInitiative;
   sessions: MASessionSummary[];
   cards: MAInitiativeCardView[];
+}
+
+export interface MACreateInitiativeCardRequest {
+  vatCode?: string;
+  companyKey?: string;
+  domain?: string;
+}
+
+export interface MACreateInitiativeCardResponse {
+  card: MAInitiativeCard;
+  domainVerification?: 'queued';
 }
 
 export interface MACardEvent {
@@ -716,6 +728,8 @@ export interface MACompanyOverviewIdentity {
   atecoCode?: string;
   atecoDescription?: string;
   domain?: string;
+  domainMethod?: string;
+  identityState?: 'verified' | 'vouched' | 'assumed';
 }
 
 export interface MABucketReason {
@@ -749,6 +763,7 @@ export interface MACompanyOverviewCard {
   initiativeTitle: string;
   companyKey: string;
   companyName: string;
+  origin: 'search' | 'direct';
   state: string;
   esito?: string;
   lastEvent?: string;

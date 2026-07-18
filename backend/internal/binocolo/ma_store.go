@@ -28,6 +28,7 @@ type maWorkspaceStore interface {
 	GetMAStrategyVersion(ctx context.Context, sessionID, versionID string) (MAStrategyVersion, error)
 	ReplaceMAEstimates(ctx context.Context, sessionID, strategyVersionID, selectedStrategy string, estimates []MAEstimate) error
 	EnqueueMAJob(ctx context.Context, input maJobEnqueue) (jobID string, created bool, err error)
+	HasActiveMACardDomainJob(ctx context.Context, initiativeID, companyKey string) (bool, error)
 	LatestMAManualAddJob(ctx context.Context, sessionID string) (*MAManualAddJobProgress, error)
 	SetMASessionEstimateStatus(ctx context.Context, sessionID, strategyVersionID, status string) error
 	MarkMASessionExecuting(ctx context.Context, sessionID string) error
@@ -57,6 +58,8 @@ type maWorkspaceStore interface {
 	ListMADeepAnalysis(ctx context.Context, companyKeys []string) (map[string]MADeepAnalysis, error)
 	GetMATargetDeepDiveIdentity(ctx context.Context, companyKey string) (*maDeepDiveIdentity, error)
 	GetMAInitiativeCardDeepDiveIdentity(ctx context.Context, companyKey string) (*maDeepDiveIdentity, error)
+	FindMACompanySnapshotByIdentity(ctx context.Context, vatOrTax string) (*maCompanySnapshot, error)
+	FindMACompanySnapshotByKey(ctx context.Context, companyKey string) (*maCompanySnapshot, error)
 	EnqueueMADeepAnalysis(ctx context.Context, companyKey, vatCode, taxCode, email string) error
 	ListMADeepReadyPayloads(ctx context.Context) ([]maDeepPayloadRow, error)
 	CountMADeepByStatus(ctx context.Context) (map[string]int, error)
@@ -121,6 +124,14 @@ type maDeepDiveIdentity struct {
 	TaxCode string
 }
 
+type maCompanySnapshot struct {
+	CompanyKey  string
+	CompanyName string
+	VATCode     string
+	TaxCode     string
+	Province    string
+}
+
 // maCompanyDomain is one row of the cross-session verified-domain registry
 // (binocolo.ma_company_domain, mig 082): the durable company→official-domain
 // association written on strong identity verification (on-page P.IVA/CF) or
@@ -133,6 +144,7 @@ type maCompanyDomain struct {
 	Domain           string
 	Method           string // maDomainMethodAutoVerified | maDomainMethodManual
 	GroupSite        bool
+	IdentityState    string
 	CreatedBySubject string
 	CreatedByEmail   string
 }
@@ -427,6 +439,9 @@ SELECT
       WHEN o.event = 'contattato' THEN 'Contattata'
       WHEN o.event = 'card_rimossa' THEN 'Card rimossa'
       WHEN o.event = 'card_riaperta' THEN 'Card riaperta'
+      WHEN o.event = 'dominio_verificato' AND o.payload->>'esito' = 'confermato' THEN 'Dominio confermato'
+      WHEN o.event = 'dominio_verificato' AND o.payload->>'esito' = 'non_confermato' THEN 'Dominio non confermato'
+      WHEN o.event = 'dominio_verificato' THEN 'Dominio non verificabile'
       WHEN o.event = 'buon_lead' AND COALESCE(o.note, '') != '' THEN 'Buon lead: ' || o.note
       WHEN o.event = 'buon_lead' THEN 'Buon lead'
       WHEN o.event = 'no_go' AND COALESCE(o.note, '') != '' THEN 'No-go: ' || o.note
@@ -2632,7 +2647,7 @@ func (s *SQLStore) GetMACompanyDomain(ctx context.Context, companyKey, vatCode, 
 		return nil, nil
 	}
 	row := s.db.QueryRowContext(ctx, `
-SELECT company_key, vat_code, tax_code, company_name, domain, method, COALESCE(group_site, false)
+SELECT company_key, vat_code, tax_code, company_name, domain, method, COALESCE(group_site, false), COALESCE(identity_state, '')
 FROM binocolo.ma_company_domain
 WHERE ($1 <> '' AND company_key = $1)
    OR ($2 <> '' AND vat_code = $2)
@@ -2641,7 +2656,7 @@ ORDER BY (method IN ('manual', 'no_website')) DESC, (company_key = $1) DESC, ver
 LIMIT 1
 `, companyKey, vatCode, taxCode)
 	var rec maCompanyDomain
-	if err := row.Scan(&rec.CompanyKey, &rec.VATCode, &rec.TaxCode, &rec.CompanyName, &rec.Domain, &rec.Method, &rec.GroupSite); err != nil {
+	if err := row.Scan(&rec.CompanyKey, &rec.VATCode, &rec.TaxCode, &rec.CompanyName, &rec.Domain, &rec.Method, &rec.GroupSite, &rec.IdentityState); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -2662,13 +2677,14 @@ func (s *SQLStore) UpsertMACompanyDomain(ctx context.Context, record maCompanyDo
 	}
 	if _, err := s.db.ExecContext(ctx, `
 INSERT INTO binocolo.ma_company_domain (
-    company_key, vat_code, tax_code, company_name, domain, method, group_site,
+    company_key, vat_code, tax_code, company_name, domain, method, group_site, identity_state,
     verified_at, created_by_subject, created_by_email, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, now(), $8, $9, now(), now())
+VALUES ($1, $2, $3, $4, $5, $6, $7, NULLIF($8, ''), now(), $9, $10, now(), now())
 ON CONFLICT (company_key) DO UPDATE SET
     domain       = EXCLUDED.domain,
     method       = EXCLUDED.method,
     group_site   = EXCLUDED.group_site,
+    identity_state = EXCLUDED.identity_state,
     vat_code     = CASE WHEN EXCLUDED.vat_code <> '' THEN EXCLUDED.vat_code ELSE binocolo.ma_company_domain.vat_code END,
     tax_code     = CASE WHEN EXCLUDED.tax_code <> '' THEN EXCLUDED.tax_code ELSE binocolo.ma_company_domain.tax_code END,
     company_name = CASE WHEN EXCLUDED.company_name <> '' THEN EXCLUDED.company_name ELSE binocolo.ma_company_domain.company_name END,
@@ -2676,7 +2692,7 @@ ON CONFLICT (company_key) DO UPDATE SET
     updated_at   = now()
 WHERE NOT (binocolo.ma_company_domain.method IN ('manual', 'no_website') AND EXCLUDED.method = 'auto_verified')
 `, record.CompanyKey, record.VATCode, record.TaxCode, record.CompanyName, record.Domain, record.Method,
-		record.GroupSite, record.CreatedBySubject, record.CreatedByEmail); err != nil {
+		record.GroupSite, record.IdentityState, record.CreatedBySubject, record.CreatedByEmail); err != nil {
 		return fmt.Errorf("upsert ma company domain: %w", err)
 	}
 	return nil
@@ -2744,7 +2760,7 @@ func (s *SQLStore) GetMAInitiativeCard(ctx context.Context, initiativeID, compan
 	}
 	row := s.db.QueryRowContext(ctx, `
 SELECT initiative_id::text, company_key, company_name, vat_code, tax_code, province,
-       state, COALESCE(esito, ''), COALESCE(created_from_session::text, ''),
+       origin, state, COALESCE(esito, ''), COALESCE(created_from_session::text, ''),
        created_at, updated_at, closed_at
 FROM binocolo.ma_initiative_card
 WHERE initiative_id = $1::uuid AND company_key = $2
@@ -2752,7 +2768,7 @@ WHERE initiative_id = $1::uuid AND company_key = $2
 	var card MAInitiativeCard
 	var closedAt sql.NullTime
 	if err := row.Scan(&card.InitiativeID, &card.CompanyKey, &card.CompanyName, &card.VATCode, &card.TaxCode,
-		&card.Province, &card.State, &card.Esito, &card.CreatedFromSession, &card.CreatedAt, &card.UpdatedAt, &closedAt); err != nil {
+		&card.Province, &card.Origin, &card.State, &card.Esito, &card.CreatedFromSession, &card.CreatedAt, &card.UpdatedAt, &closedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -2779,20 +2795,21 @@ func (s *SQLStore) UpsertMAInitiativeCard(ctx context.Context, card MAInitiative
 	}
 	if _, err := s.db.ExecContext(ctx, `
 INSERT INTO binocolo.ma_initiative_card (
-    initiative_id, company_key, company_name, vat_code, tax_code, province,
+    initiative_id, company_key, company_name, vat_code, tax_code, province, origin,
     state, esito, created_from_session, created_at, updated_at, closed_at)
-VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, NULLIF($8, ''), $9::uuid, now(), now(), $10)
+VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, NULLIF($9, ''), $10::uuid, now(), now(), $11)
 ON CONFLICT (initiative_id, company_key) DO UPDATE SET
     company_name = CASE WHEN EXCLUDED.company_name <> '' THEN EXCLUDED.company_name ELSE binocolo.ma_initiative_card.company_name END,
     vat_code     = CASE WHEN EXCLUDED.vat_code <> '' THEN EXCLUDED.vat_code ELSE binocolo.ma_initiative_card.vat_code END,
     tax_code     = CASE WHEN EXCLUDED.tax_code <> '' THEN EXCLUDED.tax_code ELSE binocolo.ma_initiative_card.tax_code END,
     province     = CASE WHEN EXCLUDED.province <> '' THEN EXCLUDED.province ELSE binocolo.ma_initiative_card.province END,
+    origin       = EXCLUDED.origin,
     state        = EXCLUDED.state,
     esito        = EXCLUDED.esito,
     updated_at   = now(),
     closed_at    = EXCLUDED.closed_at
 `, card.InitiativeID, card.CompanyKey, card.CompanyName, card.VATCode, card.TaxCode, card.Province,
-		card.State, card.Esito, createdFromSession, card.ClosedAt); err != nil {
+		card.Origin, card.State, card.Esito, createdFromSession, card.ClosedAt); err != nil {
 		return fmt.Errorf("upsert ma initiative card: %w", err)
 	}
 	return nil
@@ -2805,7 +2822,7 @@ func (s *SQLStore) ListMAInitiativeCards(ctx context.Context, initiativeID strin
 	}
 	rows, err := s.db.QueryContext(ctx, `
 SELECT initiative_id::text, company_key, company_name, vat_code, tax_code, province,
-       state, COALESCE(esito, ''), COALESCE(created_from_session::text, ''),
+       origin, state, COALESCE(esito, ''), COALESCE(created_from_session::text, ''),
        created_at, updated_at, closed_at
 FROM binocolo.ma_initiative_card
 WHERE initiative_id = $1::uuid
@@ -2820,7 +2837,7 @@ ORDER BY updated_at DESC
 		var card MAInitiativeCard
 		var closedAt sql.NullTime
 		if err := rows.Scan(&card.InitiativeID, &card.CompanyKey, &card.CompanyName, &card.VATCode, &card.TaxCode,
-			&card.Province, &card.State, &card.Esito, &card.CreatedFromSession, &card.CreatedAt, &card.UpdatedAt, &closedAt); err != nil {
+			&card.Province, &card.Origin, &card.State, &card.Esito, &card.CreatedFromSession, &card.CreatedAt, &card.UpdatedAt, &closedAt); err != nil {
 			return nil, fmt.Errorf("scan ma initiative card: %w", err)
 		}
 		if closedAt.Valid {
@@ -2867,6 +2884,9 @@ SELECT DISTINCT ON (o.company_key) o.company_key,
     WHEN o.event = 'contattato' THEN 'Contattata'
     WHEN o.event = 'card_rimossa' THEN 'Card rimossa'
     WHEN o.event = 'card_riaperta' THEN 'Card riaperta'
+    WHEN o.event = 'dominio_verificato' AND o.payload->>'esito' = 'confermato' THEN 'Dominio confermato'
+    WHEN o.event = 'dominio_verificato' AND o.payload->>'esito' = 'non_confermato' THEN 'Dominio non confermato'
+    WHEN o.event = 'dominio_verificato' THEN 'Dominio non verificabile'
     WHEN o.event = 'buon_lead' AND COALESCE(o.note, '') != '' THEN 'Buon lead: ' || o.note
     WHEN o.event = 'buon_lead' THEN 'Buon lead'
     WHEN o.event = 'no_go' AND COALESCE(o.note, '') != '' THEN 'No-go: ' || o.note
@@ -2916,7 +2936,7 @@ func (s *SQLStore) ListMAActiveCardsByCompany(ctx context.Context, companyKeys [
 	}
 	query := fmt.Sprintf(`
 SELECT c.initiative_id::text, c.company_key, c.company_name, c.vat_code, c.tax_code, c.province,
-       c.state, COALESCE(c.esito, ''), COALESCE(c.created_from_session::text, ''),
+       c.origin, c.state, COALESCE(c.esito, ''), COALESCE(c.created_from_session::text, ''),
        c.created_at, c.updated_at, c.closed_at
 FROM binocolo.ma_initiative_card c
 JOIN binocolo.ma_initiative i ON i.id = c.initiative_id
@@ -2935,7 +2955,7 @@ WHERE c.company_key IN (%s)
 		var card MAInitiativeCard
 		var closedAt sql.NullTime
 		if err := rows.Scan(&card.InitiativeID, &card.CompanyKey, &card.CompanyName, &card.VATCode, &card.TaxCode,
-			&card.Province, &card.State, &card.Esito, &card.CreatedFromSession, &card.CreatedAt, &card.UpdatedAt, &closedAt); err != nil {
+			&card.Province, &card.Origin, &card.State, &card.Esito, &card.CreatedFromSession, &card.CreatedAt, &card.UpdatedAt, &closedAt); err != nil {
 			return nil, fmt.Errorf("scan ma active card: %w", err)
 		}
 		if closedAt.Valid {
@@ -3092,23 +3112,22 @@ func (s *SQLStore) GetMACompanyOverviewIdentity(ctx context.Context, companyKey 
 		return nil, nil
 	}
 	row := s.db.QueryRowContext(ctx, `
-WITH latest AS (
+WITH identities AS (
   SELECT
     COALESCE(NULLIF(upper(btrim(vendor_id)), ''), NULLIF(upper(btrim(vat_code)), ''), NULLIF(upper(btrim(tax_code)), ''), upper(btrim(company_name))) AS company_key,
-    COALESCE(company_name, '') AS company_name,
-    COALESCE(vat_code, '') AS vat_code,
-    COALESCE(tax_code, '') AS tax_code,
-    COALESCE(province, '') AS province,
-    COALESCE(town, '') AS town,
-    COALESCE(ateco_code, '') AS ateco_code,
-    COALESCE(ateco_description, '') AS ateco_description,
-    created_at AS created_at
+    COALESCE(company_name, '') AS company_name, COALESCE(vat_code, '') AS vat_code,
+    COALESCE(tax_code, '') AS tax_code, COALESCE(province, '') AS province,
+    COALESCE(town, '') AS town, COALESCE(ateco_code, '') AS ateco_code,
+    COALESCE(ateco_description, '') AS ateco_description, created_at, 1 AS priority
   FROM binocolo.ma_target
+  UNION ALL
+  SELECT company_key, company_name, vat_code, tax_code, province, '', '', '', updated_at, 2
+  FROM binocolo.ma_initiative_card
 )
 SELECT company_key, company_name, vat_code, tax_code, province, town, ateco_code, ateco_description
-FROM latest
+FROM identities
 WHERE company_key = $1
-ORDER BY created_at DESC
+ORDER BY priority, created_at DESC
 LIMIT 1
 `, companyKey)
 	var identity MACompanyOverviewIdentity
@@ -3118,35 +3137,16 @@ LIMIT 1
 		}
 		return nil, fmt.Errorf("get ma company overview identity: %w", err)
 	}
-	domain, err := s.getMACompanyOverviewDomain(ctx, identity.CompanyKey, identity.VATCode, identity.TaxCode)
+	domain, err := s.GetMACompanyDomain(ctx, identity.CompanyKey, identity.VATCode, identity.TaxCode)
 	if err != nil {
 		return nil, err
 	}
-	identity.Domain = domain
+	if domain != nil {
+		identity.Domain = domain.Domain
+		identity.DomainMethod = domain.Method
+		identity.IdentityState = domain.IdentityState
+	}
 	return &identity, nil
-}
-
-func (s *SQLStore) getMACompanyOverviewDomain(ctx context.Context, companyKey, vatCode, taxCode string) (string, error) {
-	if companyKey == "" && vatCode == "" && taxCode == "" {
-		return "", nil
-	}
-	row := s.db.QueryRowContext(ctx, `
-SELECT COALESCE(domain, '')
-FROM binocolo.ma_company_domain
-WHERE ($1 <> '' AND company_key = $1)
-   OR ($2 <> '' AND vat_code = $2)
-   OR ($3 <> '' AND tax_code = $3)
-ORDER BY (method IN ('manual', 'no_website')) DESC, (company_key = $1) DESC, verified_at DESC
-LIMIT 1
-`, companyKey, vatCode, taxCode)
-	var domain string
-	if err := row.Scan(&domain); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return "", nil
-		}
-		return "", fmt.Errorf("get ma company overview domain: %w", err)
-	}
-	return domain, nil
 }
 
 func (s *SQLStore) ListMACompanyOverviewAppearances(ctx context.Context, companyKey string) ([]MACompanyOverviewAppearance, error) {
@@ -3318,7 +3318,7 @@ func (s *SQLStore) ListMACompanyOverviewCards(ctx context.Context, companyKey st
 		return []MACompanyOverviewCard{}, nil
 	}
 	rows, err := s.db.QueryContext(ctx, `
-SELECT c.initiative_id::text, COALESCE(i.title, ''), c.company_key, c.company_name, c.state, COALESCE(c.esito, ''),
+SELECT c.initiative_id::text, COALESCE(i.title, ''), c.company_key, c.company_name, c.origin, c.state, COALESCE(c.esito, ''),
        COALESCE(c.created_from_session::text, ''), c.created_at, c.updated_at, c.closed_at
 FROM binocolo.ma_initiative_card c
 JOIN binocolo.ma_initiative i ON i.id = c.initiative_id
@@ -3334,7 +3334,7 @@ ORDER BY c.updated_at DESC, c.created_at DESC
 	for rows.Next() {
 		var item MACompanyOverviewCard
 		var closedAt sql.NullTime
-		if err := rows.Scan(&item.InitiativeID, &item.InitiativeTitle, &item.CompanyKey, &item.CompanyName, &item.State, &item.Esito,
+		if err := rows.Scan(&item.InitiativeID, &item.InitiativeTitle, &item.CompanyKey, &item.CompanyName, &item.Origin, &item.State, &item.Esito,
 			&item.CreatedFromSession, &item.CreatedAt, &item.UpdatedAt, &closedAt); err != nil {
 			return nil, fmt.Errorf("scan ma company overview card: %w", err)
 		}
@@ -4163,6 +4163,59 @@ LIMIT 1
 		return nil, fmt.Errorf("get ma target deep dive identity: %w", err)
 	}
 	return &identity, nil
+}
+
+func (s *SQLStore) FindMACompanySnapshotByIdentity(ctx context.Context, vatOrTax string) (*maCompanySnapshot, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	vatOrTax = normalizeMAVATOrTax(vatOrTax)
+	if vatOrTax == "" {
+		return nil, nil
+	}
+	row := s.db.QueryRowContext(ctx, `
+WITH snapshots AS (
+  SELECT COALESCE(NULLIF(upper(btrim(vendor_id)), ''), NULLIF(upper(btrim(vat_code)), ''), NULLIF(upper(btrim(tax_code)), ''), upper(btrim(company_name))) AS company_key,
+         COALESCE(company_name, '') AS company_name, COALESCE(vat_code, '') AS vat_code,
+         COALESCE(tax_code, '') AS tax_code, COALESCE(province, '') AS province,
+         created_at AS seen_at, 1 AS priority
+  FROM binocolo.ma_target
+  WHERE upper(btrim(vat_code)) = $1 OR upper(btrim(tax_code)) = $1
+  UNION ALL
+  SELECT company_key, company_name, vat_code, tax_code, province, updated_at, 2
+  FROM binocolo.ma_initiative_card
+  WHERE upper(btrim(vat_code)) = $1 OR upper(btrim(tax_code)) = $1
+)
+SELECT company_key, company_name, vat_code, tax_code, province
+FROM snapshots
+ORDER BY priority, seen_at DESC
+LIMIT 1
+`, vatOrTax)
+	var out maCompanySnapshot
+	if err := row.Scan(&out.CompanyKey, &out.CompanyName, &out.VATCode, &out.TaxCode, &out.Province); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("find ma company snapshot by identity: %w", err)
+	}
+	out.CompanyKey = normalizeMACompanyKey(out.CompanyKey)
+	return &out, nil
+}
+
+func (s *SQLStore) FindMACompanySnapshotByKey(ctx context.Context, companyKey string) (*maCompanySnapshot, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey == "" {
+		return nil, nil
+	}
+	if row, err := s.GetMACompanyOverviewIdentity(ctx, companyKey); err != nil {
+		return nil, err
+	} else if row != nil {
+		return &maCompanySnapshot{CompanyKey: row.CompanyKey, CompanyName: row.CompanyName, VATCode: row.VATCode, TaxCode: row.TaxCode, Province: row.Province}, nil
+	}
+	return nil, nil
 }
 
 func (s *SQLStore) GetMAInitiativeCardDeepDiveIdentity(ctx context.Context, companyKey string) (*maDeepDiveIdentity, error) {

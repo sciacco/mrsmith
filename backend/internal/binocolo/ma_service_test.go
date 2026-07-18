@@ -1444,6 +1444,10 @@ func (f *fakeMAWorkspaceStore) EnqueueMAJob(context.Context, maJobEnqueue) (stri
 	return "", false, errors.New("not implemented")
 }
 
+func (f *fakeMAWorkspaceStore) HasActiveMACardDomainJob(context.Context, string, string) (bool, error) {
+	return false, nil
+}
+
 func (f *fakeMAWorkspaceStore) LatestMAManualAddJob(context.Context, string) (*MAManualAddJobProgress, error) {
 	return nil, nil
 }
@@ -1545,6 +1549,14 @@ func (f *fakeMAWorkspaceStore) GetMATargetDeepDiveIdentity(context.Context, stri
 }
 
 func (f *fakeMAWorkspaceStore) GetMAInitiativeCardDeepDiveIdentity(context.Context, string) (*maDeepDiveIdentity, error) {
+	return nil, nil
+}
+
+func (f *fakeMAWorkspaceStore) FindMACompanySnapshotByIdentity(context.Context, string) (*maCompanySnapshot, error) {
+	return nil, nil
+}
+
+func (f *fakeMAWorkspaceStore) FindMACompanySnapshotByKey(context.Context, string) (*maCompanySnapshot, error) {
 	return nil, nil
 }
 

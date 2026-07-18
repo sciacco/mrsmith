@@ -125,6 +125,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/initiatives/{id}/purge", h.handlePurgeMAInitiative)
 	handle("POST /binocolo/v1/ma/sessions/{id}/initiative", h.handleSetMASessionInitiative)
 	handle("GET /binocolo/v1/ma/initiatives/{id}", h.handleGetMAInitiativeBoard)
+	handle("POST /binocolo/v1/ma/initiatives/{id}/cards", h.handleCreateMAInitiativeCard)
 	handle("GET /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/events", h.handleGetMAInitiativeCardEvents)
 	handle("GET /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/dossier", h.handleGetMACardDossier)
 	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/state", h.handleSetMACardState)
@@ -570,6 +571,31 @@ func (h *Handler) handleGetMAInitiativeBoard(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	httputil.JSON(w, http.StatusOK, board)
+}
+
+func (h *Handler) handleCreateMAInitiativeCard(w http.ResponseWriter, r *http.Request) {
+	id, ok := maInitiativeID(w, r)
+	if !ok {
+		return
+	}
+	var body MACreateInitiativeCardRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	var traceOK bool
+	r, traceOK = h.startMATrace(w, r, "ma_initiative_card_create", "", map[string]any{"initiativeId": id, "domainSupplied": strings.TrimSpace(body.Domain) != ""}, subject, email)
+	if !traceOK {
+		return
+	}
+	result, err := h.ma.createDirectInitiativeCard(r.Context(), id, body, subject, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_initiative_card_create", err, "initiative_id", id)
+		return
+	}
+	h.completeMATraceSuccess(r, http.StatusCreated)
+	httputil.JSON(w, http.StatusCreated, result)
 }
 
 func (h *Handler) handleGetMAInitiativeCardEvents(w http.ResponseWriter, r *http.Request) {
@@ -1922,6 +1948,15 @@ func maHTTPError(err error) (int, string, string) {
 	}
 	if errors.Is(err, errMAInitiativeNotFound) {
 		return http.StatusNotFound, "ma_initiative_not_found", "warn"
+	}
+	if errors.Is(err, errMACardAlreadyPresent) {
+		return http.StatusConflict, "card_already_present", "warn"
+	}
+	if errors.Is(err, errMAVATNotFound) {
+		return http.StatusNotFound, "vat_not_found", "warn"
+	}
+	if errors.Is(err, errMAStrategyInvalid) && strings.Contains(err.Error(), "vatCode") {
+		return http.StatusUnprocessableEntity, "invalid_vat", "warn"
 	}
 	if errors.Is(err, errMACompanyFactActive) {
 		return http.StatusBadRequest, "ma_company_fact_already_active", "warn"

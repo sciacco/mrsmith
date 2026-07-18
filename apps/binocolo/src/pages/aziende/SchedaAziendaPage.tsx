@@ -1,7 +1,7 @@
 import { ApiError } from '@mrsmith/api-client';
 import { Button, Icon, Modal, Skeleton, StatusBadge, useToast, type StatusBadgeVariant } from '@mrsmith/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useApiClient } from '../../api/client';
 import type {
@@ -9,7 +9,9 @@ import type {
   MACompanyOverview,
   MACompanyOverviewAppearance,
   MACompanyOverviewCard,
+  MACreateInitiativeCardResponse,
   MADeepAnalysis,
+  MAInitiativeListResponse,
   MASessionThesisReading,
   MATarget,
 } from '../../api/types';
@@ -269,7 +271,7 @@ function evidenceFromTarget(target?: MATarget): CandidateMatchAnalysisResponse |
   return target?.webValidation?.candidateMatchAnalysis;
 }
 
-function EmptyPanel({ icon, title, text }: { icon: 'file-text' | 'target' | 'bar-chart-2'; title: string; text: string }) {
+function EmptyPanel({ icon, title, text, action }: { icon: 'file-text' | 'target' | 'bar-chart-2'; title: string; text: string; action?: ReactNode }) {
   return (
     <div className={styles.emptyState}>
       <span className={styles.emptyIcon} aria-hidden="true">
@@ -277,6 +279,7 @@ function EmptyPanel({ icon, title, text }: { icon: 'file-text' | 'target' | 'bar
       </span>
       <h3>{title}</h3>
       <p>{text}</p>
+      {action}
     </div>
   );
 }
@@ -730,9 +733,14 @@ export function SchedaAziendaPage() {
             <dt>Dominio</dt>
             <dd>
               {domain ? (
-                <a href={normalizeDomainHref(domain)} target="_blank" rel="noopener noreferrer" className={styles.externalLink}>
-                  {domain} <Icon name="external-link" size={13} />
-                </a>
+                <span className={styles.domainValue}>
+                  <a href={normalizeDomainHref(domain)} target="_blank" rel="noopener noreferrer" className={styles.externalLink}>
+                    {domain} <Icon name="external-link" size={13} />
+                  </a>
+                  {identity.domainMethod === 'manual' && identity.identityState !== 'verified' ? (
+                    <StatusBadge value="Dominio non confermato" variant="warning" dot={false} />
+                  ) : null}
+                </span>
               ) : (
                 'n.d.'
               )}
@@ -1005,12 +1013,40 @@ function HistorySection({ appearances, companyKey }: { appearances: MACompanyOve
 }
 
 function CardsSection({ cards, companyKey, activeInitiativeId }: { cards: MACompanyOverviewCard[]; companyKey: string; activeInitiativeId?: string }) {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [creatingFor, setCreatingFor] = useState<string | null>(null);
+  const initiatives = useQuery({
+    queryKey: ['ma-initiatives', 'active'],
+    enabled: pickerOpen,
+    queryFn: () => api.get<MAInitiativeListResponse>('/binocolo/v1/ma/initiatives'),
+  });
+  const existingIds = new Set(cards.map((card) => card.initiativeId));
+  const available = (initiatives.data?.items ?? []).filter((initiative) => !existingIds.has(initiative.id));
   const sorted = [...cards].sort((a, b) => Number(b.initiativeId === activeInitiativeId) - Number(a.initiativeId === activeInitiativeId));
+
+  async function addToInitiative(initiativeId: string) {
+    setCreatingFor(initiativeId);
+    try {
+      await api.post<MACreateInitiativeCardResponse>(`/binocolo/v1/ma/initiatives/${initiativeId}/cards`, { companyKey });
+      await queryClient.invalidateQueries({ queryKey: ['ma-company-overview', companyKey] });
+      setPickerOpen(false);
+      toast('Azienda aggiunta all’iniziativa.', 'success');
+    } catch (error) {
+      toast(error instanceof ApiError && error.status === 409 ? 'Azienda già presente in questa iniziativa.' : errorLabel(error), 'error');
+    } finally {
+      setCreatingFor(null);
+    }
+  }
+
+  const addAction = <Button size="sm" onClick={() => setPickerOpen(true)} leftIcon={<Icon name="plus" size={14} />}>Aggiungi a iniziativa</Button>;
   return (
     <div className={styles.subSection}>
-      <h3>Iniziative collegate</h3>
+      <div className={styles.subSectionHeader}><h3>Iniziative collegate</h3>{sorted.length > 0 ? addAction : null}</div>
       {sorted.length === 0 ? (
-        <EmptyPanel icon="file-text" title="Nessuna iniziativa" text="Non risultano card aperte o storiche per questa azienda." />
+        <EmptyPanel icon="file-text" title="Nessuna iniziativa" text="Non risultano card aperte o storiche per questa azienda." action={addAction} />
       ) : (
         <div className={styles.cardGrid}>
           {sorted.map((card) => (
@@ -1023,6 +1059,7 @@ function CardsSection({ cards, companyKey, activeInitiativeId }: { cards: MAComp
                   {card.initiativeTitle || card.initiativeId}
                 </Link>
                 {card.initiativeId === activeInitiativeId ? <span className={styles.statusPill}>Lente attiva</span> : null}
+                {card.origin === 'direct' ? <span className={styles.statusPill}>Diretta</span> : null}
               </div>
               <dl>
                 <div><dt>Stato</dt><dd>{CARD_STATE_LABELS[card.state] ?? card.state}</dd></div>
@@ -1035,6 +1072,21 @@ function CardsSection({ cards, companyKey, activeInitiativeId }: { cards: MAComp
           ))}
         </div>
       )}
+      <Modal open={pickerOpen} onClose={() => setPickerOpen(false)} title="Aggiungi a iniziativa" size="md" dismissible={!creatingFor}>
+        <div className={styles.initiativePicker}>
+          <p>Seleziona l’iniziativa in cui aprire la card di lavorazione.</p>
+          {initiatives.isLoading ? <Skeleton rows={3} /> : initiatives.isError ? (
+            <div className={styles.warning} role="alert"><Icon name="triangle-alert" size={16} /><span>{errorLabel(initiatives.error)}</span></div>
+          ) : available.length === 0 ? (
+            <p className={styles.muted}>Nessuna iniziativa attiva disponibile.</p>
+          ) : available.map((initiative) => (
+            <div key={initiative.id} className={styles.initiativeOption}>
+              <div><strong>{initiative.title}</strong>{initiative.description ? <p>{initiative.description}</p> : null}</div>
+              <Button variant="secondary" size="sm" loading={creatingFor === initiative.id} disabled={Boolean(creatingFor && creatingFor !== initiative.id)} onClick={() => void addToInitiative(initiative.id)}>Aggiungi</Button>
+            </div>
+          ))}
+        </div>
+      </Modal>
     </div>
   );
 }

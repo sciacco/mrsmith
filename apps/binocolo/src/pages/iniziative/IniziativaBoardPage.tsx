@@ -10,6 +10,7 @@ import type {
   MACardEventListResponse,
   MACardProvenance,
   MACardRemoveResponse,
+  MACreateInitiativeCardResponse,
   MAInitiativeBoard,
   MAInitiativeCardView,
   MACompanyRegistry,
@@ -17,6 +18,7 @@ import type {
   MASessionSummary,
 } from '../../api/types';
 import { dateLabel, relativeDate, shortAuthor, errorLabel } from '../ricerche/helpers';
+import { DirectCompanyModal } from '../../components/company/DirectCompanyModal';
 import { writeCohort } from '../../components/scheda/cohort';
 import styles from './Iniziative.module.css';
 
@@ -124,6 +126,10 @@ function confidenceLabel(confidence?: string): string | null {
   return confidence ? `Confidenza: ${confidence}` : null;
 }
 
+function OriginChip({ origin }: { origin: string }) {
+  return origin === 'direct' ? <span className={`${styles.badge} ${styles.badgeLav}`}>Diretta</span> : null;
+}
+
 function RatingChip({ provenance }: { provenance?: MACardProvenance }) {
   if (!provenance) return null;
   return (
@@ -197,6 +203,8 @@ export function IniziativaBoardPage() {
   const collapsedInitRef = useRef(false);
 
   const [attachModalOpen, setAttachModalOpen] = useState(false);
+  const [directModalOpen, setDirectModalOpen] = useState(false);
+  const [directSubmitting, setDirectSubmitting] = useState(false);
   const [availableSessions, setAvailableSessions] = useState<MASessionSummary[]>([]);
   const [attachLoading, setAttachLoading] = useState(false);
   const [attaching, setAttaching] = useState<string | null>(null);
@@ -286,6 +294,30 @@ export function IniziativaBoardPage() {
       toast(errorLabel(err), 'error');
     } finally {
       setAttaching(null);
+    }
+  };
+
+  const createDirectCard = async (
+    payload: { vatCode: string; domain?: string },
+    setFormError: (message: string) => void,
+  ) => {
+    if (!id) return;
+    setDirectSubmitting(true);
+    try {
+      const result = await api.post<MACreateInitiativeCardResponse>(`/binocolo/v1/ma/initiatives/${id}/cards`, payload);
+      await load();
+      setDirectModalOpen(false);
+      toast(result.domainVerification === 'queued' ? 'Azienda aggiunta. Verifica del dominio in corso.' : 'Azienda aggiunta.', 'success');
+    } catch (err) {
+      if (err instanceof ApiError && (err.status === 409 || apiErrorCode(err) === 'card_already_present')) {
+        setFormError('Azienda già presente in questa iniziativa. Apri la card esistente dalla board.');
+      } else if (err instanceof ApiError && apiErrorCode(err) === 'vat_not_found') {
+        setFormError('P.IVA non trovata nel registro. Verifica l’identificativo e riprova.');
+      } else {
+        setFormError(errorLabel(err));
+      }
+    } finally {
+      setDirectSubmitting(false);
     }
   };
 
@@ -451,6 +483,9 @@ export function IniziativaBoardPage() {
               {session.title}
             </span>
           ))}
+          <Button variant="primary" size="sm" onClick={() => setDirectModalOpen(true)} leftIcon={<Icon name="plus" size={14} />}>
+            Aggiungi azienda
+          </Button>
           <Button
             variant="secondary"
             size="sm"
@@ -530,6 +565,7 @@ export function IniziativaBoardPage() {
                       >
                         <span className={styles.kcardName} title={card.companyName}>{card.companyName}</span>
                         <RatingChip provenance={latestProvenance(card)} />
+                        <OriginChip origin={card.origin} />
                         {card.esito ? (
                           <span className={`${styles.badge} ${styles.badgeEsito}`}>{ESITO_LABELS[card.esito] ?? card.esito}</span>
                         ) : null}
@@ -549,6 +585,7 @@ export function IniziativaBoardPage() {
                         <div className={styles.kcardMeta}>
                           <span className={styles.provinceBadge}>{card.province}</span>
                           <RatingChip provenance={latestProvenance(card)} />
+                          <OriginChip origin={card.origin} />
                           {(card.registryFacts ?? []).map((kind) => {
                             const info = registryLabel(kind);
                             return (
@@ -635,6 +672,7 @@ export function IniziativaBoardPage() {
                   <tr key={card.companyKey} className={styles.tableRow} onClick={() => setSelectedCard(card)}>
                     <td className={styles.cellMain}>
                       <span className={styles.companyNameText} title={card.companyName}>{card.companyName}</span>
+                      <OriginChip origin={card.origin} />
                     </td>
                     <td>
                       <span className={styles.provinceBadge}>{card.province}</span>
@@ -708,6 +746,13 @@ export function IniziativaBoardPage() {
           </table>
         </div>
       )}
+
+      <DirectCompanyModal
+        open={directModalOpen}
+        submitting={directSubmitting}
+        onClose={() => setDirectModalOpen(false)}
+        onSubmit={createDirectCard}
+      />
 
       <Modal open={attachModalOpen} onClose={() => setAttachModalOpen(false)} title="Collega ricerca">
         {attachLoading ? (
@@ -1354,6 +1399,12 @@ function eventLabel(event: MACardEvent, sessionMap?: Map<string, string>): strin
       return 'Card riaperta';
     case 'card_rimossa':
       return 'Card rimossa';
+    case 'dominio_verificato': {
+      const esito = p && typeof p.esito === 'string' ? p.esito : 'non_verificabile';
+      if (esito === 'confermato') return 'Dominio confermato';
+      if (esito === 'non_confermato') return 'Dominio non confermato';
+      return 'Dominio non verificabile';
+    }
     case 'nota':
       return event.note ?? 'Nota';
     case 'contattato':

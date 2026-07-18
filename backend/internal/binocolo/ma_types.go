@@ -78,6 +78,9 @@ const (
 	// maJobTypeManualAdd inserts one analyst-specified company into an existing MA
 	// session by VAT/tax code, then web-validates and re-scores it asynchronously.
 	maJobTypeManualAdd = "manual_add"
+	// maJobTypeCardDomainVerify verifies an analyst-supplied domain for a direct
+	// initiative card. It is initiative/company scoped and has no session strategy.
+	maJobTypeCardDomainVerify = "card_domain_verify"
 
 	maJobStatusQueued  = "queued"
 	maJobStatusRunning = "running"
@@ -286,12 +289,16 @@ const (
 	// Eventi di card aggiunti dall'evoluzione a log unico (migrazione 089,
 	// INIZIATIVE-PRD.md §5): ma_target_outcome diventa il diario di
 	// lavorazione, ancorato a initiative_id oltre che a session_id.
-	maEventCardCreata   = "card_creata"
-	maEventCardRimossa  = "card_rimossa"
-	maEventCardRiaperta = "card_riaperta"
-	maEventStato        = "stato"
-	maEventNota         = "nota"
-	maEventChiusura     = "chiusura"
+	maEventCardCreata        = "card_creata"
+	maEventCardRimossa       = "card_rimossa"
+	maEventCardRiaperta      = "card_riaperta"
+	maEventStato             = "stato"
+	maEventNota              = "nota"
+	maEventChiusura          = "chiusura"
+	maEventDominioVerificato = "dominio_verificato"
+
+	maCardOriginSearch = "search"
+	maCardOriginDirect = "direct"
 
 	// Stati della card di lavorazione (ma_initiative_card, migrazione 088,
 	// INIZIATIVE-PRD.md §4.4). "rimossa" non è mai una colonna del board.
@@ -425,6 +432,7 @@ type MAInitiativeCard struct {
 	VATCode            string     `json:"vatCode,omitempty"`
 	TaxCode            string     `json:"taxCode,omitempty"`
 	Province           string     `json:"province,omitempty"`
+	Origin             string     `json:"origin"`
 	State              string     `json:"state"`
 	Esito              string     `json:"esito,omitempty"`
 	CreatedFromSession string     `json:"createdFromSession,omitempty"`
@@ -494,6 +502,8 @@ type MACompanyOverviewIdentity struct {
 	AtecoCode        string `json:"atecoCode,omitempty"`
 	AtecoDescription string `json:"atecoDescription,omitempty"`
 	Domain           string `json:"domain,omitempty"`
+	DomainMethod     string `json:"domainMethod,omitempty"`
+	IdentityState    string `json:"identityState,omitempty"`
 }
 
 type MACompanyOverviewAppearance struct {
@@ -521,6 +531,7 @@ type MACompanyOverviewCard struct {
 	InitiativeTitle    string     `json:"initiativeTitle"`
 	CompanyKey         string     `json:"companyKey"`
 	CompanyName        string     `json:"companyName"`
+	Origin             string     `json:"origin"`
 	State              string     `json:"state"`
 	Esito              string     `json:"esito,omitempty"`
 	LastEvent          string     `json:"lastEvent,omitempty"`
@@ -574,6 +585,19 @@ type MAInitiativeBoard struct {
 	Initiative MAInitiative           `json:"initiative"`
 	Sessions   []MASessionSummary     `json:"sessions"`
 	Cards      []MAInitiativeCardView `json:"cards"`
+}
+
+// MACreateInitiativeCardRequest is shared by the board (VAT + optional domain)
+// and company sheet (known companyKey) direct-card entry points.
+type MACreateInitiativeCardRequest struct {
+	VATCode    string `json:"vatCode,omitempty"`
+	CompanyKey string `json:"companyKey,omitempty"`
+	Domain     string `json:"domain,omitempty"`
+}
+
+type MACreateInitiativeCardResponse struct {
+	Card               MAInitiativeCard `json:"card"`
+	DomainVerification string           `json:"domainVerification,omitempty"`
 }
 
 // MACardStateRequest drives POST .../cards/{companyKey}/state (B4 passo 3):
