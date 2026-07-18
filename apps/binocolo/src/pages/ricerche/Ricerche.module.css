@@ -1080,6 +1080,22 @@
   color: var(--color-warning-strong);
 }
 
+/* Cella Esito: chip a larghezza standard, storia di soppressione su riga
+   propria — la label composta nel chip spaginava la colonna. */
+.esitoStack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+}
+
+.chipHistory {
+  max-width: 22ch;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--color-text-muted);
+}
+
 .ratingControl {
   display: inline-flex;
   align-items: center;

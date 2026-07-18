@@ -25,7 +25,6 @@ import {
   bucketChipDescription,
   bucketChipLabel,
   bucketLabel,
-  bucketLabelWithSuppressionHistory,
   dateLabel,
   downloadBlob,
   errorLabel,
@@ -36,6 +35,7 @@ import {
   numberFormat,
   safeFilename,
   sessionStatusLabel,
+  suppressedReasonShort,
   targetKey,
   targetsToCSV,
 } from './helpers';
@@ -1346,7 +1346,12 @@ function ResultsTable({
               <td>
                 {bucketChipLabel(target.bucket) ? (
                   <Tooltip content={bucketChipDescription(target.bucket, target.bucketReason ?? target.suppressedReason)}>
-                    <span className={bucketClassName(target.bucket, target.bucketReason?.kind)}>{bucketLabelWithSuppressionHistory(target.bucket, target.suppressedReason)}</span>
+                    <span className={styles.esitoStack}>
+                      <span className={bucketClassName(target.bucket, target.bucketReason?.kind)}>{bucketChipLabel(target.bucket)}</span>
+                      {target.suppressedReason ? (
+                        <span className={styles.chipHistory}>era soppressa: {suppressedReasonShort(target.suppressedReason.code)}</span>
+                      ) : null}
+                    </span>
                   </Tooltip>
                 ) : null}
               </td>
