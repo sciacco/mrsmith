@@ -40,7 +40,6 @@ import {
   sessionStatusLabel,
   suppressedReasonShort,
   targetKey,
-  targetsToCSV,
 } from './helpers';
 import styles from './Ricerche.module.css';
 
@@ -390,12 +389,6 @@ export function RicercaDetailPage() {
     }
   }
 
-  function exportCSV() {
-    if (!detail) return;
-    const blob = new Blob([targetsToCSV(resultTargets)], { type: 'text/csv;charset=utf-8' });
-    downloadBlob(blob, `ricerca-${safeFilename(detail.session.title)}.csv`);
-  }
-
   function closeManualAddModal() {
     if (manualAddSubmitting) return;
     setManualAddOpen(false);
@@ -708,7 +701,6 @@ export function RicercaDetailPage() {
                   <Button variant="secondary" onClick={() => void exportXLSX()} loading={busy === 'export'} leftIcon={<Icon name="download" />}>
                     Export XLSX
                   </Button>
-                  <Button variant="secondary" onClick={exportCSV}>CSV</Button>
                 </div>
                 {detail.scoringPlan ? (
                   <details
