@@ -575,26 +575,18 @@
   white-space: nowrap;
 }
 
-.thesisGuidance {
+.workbenchControls {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, auto);
-  gap: var(--space-3) var(--space-5);
-  align-items: start;
-  margin-top: var(--space-3);
-  padding: var(--space-3);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
+  gap: var(--space-3);
+  padding-top: var(--space-4);
 }
 
-.thesisGuidance p {
+.thesisGuidance {
+  min-width: 0;
   margin: 0;
   color: var(--color-text-secondary);
   font-size: 0.8125rem;
   line-height: 1.5;
-}
-
-.thesisGuidance p:last-child {
-  color: var(--color-text-muted);
 }
 
 .thesisGuidance strong {
@@ -603,7 +595,50 @@
 }
 
 .scoringPlanDisclosure {
-  margin-top: var(--space-3);
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.scoringPlanDisclosure summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3);
+  cursor: pointer;
+  list-style: none;
+}
+
+.scoringPlanDisclosure summary::-webkit-details-marker {
+  display: none;
+}
+
+.scoringPlanDisclosure summary:focus-visible {
+  outline: 1px solid transparent;
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
+}
+
+.scoringPlanToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-accent);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.scoringPlanToggle svg {
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.scoringPlanDisclosure[open] .scoringPlanToggle svg {
+  transform: rotate(180deg);
+}
+
+.scoringPlanBody {
+  padding: var(--space-2) var(--space-3) var(--space-3);
 }
 
 .toggleButton,
@@ -1709,9 +1744,22 @@ td .inspectLink { margin-left: var(--space-1); }
     grid-template-columns: 1fr;
   }
 
-  .scoreDetailRow,
-  .thesisGuidance {
+  .scoreDetailRow {
     grid-template-columns: 1fr;
+  }
+
+  .scoringPlanDisclosure summary {
+    align-items: start;
+    gap: var(--space-3);
+  }
+
+  .scoringPlanToggle {
+    font-size: 0;
+  }
+
+  .scoringPlanToggle svg {
+    width: 18px;
+    height: 18px;
   }
 
   .scoreDetailRow strong {

@@ -4,12 +4,11 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useApiClient } from '../../api/client';
-import { THESIS_META, THESIS_OPTIONS, thesisLabel } from '../../api/thesis';
+import { THESIS_META, THESIS_OPTIONS } from '../../api/thesis';
 import { DeepAnalysisContent } from '../../components/deep/DeepComponents';
 import { RatingStars } from '../../components/RatingStars';
 import { ScoringPlanPanel } from '../../components/ScoringPlanPanel/ScoringPlanPanel';
 import { writeCohort } from '../../components/scheda/cohort';
-import { LabeledDisclosure } from '../../components/scheda/LabeledDisclosure';
 import { ThesisReadingPanel } from '../../components/ThesisReadingPanel/ThesisReadingPanel';
 import { normalizeManualVat, validateManualDomain, validateManualVat } from '../../lib/companyIdentifiers';
 import type {
@@ -670,8 +669,11 @@ export function RicercaDetailPage() {
                   <h2 id="results-title">Lavorazione</h2>
                   <p className={styles.hint}>Risultati, rimedi e audit del gate.</p>
                 </div>
+                <Button onClick={() => setManualAddOpen(true)} leftIcon={<Icon name="plus" />} disabled={manualAddInFlight}>
+                  Aggiungi azienda
+                </Button>
               </div>
-              <div className={styles.panelBody}>
+              <div className={`${styles.panelBody} ${styles.workbenchControls}`}>
                 <div className={styles.summaryStrip}>
                   <span>Superficie <b>{numberFormat.format(progress?.surface.fetched || progress?.surface.expected || rows.length)}</b></span>
                   <span>→</span>
@@ -683,8 +685,6 @@ export function RicercaDetailPage() {
                   <span>·</span>
                   <span>fuori tesi <b>{numberFormat.format(buckets.reject || outsideTargets.length)}</b></span>
                 </div>
-              </div>
-              <div className={styles.panelBody}>
                 <div className={styles.toolbar}>
                   <span className={styles.thesis}>Tesi</span>
                   <select className={styles.select} value={thesis} onChange={(event) => setThesis(event.target.value as MAThesis)}>
@@ -692,31 +692,38 @@ export function RicercaDetailPage() {
                       <option key={item.value} value={item.value}>{item.label}</option>
                     ))}
                   </select>
-                  <Button onClick={() => setManualAddOpen(true)} leftIcon={<Icon name="plus" />} disabled={manualAddInFlight}>
-                    Aggiungi azienda
-                  </Button>
-                  <Button variant="secondary" onClick={() => void rescore()} loading={busy === 'rescore'} leftIcon={<Icon name="refresh-cw" />}>
-                    Cambia tesi e ricalcola
-                  </Button>
+                  <Tooltip content="Ricalcolo dai dati già acquisiti: nessun costo. Reversibile tornando alla tesi precedente.">
+                    <Button variant="secondary" onClick={() => void rescore()} loading={busy === 'rescore'} leftIcon={<Icon name="refresh-cw" />}>
+                      Cambia tesi e ricalcola
+                    </Button>
+                  </Tooltip>
                   <Button variant="secondary" onClick={() => void exportXLSX()} loading={busy === 'export'} leftIcon={<Icon name="download" />}>
                     Export XLSX
                   </Button>
                   <Button variant="secondary" onClick={exportCSV}>CSV</Button>
                 </div>
-                <div className={styles.thesisGuidance}>
-                  <p>
-                    <strong>{detail.scoringPlan?.thesis === thesis ? 'Tesi attuale' : 'Da applicare'} — {THESIS_META[thesis].label}.</strong>{' '}
+                {detail.scoringPlan ? (
+                  <details className={styles.scoringPlanDisclosure}>
+                    <summary>
+                      <span className={styles.thesisGuidance}>
+                        <strong>{detail.scoringPlan.thesis === thesis ? 'Tesi attuale' : 'Da applicare'} — {THESIS_META[thesis].label}.</strong>{' '}
+                        {THESIS_META[thesis].description}
+                      </span>
+                      <span className={styles.scoringPlanToggle}>
+                        Cosa valuta lo score
+                        <Icon name="chevron-down" size={16} />
+                      </span>
+                    </summary>
+                    <div className={styles.scoringPlanBody}>
+                      <ScoringPlanPanel plan={detail.scoringPlan} />
+                    </div>
+                  </details>
+                ) : (
+                  <p className={styles.thesisGuidance}>
+                    <strong>Da applicare — {THESIS_META[thesis].label}.</strong>{' '}
                     {THESIS_META[thesis].description}
                   </p>
-                  <p>Ricalcolo dai dati già acquisiti: nessun costo. Reversibile tornando alla tesi precedente.</p>
-                </div>
-                {detail.scoringPlan ? (
-                  <div className={styles.scoringPlanDisclosure}>
-                    <LabeledDisclosure title="Cosa valuta lo score" density={`Tesi ${thesisLabel(detail.scoringPlan.thesis)}`}>
-                      <ScoringPlanPanel plan={detail.scoringPlan} />
-                    </LabeledDisclosure>
-                  </div>
-                ) : null}
+                )}
               </div>
               <div className={styles.tabs} role="tablist" aria-label="Viste risultati">
                 <button type="button" role="tab" aria-selected={activeTab === 'results'} className={`${styles.tab} ${activeTab === 'results' ? styles.tabActive : ''}`} onClick={() => setActiveTab('results')}>
