@@ -243,6 +243,7 @@ export function IniziativaBoardPage() {
         const stored = loadCollapsed(id);
         setCollapsed(new Set(stored));
       }
+      return data;
     } catch (err) {
       setError(boardErrorLabel(err));
     } finally {
@@ -758,11 +759,19 @@ export function IniziativaBoardPage() {
         onClose={() => setDirectModalOpen(false)}
         onSubmit={createDirectCard}
         onOpenExisting={(companyKey) => {
-          const existing = board.cards.find((card) => card.companyKey === companyKey);
-          if (existing) {
+          const openCard = (cards: MAInitiativeCardView[]) => {
+            const existing = cards.find((card) => card.companyKey === companyKey);
+            if (!existing) return false;
             setDirectModalOpen(false);
             setSelectedCard(existing);
-          }
+            return true;
+          };
+          if (openCard(board.cards)) return;
+          void load().then((freshBoard) => {
+            if (!freshBoard || !openCard(freshBoard.cards)) {
+              toast('Card non ancora disponibile. Aggiorna la board e riprova.', 'warning');
+            }
+          });
         }}
       />
 
