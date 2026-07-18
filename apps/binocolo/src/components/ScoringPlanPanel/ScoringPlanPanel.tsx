@@ -65,7 +65,11 @@ export function ScoringPlanPanel({ plan }: { plan: MAScoringPlan }) {
         ) : (
           <p className={styles.empty}>Nessun segnale attivo per questa ricerca.</p>
         )}
-        <p className={styles.note}>Su una singola azienda i segnali senza dato non pesano: il peso si ridistribuisce tra quelli misurabili.</p>
+        <p className={styles.note}>
+          Su una singola azienda i segnali senza dato non pesano: il budget si ridistribuisce su quelli misurabili.
+          In cambio cala la copertura: senza segnali economici l&apos;azienda non è mai «In tesi», sotto metà
+          copertura va in coda di verifica, e a parità di punteggio viene prima la più documentata.
+        </p>
       </section>
 
       <section className={styles.section} aria-labelledby="scoring-plan-filtered">
