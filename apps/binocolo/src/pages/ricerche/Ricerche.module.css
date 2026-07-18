@@ -637,6 +637,19 @@
   transform: rotate(180deg);
 }
 
+.scoringPlanDisclosureDisabled summary {
+  cursor: default;
+}
+
+.scoringPlanDisclosureDisabled .scoringPlanToggle {
+  color: var(--color-text-faint);
+  opacity: 0.65;
+}
+
+.scoringPlanDisclosureDisabled .scoringPlanToggle svg {
+  transform: none;
+}
+
 .scoringPlanBody {
   padding: var(--space-2) var(--space-3) var(--space-3);
 }

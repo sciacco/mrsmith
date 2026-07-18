@@ -136,6 +136,7 @@ export function RicercaDetailPage() {
   const [deepLaunchError, setDeepLaunchError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [thesis, setThesis] = useState<MAThesis>('generico');
+  const [scoringPlanOpen, setScoringPlanOpen] = useState(false);
   const [associateFor, setAssociateFor] = useState<string | null>(null);
   const [associateDomain, setAssociateDomain] = useState('');
   const [noWebsiteItem, setNoWebsiteItem] = useState<MAVerificationQueueItem | null>(null);
@@ -687,7 +688,14 @@ export function RicercaDetailPage() {
                 </div>
                 <div className={styles.toolbar}>
                   <span className={styles.thesis}>Tesi</span>
-                  <select className={styles.select} value={thesis} onChange={(event) => setThesis(event.target.value as MAThesis)}>
+                  <select
+                    className={styles.select}
+                    value={thesis}
+                    onChange={(event) => {
+                      setThesis(event.target.value as MAThesis);
+                      setScoringPlanOpen(false);
+                    }}
+                  >
                     {THESIS_OPTIONS.map((item) => (
                       <option key={item.value} value={item.value}>{item.label}</option>
                     ))}
@@ -703,8 +711,22 @@ export function RicercaDetailPage() {
                   <Button variant="secondary" onClick={exportCSV}>CSV</Button>
                 </div>
                 {detail.scoringPlan ? (
-                  <details className={styles.scoringPlanDisclosure}>
-                    <summary>
+                  <details
+                    className={`${styles.scoringPlanDisclosure} ${detail.scoringPlan.thesis !== thesis ? styles.scoringPlanDisclosureDisabled : ''}`}
+                    open={scoringPlanOpen && detail.scoringPlan.thesis === thesis}
+                    onToggle={(event) => {
+                      if (detail.scoringPlan?.thesis === thesis) setScoringPlanOpen(event.currentTarget.open);
+                    }}
+                  >
+                    <summary
+                      aria-disabled={detail.scoringPlan.thesis !== thesis}
+                      onClick={(event) => {
+                        if (detail.scoringPlan?.thesis !== thesis) event.preventDefault();
+                      }}
+                      onKeyDown={(event) => {
+                        if (detail.scoringPlan?.thesis !== thesis && (event.key === 'Enter' || event.key === ' ')) event.preventDefault();
+                      }}
+                    >
                       <span className={styles.thesisGuidance}>
                         <strong>{detail.scoringPlan.thesis === thesis ? 'Tesi attuale' : 'Da applicare'} — {THESIS_META[thesis].label}.</strong>{' '}
                         {THESIS_META[thesis].description}
