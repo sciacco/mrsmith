@@ -1,4 +1,5 @@
 @import '@mrsmith/ui/src/themes/clean.css';
+@import './tokens.css';
 
 *,
 *::before,

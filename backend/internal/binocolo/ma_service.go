@@ -2000,17 +2000,23 @@ func (s *maService) setTargetRating(ctx context.Context, sessionID string, input
 	return nil
 }
 
-func openMAInitiativeCard(initiativeID, companyKey string, snapshot maCompanySnapshot, origin, sessionID string, existing *MAInitiativeCard) (MAInitiativeCard, string) {
+func openMAInitiativeCard(initiativeID, companyKey string, snapshot maCompanySnapshot, origin, sessionID, initialState string, existing *MAInitiativeCard) (MAInitiativeCard, string) {
+	state := maCardStateApprofondimento
+	if initialState != "" {
+		state = initialState
+	}
 	card := MAInitiativeCard{
 		InitiativeID: initiativeID, CompanyKey: companyKey, CompanyName: snapshot.CompanyName,
 		VATCode: snapshot.VATCode, TaxCode: snapshot.TaxCode, Province: snapshot.Province,
-		Origin: origin, State: maCardStateApprofondimento, CreatedFromSession: sessionID,
+		Origin: origin, State: state, CreatedFromSession: sessionID,
 	}
 	if existing == nil {
 		return card, maEventCardCreata
 	}
-	// A reopen always preserves the original card snapshot and provenance. The
+	// A reopen always lands on `approfondimento` (§1.1), ignoring any requested
+	// initialState, and preserves the original snapshot and provenance. The
 	// trigger belongs in the event payload, not in the card's origin.
+	card.State = maCardStateApprofondimento
 	card.CompanyName, card.VATCode, card.TaxCode, card.Province = existing.CompanyName, existing.VATCode, existing.TaxCode, existing.Province
 	card.Origin, card.CreatedFromSession = existing.Origin, existing.CreatedFromSession
 	return card, maEventCardRiaperta
@@ -2042,6 +2048,17 @@ func (s *maService) createDirectInitiativeCard(ctx context.Context, initiativeID
 		domain, ok = normalizeDomain(input.Domain)
 		if !ok {
 			return MACreateInitiativeCardResponse{}, fmt.Errorf("%w: domain", errMAStrategyInvalid)
+		}
+	}
+
+	// initialState (colonna di destinazione del "+ Aggiungi") va validato PRIMA
+	// della risoluzione snapshot, che per un VAT non in cache fa una probe esterna
+	// a pagamento (fetchDirectCardSnapshot).
+	initialState := ""
+	if strings.TrimSpace(input.InitialState) != "" {
+		initialState = strings.TrimSpace(input.InitialState)
+		if !validMACardState(initialState) || isMACardTerminalState(initialState) || initialState == maCardStateRimossa {
+			return MACreateInitiativeCardResponse{}, fmt.Errorf("%w: initialState", errMAStrategyInvalid)
 		}
 	}
 
@@ -2077,10 +2094,10 @@ func (s *maService) createDirectInitiativeCard(ctx context.Context, initiativeID
 	if err != nil {
 		return MACreateInitiativeCardResponse{}, err
 	}
-	if existing != nil && existing.State != maCardStateChiusa && existing.State != maCardStateRimossa {
+	if existing != nil && !isMACardTerminalState(existing.State) && existing.State != maCardStateRimossa {
 		return MACreateInitiativeCardResponse{}, &maCardAlreadyPresentError{CompanyKey: companyKey}
 	}
-	card, event := openMAInitiativeCard(initiativeID, companyKey, *snapshot, maCardOriginDirect, "", existing)
+	card, event := openMAInitiativeCard(initiativeID, companyKey, *snapshot, maCardOriginDirect, "", initialState, existing)
 	if err := s.store.UpsertMAInitiativeCard(ctx, card); err != nil {
 		return MACreateInitiativeCardResponse{}, err
 	}
@@ -2182,7 +2199,7 @@ func (s *maService) ensureInitiativeCard(ctx context.Context, initiativeID, sess
 	if err != nil {
 		return err
 	}
-	if existing != nil && existing.State != maCardStateChiusa && existing.State != maCardStateRimossa {
+	if existing != nil && !isMACardTerminalState(existing.State) && existing.State != maCardStateRimossa {
 		return nil
 	}
 
@@ -2199,7 +2216,7 @@ func (s *maService) ensureInitiativeCard(ctx context.Context, initiativeID, sess
 			}
 		}
 	}
-	card, event := openMAInitiativeCard(initiativeID, companyKey, snapshot, maCardOriginSearch, sessionID, existing)
+	card, event := openMAInitiativeCard(initiativeID, companyKey, snapshot, maCardOriginSearch, sessionID, "", existing)
 
 	if err := s.store.UpsertMAInitiativeCard(ctx, card); err != nil {
 		return err
@@ -2377,6 +2394,94 @@ func (s *maService) collisionInitiativeTitles(ctx context.Context, views []MAIni
 	return titles, nil
 }
 
+// getPipeline assembla la dashboard aggregata (KANBAN-V2-PLAN §7): le card di
+// TUTTE le iniziative attive, sola lettura. La decorazione a livello azienda
+// (deep-dive, collisioni, fatti registro) è batch UNA volta su tutte le chiavi;
+// provenienze ed evento più recente sono per-iniziativa (limitate dal numero di
+// iniziative attive, non dal numero di card → nessun N+1 sui join pesanti).
+func (s *maService) getPipeline(ctx context.Context) (MAPipelineResponse, error) {
+	if s.store == nil {
+		return MAPipelineResponse{}, errMAStoreUnavailable
+	}
+	initiatives, err := s.store.ListMAInitiatives(ctx, "active")
+	if err != nil {
+		return MAPipelineResponse{}, err
+	}
+
+	type initCards struct {
+		init  MAInitiativeSummary
+		cards []MAInitiativeCard
+	}
+	all := make([]initCards, 0, len(initiatives))
+	keySet := map[string]struct{}{}
+	titleByID := map[string]string{}
+	for _, init := range initiatives {
+		titleByID[init.ID] = init.Title
+		cards, err := s.store.ListMAInitiativeCards(ctx, init.ID)
+		if err != nil {
+			return MAPipelineResponse{}, err
+		}
+		all = append(all, initCards{init: init, cards: cards})
+		for _, c := range cards {
+			keySet[c.CompanyKey] = struct{}{}
+		}
+	}
+	allKeys := make([]string, 0, len(keySet))
+	for k := range keySet {
+		allKeys = append(allKeys, k)
+	}
+
+	deep, err := s.store.ListMADeepAnalysis(ctx, allKeys)
+	if err != nil {
+		return MAPipelineResponse{}, err
+	}
+	activeCards, err := s.store.ListMAActiveCardsByCompany(ctx, allKeys)
+	if err != nil {
+		return MAPipelineResponse{}, err
+	}
+	facts, err := s.store.ListMACompanyFactsActive(ctx, allKeys)
+	if err != nil {
+		return MAPipelineResponse{}, err
+	}
+
+	views := make([]MAPipelineCardView, 0)
+	for _, ic := range all {
+		keys := make([]string, 0, len(ic.cards))
+		for _, c := range ic.cards {
+			keys = append(keys, c.CompanyKey)
+		}
+		provenances, err := s.store.ListMACardProvenances(ctx, ic.init.ID, keys)
+		if err != nil {
+			return MAPipelineResponse{}, err
+		}
+		events, err := s.store.ListMALatestCardEvents(ctx, ic.init.ID, keys)
+		if err != nil {
+			return MAPipelineResponse{}, err
+		}
+		for _, card := range ic.cards {
+			view := MAInitiativeCardView{
+				MAInitiativeCard: card,
+				DossierStatus:    maCardDossierStatus(deep[card.CompanyKey]),
+				RegistryFacts:    facts[card.CompanyKey],
+				Provenances:      provenances[card.CompanyKey],
+				LastEvent:        events[card.CompanyKey],
+			}
+			for _, other := range activeCards[card.CompanyKey] {
+				if other.InitiativeID == ic.init.ID {
+					continue
+				}
+				view.Collisions = append(view.Collisions, MACardMarker{
+					InitiativeID:    other.InitiativeID,
+					InitiativeTitle: titleByID[other.InitiativeID],
+				})
+			}
+			views = append(views, MAPipelineCardView{MAInitiativeCardView: view, InitiativeTitle: ic.init.Title})
+		}
+	}
+
+	return MAPipelineResponse{Initiatives: initiatives, Cards: views}, nil
+}
+
 // maCardDossierStatus proietta lo stato del deep-dive (PRD §7) sul ciclo di
 // vita del bottone: assente/failed → none, queued/running → working, ready →
 // ready.
@@ -2440,28 +2545,52 @@ func (s *maService) requireOperationalInitiativeCard(ctx context.Context, initia
 	return *card, nil
 }
 
-// setCardState applica una transizione libera fra i 5 stati attivi (PRD
-// §4.4: nessun vincolo di sequenza). Chiusura e rimozione hanno endpoint
-// dedicati perché portano side-effect (esito, correzione stella).
-func (s *maService) setCardState(ctx context.Context, initiativeID, companyKey, state string, subject, email string) (MAInitiativeCard, error) {
+// setCardState applica una transizione libera fra i 7 stati non terminali
+// (KANBAN-V2-PLAN.md §1.1: nessun vincolo di sequenza). I terminali passano da
+// /close, `rimossa` da /remove, e l'uscita da un terminale solo da /reopen.
+func (s *maService) setCardState(ctx context.Context, initiativeID, companyKey, state string, recontactOn *string, subject, email string) (MAInitiativeCard, error) {
 	companyKey = normalizeMACompanyKey(companyKey)
-	if !validMACardState(state) || state == maCardStateChiusa || state == maCardStateRimossa {
+	// Solo i 7 non-terminali: i terminali passano da /close, `rimossa` da /remove.
+	if !validMACardState(state) || isMACardTerminalState(state) || state == maCardStateRimossa {
 		return MAInitiativeCard{}, fmt.Errorf("%w: state", errMAStrategyInvalid)
+	}
+	// recontact_on è informativa e valida solo verso `ricontattare`; ogni altra
+	// transizione azzera la data (chip solo in follow-up, vincolo non-CRM).
+	var recontact *time.Time
+	if state == maCardStateRicontattare && recontactOn != nil {
+		if raw := strings.TrimSpace(*recontactOn); raw != "" {
+			parsed, err := time.Parse("2006-01-02", raw)
+			if err != nil {
+				return MAInitiativeCard{}, fmt.Errorf("%w: recontactOn", errMAStrategyInvalid)
+			}
+			recontact = &parsed
+		}
 	}
 	card, err := s.requireOperationalInitiativeCard(ctx, initiativeID, companyKey)
 	if err != nil {
 		return MAInitiativeCard{}, err
 	}
+	// Da uno stato terminale (o `rimossa`) si esce SOLO via /reopen, che bonifica
+	// esito/closed_at/recontact: /state non deve generare una riga attiva sporca
+	// (stato attivo che trascina esito e closed_at della vecchia chiusura).
+	if isMACardTerminalState(card.State) || card.State == maCardStateRimossa {
+		return MAInitiativeCard{}, fmt.Errorf("%w: card terminale o rimossa, usare /reopen", errMAStrategyInvalid)
+	}
 	from := card.State
 	card.State = state
+	card.RecontactOn = recontact // set su `ricontattare`, azzerata altrove
 	if err := s.store.UpsertMAInitiativeCard(ctx, card); err != nil {
 		return MAInitiativeCard{}, err
+	}
+	payload := map[string]any{"from": from, "to": state}
+	if recontact != nil {
+		payload["recontactOn"] = recontact.Format("2006-01-02")
 	}
 	if err := s.store.InsertMATargetOutcome(ctx, MATargetOutcome{
 		InitiativeID:     initiativeID,
 		CompanyKey:       companyKey,
 		Event:            maEventStato,
-		Payload:          maTraceJSON(map[string]any{"from": from, "to": state}),
+		Payload:          maTraceJSON(payload),
 		CreatedBySubject: subject,
 		CreatedByEmail:   email,
 	}); err != nil {
@@ -2471,27 +2600,35 @@ func (s *maService) setCardState(ctx context.Context, initiativeID, companyKey, 
 }
 
 // maCardCloseRegisterableKinds is the closed set of fatti tipizzati che la
-// chiusura può proporre (PRD §4.4/§6): mai per non_idonea, mai un fatto fuori
-// da questi due.
+// chiusura può proporre (§6): solo per ko_target, mai un fatto fuori da questi due.
 var maCardCloseRegisterableKinds = map[string]bool{
 	"non_vende":            true,
 	"in_trattativa_altrui": true,
 }
 
-// closeCard chiude la card con un esito (PRD §4.4: attributo della chiusura,
-// non colonne separate) e opzionalmente propone il ponte tipizzato verso il
-// registro azienda per no_go/rimandata (§6). Un fatto già attivo non fa
-// fallire la chiusura (idempotenza, B4 passo 4).
+// closeCard applica una transizione TERMINALE (KANBAN-V2-PLAN.md §B1.3): State è
+// uno dei 3 terminali. WON è una conferma secca (nessun esito); i KO richiedono
+// un esito (testo libero, max 120). Il ponte tipizzato al registro azienda (§6)
+// è ammesso SOLO per ko_target e solo per non_vende/in_trattativa_altrui. Un
+// fatto già attivo non fa fallire la chiusura (idempotenza).
 func (s *maService) closeCard(ctx context.Context, initiativeID, companyKey string, input MACardCloseRequest, subject, email string) (MACardCloseResponse, error) {
 	companyKey = normalizeMACompanyKey(companyKey)
-	if !validMACardEsito(input.Esito) {
-		return MACardCloseResponse{}, fmt.Errorf("%w: esito", errMAStrategyInvalid)
+	if !isMACardTerminalState(input.State) {
+		return MACardCloseResponse{}, fmt.Errorf("%w: state terminale", errMAStrategyInvalid)
+	}
+	esito := cleanText(input.Esito, 120)
+	if input.State == maCardStateWon {
+		if esito != "" {
+			return MACardCloseResponse{}, fmt.Errorf("%w: WON non porta esito", errMAStrategyInvalid)
+		}
+	} else if esito == "" {
+		return MACardCloseResponse{}, fmt.Errorf("%w: esito obbligatorio per KO", errMAStrategyInvalid)
 	}
 	note := cleanText(input.Note, 500)
 	var registerKinds []string
 	if len(input.RegisterFacts) > 0 {
-		if input.Esito != maCardEsitoNoGo && input.Esito != maCardEsitoRimandata {
-			return MACardCloseResponse{}, fmt.Errorf("%w: registerFacts non ammesso per questo esito", errMAStrategyInvalid)
+		if input.State != maCardStateKOTarget {
+			return MACardCloseResponse{}, fmt.Errorf("%w: registerFacts ammesso solo per ko_target", errMAStrategyInvalid)
 		}
 		for _, kind := range input.RegisterFacts {
 			if !maCardCloseRegisterableKinds[kind] {
@@ -2504,8 +2641,9 @@ func (s *maService) closeCard(ctx context.Context, initiativeID, companyKey stri
 	if err != nil {
 		return MACardCloseResponse{}, err
 	}
-	card.State = maCardStateChiusa
-	card.Esito = input.Esito
+	card.State = input.State
+	card.Esito = esito
+	card.RecontactOn = nil // una chiusura esce dal follow-up
 	now := time.Now()
 	card.ClosedAt = &now
 	if err := s.store.UpsertMAInitiativeCard(ctx, card); err != nil {
@@ -2516,7 +2654,7 @@ func (s *maService) closeCard(ctx context.Context, initiativeID, companyKey stri
 		CompanyKey:       companyKey,
 		Event:            maEventChiusura,
 		Note:             note,
-		Payload:          maTraceJSON(map[string]any{"esito": input.Esito}),
+		Payload:          maTraceJSON(map[string]any{"stato": input.State, "esito": esito}),
 		CreatedBySubject: subject,
 		CreatedByEmail:   email,
 	}); err != nil {
@@ -2614,11 +2752,12 @@ func (s *maService) reopenCard(ctx context.Context, initiativeID, companyKey, su
 	if err != nil {
 		return MAInitiativeCard{}, err
 	}
-	if card.State != maCardStateChiusa && card.State != maCardStateRimossa {
-		return MAInitiativeCard{}, fmt.Errorf("%w: card non chiusa né rimossa", errMAStrategyInvalid)
+	if !isMACardTerminalState(card.State) && card.State != maCardStateRimossa {
+		return MAInitiativeCard{}, fmt.Errorf("%w: card non terminale né rimossa", errMAStrategyInvalid)
 	}
 	card.State = maCardStateApprofondimento
 	card.Esito = ""
+	card.RecontactOn = nil
 	card.ClosedAt = nil
 	if err := s.store.UpsertMAInitiativeCard(ctx, card); err != nil {
 		return MAInitiativeCard{}, err

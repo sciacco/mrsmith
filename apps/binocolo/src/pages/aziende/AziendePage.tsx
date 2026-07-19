@@ -5,23 +5,8 @@ import { Link } from 'react-router-dom';
 import { useApiClient } from '../../api/client';
 import type { MACompanySearchResponse, MACompanySearchRow } from '../../api/types';
 import { bucketLabel, dateTimeLabel, relativeDate } from '../ricerche/helpers';
+import { stateLabel, esitoLabel } from '../../lib/cardStates';
 import styles from './AziendePage.module.css';
-
-const cardStateLabels: Record<string, string> = {
-  da_contattare: 'Da contattare',
-  contattata: 'Contattata',
-  in_dialogo: 'In dialogo',
-  approfondimento: 'Approfondimento',
-  offerta: 'Offerta',
-};
-
-const outcomeLabels: Record<string, string> = {
-  conclusa: 'Conclusa',
-  no_go: 'No go',
-  non_idonea: 'Non idonea',
-  sfumata: 'Sfumata',
-  rimandata: 'Rimandata',
-};
 
 function statusPresentation(status: MACompanySearchRow['status']): {
   label: string;
@@ -31,16 +16,20 @@ function statusPresentation(status: MACompanySearchRow['status']): {
   switch (status.kind) {
     case 'working':
       return {
-        label: `In lavorazione · ${cardStateLabels[status.value ?? ''] ?? status.value ?? ''}`,
+        label: `In lavorazione · ${stateLabel(status.value ?? '')}`,
         detail: status.contextTitle,
         variant: 'accent',
       };
-    case 'closed':
+    case 'closed': {
+      // v2: value = stato terminale (won/ko_nostro/ko_target), reason = esito libero.
+      const terminal = stateLabel(status.value ?? '');
+      const esito = esitoLabel(status.reason ?? '');
       return {
-        label: `Lavorazione chiusa${status.value ? ` · ${outcomeLabels[status.value] ?? status.value}` : ''}`,
+        label: esito ? `${terminal} · ${esito}` : terminal,
         detail: status.contextTitle,
-        variant: 'neutral',
+        variant: status.value === 'won' ? 'success' : 'neutral',
       };
+    }
     case 'excluded':
       return { label: 'Esclusa dall’analista', detail: status.reason, variant: 'danger' };
     case 'preferred':

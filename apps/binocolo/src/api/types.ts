@@ -357,6 +357,7 @@ export interface MAInitiativeCard {
   origin: 'search' | 'direct';
   state: string;
   esito?: string;
+  recontactOn?: string;
   createdFromSession?: string;
   createdAt: string;
   updatedAt: string;
@@ -400,6 +401,17 @@ export interface MAInitiativeBoard {
   initiative: MAInitiative;
   sessions: MASessionSummary[];
   cards: MAInitiativeCardView[];
+}
+
+// Dashboard aggregata /pipeline (KANBAN-V2-PLAN §7): card di tutte le iniziative
+// attive, ognuna con il titolo dell'iniziativa (l'initiativeId è già sulla card).
+export interface MAPipelineCardView extends MAInitiativeCardView {
+  initiativeTitle: string;
+}
+
+export interface MAPipelineResponse {
+  initiatives: MAInitiativeSummary[];
+  cards: MAPipelineCardView[];
 }
 
 export interface MACreateInitiativeCardRequest {

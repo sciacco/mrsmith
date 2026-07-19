@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useApiClient } from '../../api/client';
 import type { MAInitiative, MAInitiativeListResponse, MAInitiativeSummary } from '../../api/types';
 import { relativeDate, errorLabel } from '../ricerche/helpers';
+import { MACROFASI, stateLabel } from '../../lib/cardStates';
 import styles from './Iniziative.module.css';
 
 type InitiativeVisibility = 'active' | 'archived' | 'deleted';
@@ -12,21 +13,6 @@ const visibilityOptions: { value: InitiativeVisibility; label: string }[] = [
   { value: 'active', label: 'Attive' },
   { value: 'archived', label: 'Archiviate' },
   { value: 'deleted', label: 'Cestino' },
-];
-
-const visibilityTitle: Record<InitiativeVisibility, string> = {
-  active: 'Attive',
-  archived: 'Archiviate',
-  deleted: 'Cestino',
-};
-
-const STATE_ORDER: Array<{ key: string; label: string }> = [
-  { key: 'approfondimento', label: 'Approfondimento' },
-  { key: 'da_contattare', label: 'Da contattare' },
-  { key: 'contattata', label: 'Contattata' },
-  { key: 'in_dialogo', label: 'In dialogo' },
-  { key: 'offerta', label: 'Offerta' },
-  { key: 'chiusa', label: 'Chiuse' },
 ];
 
 export function IniziativePage() {
@@ -234,13 +220,7 @@ export function IniziativePage() {
         </div>
       ) : null}
 
-      <section className={styles.panel} aria-labelledby="iniziative-title">
-        <div className={styles.panelHeader}>
-          <div>
-            <h2 id="iniziative-title">{visibilityTitle[visibility]}</h2>
-            <p className={styles.hint}>Gestisci visibilità e titolo delle iniziative.</p>
-          </div>
-        </div>
+      <section className={styles.panel} aria-label="Elenco iniziative">
         <div className={styles.tabs} role="tablist" aria-label="Filtri visibilità">
           {visibilityOptions.map((opt) => (
             <button
@@ -444,18 +424,19 @@ function IniziativaCard({
       </div>
       {item.description ? <p className={styles.cardDesc}>{item.description}</p> : null}
       <div className={styles.stateLine}>
-        {STATE_ORDER.map((state) => {
-          const count = item.counts[state.key] ?? 0;
+        {MACROFASI.map((macro) => {
+          const total = macro.states.reduce((sum, sk) => sum + (item.counts[sk] ?? 0), 0);
+          const detail = macro.states.map((sk) => `${stateLabel(sk)}: ${item.counts[sk] ?? 0}`).join(' · ');
           return (
             <button
-              key={state.key}
+              key={macro.key}
               type="button"
-              className={`${styles.statePill}${count > 0 ? ` ${styles.statePillActive}` : ''}`}
+              className={`${styles.statePill}${total > 0 ? ` ${styles.statePillActive}` : ''}`}
               onClick={onOpen}
               disabled={visibility === 'deleted'}
-              title={`Vai al board filtrato su ${state.label}`}
+              title={detail}
             >
-              {state.label} <b>{count}</b>
+              {macro.label} <b>{total}</b>
             </button>
           );
         })}

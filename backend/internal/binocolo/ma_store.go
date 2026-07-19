@@ -136,6 +136,7 @@ type maCompanySnapshot struct {
 type maCompanySearchHydration struct {
 	ActiveCardState      string
 	ActiveCardInitiative string
+	ClosedCardState      string
 	ClosedCardEsito      string
 	ClosedCardInitiative string
 	LatestRating         *int
@@ -2773,14 +2774,14 @@ func (s *SQLStore) GetMAInitiativeCard(ctx context.Context, initiativeID, compan
 	row := s.db.QueryRowContext(ctx, `
 SELECT initiative_id::text, company_key, company_name, vat_code, tax_code, province,
        origin, state, COALESCE(esito, ''), COALESCE(created_from_session::text, ''),
-       created_at, updated_at, closed_at
+       created_at, updated_at, closed_at, recontact_on
 FROM binocolo.ma_initiative_card
 WHERE initiative_id = $1::uuid AND company_key = $2
 `, initiativeID, companyKey)
 	var card MAInitiativeCard
-	var closedAt sql.NullTime
+	var closedAt, recontactOn sql.NullTime
 	if err := row.Scan(&card.InitiativeID, &card.CompanyKey, &card.CompanyName, &card.VATCode, &card.TaxCode,
-		&card.Province, &card.Origin, &card.State, &card.Esito, &card.CreatedFromSession, &card.CreatedAt, &card.UpdatedAt, &closedAt); err != nil {
+		&card.Province, &card.Origin, &card.State, &card.Esito, &card.CreatedFromSession, &card.CreatedAt, &card.UpdatedAt, &closedAt, &recontactOn); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -2788,6 +2789,9 @@ WHERE initiative_id = $1::uuid AND company_key = $2
 	}
 	if closedAt.Valid {
 		card.ClosedAt = &closedAt.Time
+	}
+	if recontactOn.Valid {
+		card.RecontactOn = &recontactOn.Time
 	}
 	return &card, nil
 }
@@ -2808,8 +2812,8 @@ func (s *SQLStore) UpsertMAInitiativeCard(ctx context.Context, card MAInitiative
 	if _, err := s.db.ExecContext(ctx, `
 INSERT INTO binocolo.ma_initiative_card (
     initiative_id, company_key, company_name, vat_code, tax_code, province, origin,
-    state, esito, created_from_session, created_at, updated_at, closed_at)
-VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, NULLIF($9, ''), $10::uuid, now(), now(), $11)
+    state, esito, created_from_session, created_at, updated_at, closed_at, recontact_on)
+VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, NULLIF($9, ''), $10::uuid, now(), now(), $11, $12)
 ON CONFLICT (initiative_id, company_key) DO UPDATE SET
     company_name = CASE WHEN EXCLUDED.company_name <> '' THEN EXCLUDED.company_name ELSE binocolo.ma_initiative_card.company_name END,
     vat_code     = CASE WHEN EXCLUDED.vat_code <> '' THEN EXCLUDED.vat_code ELSE binocolo.ma_initiative_card.vat_code END,
@@ -2819,9 +2823,10 @@ ON CONFLICT (initiative_id, company_key) DO UPDATE SET
     state        = EXCLUDED.state,
     esito        = EXCLUDED.esito,
     updated_at   = now(),
-    closed_at    = EXCLUDED.closed_at
+    closed_at    = EXCLUDED.closed_at,
+    recontact_on = EXCLUDED.recontact_on
 `, card.InitiativeID, card.CompanyKey, card.CompanyName, card.VATCode, card.TaxCode, card.Province,
-		card.Origin, card.State, card.Esito, createdFromSession, card.ClosedAt); err != nil {
+		card.Origin, card.State, card.Esito, createdFromSession, card.ClosedAt, card.RecontactOn); err != nil {
 		return fmt.Errorf("upsert ma initiative card: %w", err)
 	}
 	return nil
@@ -2835,7 +2840,7 @@ func (s *SQLStore) ListMAInitiativeCards(ctx context.Context, initiativeID strin
 	rows, err := s.db.QueryContext(ctx, `
 SELECT initiative_id::text, company_key, company_name, vat_code, tax_code, province,
        origin, state, COALESCE(esito, ''), COALESCE(created_from_session::text, ''),
-       created_at, updated_at, closed_at
+       created_at, updated_at, closed_at, recontact_on
 FROM binocolo.ma_initiative_card
 WHERE initiative_id = $1::uuid
 ORDER BY updated_at DESC
@@ -2847,13 +2852,16 @@ ORDER BY updated_at DESC
 	out := []MAInitiativeCard{}
 	for rows.Next() {
 		var card MAInitiativeCard
-		var closedAt sql.NullTime
+		var closedAt, recontactOn sql.NullTime
 		if err := rows.Scan(&card.InitiativeID, &card.CompanyKey, &card.CompanyName, &card.VATCode, &card.TaxCode,
-			&card.Province, &card.Origin, &card.State, &card.Esito, &card.CreatedFromSession, &card.CreatedAt, &card.UpdatedAt, &closedAt); err != nil {
+			&card.Province, &card.Origin, &card.State, &card.Esito, &card.CreatedFromSession, &card.CreatedAt, &card.UpdatedAt, &closedAt, &recontactOn); err != nil {
 			return nil, fmt.Errorf("scan ma initiative card: %w", err)
 		}
 		if closedAt.Valid {
 			card.ClosedAt = &closedAt.Time
+		}
+		if recontactOn.Valid {
+			card.RecontactOn = &recontactOn.Time
 		}
 		out = append(out, card)
 	}
@@ -2953,7 +2961,7 @@ SELECT c.initiative_id::text, c.company_key, c.company_name, c.vat_code, c.tax_c
 FROM binocolo.ma_initiative_card c
 JOIN binocolo.ma_initiative i ON i.id = c.initiative_id
 WHERE c.company_key IN (%s)
-  AND c.state NOT IN ('chiusa', 'rimossa')
+  AND c.state NOT IN ('won', 'ko_nostro', 'ko_target', 'rimossa')
   AND i.archived_at IS NULL
   AND i.deleted_at IS NULL
   AND i.purged_at IS NULL
@@ -3211,7 +3219,7 @@ SELECT
   ), '[]'::jsonb),
   COALESCE(last_context.company_key, identity.company_key),
   COALESCE(active_card.card_state, ''), COALESCE(active_card.context_title, ''),
-  COALESCE(closed_card.card_esito, ''), COALESCE(closed_card.context_title, ''),
+  COALESCE(closed_card.card_state, ''), COALESCE(closed_card.card_esito, ''), COALESCE(closed_card.context_title, ''),
   latest_rating.rating, COALESCE(latest_rating.reason, ''),
   latest_target.id, latest_target.run_id, COALESCE(latest_target.company_key, ''), COALESCE(latest_target.company_name, ''),
   COALESCE(latest_target.origin, ''), COALESCE(latest_target.vat_code, ''), COALESCE(latest_target.province, ''),
@@ -3260,14 +3268,15 @@ LEFT JOIN LATERAL (
   SELECT sr.card_state, sr.context_title
   FROM source_rows sr
   WHERE sr.stable_key = sk.stable_key AND sr.source_kind = 'iniziativa'
-    AND sr.card_state NOT IN ('chiusa', 'rimossa')
+    AND sr.card_state NOT IN ('won', 'ko_nostro', 'ko_target', 'rimossa')
   ORDER BY sr.seen_at DESC
   LIMIT 1
 ) active_card ON TRUE
 LEFT JOIN LATERAL (
-  SELECT sr.card_esito, sr.context_title
+  SELECT sr.card_state, sr.card_esito, sr.context_title
   FROM source_rows sr
-  WHERE sr.stable_key = sk.stable_key AND sr.source_kind = 'iniziativa' AND sr.card_state = 'chiusa'
+  WHERE sr.stable_key = sk.stable_key AND sr.source_kind = 'iniziativa'
+    AND sr.card_state IN ('won', 'ko_nostro', 'ko_target')
   ORDER BY sr.seen_at DESC
   LIMIT 1
 ) closed_card ON TRUE
@@ -3343,7 +3352,7 @@ ORDER BY sk.max_seen DESC, identity.company_name
 			&item.SessionCount, &item.InitiativeCount, &item.LastSeenAt,
 			&contextType, &contextID, &contextTitle, &companyKeysRaw, &item.PrimaryCompanyKey,
 			&hydration.ActiveCardState, &hydration.ActiveCardInitiative,
-			&hydration.ClosedCardEsito, &hydration.ClosedCardInitiative,
+			&hydration.ClosedCardState, &hydration.ClosedCardEsito, &hydration.ClosedCardInitiative,
 			&latestRating, &hydration.LatestRatingReason,
 			&targetID, &targetRunID, &targetCompanyKey, &targetCompanyName, &targetOrigin, &targetVAT,
 			&targetProvince, &targetTown, &targetAteco, &targetScore, &targetScoreVersion,
@@ -3415,8 +3424,11 @@ func resolveMACompanySearchStatus(row maCompanySearchHydration) MACompanySearchS
 	if row.ActiveCardState != "" {
 		return MACompanySearchStatus{Kind: "working", Value: row.ActiveCardState, ContextTitle: row.ActiveCardInitiative}
 	}
-	if row.ClosedCardEsito != "" {
-		return MACompanySearchStatus{Kind: "closed", Value: row.ClosedCardEsito, ContextTitle: row.ClosedCardInitiative}
+	if row.ClosedCardState != "" {
+		// v2: il "closed" porta lo STATO terminale come Value (won/ko_nostro/
+		// ko_target) e l'esito in Reason — più informativo dell'esito solo (che
+		// per WON è vuoto). KANBAN-V2-PLAN.md §B1.6.
+		return MACompanySearchStatus{Kind: "closed", Value: row.ClosedCardState, Reason: row.ClosedCardEsito, ContextTitle: row.ClosedCardInitiative}
 	}
 	if row.LatestRating != nil {
 		if *row.LatestRating == -1 {

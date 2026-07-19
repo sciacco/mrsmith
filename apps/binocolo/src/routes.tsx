@@ -9,6 +9,7 @@ import { RicercaDetailPage } from './pages/ricerche/RicercaDetailPage';
 import { TargetInspectorPage } from './pages/ricerche/TargetInspectorPage';
 import { IniziativePage } from './pages/iniziative/IniziativePage';
 import { IniziativaBoardPage } from './pages/iniziative/IniziativaBoardPage';
+import { PipelinePage } from './pages/pipeline/PipelinePage';
 import { AziendePage } from './pages/aziende/AziendePage';
 import { SchedaAziendaPage } from './pages/aziende/SchedaAziendaPage';
 
@@ -20,7 +21,8 @@ function CardDossierRedirect() {
 }
 
 export const routes: RouteObject[] = [
-  { index: true, element: <Navigate to="/iniziative" replace /> },
+  { index: true, element: <Navigate to="/pipeline" replace /> },
+  { path: 'pipeline', element: <PipelinePage /> },
   { path: 'ricerche', element: <RicerchePage /> },
   { path: 'ricerche/nuova', element: <NuovaRicercaPage /> },
   { path: 'ricerche/:id', element: <RicercaDetailPage /> },
@@ -34,5 +36,5 @@ export const routes: RouteObject[] = [
   { path: 'ricerca-web', element: <WebSearchPage /> },
   { path: 'config', element: <ConfigPage /> },
   { path: 'test', element: <TestPage /> },
-  { path: '*', element: <Navigate to="/iniziative" replace /> },
+  { path: '*', element: <Navigate to="/pipeline" replace /> },
 ];

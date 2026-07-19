@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useApiClient } from '../../api/client';
+import { stateLabel, esitoLabel, isTerminalState } from '../../lib/cardStates';
 import type {
   CandidateMatchAnalysisResponse,
   MACompanyOverview,
@@ -49,16 +50,9 @@ type OwnershipSummary =
 
 const SPINE_IDS = ['scheda-identita-title', 'scheda-deep-title', 'scheda-controllo-title', 'scheda-storia-title'] as const;
 
-const CARD_STATE_LABELS: Record<string, string> = {
-  da_contattare: 'Da contattare',
-  contattata: 'Contattata',
-  in_dialogo: 'In dialogo',
-  approfondimento: 'Approfondimento',
-  offerta: 'Offerta',
-  chiusa: 'Chiusa',
-  rimossa: 'Rimossa',
-};
-
+// Etichette degli EVENTI del diario (storico append-only, mai riscritto). Lo
+// stato e l'esito della card usano invece il dominio condiviso (stateLabel/
+// esitoLabel), che copre anche le chiavi legacy dei payload storici.
 const OUTCOME_LABELS: Record<string, string> = {
   contattato: 'Contattata',
   buon_lead: 'Buon lead',
@@ -1023,7 +1017,7 @@ function CardsSection({ cards, companyKey, activeInitiativeId }: { cards: MAComp
     enabled: pickerOpen,
     queryFn: () => api.get<MAInitiativeListResponse>('/binocolo/v1/ma/initiatives'),
   });
-  const existingIds = new Set(cards.filter((card) => card.state !== 'chiusa' && card.state !== 'rimossa').map((card) => card.initiativeId));
+  const existingIds = new Set(cards.filter((card) => !isTerminalState(card.state) && card.state !== 'rimossa').map((card) => card.initiativeId));
   const available = (initiatives.data?.items ?? []).filter((initiative) => !existingIds.has(initiative.id));
   const sorted = [...cards].sort((a, b) => Number(b.initiativeId === activeInitiativeId) - Number(a.initiativeId === activeInitiativeId));
 
@@ -1062,8 +1056,8 @@ function CardsSection({ cards, companyKey, activeInitiativeId }: { cards: MAComp
                 {card.origin === 'direct' ? <span className={styles.statusPill}>Diretta</span> : null}
               </div>
               <dl>
-                <div><dt>Stato</dt><dd>{CARD_STATE_LABELS[card.state] ?? card.state}</dd></div>
-                <div><dt>Esito</dt><dd>{card.esito ? OUTCOME_LABELS[card.esito] ?? card.esito : 'n.d.'}</dd></div>
+                <div><dt>Stato</dt><dd>{stateLabel(card.state)}</dd></div>
+                <div><dt>Esito</dt><dd>{card.esito ? esitoLabel(card.esito) : 'n.d.'}</dd></div>
                 {card.lastEvent ? <div><dt>Ultimo evento</dt><dd>{card.lastEvent}</dd></div> : null}
                 <div><dt>Aggiornata</dt><dd>{dateLabel(card.updatedAt)}</dd></div>
               </dl>

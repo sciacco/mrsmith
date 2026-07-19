@@ -1,0 +1,76 @@
+/* ============================================================================
+   Binocolo — token app-level (estensione del tema clean, UI-UX §18)
+   ----------------------------------------------------------------------------
+   Rampa cromatica del funnel Kanban v2 (direzione "A · rampa termica", ratificata
+   al gate G0 il 2026-07-18). Ogni stato ha:
+     -base : colore pieno per dot / bordo colonna / bordo-sinistro card / tile   (NON testo su chiaro)
+     -tint : sfondo tinto per bande/colonne/chip di stato
+     -text : variante scura AA per il testo (label, conteggi) su -tint e su bianco
+
+   AA verificato (WCAG 2.1, testo normale ≥4.5:1) — testo -text su -tint / su #fff:
+     approfondimento 6.59 / 7.56   da-contattare 7.15 / 8.72   primo-contatto 8.06 / 9.93
+     primo-incontro  7.57 / 8.98   nda           7.08 / 8.24   loi            6.37 / 7.09
+     ricontattare    6.38 / 7.31   won           6.78 / 7.68   ko-nostro      6.68 / 8.02
+     ko-target       6.80 / 8.31
+   Tile numero macrofase (bianco su -base): origination 5.93 · engagement 7.10 · followup 5.18 · esito 7.58.
+   NB: il conteggio colonna NON usa mai #fff su -base (fallirebbe AA sugli hue chiari):
+       usa -text su -tint (§6.3.3 "grandi e scuri").
+
+   Candidato di sistema (UI-UX v3): il metodo "un colore per stadio del funnel" è
+   promuovibile; la promozione a packages/ui/src/themes/clean.css è fuori da questo
+   change (decisione post-GF, piano §12). Qui resta app-level.
+   ============================================================================ */
+:root[data-theme='clean'] {
+  /* ── Canvas board (più profondo delle colonne, §6.3.2) ── */
+  --kanban-canvas: #e8ecf4;
+
+  /* ── Origination (freddo: ciano → blu → indaco) ── */
+  --kanban-approfondimento-base: #0284c7;
+  --kanban-approfondimento-tint: #e0f2fe;
+  --kanban-approfondimento-text: #075985;
+
+  --kanban-da-contattare-base: #2563eb;
+  --kanban-da-contattare-tint: #dbeafe;
+  --kanban-da-contattare-text: #1e40af;
+
+  --kanban-primo-contatto-base: #4f46e5;
+  --kanban-primo-contatto-tint: #e0e7ff;
+  --kanban-primo-contatto-text: #3730a3;
+
+  /* ── Engagement (caldo: viola → fuchsia → ambra) — salto di hue = confine di fase ── */
+  --kanban-primo-incontro-base: #7c3aed;
+  --kanban-primo-incontro-tint: #ede9fe;
+  --kanban-primo-incontro-text: #5b21b6;
+
+  --kanban-nda-base: #c026d3;
+  --kanban-nda-tint: #fae8ff;
+  --kanban-nda-text: #86198f;
+
+  --kanban-loi-base: #d97706;
+  --kanban-loi-tint: #fef3c7;
+  --kanban-loi-text: #92400e;
+
+  /* ── Follow-up (arancio) ── */
+  --kanban-ricontattare-base: #ea580c;
+  --kanban-ricontattare-tint: #ffedd5;
+  --kanban-ricontattare-text: #9a3412;
+
+  /* ── Esito (verde WON · rossi distinti KO) ── */
+  --kanban-won-base: #059669;
+  --kanban-won-tint: #d1fae5;
+  --kanban-won-text: #065f46;
+
+  --kanban-ko-nostro-base: #e11d48;
+  --kanban-ko-nostro-tint: #ffe4e6;
+  --kanban-ko-nostro-text: #9f1239;
+
+  --kanban-ko-target-base: #dc2626;
+  --kanban-ko-target-tint: #fee2e2;
+  --kanban-ko-target-text: #991b1b;
+
+  /* ── Colori di macrofase (header colonne in vista Macrofasi) ── */
+  --kanban-macro-origination: #0369a1;
+  --kanban-macro-engagement: #6d28d9;
+  --kanban-macro-followup: #c2410c;
+  --kanban-macro-esito: #475569;
+}

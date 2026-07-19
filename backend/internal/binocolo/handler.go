@@ -117,6 +117,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("GET /binocolo/v1/ma/catalog/provinces", h.handleListMAProvinceCatalog)
 	handle("PUT /binocolo/v1/ma/parameters", h.handleUpdateMAParameter)
 	handle("GET /binocolo/v1/ma/initiatives", h.handleListMAInitiatives)
+	handle("GET /binocolo/v1/ma/pipeline", h.handleGetMAPipeline)
 	handle("POST /binocolo/v1/ma/initiatives", h.handleCreateMAInitiative)
 	handle("PATCH /binocolo/v1/ma/initiatives/{id}", h.handleUpdateMAInitiative)
 	handle("POST /binocolo/v1/ma/initiatives/{id}/archive", h.handleArchiveMAInitiative)
@@ -574,6 +575,17 @@ func (h *Handler) handleGetMAInitiativeBoard(w http.ResponseWriter, r *http.Requ
 	httputil.JSON(w, http.StatusOK, board)
 }
 
+// handleGetMAPipeline serve la dashboard aggregata (sola lettura) di tutte le
+// iniziative attive (KANBAN-V2-PLAN §B2).
+func (h *Handler) handleGetMAPipeline(w http.ResponseWriter, r *http.Request) {
+	pipeline, err := h.ma.getPipeline(r.Context())
+	if err != nil {
+		h.maFailure(w, r, "ma_pipeline_get", err)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, pipeline)
+}
+
 func (h *Handler) handleCreateMAInitiativeCard(w http.ResponseWriter, r *http.Request) {
 	id, ok := maInitiativeID(w, r)
 	if !ok {
@@ -648,7 +660,7 @@ func (h *Handler) handleSetMACardState(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	subject, email := companySearchRefreshActor(r.Context())
-	card, err := h.ma.setCardState(r.Context(), id, companyKey, body.State, subject, email)
+	card, err := h.ma.setCardState(r.Context(), id, companyKey, body.State, body.RecontactOn, subject, email)
 	if err != nil {
 		h.maFailure(w, r, "ma_card_state_set", err, "initiative_id", id, "company_key", companyKey)
 		return

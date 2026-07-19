@@ -300,48 +300,60 @@ const (
 	maCardOriginSearch = "search"
 	maCardOriginDirect = "direct"
 
-	// Stati della card di lavorazione (ma_initiative_card, migrazione 088,
-	// INIZIATIVE-PRD.md §4.4). "rimossa" non è mai una colonna del board.
-	maCardStateDaContattare    = "da_contattare"
-	maCardStateContattata      = "contattata"
-	maCardStateInDialogo       = "in_dialogo"
+	// Stati della card di lavorazione v2 (ma_initiative_card, migrazione 112,
+	// KANBAN-V2-PLAN.md §1.1), in ordine di funnel: 7 non-terminali + 3
+	// terminali. "rimossa" non è mai una colonna del board (errore di triage,
+	// mai un verdetto). L'esito è testo libero (vocabolario solo suggerito lato
+	// applicativo), obbligatorio non-vuoto solo per i KO.
 	maCardStateApprofondimento = "approfondimento"
-	maCardStateOfferta         = "offerta"
-	maCardStateChiusa          = "chiusa"
+	maCardStateDaContattare    = "da_contattare"
+	maCardStatePrimoContatto   = "primo_contatto"
+	maCardStatePrimoIncontro   = "primo_incontro"
+	maCardStateNDA             = "nda"
+	maCardStateLOI             = "loi"
+	maCardStateRicontattare    = "ricontattare"
+	maCardStateWon             = "won"
+	maCardStateKONostro        = "ko_nostro"
+	maCardStateKOTarget        = "ko_target"
 	maCardStateRimossa         = "rimossa"
-
-	// Esiti di chiusura della card (PRD §4.4): attributo della chiusura, non
-	// colonne separate.
-	maCardEsitoConclusa  = "conclusa"
-	maCardEsitoNoGo      = "no_go"
-	maCardEsitoNonIdonea = "non_idonea"
-	maCardEsitoSfumata   = "sfumata"
-	maCardEsitoRimandata = "rimandata"
 )
 
-// maCardActiveStates elenca gli stati non terminali di una card: usati per il
-// filtro "attiva" delle collisioni cross-iniziativa (PRD §6.1) e dei badge
-// nelle proiezioni (B5).
+// maCardActiveStates elenca i 7 stati non terminali (ordine di funnel): usati
+// per il filtro "attiva" delle collisioni cross-iniziativa (PRD §6.1) e dei
+// badge nelle proiezioni.
 var maCardActiveStates = []string{
-	maCardStateDaContattare,
-	maCardStateContattata,
-	maCardStateInDialogo,
 	maCardStateApprofondimento,
-	maCardStateOfferta,
+	maCardStateDaContattare,
+	maCardStatePrimoContatto,
+	maCardStatePrimoIncontro,
+	maCardStateNDA,
+	maCardStateLOI,
+	maCardStateRicontattare,
 }
 
-func validMACardState(state string) bool {
+// maCardTerminalStates elenca i 3 stati terminali (Esito): non sono colonne
+// della board attiva e si raggiungono dall'endpoint di chiusura, non da
+// setCardState.
+var maCardTerminalStates = []string{
+	maCardStateWon,
+	maCardStateKONostro,
+	maCardStateKOTarget,
+}
+
+func isMACardTerminalState(state string) bool {
 	switch state {
-	case maCardStateDaContattare, maCardStateContattata, maCardStateInDialogo, maCardStateApprofondimento, maCardStateOfferta, maCardStateChiusa, maCardStateRimossa:
+	case maCardStateWon, maCardStateKONostro, maCardStateKOTarget:
 		return true
 	default:
 		return false
 	}
 }
 
-func validMACardEsito(esito string) bool {
-	switch esito {
-	case maCardEsitoConclusa, maCardEsitoNoGo, maCardEsitoNonIdonea, maCardEsitoSfumata, maCardEsitoRimandata:
+func validMACardState(state string) bool {
+	switch state {
+	case maCardStateApprofondimento, maCardStateDaContattare, maCardStatePrimoContatto,
+		maCardStatePrimoIncontro, maCardStateNDA, maCardStateLOI, maCardStateRicontattare,
+		maCardStateWon, maCardStateKONostro, maCardStateKOTarget, maCardStateRimossa:
 		return true
 	default:
 		return false
@@ -435,6 +447,7 @@ type MAInitiativeCard struct {
 	Origin             string     `json:"origin"`
 	State              string     `json:"state"`
 	Esito              string     `json:"esito,omitempty"`
+	RecontactOn        *time.Time `json:"recontactOn,omitempty"`
 	CreatedFromSession string     `json:"createdFromSession,omitempty"`
 	CreatedAt          time.Time  `json:"createdAt"`
 	UpdatedAt          time.Time  `json:"updatedAt"`
@@ -623,12 +636,30 @@ type MAInitiativeBoard struct {
 	Cards      []MAInitiativeCardView `json:"cards"`
 }
 
+// MAPipelineCardView is a board card decorated with its owning initiative title
+// (the card already carries initiativeId). Aggregate dashboard (KANBAN-V2-PLAN §7).
+type MAPipelineCardView struct {
+	MAInitiativeCardView
+	InitiativeTitle string `json:"initiativeTitle"`
+}
+
+// MAPipelineResponse is GET /ma/pipeline: cards of ALL active initiatives (same
+// company in N initiatives = N cards), read-only. The collision marker is the
+// primary anti-double-contact signal across the cards.
+type MAPipelineResponse struct {
+	Initiatives []MAInitiativeSummary `json:"initiatives"`
+	Cards       []MAPipelineCardView  `json:"cards"`
+}
+
 // MACreateInitiativeCardRequest is shared by the board (VAT + optional domain)
-// and company sheet (known companyKey) direct-card entry points.
+// and company sheet (known companyKey) direct-card entry points. InitialState
+// lets the "+ Aggiungi azienda" per-column action land the card in the target
+// column (only non-terminal states; default approfondimento).
 type MACreateInitiativeCardRequest struct {
-	VATCode    string `json:"vatCode,omitempty"`
-	CompanyKey string `json:"companyKey,omitempty"`
-	Domain     string `json:"domain,omitempty"`
+	VATCode      string `json:"vatCode,omitempty"`
+	CompanyKey   string `json:"companyKey,omitempty"`
+	Domain       string `json:"domain,omitempty"`
+	InitialState string `json:"initialState,omitempty"`
 }
 
 type MACreateInitiativeCardResponse struct {
@@ -636,19 +667,23 @@ type MACreateInitiativeCardResponse struct {
 	DomainVerification string           `json:"domainVerification,omitempty"`
 }
 
-// MACardStateRequest drives POST .../cards/{companyKey}/state (B4 passo 3):
-// free transitions among the 5 active states (chiusa/rimossa go through
-// their dedicated endpoints).
+// MACardStateRequest drives POST .../cards/{companyKey}/state: free transitions
+// among the 7 non-terminal states (terminals go through /close, rimossa through
+// /remove). RecontactOn (ISO date) is valid only toward `ricontattare`; a
+// transition away from `ricontattare` clears the date.
 type MACardStateRequest struct {
-	State string `json:"state"`
+	State       string  `json:"state"`
+	RecontactOn *string `json:"recontactOn,omitempty"`
 }
 
-// MACardCloseRequest drives POST .../cards/{companyKey}/close (B4 passo 4):
-// the esito is the attribute of the closure (PRD §4.4); RegisterFacts is the
-// typed bridge to the company registry (§6), allowed only for esito
-// no_go/rimandata and only for non_vende/in_trattativa_altrui.
+// MACardCloseRequest drives POST .../cards/{companyKey}/close as a terminal
+// transition (KANBAN-V2-PLAN.md §B1.3): State is the terminal (won|ko_nostro|
+// ko_target); Esito is free text, required for the KOs and forbidden for WON;
+// RegisterFacts is the typed bridge to the company registry (§6), allowed only
+// for ko_target and only for non_vende/in_trattativa_altrui.
 type MACardCloseRequest struct {
-	Esito         string   `json:"esito"`
+	State         string   `json:"state"`
+	Esito         string   `json:"esito,omitempty"`
 	Note          string   `json:"note,omitempty"`
 	RegisterFacts []string `json:"registerFacts,omitempty"`
 }

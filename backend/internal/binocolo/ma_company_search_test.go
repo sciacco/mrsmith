@@ -52,25 +52,38 @@ func TestResolveMACompanySearchStatus(t *testing.T) {
 
 	t.Run("active card wins over everything", func(t *testing.T) {
 		status := resolveMACompanySearchStatus(maCompanySearchHydration{
-			ActiveCardState:      "in_dialogo",
+			ActiveCardState:      "primo_incontro",
 			ActiveCardInitiative: "Roll-up MSP",
-			ClosedCardEsito:      "no_go",
+			ClosedCardState:      "ko_target",
+			ClosedCardEsito:      "non_vende",
 			LatestRating:         &excluded,
 			LatestTarget:         inThesis,
 		})
-		if status.Kind != "working" || status.Value != "in_dialogo" || status.ContextTitle != "Roll-up MSP" {
+		if status.Kind != "working" || status.Value != "primo_incontro" || status.ContextTitle != "Roll-up MSP" {
 			t.Fatalf("unexpected status: %+v", status)
 		}
 	})
 
 	t.Run("closed card beats rating and appearance", func(t *testing.T) {
 		status := resolveMACompanySearchStatus(maCompanySearchHydration{
-			ClosedCardEsito:      "no_go",
+			ClosedCardState:      "ko_target",
+			ClosedCardEsito:      "non_vende",
 			ClosedCardInitiative: "Roll-up MSP",
 			LatestRating:         &excluded,
 			LatestTarget:         inThesis,
 		})
-		if status.Kind != "closed" || status.Value != "no_go" || status.ContextTitle != "Roll-up MSP" {
+		if status.Kind != "closed" || status.Value != "ko_target" || status.Reason != "non_vende" || status.ContextTitle != "Roll-up MSP" {
+			t.Fatalf("unexpected status: %+v", status)
+		}
+	})
+
+	t.Run("won closes without esito", func(t *testing.T) {
+		status := resolveMACompanySearchStatus(maCompanySearchHydration{
+			ClosedCardState:      "won",
+			ClosedCardInitiative: "Roll-up MSP",
+			LatestRating:         &preferred,
+		})
+		if status.Kind != "closed" || status.Value != "won" || status.Reason != "" || status.ContextTitle != "Roll-up MSP" {
 			t.Fatalf("unexpected status: %+v", status)
 		}
 	})

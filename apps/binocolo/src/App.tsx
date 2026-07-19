@@ -6,6 +6,10 @@ import { useOptionalAuth } from './hooks/useOptionalAuth';
 
 const navGroups: TabGroup[] = [
   {
+    label: 'Pipeline',
+    items: [{ label: 'Pipeline', path: '/pipeline' }],
+  },
+  {
     label: 'Iniziative',
     items: [{ label: 'Iniziative', path: '/iniziative' }],
   },

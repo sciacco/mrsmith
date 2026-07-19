@@ -1,0 +1,887 @@
+<meta charset="utf-8">
+<title>Binocolo — Wireframe G0 · Kanban v2</title>
+<style>
+  :root{
+    /* doc chrome */
+    --ink:#0f172a; --ink-2:#475569; --muted:#94a3b8; --faint:#cbd5e1;
+    --border:#e2e8f0; --border-soft:#f0f3f7;
+    --accent:#635bff; --accent-2:#7c6cff;
+    --accent-subtle:rgba(99,91,255,.08); --accent-muted:rgba(99,91,255,.15); --accent-glow:rgba(99,91,255,.25);
+    --danger:#ef4444; --danger-strong:#b91c1c; --danger-subtle:rgba(239,68,68,.08);
+    --warn:#f59e0b; --warn-strong:#b45309; --warn-subtle:rgba(245,158,11,.12);
+    --ok:#10b981; --ok-bg:#ecfdf5; --ok-strong:#047857;
+    --info-strong:#075985; --info-subtle:rgba(14,116,144,.10);
+    --doc-bg:#eef1f6; --doc-ink:#1e293b;
+    --sans:"DM Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    --mono:"JetBrains Mono","SF Mono",ui-monospace,Menlo,monospace;
+    --r-sm:6px; --r-md:10px; --r-lg:14px; --r-xl:20px;
+
+    /* motion tokens (clean theme) */
+    --ease-out:cubic-bezier(0.16,1,0.3,1);
+    --ease-spring:cubic-bezier(0.34,1.56,0.64,1);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--doc-bg);color:var(--doc-ink);font:400 15px/1.55 var(--sans)}
+
+  /* ---------- review-document chrome ---------- */
+  .doc{max-width:1240px;margin:0 auto;padding:40px 24px 120px}
+  .doc-head .eyebrow{font:600 11px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+  .doc-head h1{margin:10px 0 6px;font-size:1.9rem;font-weight:700;letter-spacing:-.04em;color:var(--ink);text-wrap:balance}
+  .doc-head p{margin:0 0 4px;max-width:78ch;color:var(--ink-2)}
+  .callout{margin:20px 0 0;padding:14px 18px;border:1px solid var(--border);border-left:3px solid var(--danger);
+    border-radius:var(--r-md);background:#fff;font-size:.875rem;color:var(--ink-2)}
+  .callout b{color:var(--ink)}
+  .callout.rec{border-left-color:var(--ok)}
+  .callout.rec b{color:var(--ok-strong)}
+
+  .statenav{position:sticky;top:0;z-index:40;display:flex;gap:8px;flex-wrap:wrap;padding:12px 0;margin:22px 0 8px;
+    background:linear-gradient(180deg,var(--doc-bg) 80%,rgba(238,241,246,0))}
+  .statenav a{font:600 12px/1 var(--mono);letter-spacing:.04em;text-decoration:none;color:var(--ink-2);
+    padding:8px 12px;border:1px solid var(--border);border-radius:999px;background:#fff}
+  .statenav a:hover{border-color:var(--accent);color:var(--accent)}
+
+  section.blk{margin:60px 0 0}
+  .blk-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  .blk-head .sid{font:700 12px/1 var(--mono);letter-spacing:.1em;color:#fff;background:var(--ink);padding:6px 10px;border-radius:6px}
+  .blk-head h2{margin:0;font-size:1.3rem;font-weight:700;letter-spacing:-.02em;color:var(--ink)}
+  .blk-head .ref{font:500 11px/1 var(--mono);color:var(--muted)}
+  .blk-intent{margin:10px 0 20px;max-width:82ch;color:var(--ink-2);font-size:.9rem}
+  .blk-intent code{font:600 .85em/1 var(--mono);background:#fff;border:1px solid var(--border-soft);border-radius:5px;padding:2px 5px;color:var(--ink)}
+
+  .m{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;
+    background:var(--ink);color:#fff;font:700 10.5px/1 var(--mono);vertical-align:2px;flex:none}
+  .notes{margin:18px 0 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:10px 26px;padding:0;list-style:none}
+  .notes li{display:flex;gap:9px;font-size:.8125rem;color:var(--ink-2)}
+  .notes li .m{margin-top:1px}
+  .notes li b{color:var(--ink);font-weight:600}
+  .notes li .ref{font:500 10.5px/1.5 var(--mono);color:var(--muted);white-space:nowrap}
+
+  .frame{background:#fff;border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;
+    box-shadow:0 18px 40px -22px rgba(15,23,42,.28);margin-top:8px}
+  .frame-bar{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border-soft);background:#fbfcfe}
+  .frame-bar .dots{display:flex;gap:5px}
+  .frame-bar .dots i{width:9px;height:9px;border-radius:50%;background:var(--faint)}
+  .frame-bar .url{font:500 11px/1 var(--mono);color:var(--muted);background:#fff;border:1px solid var(--border-soft);border-radius:999px;padding:5px 12px}
+  .frame-bar .tag{margin-left:auto;font:600 10px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+
+  .exp-caption{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:34px 0 10px}
+  .exp-caption .lab{font:700 12px/1 var(--mono);letter-spacing:.06em;color:#fff;background:var(--accent);padding:6px 10px;border-radius:6px}
+  .exp-caption .lab.b{background:#4338ca}
+  .exp-caption .lab.c{background:#334155}
+  .exp-caption h3{margin:0;font-size:1.05rem;font-weight:700;color:var(--ink)}
+  .exp-caption .pill{font:600 10px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;padding:5px 9px;border-radius:999px;border:1px solid}
+  .exp-caption .pill.rec{color:var(--ok-strong);border-color:var(--ok);background:var(--ok-bg)}
+  .exp-note{margin:8px 0 0;font-size:.8125rem;color:var(--ink-2);max-width:84ch}
+  .exp-note .gen{color:var(--accent);font-weight:600}
+
+  .compareGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;align-items:start}
+  .capsule{background:#fff;border:1px solid var(--border);border-radius:var(--r-md);padding:14px 16px}
+  .capsule h4{margin:0 0 8px;font-size:.8125rem;font-weight:700;color:var(--ink)}
+  .capsule ul{margin:0;padding-left:18px;font-size:.8125rem;color:var(--ink-2)}
+  .capsule li{margin:3px 0}
+
+  table.spec{width:100%;border-collapse:collapse;margin-top:12px;font-size:.8125rem;background:#fff;
+    border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden}
+  table.spec th{text-align:left;font:600 10.5px/1.3 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);
+    background:#fbfcfe;padding:10px 12px;border-bottom:1px solid var(--border)}
+  table.spec td{padding:10px 12px;border-bottom:1px solid var(--border-soft);color:var(--ink-2);vertical-align:top}
+  table.spec tr:last-child td{border-bottom:none}
+  table.spec td b{color:var(--ink);font-weight:600}
+  table.spec kbd{font:600 11px/1 var(--mono);background:var(--ink);color:#fff;border-radius:5px;padding:3px 6px;white-space:nowrap}
+  table.spec code{font:500 11.5px/1 var(--mono);color:var(--accent)}
+
+  /* =========================================================================
+     BOARD v2 — shared component styles.
+     Ogni stato colora sé stesso via --c (base), --tint (sfondo), --strong (testo AA).
+     Le esplorazioni (.rampA/.monoB/.semC) ridefiniscono queste 3 var per-stato.
+     ========================================================================= */
+  .board{--canvas:#e8ecf4;background:var(--canvas);padding:18px;font-family:var(--sans)}
+
+  .b-top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+  .b-title{display:flex;flex-direction:column;gap:2px}
+  .b-title .kick{font:600 10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2)}
+  .b-title h3{margin:0;font-size:1.15rem;font-weight:700;letter-spacing:-.02em;color:var(--ink)}
+  .viewmatrix{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+  .seg{display:flex;background:#fff;border:1px solid var(--border);border-radius:999px;padding:3px;box-shadow:var(--shadow-xs)}
+  .seg button{border:none;background:none;font:600 12px/1 var(--sans);color:var(--ink-2);padding:7px 13px;border-radius:999px;cursor:pointer}
+  .seg button.on{background:var(--accent);color:#fff}
+  .b-search{display:flex;align-items:center;gap:7px;background:#fff;border:1.5px solid var(--border);border-radius:999px;padding:8px 14px;min-width:200px}
+  .b-search svg{width:14px;height:14px;color:var(--muted)}
+  .b-search span{font-size:.8125rem;color:var(--muted)}
+  .b-search kbd{margin-left:auto;font:600 10px/1 var(--mono);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 5px}
+
+  /* funnel strip */
+  .funnel{display:flex;gap:8px;flex-wrap:wrap;align-items:stretch;background:#fff;border:1px solid var(--border);
+    border-radius:var(--r-lg);padding:12px 14px;margin-bottom:18px;box-shadow:var(--shadow-sm)}
+  .fgroup{display:flex;flex-direction:column;gap:7px;padding-right:14px;border-right:1px dashed var(--border);}
+  .fgroup:last-child{border-right:none;padding-right:0}
+  .fgroup .glab{font:700 9.5px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2)}
+  .fgroup .grow{display:flex;gap:6px}
+  .fchip{display:flex;align-items:center;gap:7px;padding:6px 10px;border-radius:999px;border:1px solid var(--border);
+    background:#fff;cursor:pointer;transition:all var(--duration-fast,150ms) var(--ease-out)}
+  .fchip .dot{width:8px;height:8px;border-radius:50%;background:var(--c);flex:none}
+  .fchip .fn{font-size:.75rem;font-weight:600;color:var(--ink)}
+  .fchip .fc{font:700 .75rem/1 var(--sans);font-variant-numeric:tabular-nums;color:var(--strong)}
+  .fchip.zero{opacity:.5}
+  .fchip.zero .fc{color:var(--muted)}
+  .fchip.on{border-color:var(--c);background:var(--tint);box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 18%,transparent)}
+  .fchip:hover{border-color:var(--c)}
+
+  /* columns (Vista Tutti gli stati) */
+  .cols{display:flex;gap:14px;align-items:flex-start;overflow-x:auto;padding-bottom:8px}
+  .kcol{flex:0 0 254px;background:var(--col-bg,#f4f6fb);border:1px solid var(--border);border-radius:var(--r-lg);
+    display:flex;flex-direction:column;max-height:560px}
+  .kcol.tint{background:var(--tint);border-color:color-mix(in srgb,var(--c) 30%,var(--border))}
+  .kcolhead{display:flex;align-items:center;gap:9px;padding:12px 13px 11px;border-bottom:1px solid var(--border-soft);
+    border-top:3px solid var(--c);border-radius:var(--r-lg) var(--r-lg) 0 0}
+  .kcolhead .dot{width:9px;height:9px;border-radius:50%;background:var(--c);flex:none}
+  .kcolhead .nm{font-size:.8125rem;font-weight:700;color:var(--ink);letter-spacing:-.01em}
+  /* conteggio colonna: --strong su --tint (AA), realizza "grande e scuro" (§6.3.3) — mai #fff su --c chiaro */
+  .kcolhead .cnt{margin-left:auto;font:800 .8125rem/1 var(--sans);font-variant-numeric:tabular-nums;color:var(--strong);
+    background:var(--tint);border:1px solid color-mix(in srgb,var(--c) 30%,transparent);min-width:22px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:999px;padding:0 6px}
+  .kcolhead .rail{color:var(--muted);cursor:pointer}
+  .kcolbody{display:flex;flex-direction:column;gap:10px;padding:11px;overflow-y:auto}
+  .kadd{display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border:1px dashed var(--border);
+    border-radius:var(--r-md);color:var(--ink-2);font-size:.75rem;font-weight:600;cursor:pointer;background:rgba(255,255,255,.4)}
+  .kadd:hover{border-color:var(--c);color:var(--strong);background:var(--tint)}
+  .kadd svg{width:13px;height:13px}
+
+  /* collapsed rail (colonna collassata) */
+  .krail{flex:0 0 46px;min-width:46px;align-self:stretch;display:flex;flex-direction:column;align-items:center;gap:12px;
+    font-family:inherit;background:var(--tint,#f4f6fb);border:1px solid color-mix(in srgb,var(--c) 32%,var(--border));
+    border-top:3px solid var(--c);border-radius:var(--r-lg);padding:12px 6px 14px;cursor:pointer;position:relative;
+    transition:box-shadow var(--duration-normal,250ms) var(--ease-out),background var(--duration-fast,150ms) var(--ease-out)}
+  .krail .rcount{font:800 .8125rem/1 var(--sans);font-variant-numeric:tabular-nums;color:var(--strong);background:#fff;
+    border:1px solid color-mix(in srgb,var(--c) 30%,transparent);min-width:22px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:999px;padding:0 6px}
+  .krail .rlabel{writing-mode:vertical-rl;transform:rotate(180deg);font-size:.75rem;font-weight:700;color:var(--strong);letter-spacing:.02em;white-space:nowrap}
+  .krail .rchev{color:var(--strong);opacity:.55;margin-top:auto}
+  .krail.focus{box-shadow:0 0 0 3px var(--accent-glow);outline:2px solid transparent}
+  .krail.dropover{box-shadow:0 0 0 2px var(--c) inset;background:var(--tint)}
+  .krail.dropover .rchev{opacity:1}
+
+  /* rich card */
+  .kcard{position:relative;background:#fff;border:1px solid var(--border-soft);border-left:3px solid var(--c);
+    border-radius:var(--r-md);padding:11px 12px 10px;box-shadow:var(--shadow-md,0 4px 6px -1px rgba(15,23,42,.08));
+    cursor:grab;transition:transform var(--duration-fast,150ms) var(--ease-out),box-shadow var(--duration-fast,150ms) var(--ease-out),border-color var(--duration-fast,150ms) var(--ease-out)}
+  .kcard:hover{transform:translateY(-1px);border-color:var(--c);box-shadow:var(--shadow-lg,0 10px 15px -3px rgba(15,23,42,.12))}
+  .kcard .cn{display:flex;align-items:flex-start;gap:8px}
+  .kcard .cn .nm{font-size:.9375rem;font-weight:650;line-height:1.25;color:var(--ink);letter-spacing:-.01em}
+  .kcard .cn .grab{margin-left:auto;color:var(--faint);flex:none;margin-top:2px}
+  .kcard .meta{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px;align-items:center}
+  .kcard .foot{display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:9px;border-top:1px solid var(--border-soft)}
+  .kcard .ev{font-size:.6875rem;color:var(--muted);display:flex;align-items:center;gap:5px;min-width:0}
+  .kcard .ev .txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  .prov{display:inline-flex;align-items:center;font:600 .6875rem/1 var(--mono);color:var(--ink-2);
+    background:var(--border-soft);border-radius:5px;padding:3px 6px;letter-spacing:.02em}
+  .stars{font-size:.72rem;color:var(--warn);letter-spacing:.04em}
+  .stars .off{color:var(--faint)}
+  .chip{display:inline-flex;align-items:center;gap:4px;padding:3px 7px;border-radius:999px;font-size:.65rem;font-weight:600;white-space:nowrap}
+  .chip svg{width:10px;height:10px}
+  .chip.diretta{background:var(--accent-subtle);color:var(--accent);border:1px dashed var(--accent-muted)}
+  .chip.reg-warn{background:var(--warn-subtle);color:var(--warn-strong)}
+  .chip.reg-info{background:var(--info-subtle);color:var(--info-strong)}
+  /* marker collisione: segnale anti doppio-contatto, DISTINTO da Diretta (fuori dalla famiglia accent) e da registro/esito.
+     Pill bordata scura con cornice "Anche in:" — legge come cautela/link, non come tag di provenienza. */
+  .chip.coll{background:#fff;color:var(--ink);border:1.5px solid var(--ink-2);font-weight:700}
+  .chip.coll svg{color:var(--ink-2)}
+  .chip.coll .also{color:var(--muted);font-weight:600;margin-right:1px}
+  .chip.esito-won{background:var(--ok-bg);color:var(--ok-strong)}
+  .chip.esito-ko{background:var(--danger-subtle);color:var(--danger-strong)}
+  .dossier{display:inline-flex;align-items:center;gap:5px;font-size:.6875rem;font-weight:600;padding:5px 9px;border-radius:999px;border:1px solid var(--border);color:var(--ink-2);background:#fff;cursor:pointer}
+  .dossier svg{width:11px;height:11px}
+  .dossier.ready{border-color:var(--accent-muted);color:var(--accent);background:var(--accent-subtle)}
+  .dossier.run{border-color:var(--warn);color:var(--warn-strong);background:var(--warn-subtle)}
+  .recdate{display:inline-flex;align-items:center;gap:4px;font-size:.65rem;font-weight:600;padding:3px 7px;border-radius:999px;
+    background:var(--warn-subtle);color:var(--warn-strong)}
+  .recdate svg{width:10px;height:10px}
+
+  /* compact card (macro view / esito) */
+  .kcard.compact{padding:8px 11px;cursor:pointer}
+  .kcard.compact .cn .nm{font-size:.8125rem;font-weight:600}
+  .kcard.compact .meta{margin-top:6px;gap:5px}
+
+  /* drag-state demo */
+  .kcard.lift{transform:scale(1.03) rotate(1.5deg);box-shadow:var(--shadow-lg,0 12px 28px -8px rgba(15,23,42,.35));cursor:grabbing;border-color:var(--c)}
+  .kcard.ghost{opacity:.4}
+  .placeholder{height:64px;border:2px dashed var(--c);border-radius:var(--r-md);background:var(--tint)}
+  .kcol.dropover{box-shadow:0 0 0 2px var(--c) inset}
+
+  /* macro view = KANBAN, colonne = macrofasi (stessa idioma di Tutti gli stati, granularità diversa) */
+  /* poche colonne (3–4 macrofasi) → si distribuiscono su TUTTA la larghezza (flex:1), niente scroll orizzontale */
+  .mcols{display:flex;gap:14px;align-items:flex-start;padding-bottom:8px}
+  .mcol{flex:1 1 0;min-width:0;background:#f4f6fb;border:1px solid var(--border);border-radius:var(--r-lg);display:flex;flex-direction:column;max-height:640px}
+  /* header macrofase = elemento grafico forte (§6.3.2/3): tile numero pieno + titolo nel colore fase + pill conteggio */
+  .mcolhead{display:flex;align-items:center;gap:13px;padding:15px 16px 14px;border-top:4px solid var(--mc);border-bottom:1px solid var(--border-soft);border-radius:var(--r-lg) var(--r-lg) 0 0;background:var(--mtint)}
+  .mcolhead .num{font:800 1.05rem/1 var(--mono);letter-spacing:-.02em;color:#fff;background:var(--mc);width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:var(--r-md);flex:none;box-shadow:0 3px 8px -2px color-mix(in srgb,var(--mc) 55%,transparent)}
+  .mcolhead .mt{font-size:1.05rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--mc);line-height:1}
+  .mcolhead .msub{font-size:.7rem;color:var(--ink-2);margin-top:3px}
+  .mcolhead .mcnt{margin-left:auto;font:800 .95rem/1 var(--sans);font-variant-numeric:tabular-nums;color:var(--mc);background:#fff;border:1.5px solid color-mix(in srgb,var(--mc) 32%,transparent);border-radius:999px;min-width:30px;height:28px;display:flex;align-items:center;justify-content:center;padding:0 9px}
+  .mcolbody{display:flex;flex-direction:column;gap:16px;padding:13px;overflow-y:auto}
+  /* header stato = banda tinta delimitata e cliccabile, titolo nel colore-stato (§6.3.3);
+     l'affordance drill-down è l'icona discreta a destra (isola lo stato in una colonna), non un link vistoso */
+  .substate{display:flex;flex-direction:column;gap:9px}
+  .substate .sh{display:flex;align-items:center;gap:9px;padding:7px 11px;border-radius:var(--r-sm);background:var(--tint);border-left:3px solid var(--c)}
+  .substate .sh .dot{display:none}
+  .substate .sh .nm{font-size:.75rem;font-weight:800;color:var(--strong);text-transform:uppercase;letter-spacing:.04em}
+  .substate .sh .cnt{font:800 .75rem/1 var(--sans);font-variant-numeric:tabular-nums;color:var(--strong)}
+  .substate .sh .acts{margin-left:auto;display:flex;align-items:center;gap:9px}
+  .substate .sh .iconbtn{color:var(--strong);opacity:.42;display:flex;cursor:pointer;transition:opacity var(--duration-fast) var(--ease-out)}
+  .substate .sh:hover .iconbtn{opacity:.65}
+  .substate .sh .iconbtn:hover{opacity:1}
+  .substate .sh .iconbtn svg{width:14px;height:14px}
+  /* collasso stato (accordion verticale) — avvicina il target del DnD verticale; la banda resta drop-zone */
+  .substate .sh .chev{transition:transform var(--duration-fast) var(--ease-out),opacity var(--duration-fast) var(--ease-out)}
+  .substate.collapsed{gap:0}
+  .substate.collapsed .sh .chev{transform:rotate(-90deg);opacity:.85}
+  .substate.collapsed .kcard,.substate.collapsed .kadd,.substate.collapsed .empty{display:none}
+  .substate .empty{font-size:.72rem;color:var(--muted);padding:2px 0 4px 13px}
+
+  /* today vs v2 */
+  .today .kcolhead{border-top:none;background:#fff}
+  .today .kcolhead .cnt{background:#eef1f6;color:#475569}
+  .today .kcard{border-left:3px solid #e2e8f0;box-shadow:0 1px 2px rgba(15,23,42,.04);border-color:#eef1f6}
+  .today .kcard .cn .nm{font-size:.8125rem;font-weight:600}
+  .today-pill{display:inline-flex;padding:3px 8px;border-radius:999px;font-size:.65rem;font-weight:600}
+  .badge-note{font-size:.75rem;color:var(--muted);margin:8px 2px 0}
+
+  .legend-inline{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;font-size:.75rem;color:var(--ink-2)}
+  .legend-inline span{display:inline-flex;align-items:center;gap:6px}
+  .legend-inline i{width:10px;height:10px;border-radius:3px;display:inline-block}
+
+  /* ---------- buttons (per la modale) ---------- */
+  .btn{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:0 16px;border-radius:999px;font-weight:700;font-size:.8125rem;border:1px solid transparent;cursor:pointer;white-space:nowrap}
+  .btn.secondary{background:#fff;border-color:var(--border);color:var(--ink)}
+  .btn.danger{background:var(--danger);color:#fff}
+  .btn.ok{background:var(--ok);color:#fff}
+
+  /* ---------- terminal modal ---------- */
+  .tmodal{background:#fff;border:1px solid var(--border);border-radius:var(--r-lg);padding:20px 22px;box-shadow:0 24px 48px -18px rgba(15,23,42,.35)}
+  .tmodal .thead{display:flex;align-items:center;gap:10px;margin-bottom:2px}
+  .tmodal .tbadge{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex:none}
+  .tmodal .tbadge svg{width:17px;height:17px}
+  .tmodal.ko .tbadge{background:var(--danger-subtle);color:var(--danger-strong)}
+  .tmodal.won .tbadge{background:var(--ok-bg);color:var(--ok-strong)}
+  .tmodal h4{margin:0;font-size:1.02rem;font-weight:700;color:var(--ink)}
+  .tmodal .tsub{margin:8px 0 16px;font-size:.8125rem;color:var(--ink-2)}
+  .tfield{margin-bottom:14px}
+  .tfield > label{display:block;font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-2);margin-bottom:6px}
+  .tcombo{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+  .tcombo .opt{font-size:.75rem;font-weight:600;padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:#fbfcfe;color:var(--ink-2);cursor:pointer}
+  .tcombo .opt.on{border-color:var(--danger);background:var(--danger-subtle);color:var(--danger-strong)}
+  .tinput{width:100%;border:1.5px solid var(--border);border-radius:var(--r-md);padding:9px 12px;font-size:.8125rem;color:var(--ink);background:#fff;font-family:inherit}
+  .tinput.ph{color:var(--muted)}
+  .tinput.area{min-height:56px;resize:vertical}
+  .tbridge{border:1px solid color-mix(in srgb,var(--warn) 30%,transparent);background:var(--warn-subtle);border-radius:var(--r-md);padding:11px 13px;margin-bottom:16px}
+  .tbridge .bh{display:flex;align-items:center;gap:8px;font-size:.75rem;font-weight:700;color:var(--warn-strong)}
+  .tbridge .bh svg{width:13px;height:13px}
+  .tbridge .bsub{margin:5px 0 9px;font-size:.75rem;color:var(--ink-2)}
+  .tbridge .bopt{display:flex;align-items:center;gap:8px;font-size:.8125rem;color:var(--ink);padding:4px 0}
+  .tbridge .chk{width:16px;height:16px;border-radius:4px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--warn-strong);color:#fff}
+  .tbridge .chk svg{width:11px;height:11px}
+  .tbridge .chk.off{background:#fff;border:1.5px solid var(--warn-strong);color:transparent}
+  .tactions{display:flex;gap:10px;justify-content:flex-end;margin-top:4px}
+
+  @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="doc">
+  <div class="doc-head">
+    <div class="eyebrow">Binocolo · Gate G0 · Kanban v2</div>
+    <h1>Board di iniziativa v2 — struttura, esplorazioni cromatiche, motion &amp; keyboard</h1>
+    <p>Fonte di verità per layout, copy e feel prima di scrivere codice. Struttura dal mockup «Pipeline M&amp;A», contenuti delle card i nostri (§1.2 del piano). L'obiettivo dichiarato: <b>superare Linear</b> su due assi — interaction engineering e presenza visiva.</p>
+    <div class="callout"><b>Criterio di bocciatura (G0/G2/GF).</b> Se uno screenshot della board v2 affiancato all'attuale non produce un salto percepito immediato — più colore, più contrasto, più gerarchia — il gate non passa, a prescindere dalla qualità del motion. Riprodurre la palette pallida di oggi con più animazioni = fallimento.</div>
+    <div class="callout rec"><b>Decisione richiesta all'utente.</b> Tre esplorazioni cromatiche complete della stessa schermata (§C). Scegli la direzione: i token entrano in <code style="font-family:var(--mono)">tokens.css</code> e in un aggiornamento di <code style="font-family:var(--mono)">UI-UX.md</code> nello stesso change. Raccomandazione motivata in fondo alla §C.</div>
+  </div>
+
+  <nav class="statenav">
+    <a href="#stati">Stati &amp; macrofasi</a>
+    <a href="#struttura">Struttura</a>
+    <a href="#anatomia">Anatomia card</a>
+    <a href="#expA">A · Rampa termica</a>
+    <a href="#expB">B · Mono indaco</a>
+    <a href="#expC">C · Semantica pura</a>
+    <a href="#macro">Vista Macrofasi</a>
+    <a href="#today">Oggi ↔ v2</a>
+    <a href="#collasso">Collasso colonna</a>
+    <a href="#terminale">Terminale</a>
+    <a href="#motion">Motion</a>
+    <a href="#keyboard">Keyboard</a>
+  </nav>
+
+  <!-- ============================ STATI ============================ -->
+  <section class="blk" id="stati">
+    <div class="blk-head"><span class="sid">00</span><h2>Stati v2 &amp; macrofasi</h2><span class="ref">§1.1 · 10 stati + rimossa</span></div>
+    <p class="blk-intent">10 stati operativi raggruppati in 4 macrofasi (<b>pura presentazione</b>: nessuna colonna DB, nessun evento dedicato). Origination / Engagement / Follow-up sempre visibili; <b>Esito solo in «Vista completa»</b>. <code>rimossa</code> resta fuori board (errore di triage, mai un verdetto).</p>
+    <table class="spec">
+      <thead><tr><th>Macrofase</th><th>Stati</th><th>Tipo</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr><td><b>01 · Origination</b></td><td>Approfondimento · Da contattare · Primo contatto</td><td>attivi</td><td>ingresso e primo aggancio</td></tr>
+        <tr><td><b>02 · Engagement</b></td><td>Primo incontro · NDA · LOI</td><td>attivi</td><td>trattativa in corso</td></tr>
+        <tr><td><b>03 · Follow-up</b></td><td>Ricontattare</td><td>attivo (in attesa)</td><td>data opzionale, informativa · nessun reminder</td></tr>
+        <tr><td><b>04 · Esito</b></td><td>WON · KO nostro · KO target</td><td>terminali</td><td>solo in Vista completa · esito su KO, ponte registro solo KO target</td></tr>
+      </tbody>
+    </table>
+    <ul class="notes">
+      <li><span class="m">1</span><span><b>Transizioni libere</b> fra i 7 non-terminali (drag). Drop sui 3 terminali apre modale (KO: esito+nota+ponte registro; WON: conferma secca). <span class="ref">§1.1</span></span></li>
+      <li><span class="m">2</span><span><b>Ricontattare</b>: chip data opzionale sulla card, ordinamento con null in coda. Nessun alert — il vincolo non-CRM sopravvive.</span></li>
+      <li><span class="m">3</span><span><b>Esito</b>: vocabolario suggerito + testo libero (combobox). WON senza esito. Ponte registro solo su <code>ko_target</code> (<code>non_vende</code>/<code>in_trattativa_altrui</code>).</span></li>
+      <li><span class="m">4</span><span><b>Contenuti card invariati</b>: niente € per card, niente owner, niente next-step dedicato. Resta l'ultimo evento del diario.</span></li>
+    </ul>
+  </section>
+
+  <!-- ============================ STRUTTURA ============================ -->
+  <section class="blk" id="struttura">
+    <div class="blk-head"><span class="sid">01</span><h2>Struttura · matrice viste 2×2</h2><span class="ref">§1.2 · persistita per utente</span></div>
+    <p class="blk-intent"><b>Pipeline attiva | Vista completa</b> × <b>Macrofasi | Tutti gli stati</b>. La strip funnel in testa è sempre presente: chip per stato raggruppati per macrofase, <b>tutti gli stati anche a 0</b> (posizioni stabili), chip cliccabile = filtro.</p>
+
+    <div class="frame">
+      <div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span><span class="url">/apps/binocolo/#/iniziative/tgt-nexer-2026</span><span class="tag">Pipeline attiva · Tutti gli stati</span></div>
+      <div class="board rampA">
+        <div class="b-top">
+          <div class="b-title"><span class="kick">Iniziativa</span><h3>TGT — Cloud &amp; MSP Nord-Est</h3></div>
+          <div class="viewmatrix">
+            <div class="seg"><button class="on">Pipeline attiva</button><button>Vista completa</button></div>
+            <div class="seg"><button>Macrofasi</button><button class="on">Tutti gli stati</button></div>
+          </div>
+          <div class="b-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span>Cerca azienda…</span><kbd>/</kbd></div>
+        </div>
+
+        <!-- funnel strip -->
+        <div class="funnel">
+          <div class="fgroup">
+            <span class="glab">01 · Origination</span>
+            <div class="grow">
+              <div class="fchip st-approf on"><span class="dot"></span><span class="fn">Approfondimento</span><span class="fc">6</span></div>
+              <div class="fchip st-dacont"><span class="dot"></span><span class="fn">Da contattare</span><span class="fc">4</span></div>
+              <div class="fchip st-pcont"><span class="dot"></span><span class="fn">Primo contatto</span><span class="fc">3</span></div>
+            </div>
+          </div>
+          <div class="fgroup">
+            <span class="glab">02 · Engagement</span>
+            <div class="grow">
+              <div class="fchip st-pinc"><span class="dot"></span><span class="fn">Primo incontro</span><span class="fc">2</span></div>
+              <div class="fchip st-nda"><span class="dot"></span><span class="fn">NDA</span><span class="fc">1</span></div>
+              <div class="fchip st-loi zero"><span class="dot"></span><span class="fn">LOI</span><span class="fc">0</span></div>
+            </div>
+          </div>
+          <div class="fgroup">
+            <span class="glab">03 · Follow-up</span>
+            <div class="grow">
+              <div class="fchip st-ric"><span class="dot"></span><span class="fn">Ricontattare</span><span class="fc">2</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- columns -->
+        <div class="cols">
+          <!-- approfondimento -->
+          <div class="kcol st-approf">
+            <div class="kcolhead st-approf"><span class="dot"></span><span class="nm">Approfondimento</span><span class="cnt">6</span><svg class="rail" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg></div>
+            <div class="kcolbody">
+              <div class="kcard st-approf lift">
+                <div class="cn"><span class="nm">Nexer Cloud Group S.r.l.</span><svg class="grab" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg></div>
+                <div class="meta"><span class="prov">MI</span><span class="stars">★★★</span><span class="chip diretta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/></svg>Diretta</span><span class="chip coll" title="Anche in lavorazione nell'iniziativa MSP Sud"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v12M18 9a3 3 0 1 0-6 0M6 21a3 3 0 1 0 0-6"/></svg><span class="also">Anche in:</span> MSP Sud</span></div>
+                <div class="foot"><span class="dossier ready"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Dossier pronto</span></div>
+              </div>
+              <div class="kcard st-approf">
+                <div class="cn"><span class="nm">Datalytics S.p.A.</span></div>
+                <div class="meta"><span class="prov">TO</span><span class="stars">★★<span class="off">★</span></span><span class="chip reg-warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>Non vende</span></div>
+                <div class="foot"><span class="dossier"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>Genera dossier</span></div>
+              </div>
+              <div class="kadd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Aggiungi azienda</div>
+            </div>
+          </div>
+
+          <!-- da contattare -->
+          <div class="kcol st-dacont">
+            <div class="kcolhead st-dacont"><span class="dot"></span><span class="nm">Da contattare</span><span class="cnt">4</span><svg class="rail" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg></div>
+            <div class="kcolbody">
+              <div class="placeholder"></div>
+              <div class="kcard st-dacont ghost">
+                <div class="cn"><span class="nm">Fibernet Adriatica S.r.l.</span></div>
+                <div class="meta"><span class="prov">PD</span><span class="stars">★<span class="off">★★</span></span></div>
+                <div class="foot"><span class="dossier run"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10"/></svg>In analisi…</span></div>
+              </div>
+              <div class="kcard st-dacont">
+                <div class="cn"><span class="nm">Sistemi Cloud Italia</span></div>
+                <div class="meta"><span class="prov">BO</span><span class="stars">★★<span class="off">★</span></span><span class="chip diretta">Diretta</span></div>
+                <div class="foot"><span class="ev"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="txt">Aggiunta 3 gg fa · M. Bianchi</span></span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- primo contatto → collassata a rail -->
+          <button class="krail st-pcont" title="Espandi Primo contatto" aria-label="Espandi Primo contatto">
+            <span class="rcount">3</span>
+            <span class="rlabel">Primo contatto</span>
+            <svg class="rchev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+
+          <!-- nda -->
+          <div class="kcol st-nda">
+            <div class="kcolhead st-nda"><span class="dot"></span><span class="nm">NDA</span><span class="cnt">1</span><svg class="rail" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg></div>
+            <div class="kcolbody">
+              <div class="kcard st-nda">
+                <div class="cn"><span class="nm">Meridiana Datacenter</span></div>
+                <div class="meta"><span class="prov">NA</span><span class="stars">★★★</span><span class="chip reg-info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>Già cliente</span></div>
+                <div class="foot"><span class="ev"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg><span class="txt">NDA firmato · 5 gg fa</span></span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- primo incontro → rail collassata, drop target attivo durante il drag -->
+          <button class="krail st-pinc dropover" title="Rilascia per spostare in Primo incontro" aria-label="Primo incontro, rilascia qui">
+            <span class="rcount">2</span>
+            <span class="rlabel">Primo incontro</span>
+            <svg class="rchev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+          </button>
+
+          <!-- ricontattare -->
+          <div class="kcol st-ric">
+            <div class="kcolhead st-ric"><span class="dot"></span><span class="nm">Ricontattare</span><span class="cnt">2</span><svg class="rail" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg></div>
+            <div class="kcolbody">
+              <div class="kcard st-ric">
+                <div class="cn"><span class="nm">Ligure Reti S.p.A.</span></div>
+                <div class="meta"><span class="prov">GE</span><span class="stars">★★<span class="off">★</span></span><span class="recdate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Q3 2026</span></div>
+                <div class="foot"><span class="ev"><span class="txt">In attesa · budget non maturo</span></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><span class="m">1</span><span>La card in <b>pickup</b> (Nexer) mostra il feel del drag; nella colonna «Da contattare» il <b>placeholder</b> apre lo spazio e la sorgente resta <b>ghost</b>. Spec completa in §Motion.</span></li>
+      <li><span class="m">2</span><span>Due colonne sono <b>collassate a rail</b>: «Primo contatto» (a riposo) e «Primo incontro» (drop target attivo durante il drag). Anatomia e transizione in <a href="#collasso" style="color:var(--accent);font-weight:600">§Collasso</a>.</span></li>
+      <li><span class="m">3</span><span>«+ Aggiungi azienda» per colonna crea con <b>stato iniziale = colonna</b> (solo stati non-terminali).</span></li>
+    </ul>
+  </section>
+
+  <!-- ============================ ANATOMIA ============================ -->
+  <section class="blk" id="anatomia">
+    <div class="blk-head"><span class="sid">02</span><h2>Anatomia della card</h2><span class="ref">§1.2 · contenuti invariati</span></div>
+    <p class="blk-intent">Stessi segnali di oggi, gerarchia più forte. Nome più grande e pesante (0.9375rem/650), bordo sinistro colorato per stato, ombra reale che stacca (<code>--shadow-md</code> a riposo → <code>--shadow-lg</code> su hover).</p>
+    <div class="frame">
+      <div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span><span class="url">card · Vista Tutti gli stati</span><span class="tag">rampa A</span></div>
+      <div class="board rampA" style="--canvas:#eef1f8;display:grid;grid-template-columns:290px 1fr;gap:22px;align-items:center">
+        <div class="kcard st-nda" style="cursor:default">
+          <div class="cn"><span class="nm">Meridiana Datacenter S.r.l.</span><svg class="grab" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg></div>
+          <div class="meta"><span class="prov">NA</span><span class="stars">★★★</span><span class="chip diretta">Diretta</span><span class="chip reg-info">Già cliente</span><span class="chip coll" title="Anche in lavorazione nell'iniziativa MSP Sud"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v12M18 9a3 3 0 1 0-6 0M6 21a3 3 0 1 0 0-6"/></svg><span class="also">Anche in:</span> MSP Sud</span></div>
+          <div class="foot"><span class="dossier ready">Dossier pronto</span><span class="ev" style="margin-left:auto"><span class="txt">NDA · 5 gg fa</span></span></div>
+        </div>
+        <ul class="notes" style="margin:0;grid-template-columns:1fr">
+          <li><span class="m">A</span><span><b>Nome azienda</b> — 0.9375rem/650, il segnale primario. <b>Grip</b> a destra (drag handle) reso su hover.</span></li>
+          <li><span class="m">B</span><span><b>Provincia</b> (mono) · <b>stelle provenienza</b> (★ della miglior provenienza) · <b>chip Diretta</b> (origin) · <b>badge registro</b> (Non vende / Già cliente…) · <b>marker collisione</b> (anche in un'altra iniziativa).</span></li>
+          <li><span class="m">C</span><span><b>Bottone dossier a 3 stati</b>: «Genera» → «In analisi…» (spinner) → «Dossier pronto». <b>Ultimo evento</b> del diario a destra. Nessun €, nessun owner.</span></li>
+          <li><span class="m">D</span><span><b>Bordo sinistro colorato</b> per stato: a colpo d'occhio dove sta l'azienda nel funnel, coerente con la rampa.</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ ESPLORAZIONI ============================ -->
+  <section class="blk" id="expA">
+    <div class="blk-head"><span class="sid">C</span><h2>Esplorazioni cromatiche</h2><span class="ref">§6.3 · scegline una</span></div>
+    <p class="blk-intent">La stessa schermata (strip funnel + Vista completa con Esito) in tre direzioni. Il colore è <b>informazione</b>: la rampa rende leggibile a colpo d'occhio «quanto è avanti questa azienda». Le regole testo-AA di UI-UX §4.2 valgono su tutti i token nuovi (varianti <code>-strong</code> per il testo).</p>
+
+    <!-- Exploration A -->
+    <div class="exp-caption"><span class="lab">A</span><h3>Rampa termica · fredda → calda</h3><span class="pill rec">Raccomandata per questa board</span></div>
+    <p class="exp-note">Origination in <b>ciano/blu</b> progressivi → Engagement in <b>viola/magenta/ambra</b> → Follow-up in <b>arancio</b> → Esito in <b>verde pieno</b> (WON) e <b>rossi distinti</b> (KO nostro/target). La temperatura del colore = avanzamento nel funnel. <span class="gen">Generalizzabile?</span> Identità <b>locale</b> della board (la rampa presuppone un funnel a stadi); non trasferibile 1:1 a budget/quotes, ma il metodo «un colore per stadio» sì.</p>
+    <div class="frame">
+      <div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span><span class="url">Vista completa · Tutti gli stati</span><span class="tag">A · rampa termica</span></div>
+      <div class="board rampA">
+        <div class="funnel">
+          <div class="fgroup"><span class="glab">01 · Origination</span><div class="grow">
+            <div class="fchip st-approf"><span class="dot"></span><span class="fn">Appr.</span><span class="fc">6</span></div>
+            <div class="fchip st-dacont"><span class="dot"></span><span class="fn">Da cont.</span><span class="fc">4</span></div>
+            <div class="fchip st-pcont"><span class="dot"></span><span class="fn">1° cont.</span><span class="fc">3</span></div></div></div>
+          <div class="fgroup"><span class="glab">02 · Engagement</span><div class="grow">
+            <div class="fchip st-pinc"><span class="dot"></span><span class="fn">1° inc.</span><span class="fc">2</span></div>
+            <div class="fchip st-nda"><span class="dot"></span><span class="fn">NDA</span><span class="fc">1</span></div>
+            <div class="fchip st-loi zero"><span class="dot"></span><span class="fn">LOI</span><span class="fc">0</span></div></div></div>
+          <div class="fgroup"><span class="glab">03 · Follow-up</span><div class="grow">
+            <div class="fchip st-ric"><span class="dot"></span><span class="fn">Ricont.</span><span class="fc">2</span></div></div></div>
+          <div class="fgroup"><span class="glab">04 · Esito</span><div class="grow">
+            <div class="fchip st-won"><span class="dot"></span><span class="fn">WON</span><span class="fc">1</span></div>
+            <div class="fchip st-kon"><span class="dot"></span><span class="fn">KO ns.</span><span class="fc">2</span></div>
+            <div class="fchip st-kot"><span class="dot"></span><span class="fn">KO tgt.</span><span class="fc">3</span></div></div></div>
+        </div>
+        <div class="cols">
+          <div class="kcol st-approf"><div class="kcolhead st-approf"><span class="dot"></span><span class="nm">Approfondimento</span><span class="cnt">6</span></div><div class="kcolbody">
+            <div class="kcard st-approf"><div class="cn"><span class="nm">Nexer Cloud Group</span></div><div class="meta"><span class="prov">MI</span><span class="stars">★★★</span><span class="chip diretta">Diretta</span></div></div>
+            <div class="kcard st-approf"><div class="cn"><span class="nm">Datalytics S.p.A.</span></div><div class="meta"><span class="prov">TO</span><span class="stars">★★<span class="off">★</span></span></div></div></div></div>
+          <div class="kcol st-pcont"><div class="kcolhead st-pcont"><span class="dot"></span><span class="nm">Primo contatto</span><span class="cnt">3</span></div><div class="kcolbody">
+            <div class="kcard st-pcont"><div class="cn"><span class="nm">Aretek Soluzioni</span></div><div class="meta"><span class="prov">VR</span><span class="stars">★★★</span></div></div></div></div>
+          <div class="kcol st-loi"><div class="kcolhead st-loi"><span class="dot"></span><span class="nm">LOI</span><span class="cnt">0</span></div><div class="kcolbody">
+            <div class="kadd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Aggiungi</div></div></div>
+          <div class="kcol st-won"><div class="kcolhead st-won"><span class="dot"></span><span class="nm">WON</span><span class="cnt">1</span></div><div class="kcolbody">
+            <div class="kcard st-won compact"><div class="cn"><span class="nm">Ionica Telecom</span></div><div class="meta"><span class="prov">CT</span><span class="ev" style="margin-left:0"><span class="txt">chiusa 12 gg fa</span></span></div></div></div></div>
+          <div class="kcol st-kot"><div class="kcolhead st-kot"><span class="dot"></span><span class="nm">KO target</span><span class="cnt">3</span></div><div class="kcolbody">
+            <div class="kcard st-kot compact"><div class="cn"><span class="nm">Verde Reti</span></div><div class="meta"><span class="prov">FI</span><span class="chip esito-ko">Non vende</span></div></div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Exploration B -->
+    <div class="exp-caption" id="expB"><span class="lab b">B</span><h3>Monocromatica · indaco in profondità</h3></div>
+    <p class="exp-note">Un solo hue di marca (indaco <code>#635bff</code>), l'avanzamento è reso da <b>saturazione/profondità crescente</b>: tinta pallida in origination → indaco profondo su LOI. Gli esiti restano l'unica rottura cromatica (verde/rosso). Molto «Linear», identità di marca fortissima, zero effetto arcobaleno. <span class="gen">Generalizzabile?</span> La più <b>promuovibile a sistema</b>: un sistema indaco-in-profondità sale 1:1 su budget/quotes/compliance senza dipendere da una semantica di funnel.</p>
+    <div class="frame">
+      <div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span><span class="url">Vista completa · Tutti gli stati</span><span class="tag">B · mono indaco</span></div>
+      <div class="board monoB">
+        <div class="funnel">
+          <div class="fgroup"><span class="glab">01 · Origination</span><div class="grow">
+            <div class="fchip st-approf"><span class="dot"></span><span class="fn">Appr.</span><span class="fc">6</span></div>
+            <div class="fchip st-dacont"><span class="dot"></span><span class="fn">Da cont.</span><span class="fc">4</span></div>
+            <div class="fchip st-pcont"><span class="dot"></span><span class="fn">1° cont.</span><span class="fc">3</span></div></div></div>
+          <div class="fgroup"><span class="glab">02 · Engagement</span><div class="grow">
+            <div class="fchip st-pinc"><span class="dot"></span><span class="fn">1° inc.</span><span class="fc">2</span></div>
+            <div class="fchip st-nda"><span class="dot"></span><span class="fn">NDA</span><span class="fc">1</span></div>
+            <div class="fchip st-loi zero"><span class="dot"></span><span class="fn">LOI</span><span class="fc">0</span></div></div></div>
+          <div class="fgroup"><span class="glab">03 · Follow-up</span><div class="grow">
+            <div class="fchip st-ric"><span class="dot"></span><span class="fn">Ricont.</span><span class="fc">2</span></div></div></div>
+          <div class="fgroup"><span class="glab">04 · Esito</span><div class="grow">
+            <div class="fchip st-won"><span class="dot"></span><span class="fn">WON</span><span class="fc">1</span></div>
+            <div class="fchip st-kon"><span class="dot"></span><span class="fn">KO ns.</span><span class="fc">2</span></div>
+            <div class="fchip st-kot"><span class="dot"></span><span class="fn">KO tgt.</span><span class="fc">3</span></div></div></div>
+        </div>
+        <div class="cols">
+          <div class="kcol st-approf"><div class="kcolhead st-approf"><span class="dot"></span><span class="nm">Approfondimento</span><span class="cnt">6</span></div><div class="kcolbody">
+            <div class="kcard st-approf"><div class="cn"><span class="nm">Nexer Cloud Group</span></div><div class="meta"><span class="prov">MI</span><span class="stars">★★★</span><span class="chip diretta">Diretta</span></div></div>
+            <div class="kcard st-approf"><div class="cn"><span class="nm">Datalytics S.p.A.</span></div><div class="meta"><span class="prov">TO</span><span class="stars">★★<span class="off">★</span></span></div></div></div></div>
+          <div class="kcol st-pcont"><div class="kcolhead st-pcont"><span class="dot"></span><span class="nm">Primo contatto</span><span class="cnt">3</span></div><div class="kcolbody">
+            <div class="kcard st-pcont"><div class="cn"><span class="nm">Aretek Soluzioni</span></div><div class="meta"><span class="prov">VR</span><span class="stars">★★★</span></div></div></div></div>
+          <div class="kcol st-nda"><div class="kcolhead st-nda"><span class="dot"></span><span class="nm">NDA</span><span class="cnt">1</span></div><div class="kcolbody">
+            <div class="kcard st-nda"><div class="cn"><span class="nm">Meridiana Datacenter</span></div><div class="meta"><span class="prov">NA</span><span class="stars">★★★</span></div></div></div></div>
+          <div class="kcol st-won"><div class="kcolhead st-won"><span class="dot"></span><span class="nm">WON</span><span class="cnt">1</span></div><div class="kcolbody">
+            <div class="kcard st-won compact"><div class="cn"><span class="nm">Ionica Telecom</span></div><div class="meta"><span class="prov">CT</span><span class="ev" style="margin-left:0"><span class="txt">chiusa 12 gg fa</span></span></div></div></div></div>
+          <div class="kcol st-kot"><div class="kcolhead st-kot"><span class="dot"></span><span class="nm">KO target</span><span class="cnt">3</span></div><div class="kcolbody">
+            <div class="kcard st-kot compact"><div class="cn"><span class="nm">Verde Reti</span></div><div class="meta"><span class="prov">FI</span><span class="chip esito-ko">Non vende</span></div></div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Exploration C -->
+    <div class="exp-caption" id="expC"><span class="lab c">C</span><h3>Semantica pura · neutrale + segnali</h3></div>
+    <p class="exp-note">Gli stati attivi sono <b>neutri</b> (slate): l'avanzamento è reso da un <b>indicatore a step</b> (●●●○○), non dal colore. Il colore compare <b>solo dove porta significato</b>: registro (ambra), collisione (indaco), esiti (verde/rosso), data ricontatto che scalda. Il salto rispetto a oggi lo portano <b>contrasto, profondità e tipografia</b>, non il hue. <span class="gen">Generalizzabile?</span> Sì, ma è il polo <b>più prudente</b>: rischia di non soddisfare «più colore» del criterio di bocciatura.</p>
+    <div class="frame">
+      <div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span><span class="url">Vista completa · Tutti gli stati</span><span class="tag">C · semantica pura</span></div>
+      <div class="board semC">
+        <div class="funnel">
+          <div class="fgroup"><span class="glab">01 · Origination</span><div class="grow">
+            <div class="fchip st-approf"><span class="dot"></span><span class="fn">Appr.</span><span class="fc">6</span></div>
+            <div class="fchip st-dacont"><span class="dot"></span><span class="fn">Da cont.</span><span class="fc">4</span></div>
+            <div class="fchip st-pcont"><span class="dot"></span><span class="fn">1° cont.</span><span class="fc">3</span></div></div></div>
+          <div class="fgroup"><span class="glab">02 · Engagement</span><div class="grow">
+            <div class="fchip st-pinc"><span class="dot"></span><span class="fn">1° inc.</span><span class="fc">2</span></div>
+            <div class="fchip st-nda"><span class="dot"></span><span class="fn">NDA</span><span class="fc">1</span></div>
+            <div class="fchip st-loi zero"><span class="dot"></span><span class="fn">LOI</span><span class="fc">0</span></div></div></div>
+          <div class="fgroup"><span class="glab">03 · Follow-up</span><div class="grow">
+            <div class="fchip st-ric"><span class="dot"></span><span class="fn">Ricont.</span><span class="fc">2</span></div></div></div>
+          <div class="fgroup"><span class="glab">04 · Esito</span><div class="grow">
+            <div class="fchip st-won"><span class="dot"></span><span class="fn">WON</span><span class="fc">1</span></div>
+            <div class="fchip st-kon"><span class="dot"></span><span class="fn">KO ns.</span><span class="fc">2</span></div>
+            <div class="fchip st-kot"><span class="dot"></span><span class="fn">KO tgt.</span><span class="fc">3</span></div></div></div>
+        </div>
+        <div class="cols">
+          <div class="kcol st-approf"><div class="kcolhead st-approf"><span class="dot"></span><span class="nm">Approfondimento</span><span class="cnt">6</span></div><div class="kcolbody">
+            <div class="kcard st-approf"><div class="cn"><span class="nm">Nexer Cloud Group</span></div><div class="meta"><span class="prov">MI</span><span class="stars">★★★</span><span class="chip diretta">Diretta</span></div></div>
+            <div class="kcard st-approf"><div class="cn"><span class="nm">Datalytics S.p.A.</span></div><div class="meta"><span class="prov">TO</span><span class="stars">★★<span class="off">★</span></span></div></div></div></div>
+          <div class="kcol st-pcont"><div class="kcolhead st-pcont"><span class="dot"></span><span class="nm">Primo contatto</span><span class="cnt">3</span></div><div class="kcolbody">
+            <div class="kcard st-pcont"><div class="cn"><span class="nm">Aretek Soluzioni</span></div><div class="meta"><span class="prov">VR</span><span class="stars">★★★</span></div></div></div></div>
+          <div class="kcol st-nda"><div class="kcolhead st-nda"><span class="dot"></span><span class="nm">NDA</span><span class="cnt">1</span></div><div class="kcolbody">
+            <div class="kcard st-nda"><div class="cn"><span class="nm">Meridiana Datacenter</span></div><div class="meta"><span class="prov">NA</span><span class="stars">★★★</span></div></div></div></div>
+          <div class="kcol st-won"><div class="kcolhead st-won"><span class="dot"></span><span class="nm">WON</span><span class="cnt">1</span></div><div class="kcolbody">
+            <div class="kcard st-won compact"><div class="cn"><span class="nm">Ionica Telecom</span></div><div class="meta"><span class="prov">CT</span><span class="ev" style="margin-left:0"><span class="txt">chiusa 12 gg fa</span></span></div></div></div></div>
+          <div class="kcol st-kot"><div class="kcolhead st-kot"><span class="dot"></span><span class="nm">KO target</span><span class="cnt">3</span></div><div class="kcolbody">
+            <div class="kcard st-kot compact"><div class="cn"><span class="nm">Verde Reti</span></div><div class="meta"><span class="prov">FI</span><span class="chip esito-ko">Non vende</span></div></div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="compareGrid" style="margin-top:26px">
+      <div class="capsule"><h4>A · Rampa termica</h4><ul>
+        <li><b>Pro</b>: funnel leggibile a colpo d'occhio; massimo «più colore»; energia visiva alta.</li>
+        <li><b>Contro</b>: rischio arcobaleno; richiede calibrazione AA per i 10 hue; identità locale.</li>
+        <li><b>Verdetto</b>: miglior fit per <i>questa</i> board.</li>
+      </ul></div>
+      <div class="capsule"><h4>B · Mono indaco</h4><ul>
+        <li><b>Pro</b>: eleganza «oltre Linear»; identità di marca; il più <b>promuovibile a sistema</b>.</li>
+        <li><b>Contro</b>: differenze fra stadi vicini più sottili; meno «esplosivo» del criterio.</li>
+        <li><b>Verdetto</b>: scelta giusta se il piano è UI-UX v3 cross-app.</li>
+      </ul></div>
+      <div class="capsule"><h4>C · Semantica pura</h4><ul>
+        <li><b>Pro</b>: rigore massimo; nessun rischio AA; il colore resta solo segnale.</li>
+        <li><b>Contro</b>: il più vicino a «oggi»; può fallire il criterio «più colore».</li>
+        <li><b>Verdetto</b>: polo di controllo, rende leggibile la scelta.</li>
+      </ul></div>
+    </div>
+    <div class="callout rec" style="margin-top:20px"><b>Raccomandazione.</b> Per <i>questa</i> board raccomandiamo <b>A (rampa termica)</b>: soddisfa in pieno il criterio «più colore/contrasto/gerarchia» e rende il funnel leggibile a colpo d'occhio, allineandosi alla direzione ratificata (§6.3.1). Se la board è il <b>pilota di UI-UX v3</b> per tutte le mini-app, <b>B (mono indaco)</b> è la più promuovibile a sistema. Una via ibrida esiste: <b>A per gli stati, con esiti e semantica identici a B</b>. Attendiamo la scelta prima di scrivere i token in <code>tokens.css</code>.</div>
+  </section>
+
+  <!-- ============================ MACRO VIEW ============================ -->
+  <section class="blk" id="macro">
+    <div class="blk-head"><span class="sid">03</span><h2>Vista Macrofasi — <span style="color:var(--accent)">vista di lavoro principale</span></h2><span class="ref">§1.2 · kanban, colonne = macrofasi</span></div>
+    <p class="blk-intent">È <b>la superficie su cui si lavora di più</b> (default d'ingresso della board). Stesso idioma kanban di Tutti gli stati, ma le 3–4 colonne = macrofasi si <b>distribuiscono su tutta la larghezza</b>. Card <b>ricche e trascinabili</b>, <b>tutte</b> (nessun troncamento): dentro ogni colonna gli stati sono <b>sotto-sezioni</b> con banda-titolo forte, il loro «+ Aggiungi azienda», e drag tra stati e tra macrofasi. Il titolo di stato è cliccabile (icona discreta a destra) per <b>isolare quello stato in una colonna dedicata</b> in Tutti gli stati — utile solo quando uno stato è molto denso, non è un "vedi altro".</p>
+    <div class="frame">
+      <div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span><span class="url">Pipeline attiva · Macrofasi</span><span class="tag">rampa A</span></div>
+      <div class="board rampA" style="--canvas:#e8ecf4">
+        <div class="mcols">
+          <!-- 01 Origination -->
+          <div class="mcol" style="--mc:#0369a1;--mtint:linear-gradient(180deg,#e0f2fe,#f4f8ff)">
+            <div class="mcolhead"><span class="num">01</span><div><div class="mt">Origination</div><div class="msub">ingresso e primo aggancio</div></div><span class="mcnt">13</span></div>
+            <div class="mcolbody">
+              <div class="substate"><div class="sh st-approf"><span class="nm">Approfondimento</span><span class="cnt">6</span><span class="acts"><span class="chev iconbtn" title="Comprimi / espandi stato"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></span><span class="iconbtn" title="Aggiungi azienda in questo stato"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></span><span class="iconbtn" title="Isola questo stato in una colonna dedicata"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></span></span></div>
+                <div class="kcard st-approf"><div class="cn"><span class="nm">Nexer Cloud Group</span><svg class="grab" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg></div><div class="meta"><span class="prov">MI</span><span class="stars">★★★</span><span class="chip diretta">Diretta</span></div><div class="foot"><span class="dossier ready"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Dossier pronto</span></div></div>
+                <div class="kcard st-approf"><div class="cn"><span class="nm">Datalytics S.p.A.</span></div><div class="meta"><span class="prov">TO</span><span class="stars">★★<span class="off">★</span></span><span class="chip reg-warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>Non vende</span></div><div class="foot"><span class="ev"><span class="txt">Aggiunta 3 gg fa</span></span></div></div>
+                <div class="kcard st-approf"><div class="cn"><span class="nm">Kernel Reti S.p.A.</span></div><div class="meta"><span class="prov">BS</span><span class="stars">★★<span class="off">★</span></span></div><div class="foot"><span class="dossier"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>Genera dossier</span></div></div>
+                <div class="kcard st-approf"><div class="cn"><span class="nm">Delta Sistemi</span></div><div class="meta"><span class="prov">PR</span><span class="stars">★<span class="off">★★</span></span></div></div>
+                </div>
+              <div class="substate collapsed"><div class="sh st-dacont"><span class="nm">Da contattare</span><span class="cnt">4</span><span class="acts"><span class="chev iconbtn" title="Comprimi / espandi stato"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></span><span class="iconbtn" title="Aggiungi azienda in questo stato"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></span><span class="iconbtn" title="Isola questo stato in una colonna dedicata"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></span></span></div>
+                <div class="kcard st-dacont"><div class="cn"><span class="nm">Sistemi Cloud Italia</span></div><div class="meta"><span class="prov">BO</span><span class="stars">★★<span class="off">★</span></span><span class="chip diretta">Diretta</span></div><div class="foot"><span class="ev"><span class="txt">Aggiunta 5 gg fa</span></span></div></div>
+                <div class="kcard st-dacont"><div class="cn"><span class="nm">Fibernet Adriatica</span></div><div class="meta"><span class="prov">PD</span><span class="stars">★<span class="off">★★</span></span></div></div>
+                </div>
+              <div class="substate"><div class="sh st-pcont"><span class="nm">Primo contatto</span><span class="cnt">3</span><span class="acts"><span class="chev iconbtn" title="Comprimi / espandi stato"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></span><span class="iconbtn" title="Aggiungi azienda in questo stato"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></span><span class="iconbtn" title="Isola questo stato in una colonna dedicata"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></span></span></div>
+                <div class="kcard st-pcont"><div class="cn"><span class="nm">Aretek Soluzioni IT</span></div><div class="meta"><span class="prov">VR</span><span class="stars">★★★</span></div><div class="foot"><span class="ev"><span class="txt">Chiamata interlocutore · ieri</span></span></div></div>
+                </div>
+            </div>
+          </div>
+          <!-- 02 Engagement -->
+          <div class="mcol" style="--mc:#6d28d9;--mtint:linear-gradient(180deg,#ede9fe,#f6f3ff)">
+            <div class="mcolhead"><span class="num">02</span><div><div class="mt">Engagement</div><div class="msub">trattativa in corso</div></div><span class="mcnt">3</span></div>
+            <div class="mcolbody">
+              <div class="substate"><div class="sh st-pinc"><span class="nm">Primo incontro</span><span class="cnt">2</span><span class="acts"><span class="chev iconbtn" title="Comprimi / espandi stato"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></span><span class="iconbtn" title="Aggiungi azienda in questo stato"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></span><span class="iconbtn" title="Isola questo stato in una colonna dedicata"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></span></span></div>
+                <div class="kcard st-pinc"><div class="cn"><span class="nm">Adriatica Reti</span></div><div class="meta"><span class="prov">AN</span><span class="stars">★★<span class="off">★</span></span></div><div class="foot"><span class="ev"><span class="txt">Meeting · 16:30 Milano</span></span></div></div>
+                <div class="kcard st-pinc"><div class="cn"><span class="nm">BluGrid Energy</span></div><div class="meta"><span class="prov">RM</span><span class="stars">★★★</span></div></div>
+                </div>
+              <div class="substate"><div class="sh st-nda"><span class="nm">NDA</span><span class="cnt">1</span><span class="acts"><span class="chev iconbtn" title="Comprimi / espandi stato"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></span><span class="iconbtn" title="Aggiungi azienda in questo stato"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></span><span class="iconbtn" title="Isola questo stato in una colonna dedicata"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></span></span></div>
+                <div class="kcard st-nda"><div class="cn"><span class="nm">Meridiana Datacenter</span></div><div class="meta"><span class="prov">NA</span><span class="stars">★★★</span><span class="chip reg-info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>Già cliente</span></div><div class="foot"><span class="ev"><span class="txt">NDA firmato · 5 gg fa</span></span></div></div>
+                </div>
+              <div class="substate"><div class="sh st-loi"><span class="nm">LOI</span><span class="cnt">0</span><span class="acts"><span class="chev iconbtn" title="Comprimi / espandi stato"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></span><span class="iconbtn" title="Aggiungi azienda in questo stato"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></span><span class="iconbtn" title="Isola questo stato in una colonna dedicata"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></span></span></div>
+                <div class="empty">Nessuna azienda in questo stato</div>
+                </div>
+            </div>
+          </div>
+          <!-- 03 Follow-up -->
+          <div class="mcol" style="--mc:#c2410c;--mtint:linear-gradient(180deg,#ffedd5,#fff7ed)">
+            <div class="mcolhead"><span class="num">03</span><div><div class="mt">Follow-up</div><div class="msub">in attesa, da riprendere</div></div><span class="mcnt">2</span></div>
+            <div class="mcolbody">
+              <div class="substate"><div class="sh st-ric"><span class="nm">Ricontattare</span><span class="cnt">2</span><span class="acts"><span class="chev iconbtn" title="Comprimi / espandi stato"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></span><span class="iconbtn" title="Aggiungi azienda in questo stato"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></span><span class="iconbtn" title="Isola questo stato in una colonna dedicata"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></span></span></div>
+                <div class="kcard st-ric"><div class="cn"><span class="nm">Ligure Reti S.p.A.</span></div><div class="meta"><span class="prov">GE</span><span class="stars">★★<span class="off">★</span></span><span class="recdate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Q3 2026</span></div><div class="foot"><span class="ev"><span class="txt">In attesa · budget non maturo</span></span></div></div>
+                <div class="kcard st-ric"><div class="cn"><span class="nm">Arco Digital</span></div><div class="meta"><span class="prov">TO</span><span class="stars">★★<span class="off">★</span></span><span class="recdate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>2 set</span></div></div>
+                </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><span class="m">1</span><span>In <b>Pipeline attiva</b> la colonna <b>Esito è nascosta</b>; compare come 04 solo in Vista completa.</span></li>
+      <li><span class="m">2</span><span>L'icona <b>⤢</b> sul titolo di stato <b>isola</b> quello stato in una colonna dedicata in Tutti gli stati — le card volano (FLIP). Non è un «vedi altro»: qui le card sono <b>già tutte</b>, serve solo quando uno stato è così denso da meritare una colonna a sé.</span></li>
+      <li><span class="m">3</span><span>Sul titolo di ogni stato tre icone discrete: <b>⌄</b> (comprimi/espandi), <b>+</b> (aggiungi azienda), <b>⤢</b> (isola lo stato). L'aggiunta sta sul titolo, non in una riga a fondo colonna, per <b>risparmiare verticale</b>. In Tutti gli stati resta la riga «+ Aggiungi» in fondo alla colonna.</span></li>
+      <li><span class="m">4</span><span><b>Stati collassabili</b> (accordion verticale, qui «Da contattare» è compresso): comprimi gli stati che non lavori e il target del <b>DnD verticale ti arriva vicino</b>, senza scroll dentro colonne alte. La banda collassata <b>resta drop-zone</b> (drop → aggiunge allo stato); collasso persistito per utente/vista. Reduced-motion: espansione istantanea.</span></li>
+      <li><span class="m">5</span><span>Entrambe le viste sono kanban con lo stesso feel di drag/optimistic/keyboard; il toggle cambia solo <b>quante</b> colonne e a che livello. <b>Macrofasi è il default d'ingresso.</b></span></li>
+    </ul>
+  </section>
+
+  <!-- ============================ TODAY VS V2 ============================ -->
+  <section class="blk" id="today">
+    <div class="blk-head"><span class="sid">04</span><h2>Oggi ↔ v2 — il salto percepito</h2><span class="ref">criterio di bocciatura §6.3</span></div>
+    <p class="blk-intent">Stesse due colonne, stesso contenuto. A sinistra la board attuale (pill pallide, bordi sottili, ombre appena percettibili); a destra la v2 (canvas tinto, colonne come superfici distinte, card bianche con ombra reale, rampa cromatica, tipografia più coraggiosa).</p>
+    <div class="compareGrid">
+      <div class="frame"><div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span><span class="url">board attuale</span><span class="tag">oggi</span></div>
+        <div class="board today" style="--canvas:#f7f9fc;padding:16px">
+          <div class="cols" style="overflow:visible">
+            <div class="kcol" style="background:#fff;flex:1"><div class="kcolhead"><span class="nm" style="color:#334155">Approfondimento</span><span class="cnt">6</span></div><div class="kcolbody">
+              <div class="kcard"><div class="cn"><span class="nm">Nexer Cloud Group</span></div><div class="meta"><span class="today-pill" style="background:#f1f5f9;color:#475569">MI</span><span class="stars" style="color:#f59e0b">★★★</span></div></div>
+              <div class="kcard"><div class="cn"><span class="nm">Datalytics S.p.A.</span></div><div class="meta"><span class="today-pill" style="background:#f1f5f9;color:#475569">TO</span></div></div></div></div>
+            <div class="kcol" style="background:#fff;flex:1"><div class="kcolhead"><span class="nm" style="color:#334155">NDA</span><span class="cnt">1</span></div><div class="kcolbody">
+              <div class="kcard"><div class="cn"><span class="nm">Meridiana Datacenter</span></div><div class="meta"><span class="today-pill" style="background:#f1f5f9;color:#475569">NA</span></div></div></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="frame"><div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span><span class="url">board v2</span><span class="tag">rampa A</span></div>
+        <div class="board rampA" style="--canvas:#e6ebf6;padding:16px">
+          <div class="cols" style="overflow:visible">
+            <div class="kcol st-approf tint" style="flex:1"><div class="kcolhead st-approf"><span class="dot"></span><span class="nm">Approfondimento</span><span class="cnt">6</span></div><div class="kcolbody">
+              <div class="kcard st-approf"><div class="cn"><span class="nm">Nexer Cloud Group</span></div><div class="meta"><span class="prov">MI</span><span class="stars">★★★</span></div></div>
+              <div class="kcard st-approf"><div class="cn"><span class="nm">Datalytics S.p.A.</span></div><div class="meta"><span class="prov">TO</span></div></div></div></div>
+            <div class="kcol st-nda tint" style="flex:1"><div class="kcolhead st-nda"><span class="dot"></span><span class="nm">NDA</span><span class="cnt">1</span></div><div class="kcolbody">
+              <div class="kcard st-nda"><div class="cn"><span class="nm">Meridiana Datacenter</span></div><div class="meta"><span class="prov">NA</span></div></div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="badge-note">Nota: gli screenshot definitivi «oggi vs v2» a G2 si producono sul dev server vivo. Questa affiancata è la traccia di direzione: il salto deve essere immediato.</p>
+  </section>
+
+  <!-- ============================ COLLASSO COLONNA ============================ -->
+  <section class="blk" id="collasso">
+    <div class="blk-head"><span class="sid">R</span><h2>Collasso colonna → rail</h2><span class="ref">§6.2 · persistenza esistente riusata</span></div>
+    <p class="blk-intent">Le colonne si collassano a <b>rail verticale</b> per fare spazio agli stati densi. Nel v2 il rail non è il grigio anonimo di oggi: porta l'<b>accento di stato</b> in cima e il conteggio nel colore dello stato, così resti orientato anche da collassato. La persistenza è quella già in produzione (<code>localStorage</code> · chiave <code>binocolo.iniziative.&lt;id&gt;.collapsedColumns</code> · Set di chiavi stato · <code>loadCollapsed</code>/<code>saveCollapsed</code>).</p>
+    <div class="frame">
+      <div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span><span class="url">tre stati del rail</span><span class="tag">rampa A</span></div>
+      <div class="board rampA" style="--canvas:#eef1f8;display:grid;grid-template-columns:auto 1fr;gap:26px;align-items:stretch">
+        <div class="cols" style="overflow:visible;align-items:stretch">
+          <div class="kcol st-nda tint" style="max-height:none">
+            <div class="kcolhead st-nda"><span class="dot"></span><span class="nm">NDA</span><span class="cnt">1</span><svg class="rail" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg></div>
+            <div class="kcolbody">
+              <div class="kcard st-nda"><div class="cn"><span class="nm">Meridiana Datacenter</span></div><div class="meta"><span class="prov">NA</span><span class="stars">★★★</span></div></div>
+            </div>
+          </div>
+          <button class="krail st-pcont" aria-label="Espandi Primo contatto"><span class="rcount">3</span><span class="rlabel">Primo contatto</span><svg class="rchev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></button>
+          <button class="krail st-loi focus" aria-label="Espandi LOI"><span class="rcount">0</span><span class="rlabel">LOI</span><svg class="rchev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></button>
+          <button class="krail st-ric dropover" aria-label="Ricontattare, rilascia qui"><span class="rcount">2</span><span class="rlabel">Ricontattare</span><svg class="rchev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg></button>
+        </div>
+        <ul class="notes" style="margin:0;grid-template-columns:1fr;align-content:center">
+          <li><span class="m">A</span><span><b>A riposo</b> — accento stato in cima · conteggio nel colore stato · label verticale (<code>writing-mode:vertical-rl</code>, bottom-up) · chevron di espansione. Click → riespande.</span></li>
+          <li><span class="m">B</span><span><b>A fuoco</b> (LOI) — il rail è un <code>&lt;button&gt;</code>: ring <code>:focus-visible</code> (token glow) + <code>outline</code> trasparente per forced-colors. <kbd style="font-family:var(--mono);background:var(--ink);color:#fff;border-radius:4px;padding:2px 5px;font-size:11px">c</kbd> collassa/espande la colonna corrente.</span></li>
+          <li><span class="m">C</span><span><b>Drop-over</b> (Ricontattare) — durante il drag il rail resta drop-zone valida: ring interno nel colore stato + tinta, chevron pieno. Drop → applica lo stato (terminale → <code>TerminalModal</code>).</span></li>
+        </ul>
+      </div>
+    </div>
+    <table class="spec">
+      <thead><tr><th style="width:150px">Aspetto</th><th>Comportamento — effetti &amp; handler</th><th style="width:210px">Durata · easing</th></tr></thead>
+      <tbody>
+        <tr><td><b>Trigger</b></td><td>chevron nella testata colonna (<code>onClick → toggleCollapsed(state)</code>) · tasto <kbd>c</kbd> sulla colonna a fuoco · click sul rail per riespandere. Nessun trigger implicito su drag/refetch.</td><td>—</td></tr>
+        <tr><td><b>Transizione</b></td><td>la colonna passa <b>254px → 46px</b>; le colonne superstiti <b>riflowano con FLIP</b> (misura First/Last dei nodi per <code>companyKey</code>/colonna, anima <code>transform</code> via WAAPI in <code>flip.ts</code>) per riempire lo spazio <b>senza salti</b>. Il rail entra con fade+width.</td><td><code>--duration-normal</code> 250ms · <code>--ease-out</code></td></tr>
+        <tr><td><b>Anatomia rail</b></td><td>larghezza 46px, altezza piena della riga; <code>border-top</code> 3px nel colore stato; pill conteggio nel colore stato; label verticale bottom-up; chevron in basso.</td><td>—</td></tr>
+        <tr><td><b>Drop mentre collassata</b></td><td>il rail è drop-zone valida: <code>onDragOver preventDefault</code> → evidenzia (ring interno colore stato + tinta); <code>onDrop</code> → <code>setCardState</code> (stato non-terminale) oppure apre <code>TerminalModal</code> (won/ko). Feel identico al drop su colonna.</td><td><code>--duration-fast</code> 150ms · <code>--ease-out</code></td></tr>
+        <tr><td><b>Persistenza</b></td><td>Set di chiavi collassate in <code>localStorage</code> per iniziativa (chiave sopra); riusata dalla board attuale — nessun nuovo storage. In <code>/pipeline</code> (aggregata) la chiave è separata.</td><td>—</td></tr>
+        <tr><td><b>Keyboard / AA</b></td><td>il rail è <code>&lt;button aria-label="Espandi {stato}"&gt;</code>; focus visibile <code>:focus-visible</code>; navigabile con Tab e con le frecce del board; <kbd>c</kbd> toggla.</td><td>—</td></tr>
+        <tr><td><b>Reduced-motion</b></td><td>FLIP disattivato: collasso/espansione <b>istantanei</b>, nessun riflow animato (UI-UX §8.4).</td><td>istantaneo</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============================ TERMINALE ============================ -->
+  <section class="blk" id="terminale">
+    <div class="blk-head"><span class="sid">T</span><h2>Transizione terminale — modale</h2><span class="ref">§1.1 · esito + ponte registro</span></div>
+    <p class="blk-intent">La chiusura è il gesto più consequenziale e a rischio-errore: registra l'esito e, <b>solo per KO target</b>, alimenta il registro azienda (previene contatti sprecati cross-iniziativa). Copy e affordance fissati qui, a G0. <b>WON</b> = conferma secca senza esito; <b>KO</b> = esito obbligatorio (vocabolario suggerito + testo libero); <b>ponte registro solo KO target</b>.</p>
+    <div class="frame">
+      <div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span><span class="url">drop su colonna terminale → TerminalModal</span><span class="tag">esito + ponte</span></div>
+      <div class="board rampA" style="--canvas:#eef1f8;display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start;padding:26px 22px">
+        <!-- KO target -->
+        <div class="tmodal ko">
+          <div class="thead"><span class="tbadge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></span><h4>KO target — Verde Reti S.r.l.</h4></div>
+          <p class="tsub">La controparte non procede. L'esito calibra lo scoring; il ponte registro segnala l'azienda alle altre iniziative.</p>
+          <div class="tfield"><label>Esito <span style="color:var(--danger)" aria-hidden="true">•</span></label>
+            <div class="tcombo"><span class="opt on">Non vende</span><span class="opt">In trattativa con altri</span><span class="opt">Prezzo richiesto</span><span class="opt">Altro</span></div>
+            <input class="tinput ph" placeholder="…oppure scrivi un esito libero">
+          </div>
+          <div class="tfield"><label>Nota</label><textarea class="tinput area ph" placeholder="Contesto della chiusura (opzionale)"></textarea></div>
+          <div class="tbridge">
+            <div class="bh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>Ponte registro azienda</div>
+            <p class="bsub">Solo per KO target. Propaga il fatto tipizzato alle altre iniziative sulla stessa azienda.</p>
+            <div class="bopt"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span> Non vende</div>
+            <div class="bopt"><span class="chk off"></span> In trattativa con altri</div>
+          </div>
+          <div class="tactions"><span class="btn secondary">Annulla</span><span class="btn danger">Registra KO target</span></div>
+        </div>
+        <!-- WON + varianti -->
+        <div>
+          <div class="tmodal won">
+            <div class="thead"><span class="tbadge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg></span><h4>WON — Ionica Telecom</h4></div>
+            <p class="tsub">Operazione conclusa. Conferma secca: WON non porta esito.</p>
+            <div class="tactions"><span class="btn secondary">Annulla</span><span class="btn ok">Conferma WON</span></div>
+          </div>
+          <ul class="notes" style="margin-top:18px;grid-template-columns:1fr">
+            <li><span class="m">1</span><span><b>KO nostro</b> — stesso modale del KO target ma vocabolario <code>Non idonea / No-go strategico / Prezzo</code> + libero, e <b>nessun ponte registro</b> (context-scoped): una riga «Nessun ponte al registro» sostituisce il blocco ambra.</span></li>
+            <li><span class="m">2</span><span>Il drop su colonna terminale apre la modale <b>senza applicare lo stato</b>: su annulla la card torna indietro (FLIP), su conferma vola nella colonna terminale (§Motion «Spostamento senza drag»).</span></li>
+            <li><span class="m">3</span><span>Riapertura da terminale → <code>approfondimento</code> (nuova ≥1★ o azione manuale), invariata.</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ MOTION ============================ -->
+  <section class="blk" id="motion">
+    <div class="blk-head"><span class="sid">05</span><h2>Spec di feel — motion &amp; DnD</h2><span class="ref">§6.2 · ogni gesto ha durata/easing/stato intermedio</span></div>
+    <p class="blk-intent">DnD su <code>@dnd-kit</code>; FLIP su Web Animations API (utility propria <code>flip.ts</code>, nessuna libreria nuova); optimistic su react-query. Tutte le transizioni usano i token motion di UI-UX §8.1. <code>prefers-reduced-motion</code>: FLIP off, cambi istantanei.</p>
+    <table class="spec">
+      <thead><tr><th style="width:150px">Gesto</th><th>Stato intermedio</th><th style="width:230px">Durata · easing</th></tr></thead>
+      <tbody>
+        <tr><td><b>Pickup</b></td><td>lift <code>scale(1.03)</code> + rotazione ~1.5° + <code>--shadow-lg</code>; cursore <code>grabbing</code>; sorgente → ghost (opacity .4). Attivazione con <b>distance constraint 8px</b> per non rubare il click.</td><td><code>--duration-fast</code> 150ms · <code>--ease-spring</code></td></tr>
+        <tr><td><b>Over</b></td><td>placeholder animato apre lo spazio nella colonna target; la colonna target si evidenzia <b>nel proprio colore-stato</b> (bordo + tinta <code>var(--c)</code>) — «dove sto rilasciando» = «che stato è»; le rail collassate accettano il drop ed evidenziano uguale. <i>Il ring di focus da tastiera usa invece <code>--color-accent-glow</code> (glow trasparente e transitorio, mai confuso coi fill di stato).</i></td><td><code>--duration-normal</code> 250ms · <code>--ease-spring</code></td></tr>
+        <tr><td><b>Drop (attivo)</b></td><td>settling verso la posizione finale; <b>sullo stesso settle si sciolgono</b> le trasformazioni del pickup (<code>scale 1.03→1</code>, rotazione <code>1.5°→0</code>, <code>--shadow-lg→--shadow-md</code>) — nessuno snap netto (il «thunk» dell'atterraggio).</td><td><code>--duration-normal</code> 250ms · <code>--ease-out</code></td></tr>
+        <tr><td><b>Drop (terminale)</b></td><td>drop su colonna terminale <b>o</b> chip Esito della strip → apre <code>TerminalModal</code> <b>senza applicare lo stato</b>; su <b>annulla</b> la card torna indietro (FLIP), su <b>conferma</b> segue la riga «Spostamento senza drag».</td><td>modale 0.35s ease-spring · ritorno <code>--duration-slow</code> · <code>--ease-out</code></td></tr>
+        <tr><td><b>Spostamento senza drag</b></td><td><b>Ogni cambio colonna senza trascinamento</b>: tasti <kbd>1</kbd>…<kbd>7</kbd>, azione dal <code>CardDrawer</code>, <b>conferma della TerminalModal</b>, reopen da terminale. Stato intermedio: la card parte dalla posizione attuale e <b>vola</b> alla colonna di destinazione (FLIP per <code>companyKey</code>); il conteggio strip fa count-up come nel drag. In «Pipeline attiva» una conferma terminale (colonne Esito nascoste) <b>commuta a Vista completa</b>, poi anima la card nella colonna terminale.</td><td><code>--duration-slow</code> 400ms · <code>--ease-out</code></td></tr>
+        <tr><td><b>Cambio vista</b></td><td><b>Macrofasi ↔ Tutti gli stati</b>: le stesse card volano verso la nuova posizione (FLIP per <code>companyKey</code>) — il momento-firma. Le card compatte↔ricche fanno <b>morph di forma</b> (misura del Last sulla forma di arrivo, crossfade del contenuto che compare); FLIP e scroll alla colonna a fuoco sono concorrenti, lo <b>spostamento del focus avviene al termine</b>.</td><td><code>--duration-slow</code> 400ms · <code>--ease-out</code></td></tr>
+        <tr><td><b>Collasso colonna</b></td><td>colonna 254px → rail 46px con fade del contenuto; le card superstiti riflowano con FLIP. Dettaglio completo in <a href="#collasso" style="color:var(--accent);font-weight:600">§Collasso</a>.</td><td><code>--duration-normal</code> · <code>--ease-out</code></td></tr>
+        <tr><td><b>Collasso stato (Macrofasi)</b></td><td>accordion verticale: la sotto-sezione stato comprime/espande le sue card (chevron ⌄→⌐90°), le sotto-sezioni sotto scorrono su con FLIP — avvicina il target del DnD verticale. La banda collassata resta drop-zone (drop-over evidenzia nel colore-stato). Persistito per utente/vista.</td><td><code>--duration-normal</code> · <code>--ease-out</code></td></tr>
+        <tr><td><b>Enter / exit card</b></td><td>card che <b>compare/scompare</b> dal layout (filtro chip applicato o rimosso, colonne Esito rivelate dal toggle Pipeline↔Completa, sorgente rimossa): exit <code>fade + scale→0.98</code>, enter simmetrico. Keyed <b>per collezione</b>: NON è l'entrance di navigazione, non ri-triggera su refetch/polling (§8.3).</td><td><code>--duration-fast</code> · <code>--ease-out</code></td></tr>
+        <tr><td><b>Strip funnel</b></td><td>quando una card attraversa il funnel i conteggi fanno un <b>count-up/down</b> breve (tabular-nums); il chip <b>attivo come filtro</b> prende la tinta accent (stato di controllo, distinto dai colori-stato).</td><td><code>--duration-normal</code> · <code>--ease-out</code></td></tr>
+        <tr><td><b>Hover card</b></td><td><code>translateY(-1px)</code> + bordo nel colore-stato + <code>--shadow-lg</code>.</td><td><code>--duration-fast</code> · <code>--ease-out</code></td></tr>
+        <tr><td><b>Riordino in colonna</b></td><td>le card sorelle scorrono per fare spazio durante l'over; il default di <code>@dnd-kit/sortable</code> è <b>tokenizzato</b> ai token motion (non il ~200ms di libreria).</td><td><code>--duration-normal</code> · <code>--ease-spring</code></td></tr>
+        <tr><td><b>Chip ricontatto</b></td><td>il colore <b>scalda</b> (verso token warning) all'avvicinarsi della data; mai testo base (§4.2).</td><td>statico per data</td></tr>
+        <tr><td><b>Refetch / polling</b></td><td><b>nessuna entrance</b> (§8.3): structural sharing di react-query, la board non salta mai; skeleton solo al primo load.</td><td>—</td></tr>
+        <tr><td><b>Reduced-motion</b></td><td>stato ridotto per ogni gesto: FLIP e riflow → riposizionamento <b>istantaneo</b>; pickup senza scale/rotazione; enter/exit e count-up senza transizione; hover senza translate (UI-UX §8.4).</td><td>istantaneo</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============================ KEYBOARD ============================ -->
+  <section class="blk" id="keyboard">
+    <div class="blk-head"><span class="sid">06</span><h2>Spec keyboard</h2><span class="ref">§6.2 · AA · popover «?»</span></div>
+    <p class="blk-intent">Il drag è operabile da tastiera (KeyboardSensor di dnd-kit: pick con Space, frecce, drop con Space) — requisito AA. Non basta «operabile»: il drag da tastiera <b>annuncia via live-region</b> — le <code>screenReaderInstructions</code> all'ingresso e gli <code>announcements</code> di dnd-kit («presa {azienda}», «spostata in {stato}, posizione {n}», «rilasciata», «annullata»). Focus ring visibile via <code>:focus-visible</code> (token glow) + <code>outline</code> per forced-colors. Scorciatoie in un popover <kbd style="font-family:var(--mono)">?</kbd>.</p>
+    <table class="spec">
+      <thead><tr><th style="width:150px">Tasto</th><th>Azione</th></tr></thead>
+      <tbody>
+        <tr><td><kbd>/</kbd></td><td>Focus sulla ricerca (come da mock)</td></tr>
+        <tr><td><kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd></td><td>Navigazione <b>spaziale 2D</b>: <kbd>←</kbd><kbd>→</kbd> cambia colonna, <kbd>↑</kbd><kbd>↓</kbd> cambia card nella colonna. Ingresso focus: roving tabindex, entra sulla prima card della prima colonna non vuota.</td></tr>
+        <tr><td><kbd>j</kbd> <kbd>k</kbd></td><td>Traversata <b>lineare</b> della coorte appiattita (attraversa le colonne in sequenza) — coerente con la Staffetta della scheda azienda</td></tr>
+        <tr><td><kbd>Enter</kbd></td><td>Apre il drawer della card a fuoco</td></tr>
+        <tr><td><kbd>Space</kbd></td><td>Pick / drop della card a fuoco (drag da tastiera), poi frecce per spostare</td></tr>
+        <tr><td><kbd>1</kbd> … <kbd>7</kbd></td><td>Sposta la card a fuoco nello stato <i>n</i>-esimo non-terminale</td></tr>
+        <tr><td><kbd>w</kbd> / <kbd>x</kbd></td><td>Apre <code>TerminalModal</code> — WON / KO</td></tr>
+        <tr><td><kbd>c</kbd></td><td>Collassa / espande la colonna corrente</td></tr>
+        <tr><td><kbd>Esc</kbd></td><td>Chiude drawer, modale o popover</td></tr>
+        <tr><td><kbd>?</kbd></td><td>Apre il popover con l'elenco scorciatoie</td></tr>
+      </tbody>
+    </table>
+    <div class="callout" style="margin-top:22px;border-left-color:var(--accent)"><b>Prossimo passo.</b> Gate G0: panel esperti (interaction designer · impatto visivo · visual vs UI-UX · copy B2B · analista M&amp;A) + scelta della direzione cromatica da parte dell'utente. Approvato G0 → si scrivono i token in <code>tokens.css</code>, si aggiorna <code>UI-UX.md</code>, e parte B1+F1 (migrazione 112, stati v2, dominio condiviso).</div>
+  </section>
+</div>
+
+<style>
+  /* =========================================================================
+     PALETTE DELLE ESPLORAZIONI — ridefiniscono --c/--tint/--strong per stato.
+     ========================================================================= */
+
+  /* --- A · Rampa termica (fredda → calda) --- */
+  .rampA .st-approf{--c:#0284c7;--tint:#e0f2fe;--strong:#075985}
+  .rampA .st-dacont{--c:#2563eb;--tint:#dbeafe;--strong:#1e40af}
+  .rampA .st-pcont {--c:#4f46e5;--tint:#e0e7ff;--strong:#3730a3}
+  .rampA .st-pinc  {--c:#7c3aed;--tint:#ede9fe;--strong:#5b21b6}
+  .rampA .st-nda   {--c:#9333ea;--tint:#f3e8ff;--strong:#6b21a8}
+  .rampA .st-loi   {--c:#d97706;--tint:#fef3c7;--strong:#92400e}
+  .rampA .st-ric   {--c:#ea580c;--tint:#ffedd5;--strong:#9a3412}
+  .rampA .st-won   {--c:#059669;--tint:#d1fae5;--strong:#065f46}
+  .rampA .st-kon   {--c:#e11d48;--tint:#ffe4e6;--strong:#9f1239}
+  .rampA .st-kot   {--c:#dc2626;--tint:#fee2e2;--strong:#991b1b}
+
+  /* --- B · Monocromatica indaco (profondità crescente) --- */
+  .monoB .st-approf{--c:#a5b4fc;--tint:#eef2ff;--strong:#4338ca}
+  .monoB .st-dacont{--c:#818cf8;--tint:#eef2ff;--strong:#4338ca}
+  .monoB .st-pcont {--c:#6366f1;--tint:#e0e7ff;--strong:#3730a3}
+  .monoB .st-pinc  {--c:#4f46e5;--tint:#e0e7ff;--strong:#312e81}
+  .monoB .st-nda   {--c:#4338ca;--tint:#e0e7ff;--strong:#312e81}
+  .monoB .st-loi   {--c:#3730a3;--tint:#e0e7ff;--strong:#1e1b4b}
+  .monoB .st-ric   {--c:#6366f1;--tint:#eef2ff;--strong:#3730a3}
+  .monoB .st-won   {--c:#059669;--tint:#d1fae5;--strong:#065f46}
+  .monoB .st-kon   {--c:#e11d48;--tint:#ffe4e6;--strong:#9f1239}
+  .monoB .st-kot   {--c:#dc2626;--tint:#fee2e2;--strong:#991b1b}
+
+  /* --- C · Semantica pura (attivi neutri, colore solo semantico) --- */
+  .semC .st-approf{--c:#94a3b8;--tint:#f1f5f9;--strong:#334155}
+  .semC .st-dacont{--c:#64748b;--tint:#f1f5f9;--strong:#334155}
+  .semC .st-pcont {--c:#475569;--tint:#eef2f6;--strong:#1e293b}
+  .semC .st-pinc  {--c:#475569;--tint:#eef2f6;--strong:#1e293b}
+  .semC .st-nda   {--c:#334155;--tint:#e9eef4;--strong:#1e293b}
+  .semC .st-loi   {--c:#1e293b;--tint:#e9eef4;--strong:#0f172a}
+  .semC .st-ric   {--c:#f59e0b;--tint:#fef3c7;--strong:#b45309}
+  .semC .st-won   {--c:#10b981;--tint:#d1fae5;--strong:#047857}
+  .semC .st-kon   {--c:#f43f5e;--tint:#ffe4e6;--strong:#9f1239}
+  .semC .st-kot   {--c:#ef4444;--tint:#fee2e2;--strong:#b91c1c}
+</style>

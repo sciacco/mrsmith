@@ -491,3 +491,11 @@ Before shipping any new mini-app screen, verify:
 8. Errors requiring action have a persistent surface, not just a toast (§14.3).
 9. Loading = skeletons; empty states per §14.5 with an action when resolvable.
 10. Keyboard: rows/overlays/menus operable, Escape closes, focus visible and managed (§16).
+
+---
+
+## 20. App-level token extensions
+
+Apps MAY extend the theme with app-local tokens in `apps/{app}/src/styles/tokens.css` (§18 file structure) when a value has no shared token. Rules: define under `:root[data-theme="clean"]`, name neutrally, verify AA for any text recipe, and document the set here.
+
+**Binocolo — Kanban funnel ramp** (`apps/binocolo/src/styles/tokens.css`, added at Kanban v2 gate G0, 2026-07-18). A per-stage colour ramp for the initiative board (cold→warm = progress in the M&A funnel). Each state exposes a triple: `--kanban-{state}-base` (dot / column border / card left-border / number tile — **not** text on light), `--kanban-{state}-tint` (state bands, columns, chips), `--kanban-{state}-text` (AA text on tint/white). Column count badges use `-text` on `-tint`, never white-on-`-base` (fails AA on the light hues). Macrofase headers use `--kanban-macro-{origination,engagement,followup,esito}`. The "one colour per funnel stage" method is a **candidate for a future system pattern (UI-UX v3)**; promotion into `clean.css` is deferred (Kanban v2 plan §12) — it stays app-level until decided.
