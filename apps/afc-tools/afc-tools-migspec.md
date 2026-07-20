@@ -208,7 +208,7 @@ Base path: `/api/afc-tools/`. Role-gated by `app_afctools_access`. All requests 
   - No server-side pagination is introduced (matches Appsmith behavior); tables paginate client-side.
 - **Operational**:
   - Two new MySQL DSNs require provisioning steps in preprod/prod (Kubernetes Secret + ConfigMap entries).
-  - Carbone template ownership: continues to be managed manually until the cross-app "Portal Admin Module — Carbone Template Management" TODO lands.
+  - Carbone template ownership remains app-specific and backend-managed through `CARBONE_AFCTOOLS_TRANSAZIONI_TEMPLATE_ID`.
 - **UX / accessibility**: follow `docs/UI-UX.md` and the portal design system. `<b>` bindings from Appsmith are replaced by semantic bold typography, not literal markup.
 
 ## Open Questions and Deferred Decisions
@@ -216,7 +216,7 @@ Base path: `/api/afc-tools/`. Role-gated by `app_afctools_access`. All requests 
 - **Q-E1** — *Quadrimestrale code divergence*: `cdlan_dur_rin` uses 4, `cdlan_int_fatturazione` uses 5. Owner: Sales / Fatturazione domain expert. Needed input: confirmation whether both codings are authoritative or one is a bug. Preserved 1:1; TODO in `docs/TODO.md → AFC Tools App`.
 - **Q-E2** — *DDT cespiti pagination / filters*: current full-table load risks timeout at scale. Owner: AFC team. TODO in `docs/TODO.md → AFC Tools App`.
 - **Q-E3** — *Energia Colo detail field semantics*: `tipo_variabile`, `coefficiente`, `fisso_cu`, `eccedenti`, `importo_eccedenti` are displayed verbatim but their business meaning is undocumented. Owner: AFC / Billing. Not blocking 1:1.
-- **Q-E4** — *Carbone template admin*: hard-coded template id per app continues the pattern flagged in `docs/TODO.md → Listini e Sconti App → Portal Admin Module — Carbone Template Management`. Swap to the central admin module once it ships.
+- **Q-E4** — *Carbone template configuration*: resolved through the backend-owned `CARBONE_AFCTOOLS_TRANSAZIONI_TEMPLATE_ID` environment setting; no central portal administration module is planned.
 - **Q-E5** — *WHMCS floor `date > 20230120`*: embedded business rule, unclear if permanent. Owner: Billing. Preserved as-is.
 - **Q-E6** — *Path ambiguity `/orders/{id}` (Vodka) vs `/orders/{id}/pdf` (Mistra)*: two different backing DBs under the same `/orders/` namespace. Technically distinct via the `/pdf` suffix; worth a rename in a future pass (e.g. `/xconnect-orders/{id}/pdf`). Deferred — not a 1:1 blocker.
 

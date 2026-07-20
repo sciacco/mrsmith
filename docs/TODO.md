@@ -1,10 +1,5 @@
 # Project TODOs
 
-## Developer Experience
-
-### Single-Origin Dev Gateway
-Future implementation plan is tracked in [docs/DEV-GATEWAY-IMPLEMENTATION-PLAN.md](DEV-GATEWAY-IMPLEMENTATION-PLAN.md). This work would replace browser-visible per-app localhost ports with a backend-owned single-origin dev gateway while preserving independent app Vite servers as opt-in processes.
-
 ## Training App
 
 ### Calendar Integration Deferred Post Go-Live
@@ -23,9 +18,6 @@ Training v1 has a local filesystem `StorageAdapter` for dev and controlled deplo
 Training treats `training.employee` primarily as a local read model. Initial cutover may bootstrap active employees from the one-shot import CLI, while ongoing population and synchronization are delegated to external connectors outside the Training mini-app scope. The approved exception is People-admin manual creation from the Training Persone page: it creates local, audited employee rows for immediate training planning needs. Login and employee self-service workflows must not create employee records.
 
 ## Listini e Sconti App
-
-### Portal Admin Module — Carbone Template Management
-Carbone PDF templates are currently referenced by hardcoded template IDs in individual apps (e.g. kit-products, listini-e-sconti). A portal-wide admin module should be developed to centralize template management (upload, versioning, assignment to apps). Once implemented, all apps using Carbone will be updated to fetch template IDs from the admin module instead of hardcoding them.
 
 ### Bulk Kit PDF Export
 Currently the Kit di vendita page exports one kit PDF at a time via Carbone. A future enhancement should support bulk export — generating PDFs for all kits (or a filtered subset) in a single operation, either as a ZIP download or a merged multi-kit document. Useful for sales teams preparing full product catalogs.
@@ -47,10 +39,10 @@ The Dashboard page (revenue charts per client: revenue by account, historical bi
 ## Energia in DC App
 
 ### Bulk Actions on Low-Consumption Search (deferred from v1)
-The "Consumi < 1A" view lists rack sockets whose average ampere falls below a threshold. Today the user can only read the list. A future enhancement should add bulk actions on selected rows — e.g. open a ticket per socket (for on-site verification), notify the owning customer/account manager, or flag the rack for decommissioning review. Requires: (a) a selection model on the results table, (b) backend endpoints for the chosen actions, (c) integration with the async HubSpot queue (see "Cross-App Infrastructure → Async HubSpot Request Queue") for any CRM-side side effects. Scope and exact action set to be defined with Product.
+The "Consumi < 1A" view lists rack sockets whose average ampere falls below a threshold. Today the user can only read the list. A future enhancement should add bulk actions on selected rows — e.g. open a ticket per socket (for on-site verification), notify the owning customer/account manager, or flag the rack for decommissioning review. Requires: (a) a selection model on the results table, (b) backend endpoints for the chosen actions, and (c) a durable delivery decision for any CRM-side effects, based on the Raenad HubSpot queue if reliability is required. Scope and exact action set to be defined with Product.
 
 ### Addebiti PDF Export (deferred from v1)
-The "Addebiti" view ships CSV export in v1. A future pass should add a PDF export option — likely via the shared Carbone template manager (see "Listini e Sconti App → Portal Admin Module — Carbone Template Management") so the template ID isn't hardcoded in this app.
+The "Addebiti" view ships CSV export in v1. A future pass should add a PDF export option using the existing backend-owned Carbone integration pattern. Keep template resolution app-owned and use runtime configuration if operators need to change the template without a deployment.
 
 ## Grappa DCIM App
 
@@ -75,30 +67,19 @@ Currently the quote product configuration enforces single-selection per `group_n
 ### Wizard Step 2 — Inline Product Configurator (deferred from refactor Phase 3)
 The original UX spec (`quotes-migspec-phaseE-ux.md` §2.4) asked for the full `KitAccordion` + `ProductGroupRadio` inline inside the creation wizard, so the sales user could configure product variants and required groups before clicking "Crea proposta". This was deferred during the refactor because `useRowProducts(quoteId, rowId)` requires an existing quote row on the server — products are resolved by joining `quotes.quote_row` against `products.kit_product`, and there is no "draft quote" path. The wizard currently lets users pick kits (via `KitPickerModal`) and compute NRC/MRC totals at the kit level, but product-level configuration happens only in the detail page after creation. Options for a future pass: (a) add a server endpoint `POST /kits/:id/preview-products` that resolves the same product tree without requiring a `quote_row_id`, then wire `KitAccordion` in "preview" mode in the wizard, (b) accept a `draft` quote status and allow creation before commit, or (c) keep the current two-phase UX and document it as intentional. Option (a) is the cleanest but touches backend.
 
-### SegmentedControl Primitive + Wizard Radio Groups (deferred from refactor Phase 3)
-Wizard Step 1 still uses native `<input type="radio">` groups for: document type (Ricorrente/Spot), proposal type (Nuovo/Sostituzione/Rinnovo), NRC charge time (`HeaderTab`), and IaaS language (ITA/ENG). The UX spec wanted these as card-toggle / segmented-control patterns. Scope for the refactor was limited to the already-distinctive `TypeSelector` (standard vs IaaS). A proper fix is to add a shared `SegmentedControl` component to `@mrsmith/ui` (takes `options: {value, label, icon?}[]` and behaves like a radio group with pill styling, rounded track, animated thumb), then replace every remaining native radio in the quotes app. The same primitive would also benefit budget/compliance/listini radio UIs.
-
-### TrialSlider Custom Component (deferred from refactor Phase 3)
-The IaaS wizard trial field (`QuoteCreatePage.tsx` step 1) currently uses a native `<input type="range">` with `accent-color`. Spec §2.3 asked for a custom slider: track `--color-surface`, thumb 18px `--color-accent` with `--shadow-sm`, live preview label with currency formatting, tick marks every 50€. Native range works but looks inconsistent with the rest of the DS. Implement as a local `components/TrialSlider.tsx` (or promote to `@mrsmith/ui` if another app needs it) using `role="slider"` + keyboard navigation.
-
-### Accordion drag-drop via @dnd-kit
-il KitAccordion usa ancora HTML5 drag-and-drop nativo. @dnd-kit porta hint visivi migliori (shadow-float, scale). sostituirlo
-
-## Design System (@mrsmith/ui)
-
-### Stylelint Cleanup for Shared Components (deferred from refactor Phase 2)
-The `lint:css` script enforces the `declaration-property-value-disallowed-list` rule (no hex literals in color-related properties) but is currently scoped to `apps/quotes/src/**/*.module.css` only. Running the same rule against `packages/ui/src/components/**/*.module.css` produces ~300 errors: every component (`Modal`, `SingleSelect`, `MultiSelect`, `SearchInput`, `Skeleton`, `TableToolbar`, `ToastProvider`, `ToggleSwitch`, `TabNav`, `TabNavGroup`, `UserMenu`, `AppShell`) still uses the legacy `var(--color-x, #fallback)` pattern where the hex fallback can drift from the token value (and already does in several places — same token has different fallbacks across files). The hex fallbacks exist because the DS was built before the `clean.css` theme was locked in. The cleanup is purely mechanical (remove the `, #xxx` from every `var()`, replace raw hex with the correct token), but touches every shared component so it needs a focused PR. Once done, extend `lint:css` to include `packages/ui/src/components/**/*.module.css` to prevent regressions across all consumers.
+### Promote Quotes SegmentedControl if Reuse Emerges
+Quotes now has a local `components/SegmentedControl` used by the creation wizard and part of `HeaderTab`; some detail-page radio groups remain native. Promote the primitive to `@mrsmith/ui` and replace the remaining native radios only if another app needs the same control or Quotes receives another focused form-polish pass. Do not create a shared primitive solely to remove otherwise accessible native inputs.
 
 ## Cross-App Infrastructure
 
 ### Fornitori — Arak schema drift guard
 The Fornitori mini-app reads and writes Arak-owned PostgreSQL tables directly through `ARAK_DSN` for dashboard rows, RDA payment toggles, and article-category mapping. Add a schema-drift guard after the 1:1 cutover: either a small integration contract test pinned to `provider_qualifications.payment_method`, `provider_qualifications.document`, `provider_qualifications.provider_category`, `articles.article`, and `articles.article_category`, or an operational alert tied to Arak migration changes. Until then, table/column changes in Arak can break the MrSmith BFF without compile-time warning.
 
-### Shared Carbone Service
-`CarboneService` is duplicated in two packages (`internal/listini/carbone.go` and `internal/reports/carbone.go`) with nearly identical code — the only difference is `convertTo: "pdf"` vs `"xlsx"` and template ID handling (per-struct vs per-call). Extract to a shared `internal/platform/carbone` package with a single service that accepts both format and template ID per call. Both listini and reports would receive the same instance from `main.go`.
+### Shared Carbone Transport Client
+Carbone render/download transport is now duplicated across five backend packages: `internal/listini`, `internal/reports`, `internal/simulatorivendita`, `internal/afctools`, and `internal/aenad`. If another integration or material change is needed, extract the common HTTP transport into `internal/platform/carbone`: authentication, API version headers, render submission, result download, timeout, and error handling. Keep payload construction, template resolution, output naming, and app-specific workflow in each owning package. This is a maintenance refactor, not a prerequisite for current functionality.
 
-### Async HubSpot Request Queue
-Design and implement a shared async queue for submitting requests to HubSpot across all mrsmith apps. Current approach is fire-and-forget with failures tolerated. The queue should support: configurable expiry (TTL per message), exponential retry with backoff, notification channel on persistent failure (e.g. Slack, email), dead-letter handling for undeliverable messages, and per-app/per-entity configuration. This replaces the current pattern where each app calls HubSpot synchronously and silently ignores failures.
+### Generalize the Raenad HubSpot Queue if Required
+Raenad already has a persistent HubSpot queue and worker with deduplication, locking, retries/backoff, terminal `dead` state, and manual retry in `internal/raenad/hubspot_queue.go` and `hubspot_worker.go`. Listini still sends best-effort notes and tasks through fire-and-forget goroutines in `internal/listini/hubspot.go`. Before building shared infrastructure, confirm whether losing an occasional Listini CRM audit side effect is a business or operational risk. If durable delivery is required, extract the reusable queue mechanics from Raenad, migrate Listini, and add any still-required cross-app concerns such as message expiry, dead-message notifications, and operational visibility. Do not introduce a generic queue framework without a second confirmed durable-delivery use case.
 
 ## Budget Management App
 
