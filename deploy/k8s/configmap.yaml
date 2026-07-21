@@ -15,6 +15,11 @@ data:
   STATIC_DIR: "/static"
   OPENAPI_IT_CAP_BASE_URL: "https://cap.openapi.it"
   OPENAPI_IT_COMPANY_BASE_URL: "https://company.openapi.com"
+  OPENAPI_IT_DOCUENGINE_BASE_URL: "https://docuengine.openapi.com"
+  # Binocolo bilanci depositati (issue #78). Il documentId del "Bilancio Ottico"
+  # differisce tra sandbox e prod: lasciare vuoto qui e valorizzarlo per environment.
+  BINOCOLO_FILING_DOCAI_COMPARE: "true"
+  BINOCOLO_FILING_DOCUENGINE_DOCUMENT_ID: ""
   MRSMITH_PUBLIC_BASE_URL: "https://mrsmith.example.com"
   NOTIFICATIONS_WORKER_ENABLED: "true"
   NOTIFICATIONS_WORKER_INTERVAL: "60s"

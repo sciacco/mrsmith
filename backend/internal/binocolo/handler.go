@@ -32,6 +32,11 @@ type Deps struct {
 	// (config InstanceOwner) so they are pre-leased to it and foreign workers on the
 	// shared Anisetta DB can't steal them. Empty tolerated (see EnqueueMAJob).
 	InstanceOwner string
+	// FilingDocAICompare abilita il confronto OCR<->DocAI nell'ingest bilanci
+	// (issue #78). FilingDocumentID è il documentId DocuEngine del "Bilancio Ottico"
+	// pinnato per environment. Non ancora usati (F2): consumati dalle fasi 3-5.
+	FilingDocAICompare bool
+	FilingDocumentID   string
 }
 
 type Handler struct {

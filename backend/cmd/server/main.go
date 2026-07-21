@@ -54,10 +54,10 @@ import (
 	"github.com/sciacco/mrsmith/internal/raenad"
 	"github.com/sciacco/mrsmith/internal/rda"
 	"github.com/sciacco/mrsmith/internal/rdf"
-	"github.com/sciacco/mrsmith/internal/statsrda"
 	"github.com/sciacco/mrsmith/internal/rdfbackend"
 	"github.com/sciacco/mrsmith/internal/reports"
 	"github.com/sciacco/mrsmith/internal/simulatorivendita"
+	"github.com/sciacco/mrsmith/internal/statsrda"
 	"github.com/sciacco/mrsmith/internal/support"
 	"github.com/sciacco/mrsmith/internal/training"
 	"github.com/sciacco/mrsmith/pkg/middleware"
@@ -271,9 +271,10 @@ func main() {
 	var openapiitCli *openapiit.Client
 	if cfg.OpenAPIITAPIToken != "" {
 		openapiitCli = openapiit.New(openapiit.Config{
-			APIToken:       cfg.OpenAPIITAPIToken,
-			CAPBaseURL:     cfg.OpenAPIITCAPBaseURL,
-			CompanyBaseURL: cfg.OpenAPIITCompanyBaseURL,
+			APIToken:          cfg.OpenAPIITAPIToken,
+			CAPBaseURL:        cfg.OpenAPIITCAPBaseURL,
+			CompanyBaseURL:    cfg.OpenAPIITCompanyBaseURL,
+			DocuEngineBaseURL: cfg.OpenAPIITDocuEngineBaseURL,
 		})
 		logger.Info("shared openapi.it client configured", "component", "openapiit")
 	}
@@ -580,7 +581,7 @@ func main() {
 		appCatalog = filtered
 	}
 	portal.RegisterRoutes(api, appCatalog)
-	binocoloDeepWorker := binocolo.RegisterRoutes(api, binocolo.Deps{OpenAPIIT: openapiitCli, Brave: braveCli, Scrape: scrapeCli, LLM: llmSvc, AnisettaDB: anisettaDB, InstanceOwner: cfg.InstanceOwner})
+	binocoloDeepWorker := binocolo.RegisterRoutes(api, binocolo.Deps{OpenAPIIT: openapiitCli, Brave: braveCli, Scrape: scrapeCli, LLM: llmSvc, AnisettaDB: anisettaDB, InstanceOwner: cfg.InstanceOwner, FilingDocAICompare: cfg.BinocoloFilingDocAICompare, FilingDocumentID: cfg.BinocoloFilingDocumentID})
 	budget.RegisterRoutes(api, arakCli)
 	fornitori.RegisterRoutes(api, arakCli, arakDB, alyanteDB)
 	statsrda.RegisterRoutes(api, arakDB)

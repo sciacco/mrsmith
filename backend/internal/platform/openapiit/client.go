@@ -14,26 +14,30 @@ import (
 )
 
 const (
-	DefaultCAPBaseURL     = "https://cap.openapi.it"
-	DefaultCompanyBaseURL = "https://company.openapi.com"
+	DefaultCAPBaseURL        = "https://cap.openapi.it"
+	DefaultCompanyBaseURL    = "https://company.openapi.com"
+	DefaultDocuEngineBaseURL = "https://docuengine.openapi.com"
 
-	capServiceName     = "cap"
-	companyServiceName = "company"
-	defaultTimeout     = 30 * time.Second
+	capServiceName        = "cap"
+	companyServiceName    = "company"
+	docuEngineServiceName = "docuengine"
+	defaultTimeout        = 30 * time.Second
 )
 
 type Config struct {
-	APIToken       string
-	CAPBaseURL     string
-	CompanyBaseURL string
-	HTTPClient     *http.Client
+	APIToken          string
+	CAPBaseURL        string
+	CompanyBaseURL    string
+	DocuEngineBaseURL string
+	HTTPClient        *http.Client
 }
 
 type Client struct {
-	apiToken       string
-	capBaseURL     string
-	companyBaseURL string
-	httpClient     *http.Client
+	apiToken          string
+	capBaseURL        string
+	companyBaseURL    string
+	docuEngineBaseURL string
+	httpClient        *http.Client
 }
 
 type Envelope[T any] struct {
@@ -75,10 +79,11 @@ func New(cfg Config) *Client {
 		httpClient = &http.Client{Timeout: defaultTimeout}
 	}
 	return &Client{
-		apiToken:       apiToken,
-		capBaseURL:     defaultBaseURL(cfg.CAPBaseURL, DefaultCAPBaseURL),
-		companyBaseURL: defaultBaseURL(cfg.CompanyBaseURL, DefaultCompanyBaseURL),
-		httpClient:     httpClient,
+		apiToken:          apiToken,
+		capBaseURL:        defaultBaseURL(cfg.CAPBaseURL, DefaultCAPBaseURL),
+		companyBaseURL:    defaultBaseURL(cfg.CompanyBaseURL, DefaultCompanyBaseURL),
+		docuEngineBaseURL: defaultBaseURL(cfg.DocuEngineBaseURL, DefaultDocuEngineBaseURL),
+		httpClient:        httpClient,
 	}
 }
 

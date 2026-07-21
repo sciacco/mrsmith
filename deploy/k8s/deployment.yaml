@@ -94,6 +94,12 @@ spec:
                   name: mrsmith-secrets
                   key: OPENAPI_IT_API_TOKEN
                   optional: true
+            - name: MISTRAL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mrsmith-secrets
+                  key: MISTRAL_API_KEY
+                  optional: true
             - name: SMTP_HOST
               valueFrom:
                 secretKeyRef:

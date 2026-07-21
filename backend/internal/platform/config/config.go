@@ -99,9 +99,10 @@ type Config struct {
 	OpenRouterAPIKey string
 
 	// OpenAPI.it integrations (optional)
-	OpenAPIITAPIToken       string
-	OpenAPIITCAPBaseURL     string
-	OpenAPIITCompanyBaseURL string
+	OpenAPIITAPIToken          string
+	OpenAPIITCAPBaseURL        string
+	OpenAPIITCompanyBaseURL    string
+	OpenAPIITDocuEngineBaseURL string
 
 	// Brave Search API (optional — binocolo web search)
 	BraveAPIKey  string
@@ -121,6 +122,13 @@ type Config struct {
 	// restarts. Defaults to the machine hostname; override per deployment via
 	// BINOCOLO_INSTANCE_OWNER (set the same value on all pods of one release).
 	InstanceOwner string
+
+	// Binocolo — bilanci depositati (issue #78). FilingDocAICompare abilita il
+	// confronto OCR<->DocAI nell'ingest (default true). FilingDocumentID è il
+	// documentId DocuEngine del "Bilancio Ottico", pinnato per environment (sandbox
+	// != prod): vuoto = pipeline bilanci di fatto disattivata finché non è valorizzato.
+	BinocoloFilingDocAICompare bool
+	BinocoloFilingDocumentID   string
 
 	// SMTP email delivery (optional, disabled by default)
 	SMTPEnabled       bool
@@ -256,6 +264,9 @@ func Load() Config {
 		OpenAPIITAPIToken:           envOr("OPENAPI_IT_API_TOKEN", ""),
 		OpenAPIITCAPBaseURL:         envOr("OPENAPI_IT_CAP_BASE_URL", openapiit.DefaultCAPBaseURL),
 		OpenAPIITCompanyBaseURL:     envOr("OPENAPI_IT_COMPANY_BASE_URL", openapiit.DefaultCompanyBaseURL),
+		OpenAPIITDocuEngineBaseURL:  envOr("OPENAPI_IT_DOCUENGINE_BASE_URL", openapiit.DefaultDocuEngineBaseURL),
+		BinocoloFilingDocAICompare:  boolEnvOr("BINOCOLO_FILING_DOCAI_COMPARE", true),
+		BinocoloFilingDocumentID:    envOr("BINOCOLO_FILING_DOCUENGINE_DOCUMENT_ID", ""),
 		BraveAPIKey:                 envOr("BRAVE_API_KEY", ""),
 		BraveBaseURL:                envOr("BRAVE_BASE_URL", brave.DefaultBaseURL),
 		ScrapeBaseURL:               envOr("BINOCOLO_SCRAPE_BASE_URL", ""),
