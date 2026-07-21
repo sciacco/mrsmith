@@ -15,7 +15,9 @@
       "Skill(playwright-cli)",
       "Bash(playwright-cli -s=manutsmoke press PageDown)",
       "Bash(playwright-cli -s=manutsmoke screenshot --filename=/tmp/claude/manut-section.png)",
-      "WebFetch(domain:api.github.com)"
+      "WebFetch(domain:api.github.com)",
+      "Bash(python3 *)",
+      "Bash(gh api *)"
     ]
   },
   "spinnerTipsEnabled": false
