@@ -14,9 +14,9 @@
 - Follow the naming convention `app_{appname}_access` for app-level access roles (e.g., `app_budget_access`, `app_compliance_access`).
 
 ## New App Checklist
-When creating a new mini-app, these files MUST be updated in addition to the app code itself:
+Follow the complete operational guide in `docs/MINI-APP-SCAFFOLDING.md`. At minimum, these files MUST be updated in addition to the app code itself:
 - `apps/{appname}/vite.config.ts` — use `defineMrSmithAppConfig` from `@mrsmith/vite-config` (add it to the app's devDependencies) with a unique dev port; never a raw Vite `defineConfig` (see `packages/vite-config/README.md`)
-- `package.json` (root) — add to the `dev` concurrently command (name + color + filter) AND add a `dev:{appname}` script
+- `package.json` (root) — add a `dev:{appname}` script; the aggregate `dev` script already discovers `apps/*` automatically
 - `Makefile` — add a `dev-{appname}` target AND add it to `.PHONY`
 - `backend/internal/platform/applaunch/catalog.go` — add app ID/href constants, access roles, catalog entry
 - `backend/cmd/server/main.go` — add import, hrefOverrides (dev port), catalog filter condition, RegisterRoutes call
