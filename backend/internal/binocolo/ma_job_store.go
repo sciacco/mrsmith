@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -26,6 +27,10 @@ type maJob struct {
 	TraceID           string
 	CreatedBySubject  string
 	CreatedByEmail    string
+	// CreatedAt is the row's insert time, used by the filing jobs as the wall-clock anchor
+	// for their poll window (see maFilingPollWindow). Zero when a maJob is built off-DB
+	// (e.g. the inline gated-search path), which never reaches the poll-timeout logic.
+	CreatedAt time.Time
 }
 
 // maJobEnqueue is the input to enqueue a new job.
@@ -159,7 +164,7 @@ func (s *SQLStore) ListMAJobs(ctx context.Context, limit int, owner, workerID st
 	}
 	query := fmt.Sprintf(`
 SELECT id::text, job_type, COALESCE(session_id::text, ''), COALESCE(strategy_version_id::text, ''), COALESCE(initiative_id::text, ''), status, attempts,
-       payload, COALESCE(trace_id::text, ''), COALESCE(created_by_subject, ''), COALESCE(created_by_email, '')
+       payload, COALESCE(trace_id::text, ''), COALESCE(created_by_subject, ''), COALESCE(created_by_email, ''), created_at
 FROM binocolo.ma_job
 WHERE status IN ('queued', 'running', 'pending', 'processing')
   AND (owner IS NULL OR owner = $2)
@@ -177,7 +182,7 @@ LIMIT $1
 	for rows.Next() {
 		var job maJob
 		var payload []byte
-		if err := rows.Scan(&job.ID, &job.JobType, &job.SessionID, &job.StrategyVersionID, &job.InitiativeID, &job.Status, &job.Attempts, &payload, &job.TraceID, &job.CreatedBySubject, &job.CreatedByEmail); err != nil {
+		if err := rows.Scan(&job.ID, &job.JobType, &job.SessionID, &job.StrategyVersionID, &job.InitiativeID, &job.Status, &job.Attempts, &payload, &job.TraceID, &job.CreatedBySubject, &job.CreatedByEmail, &job.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scan ma job: %w", err)
 		}
 		if len(payload) > 0 {
@@ -291,6 +296,24 @@ WHERE id = $1::uuid
 `, jobID, nullString(errorCode))
 	if err != nil {
 		return fmt.Errorf("fail ma job: %w", err)
+	}
+	return nil
+}
+
+// TouchMAJob bumps only updated_at — no attempt change, no status change. The filing poll
+// loop calls it each pending tick so a long-polling job moves to the back of the worker's
+// `ORDER BY updated_at LIMIT n` queue instead of stably occupying the front slots and
+// starving other job types (estimate/execute/gated_search) on the shared queue.
+func (s *SQLStore) TouchMAJob(ctx context.Context, jobID string) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	if _, err := s.db.ExecContext(ctx, `
+UPDATE binocolo.ma_job
+SET updated_at = now()
+WHERE id = $1::uuid
+`, jobID); err != nil {
+		return fmt.Errorf("touch ma job: %w", err)
 	}
 	return nil
 }

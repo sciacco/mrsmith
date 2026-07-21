@@ -196,6 +196,19 @@ type maService struct {
 	// every enqueued ma_job so the job is pre-leased to this instance and foreign
 	// workers on the shared DB can't steal it. Set post-construction like brave.
 	owner string
+	// filing is the deposited-filing store (issue #78). Narrow interface (the F3
+	// filing lifecycle methods only) so the filing jobs stay testable with an
+	// in-memory fake; *SQLStore satisfies it. Set post-construction like kb.
+	filing maFilingStore
+	// docu is a test seam over the DocuEngine sub-client. Nil in production, where
+	// docuEngine() falls back to s.openapiit.DocuEngine(); a fake is injected in tests
+	// so no real, paid vendor call is ever made under test.
+	docu maDocuEngine
+	// filingDocumentID is the pinned DocuEngine documentId of the "Bilancio Ottico"
+	// document (config Deps.FilingDocumentID). Empty means the DocuEngine channel is
+	// not configured for this environment — a filing_search fails definitively rather
+	// than POSTing an invalid request. Set post-construction from the handler deps.
+	filingDocumentID string
 	// compareSnippetCache memoizes re-gathered neutral web snippets per domain for the
 	// model-comparison harness (sector-eval-models with includeSnippets). Test-support
 	// only; persists for the process lifetime so a multi-request eval pays Brave once.

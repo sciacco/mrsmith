@@ -19,6 +19,7 @@ type maJobWorkerStore interface {
 	CompleteMAJob(ctx context.Context, jobID string) error
 	FailMAJob(ctx context.Context, jobID, errorCode string) error
 	BumpMAJobAttempt(ctx context.Context, jobID string) (int, error)
+	TouchMAJob(ctx context.Context, jobID string) error
 	MarkMASessionEstimateFailed(ctx context.Context, sessionID string) error
 	MarkMASessionExecuteFailed(ctx context.Context, sessionID string) error
 }
@@ -58,6 +59,11 @@ func newMAJobWorker(svc *maService, store maJobWorkerStore, owner string) *maJob
 			maJobTypeAssociateDomain,
 			maJobTypeManualAdd,
 			maJobTypeCardDomainVerify,
+			maJobTypeFilingSearch,
+			maJobTypeFilingAcquire,
+			// maJobTypeFilingIngest is intentionally absent: F4 enqueues it but F5 owns
+			// its dispatch. Excluding it here keeps the row 'pending' (never claimed by
+			// this build) instead of falling into the default "unknown job type" branch.
 		},
 	}
 }
@@ -125,6 +131,10 @@ func (w *maJobWorker) process(ctx context.Context, job maJob) {
 		traceID, err = w.svc.runManualAddJob(ctx, job)
 	case maJobTypeCardDomainVerify:
 		traceID, err = w.svc.runCardDomainVerifyJob(ctx, job)
+	case maJobTypeFilingSearch:
+		traceID, err = w.svc.runFilingSearchJob(ctx, job)
+	case maJobTypeFilingAcquire:
+		traceID, err = w.svc.runFilingAcquireJob(ctx, job)
 	default:
 		logging.FromContext(ctx).Warn("binocolo job worker skipped unknown job type", "component", "binocolo", "job_id", job.ID, "job_type", job.JobType)
 		return
@@ -133,6 +143,13 @@ func (w *maJobWorker) process(ctx context.Context, job maJob) {
 		_ = w.store.SetMAJobTrace(ctx, job.ID, traceID)
 	}
 	if err != nil {
+		// A filing poll-pending is not a failure: the vendor result/DONE is not ready
+		// yet (or an 'unknown' outcome is being reconciled). Leave the row processing and
+		// re-run next tick, bounded by the poll budget — never the terminal give-up path.
+		if errors.Is(err, errMAFilingPollPending) {
+			w.pollAgainOrTimeout(ctx, job)
+			return
+		}
 		w.retryOrFail(ctx, job, classifyMAJobError(err, job.JobType))
 		return
 	}
@@ -174,7 +191,40 @@ func (w *maJobWorker) retryOrFail(ctx context.Context, job maJob, code string) {
 		w.svc.releaseAssociateSession(ctx, job.SessionID)
 	case maJobTypeCardDomainVerify:
 		w.svc.recordCardDomainUnverifiable(ctx, job)
+	case maJobTypeFilingSearch, maJobTypeFilingAcquire:
+		// Terminal give-up on an infrastructure error (attempts exhausted): fail the business
+		// row, but NEVER resolve an 'unknown' vendor outcome heuristically — unknown stays
+		// unknown for a future manual/dev reconciliation.
+		w.svc.failFilingJobIfNotUnknown(ctx, job, code)
 	}
+}
+
+// pollAgainOrTimeout advances a filing job that is still waiting on DocuEngine. The poll
+// budget is WALL-CLOCK (created_at + maFilingPollWindow), NOT attempt-based: a "not ready
+// yet" tick is expected and must NOT bump the attempt counter (that budget stays reserved
+// for real infra errors, including the post-payment finalize). Within the window the row
+// is left processing so the next tick re-runs it. Past the window the job ends with a
+// poll_timeout and the business row goes to 'unknown' (NOT failed) — the paid vendor
+// request may still complete and a later reconciliation can adopt it.
+func (w *maJobWorker) pollAgainOrTimeout(ctx context.Context, job maJob) {
+	// No attempt bump here: the deadline alone bounds the loop.
+	if job.CreatedAt.IsZero() {
+		return // no wall-clock anchor (off-DB job); keep polling — created_at is set in prod
+	}
+	if w.svc.now().Before(job.CreatedAt.Add(maFilingPollWindow)) {
+		// Within the poll window: re-run next tick. Bump only updated_at (no attempt change)
+		// so a long poll rotates to the back of the shared queue and does not starve other
+		// job types under `ORDER BY updated_at LIMIT n`.
+		if err := w.store.TouchMAJob(ctx, job.ID); err != nil {
+			logging.FromContext(ctx).Warn("binocolo job worker touch failed", "component", "binocolo", "job_id", job.ID, "error", err)
+		}
+		return
+	}
+	logging.FromContext(ctx).Error("binocolo job worker giving up polling", "component", "binocolo", "job_id", job.ID, "job_type", job.JobType, "created_at", job.CreatedAt)
+	if err := w.store.FailMAJob(ctx, job.ID, "poll_timeout"); err != nil {
+		logging.FromContext(ctx).Warn("binocolo job worker fail failed", "component", "binocolo", "job_id", job.ID, "error", err)
+	}
+	w.svc.markFilingJobUnknownOnPollTimeout(ctx, job)
 }
 
 // classifyMAJobError maps an internal error to a short, stable error_code stored
@@ -206,6 +256,10 @@ func classifyMAJobError(err error, jobType string) string {
 			return "manual_add_failed"
 		case maJobTypeCardDomainVerify:
 			return "card_domain_verify_failed"
+		case maJobTypeFilingSearch:
+			return "filing_search_failed"
+		case maJobTypeFilingAcquire:
+			return "filing_acquire_failed"
 		default:
 			return "estimate_failed"
 		}

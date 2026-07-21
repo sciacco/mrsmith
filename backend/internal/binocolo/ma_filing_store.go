@@ -723,6 +723,43 @@ func (s *SQLStore) GetMAFilingSearch(ctx context.Context, id string) (*maFilingS
 	return &rec, nil
 }
 
+// ListMAFilingReferencedRequestIDs returns the set of DocuEngine request ids already
+// referenced by a search or acquisition row (excluding the given search/acquisition id,
+// passed empty when N/A). The filing jobs use it as the exclusion set for pre-POST
+// reconciliation: a request already owned by another row must never be adopted, so only a
+// genuinely orphaned request (e.g. a prior attempt whose persist failed after a paid POST)
+// can be reused instead of paying for a duplicate.
+func (s *SQLStore) ListMAFilingReferencedRequestIDs(ctx context.Context, excludeSearchID, excludeAcquisitionID string) (map[string]bool, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT docuengine_request_id FROM binocolo.ma_filing_search
+WHERE docuengine_request_id IS NOT NULL AND ($1 = '' OR id <> $1::uuid)
+UNION
+SELECT docuengine_request_id FROM binocolo.ma_filing_acquisition
+WHERE docuengine_request_id IS NOT NULL AND ($2 = '' OR id <> $2::uuid)
+`, excludeSearchID, excludeAcquisitionID)
+	if err != nil {
+		return nil, fmt.Errorf("list ma filing referenced request ids: %w", err)
+	}
+	defer rows.Close()
+	out := map[string]bool{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan ma filing referenced request id: %w", err)
+		}
+		if id != "" {
+			out[id] = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma filing referenced request ids: %w", err)
+	}
+	return out, nil
+}
+
 // GetLatestMAFilingSearchWithResults returns the most recent search for a fiscal identity
 // that has results ready (status='results') — what the UI offers for acquisition. Returns
 // (nil, nil) when none.

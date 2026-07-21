@@ -81,6 +81,18 @@ const (
 	// maJobTypeCardDomainVerify verifies an analyst-supplied domain for a direct
 	// initiative card. It is initiative/company scoped and has no session strategy.
 	maJobTypeCardDomainVerify = "card_domain_verify"
+	// Bilanci depositati (issue #78) — job type della pipeline DocuEngine. NON sono
+	// session-scoped: la chiave di business vive nel payload jsonb (fiscalKey,
+	// acquisitionId, balanceSheetId, filingId) e la deduplicazione inflight usa gli
+	// indici parziali della migrazione 115.
+	//   - filing_search: apre una ricerca DocuEngine per identità fiscale.
+	//   - filing_acquire: acquista (scarica) un bilancio dai risultati di una ricerca.
+	//   - filing_ingest: OCR/parse del PDF scaricato (gestito da F5). L'acquire lo
+	//     accoda ma il worker NON lo dispaccia finché F5 non lo aggiunge a jobTypes,
+	//     così la riga resta 'pending' senza uno stub che finge di lavorare.
+	maJobTypeFilingSearch  = "filing_search"
+	maJobTypeFilingAcquire = "filing_acquire"
+	maJobTypeFilingIngest  = "filing_ingest"
 
 	maJobStatusQueued  = "queued"
 	maJobStatusRunning = "running"
@@ -102,6 +114,31 @@ const (
 	// inside one process() call, so this must exceed the slowest single estimate
 	// (parallelized probe fan-out); a crashed worker's row is reclaimed after it.
 	maJobLeaseSeconds = 300
+
+	// maFilingPollWindow bounds — by WALL CLOCK, not by attempt count — how long a filing
+	// search/acquire job may spend WAITING on DocuEngine (polling for results/DONE or
+	// reconciling an 'unknown' outcome). A "not ready yet" tick is expected, not a failure,
+	// so it must NOT consume the infrastructure-error budget (maJobMaxAttempts, which stays
+	// reserved for real errors including the post-payment finalize). The job keeps re-running
+	// each tick until the vendor completes or now() exceeds created_at + this window; past
+	// it the business row goes to 'unknown' (never 'failed' — the vendor request may still
+	// complete and a later reconciliation can adopt it) and the job ends with 'poll_timeout'.
+	// Starting value — recalibrate on the real DocuEngine smoke (vendor spend = user).
+	maFilingPollWindow = 45 * time.Minute
+
+	// docuBilancioOtticoName is the exact GET /requests name of the "Bilancio Ottico"
+	// document, the only client-side filter available when reconciling an 'unknown'
+	// search whose request id was lost (GET /requests exposes neither documentId nor
+	// taxCode — see the recon spec). Matched together with a timestamp window.
+	docuBilancioOtticoName = "Bilancio Ottico"
+
+	// maFilingReconcileWindow is the half-width of the timestamp window used to shortlist
+	// GET /requests candidates around an intent when reconciling an 'unknown' search whose
+	// vendor request id was never captured (ambiguous POST). ±30 min absorbs clock skew
+	// between our updated_at anchor and the vendor's request-creation timestamp; the
+	// definitive match is still readableSearch.taxCode on the per-request GET, never the
+	// window alone.
+	maFilingReconcileWindow = 30 * time.Minute
 
 	// --- Bilanci depositati (issue #78) --------------------------------------
 	// State-machine enums for the deposited-filing pipeline. The canonical source

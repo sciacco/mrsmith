@@ -82,6 +82,11 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	}
 	if sqlStore != nil {
 		h.ma.kb = sqlStore
+		// Deposited-filing pipeline (issue #78): the filing lifecycle store and the
+		// pinned "Bilancio Ottico" documentId. filingDocumentID empty => the DocuEngine
+		// channel is not configured and a filing_search fails definitively.
+		h.ma.filing = sqlStore
+		h.ma.filingDocumentID = deps.FilingDocumentID
 	}
 	// Background workers, returned so main.go runs them under appCtx + workerWG for
 	// graceful shutdown. Both are DB-backed and resume pending rows on restart:
