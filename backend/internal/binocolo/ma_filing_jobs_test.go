@@ -283,6 +283,14 @@ func (f *fakeFilingStore) GetMAFilingExtracts(context.Context, string) ([]maFili
 	return nil, nil
 }
 
+func (f *fakeFilingStore) ListMAFilingsByFiscalKey(context.Context, string) ([]maFiling, error) {
+	return nil, nil
+}
+
+func (f *fakeFilingStore) GetMaxMANIDecisionCreatedAt(context.Context, string) (*time.Time, error) {
+	return nil, nil
+}
+
 func (f *fakeFilingStore) CreateMANIReadingRun(context.Context, string, string, string, string, string) (string, error) {
 	return "", nil
 }

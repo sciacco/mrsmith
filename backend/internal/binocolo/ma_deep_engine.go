@@ -345,6 +345,88 @@ func buildMADeepValuation(sc *MADeepScorecard, reading *maCEEReading, multiple *
 	if sc == nil || multiple == nil {
 		return nil
 	}
+	sel, ok := selectMADeepMethod(sc, reading, multiple, pricing)
+	if !ok {
+		return nil
+	}
+	return buildMADeepValuationWithMethod(sc, reading, multiple, pricing, sel)
+}
+
+// maDeepMethodSelection captures the valuation-method decision made ONCE from the baseline
+// scorecard/CEE reading: which multiple path drives each band extreme (F7 refactor). It is
+// reused verbatim by the on-read adjusted view — the EV/EBITDA-vs-EV/Sales selector is NEVER
+// re-run on an adjusted (add-back) scorecard, so a rettifica cannot flip the method (issue #78).
+//
+//	Method     — the high-extreme method: "ev_ebitda" | "ev_sales".
+//	LowMethod  — "ev_sales" when the low extreme falls back to sales (else "").
+//	Mult       — the high-extreme multiple (EV/EBITDA for ev_ebitda, EV/Sales for ev_sales).
+//	lowExtreme — how the low band base is derived (ev_ebitda only):
+//	             "prudential" (prudential EBITDA × Mult × factor),
+//	             "sales"      (min(turnover × SalesMult × factor, highBase); ΔEBITDA never applied),
+//	             "reported"   (== highBase; symmetric band on the reported EBITDA).
+//	SalesMult  — the EV/Sales multiple used when lowExtreme=="sales".
+type maDeepMethodSelection struct {
+	Method     string
+	LowMethod  string
+	Mult       float64
+	lowExtreme string
+	SalesMult  float64
+}
+
+// selectMADeepMethod runs the (formerly inline) method selector: it decides ev_ebitda vs
+// ev_sales and, on the EBITDA path, how the low extreme is derived. ok=false reproduces the
+// old `default: return nil` (neither a usable EBITDA path nor a turnover-based EV/Sales path).
+// Pure and factor-independent: the margin gate is EBITDA/turnover, so the haircut never enters.
+func selectMADeepMethod(sc *MADeepScorecard, reading *maCEEReading, multiple *sectorMultiple, pricing maPricing) (maDeepMethodSelection, bool) {
+	marginPct := func(ebitda float64) float64 {
+		if sc.Turnover == nil || *sc.Turnover <= 0 {
+			return math.Inf(1) // senza fatturato la soglia di margine non può bocciare
+		}
+		return ebitda / *sc.Turnover * 100
+	}
+	var prudential *float64
+	if reading != nil && reading.EBITDAPrudential != nil {
+		prudential = reading.EBITDAPrudential
+	}
+	useEbitda := sc.Ebitda != nil && *sc.Ebitda > 0 && multiple.EVEbitda != nil &&
+		marginPct(*sc.Ebitda) >= pricing.EBITDAFallbackPct
+
+	sel := maDeepMethodSelection{}
+	switch {
+	case useEbitda:
+		sel.Method = "ev_ebitda"
+		sel.Mult = *multiple.EVEbitda
+		prud := *sc.Ebitda // senza lettura CEE il prudenziale coincide col reported
+		if prudential != nil {
+			prud = *prudential
+		}
+		switch {
+		case prud > 0 && marginPct(prud) >= pricing.EBITDAFallbackPct:
+			sel.lowExtreme = "prudential"
+		case sc.Turnover != nil && *sc.Turnover > 0 && multiple.EVSales != nil:
+			// Prudenziale non utilizzabile: l'estremo basso ricade su EV/Sales,
+			// senza mai superare l'estremo basso che darebbe il reported.
+			sel.LowMethod = "ev_sales"
+			sel.lowExtreme = "sales"
+			sel.SalesMult = *multiple.EVSales
+		default:
+			// Né prudenziale né EV/Sales: banda simmetrica sul reported, con caveat.
+			sel.lowExtreme = "reported"
+		}
+	case sc.Turnover != nil && *sc.Turnover > 0 && multiple.EVSales != nil:
+		sel.Method = "ev_sales"
+		sel.Mult = *multiple.EVSales
+	default:
+		return maDeepMethodSelection{}, false
+	}
+	return sel, true
+}
+
+// buildMADeepValuationWithMethod computes the EV band + bridge for a GIVEN method selection
+// (the second half of the old buildMADeepValuation). Numbers are byte-identical to the inline
+// version for the same inputs — the golden engine tests pin this. Kept split from the selector
+// so the adjusted view can re-run the SAME EV/bridge math under an add-back without re-selecting.
+func buildMADeepValuationWithMethod(sc *MADeepScorecard, reading *maCEEReading, multiple *sectorMultiple, pricing maPricing, sel maDeepMethodSelection) *MADeepValuation {
 	haircutPct := pricing.haircutForTurnover(sc.Turnover)
 	haircut := haircutPct / 100.0
 	if haircut < 0 {
@@ -355,57 +437,39 @@ func buildMADeepValuation(sc *MADeepScorecard, reading *maCEEReading, multiple *
 	}
 	factor := 1 - haircut
 
-	marginPct := func(ebitda float64) float64 {
-		if sc.Turnover == nil || *sc.Turnover <= 0 {
-			return math.Inf(1) // senza fatturato la soglia di margine non può bocciare
-		}
-		return ebitda / *sc.Turnover * 100
-	}
-	useEbitda := sc.Ebitda != nil && *sc.Ebitda > 0 && multiple.EVEbitda != nil &&
-		marginPct(*sc.Ebitda) >= pricing.EBITDAFallbackPct
-
-	const spread = 0.15
-	var method, lowMethod string
-	var mult, evLowBase, evHighBase float64
 	var prudential *float64
 	if reading != nil && reading.EBITDAPrudential != nil {
 		prudential = reading.EBITDAPrudential
 	}
 
-	switch {
-	case useEbitda:
-		method = "ev_ebitda"
-		mult = *multiple.EVEbitda
-		evHighBase = *sc.Ebitda * mult * factor
-		prud := *sc.Ebitda // senza lettura CEE il prudenziale coincide col reported
-		if prudential != nil {
-			prud = *prudential
-		}
-		switch {
-		case prud > 0 && marginPct(prud) >= pricing.EBITDAFallbackPct:
-			evLowBase = prud * mult * factor
-		case sc.Turnover != nil && *sc.Turnover > 0 && multiple.EVSales != nil:
-			// Prudenziale non utilizzabile: l'estremo basso ricade su EV/Sales,
-			// senza mai superare l'estremo basso che darebbe il reported.
-			lowMethod = "ev_sales"
-			evLowBase = math.Min(*sc.Turnover**multiple.EVSales*factor, evHighBase)
-		default:
-			// Né prudenziale né EV/Sales: banda simmetrica sul reported, con caveat.
+	const spread = 0.15
+	var evLowBase, evHighBase float64
+	switch sel.Method {
+	case "ev_ebitda":
+		evHighBase = *sc.Ebitda * sel.Mult * factor
+		switch sel.lowExtreme {
+		case "prudential":
+			prud := *sc.Ebitda // senza lettura CEE il prudenziale coincide col reported
+			if prudential != nil {
+				prud = *prudential
+			}
+			evLowBase = prud * sel.Mult * factor
+		case "sales":
+			evLowBase = math.Min(*sc.Turnover*sel.SalesMult*factor, evHighBase)
+		default: // "reported"
 			evLowBase = evHighBase
 		}
-	case sc.Turnover != nil && *sc.Turnover > 0 && multiple.EVSales != nil:
-		method = "ev_sales"
-		mult = *multiple.EVSales
-		evHighBase = *sc.Turnover * mult * factor
+	case "ev_sales":
+		evHighBase = *sc.Turnover * sel.Mult * factor
 		evLowBase = evHighBase
 	default:
 		return nil
 	}
 
 	val := &MADeepValuation{
-		Method:           method,
-		LowMethod:        lowMethod,
-		Multiple:         math.Round(mult*100) / 100,
+		Method:           sel.Method,
+		LowMethod:        sel.LowMethod,
+		Multiple:         math.Round(sel.Mult*100) / 100,
 		HaircutPct:       haircutPct,
 		EVLow:            math.Round(evLowBase * (1 - spread)),
 		EVHigh:           math.Round(evHighBase * (1 + spread)),
@@ -415,7 +479,7 @@ func buildMADeepValuation(sc *MADeepScorecard, reading *maCEEReading, multiple *
 		Source:           multiple.Source,
 		SourceDate:       multiple.SourceDate,
 	}
-	if method == "ev_ebitda" && evLowBase == evHighBase && lowMethod == "" && prudential != nil && *prudential != *sc.Ebitda {
+	if sel.Method == "ev_ebitda" && evLowBase == evHighBase && sel.LowMethod == "" && prudential != nil && *prudential != *sc.Ebitda {
 		val.Caveat = "EBITDA prudenziale non utilizzabile e multiplo EV/Sales assente: estremo basso non prudenziale."
 	}
 	if multiple.NFirms > 0 && multiple.NFirms < 10 {

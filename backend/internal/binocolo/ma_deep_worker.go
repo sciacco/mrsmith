@@ -42,17 +42,22 @@ type maDeepWorker struct {
 	pricing   func(ctx context.Context) maPricing
 	interval  time.Duration
 	batch     int
+	// briefFilingContext optionally enriches the brief with the canonical filing's ratified
+	// notes/adjusted view (F7). Injected by the service (which owns the filing store); nil ⇒ the
+	// worker passes no filing context (the common case at first analysis, before any deposit).
+	briefFilingContext func(context.Context, maDeepDiveIdentity, *maDeepVATRecord) *maDeepBriefFilingContext
 }
 
-func newMADeepWorker(store maDeepWorkerStore, client *openapiit.Client, llmp maLLMProvider, pricing func(context.Context) maPricing) *maDeepWorker {
+func newMADeepWorker(store maDeepWorkerStore, client *openapiit.Client, llmp maLLMProvider, pricing func(context.Context) maPricing, briefFilingContext func(context.Context, maDeepDiveIdentity, *maDeepVATRecord) *maDeepBriefFilingContext) *maDeepWorker {
 	worker := &maDeepWorker{
-		id:        uuid.NewString(),
-		store:     store,
-		openapiit: client,
-		llmp:      llmp,
-		pricing:   pricing,
-		interval:  5 * time.Second,
-		batch:     16,
+		id:                 uuid.NewString(),
+		store:              store,
+		openapiit:          client,
+		llmp:               llmp,
+		pricing:            pricing,
+		interval:           5 * time.Second,
+		batch:              16,
+		briefFilingContext: briefFilingContext,
 	}
 	return worker
 }
@@ -173,7 +178,8 @@ func (w *maDeepWorker) process(ctx context.Context, job maDeepJob) {
 		}
 		result := maDeepResult{Payload: resp.Data, Scorecard: scorecard, Valuation: valuation, CostEUR: pricing.CostFull}
 		if w.llmp != nil && scorecard != nil {
-			brief, modelID, promptID, err := w.generateBrief(ctx, resp.Data, scorecard, valuation)
+			identity := maDeepDiveIdentity{VATCode: job.VATCode, TaxCode: job.TaxCode}
+			brief, modelID, promptID, err := w.generateBrief(ctx, identity, resp.Data, scorecard, valuation)
 			if err != nil {
 				// Brief is best-effort: a failure must not lose the paid scorecard.
 				logging.FromContext(ctx).Warn("binocolo deep worker brief failed", "component", "binocolo", "company_key", job.CompanyKey, "error", err)
@@ -276,7 +282,7 @@ func chatWithBriefRetry(ctx context.Context, client maAIClient, req llm.ChatRequ
 // generateBrief asks the LLM (scope ma_deep_brief) to narrate the already-computed
 // scorecard + valuation. The model receives only the computed numbers and must not
 // invent any (thesis-neutral, since the deep analysis is cached globally per company).
-func (w *maDeepWorker) generateBrief(ctx context.Context, rawPayload json.RawMessage, scorecard *MADeepScorecard, valuation *MADeepValuation) (*MADeepBrief, string, string, error) {
+func (w *maDeepWorker) generateBrief(ctx context.Context, identity maDeepDiveIdentity, rawPayload json.RawMessage, scorecard *MADeepScorecard, valuation *MADeepValuation) (*MADeepBrief, string, string, error) {
 	model, err := w.llmp.ResolveModel(ctx, maModelScopeDeepBrief, "")
 	if err != nil {
 		return nil, "", "", err
@@ -285,7 +291,12 @@ func (w *maDeepWorker) generateBrief(ctx context.Context, rawPayload json.RawMes
 	if err != nil {
 		return nil, "", "", err
 	}
-	brief, err := buildMADeepBriefLLM(ctx, w.llmp, model, prompt, rawPayload, scorecard, valuation)
+	// Best-effort filing context: nil when no canonical filing exists (typical at first analysis).
+	var filingCtx *maDeepBriefFilingContext
+	if w.briefFilingContext != nil {
+		filingCtx = w.briefFilingContext(ctx, identity, &maDeepVATRecord{Payload: rawPayload, Scorecard: scorecard, Valuation: valuation})
+	}
+	brief, err := buildMADeepBriefLLM(ctx, w.llmp, model, prompt, rawPayload, scorecard, valuation, filingCtx)
 	if err != nil {
 		return nil, "", "", err
 	}
@@ -296,7 +307,7 @@ func (w *maDeepWorker) generateBrief(ctx context.Context, rawPayload json.RawMes
 // deep-dive worker (fresh analyses) and service-level brief regeneration (rolling out a
 // new prompt to already-cached companies). Numbers come from scorecard/valuation; the
 // curated raw payload supplies qualitative facts. No IT-full call.
-func buildMADeepBriefLLM(ctx context.Context, llmp maLLMProvider, model llm.Model, prompt llm.Prompt, rawPayload json.RawMessage, scorecard *MADeepScorecard, valuation *MADeepValuation) (*MADeepBrief, error) {
+func buildMADeepBriefLLM(ctx context.Context, llmp maLLMProvider, model llm.Model, prompt llm.Prompt, rawPayload json.RawMessage, scorecard *MADeepScorecard, valuation *MADeepValuation, filingCtx *maDeepBriefFilingContext) (*MADeepBrief, error) {
 	client, err := llmp.ClientForModel(ctx, model)
 	if err != nil {
 		return nil, err
@@ -304,6 +315,11 @@ func buildMADeepBriefLLM(ctx context.Context, llmp maLLMProvider, model llm.Mode
 	briefInput := map[string]any{"scorecard": scorecard, "valuation": valuation}
 	if company := curateITFullForBrief(rawPayload); company != nil {
 		briefInput["company"] = company
+	}
+	// The deposited-filing block is added ONLY when a canonical filing supplies context; the
+	// 097-style prompt is unchanged and simply ignores the extra "filings" key when absent.
+	if filingCtx != nil {
+		briefInput["filings"] = filingCtx
 	}
 	input, err := json.Marshal(briefInput)
 	if err != nil {

@@ -3346,12 +3346,15 @@ func (s *maService) regenerateMADeepBriefs(ctx context.Context, companyKey strin
 	}
 	pricing := s.loadPricing(ctx)
 	for _, row := range rows {
-		scorecard, _, _, _ := computeMADeepScorecard(ctx, s.store, row.Payload, row.CompanyKey, "", "", pricing)
+		scorecard, _, _, _ := computeMADeepScorecard(ctx, s.store, row.Payload, row.CompanyKey, row.VATCode, row.TaxCode, pricing)
 		if scorecard == nil {
 			report.Skipped = append(report.Skipped, maBriefRegenSkip{CompanyKey: row.CompanyKey, Error: "scorecard non calcolabile dal payload"})
 			continue
 		}
-		brief, err := buildMADeepBriefLLM(ctx, s.llmp, model, prompt, row.Payload, scorecard, row.Valuation)
+		// Best-effort filing context (nil when no canonical filing): the regeneration path enriches
+		// the brief with the deposited-filing reading just like the worker.
+		filingCtx := s.buildMADeepBriefFilingContext(ctx, maDeepDiveIdentity{VATCode: row.VATCode, TaxCode: row.TaxCode}, &maDeepVATRecord{Payload: row.Payload, Scorecard: scorecard, Valuation: row.Valuation})
+		brief, err := buildMADeepBriefLLM(ctx, s.llmp, model, prompt, row.Payload, scorecard, row.Valuation, filingCtx)
 		if err != nil {
 			logging.FromContext(ctx).Warn("binocolo brief regenerate failed", "component", "binocolo", "operation", "ma_deep_regenerate_briefs", "company_key", row.CompanyKey, "error", err)
 			report.Skipped = append(report.Skipped, maBriefRegenSkip{CompanyKey: row.CompanyKey, Error: err.Error()})

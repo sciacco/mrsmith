@@ -98,7 +98,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	if sqlStore != nil {
 		runners = append(runners, newMAJobWorker(h.ma, sqlStore, deps.InstanceOwner).run)
 		if deps.OpenAPIIT != nil {
-			runners = append(runners, newMADeepWorker(sqlStore, deps.OpenAPIIT, llmProvider, h.ma.loadPricing).run)
+			runners = append(runners, newMADeepWorker(sqlStore, deps.OpenAPIIT, llmProvider, h.ma.loadPricing, h.ma.buildMADeepBriefFilingContext).run)
 		}
 	}
 	var runWorkers func(context.Context)

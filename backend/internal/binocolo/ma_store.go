@@ -4757,10 +4757,14 @@ func (s *SQLStore) SaveMADeepReady(ctx context.Context, companyKey string, resul
 	if len(result.Payload) > 0 {
 		payloadRaw = result.Payload
 	}
+	// brief_generated_at stamps the brief-write moment: SaveMADeepReady and UpdateMADeepBrief are
+	// the ONLY two points that write the brief column, so they are the only two that stamp it. The
+	// stamp backs the on-read brief staleness (maDeepBriefStale) vs newer aligned NI decisions.
 	_, err = s.db.ExecContext(ctx, `
 UPDATE binocolo.ma_deep_analysis
 SET status = 'ready', itfull_payload = $2::jsonb, scorecard = $3::jsonb, valuation = $4::jsonb, brief = $5::jsonb,
-    model_id = $6::uuid, prompt_id = $7::uuid, cost_eur = $8, error_code = NULL, updated_at = now()
+    model_id = $6::uuid, prompt_id = $7::uuid, cost_eur = $8, error_code = NULL,
+    brief_generated_at = now(), updated_at = now()
 WHERE company_key = $1
 `, companyKey, []byte(payloadRaw), scorecardRaw, valuationRaw, briefRaw, nullString(result.ModelID), nullString(result.PromptID), result.CostEUR)
 	if err != nil {
@@ -5002,6 +5006,9 @@ type maDeepVATRecord struct {
 	Payload    json.RawMessage
 	ErrorCode  string
 	UpdatedAt  time.Time
+	// BriefGeneratedAt is the brief-write stamp (nil when never generated), consumed by the
+	// on-read brief-staleness check (maDeepBriefStale) against the newest aligned NI decision.
+	BriefGeneratedAt *time.Time
 }
 
 // GetMADeepByVAT resolves a deep analysis by vat_code regardless of how its row was
@@ -5013,18 +5020,22 @@ func (s *SQLStore) GetMADeepByVAT(ctx context.Context, vat string) (*maDeepVATRe
 	}
 	var rec maDeepVATRecord
 	var scorecardRaw, valuationRaw, briefRaw, payloadRaw []byte
+	var briefGeneratedAt sql.NullTime
 	err := s.db.QueryRowContext(ctx, `
-SELECT company_key, status, scorecard, valuation, brief, itfull_payload, COALESCE(error_code, ''), updated_at
+SELECT company_key, status, scorecard, valuation, brief, itfull_payload, COALESCE(error_code, ''), updated_at, brief_generated_at
 FROM binocolo.ma_deep_analysis
 WHERE vat_code = $1
 ORDER BY (status = 'ready') DESC, updated_at DESC
 LIMIT 1
-`, vat).Scan(&rec.CompanyKey, &rec.Status, &scorecardRaw, &valuationRaw, &briefRaw, &payloadRaw, &rec.ErrorCode, &rec.UpdatedAt)
+`, vat).Scan(&rec.CompanyKey, &rec.Status, &scorecardRaw, &valuationRaw, &briefRaw, &payloadRaw, &rec.ErrorCode, &rec.UpdatedAt, &briefGeneratedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("get ma deep by vat: %w", err)
+	}
+	if briefGeneratedAt.Valid {
+		rec.BriefGeneratedAt = &briefGeneratedAt.Time
 	}
 	if len(scorecardRaw) > 0 {
 		var v MADeepScorecard
@@ -5058,7 +5069,7 @@ type maRowQuerier interface {
 
 // maDeepVATRecordColumns backs maDeepVATRecord (same shape scanned by GetMADeepByVAT),
 // reused by the fiscal-identity lookups.
-const maDeepVATRecordColumns = `company_key, status, scorecard, valuation, brief, itfull_payload, COALESCE(error_code, ''), updated_at`
+const maDeepVATRecordColumns = `company_key, status, scorecard, valuation, brief, itfull_payload, COALESCE(error_code, ''), updated_at, brief_generated_at`
 
 // maDeepFiscalIdentityMatch is the WHERE predicate matching a ma_deep_analysis row to a
 // canonical fiscal_key ($1). It mirrors the finder's normalization (ma_store.go source_clean
@@ -5077,8 +5088,12 @@ const maDeepFiscalIdentityMatch = `(
 func scanMADeepVATRecord(scanner interface{ Scan(...any) error }) (*maDeepVATRecord, error) {
 	var rec maDeepVATRecord
 	var scorecardRaw, valuationRaw, briefRaw, payloadRaw []byte
-	if err := scanner.Scan(&rec.CompanyKey, &rec.Status, &scorecardRaw, &valuationRaw, &briefRaw, &payloadRaw, &rec.ErrorCode, &rec.UpdatedAt); err != nil {
+	var briefGeneratedAt sql.NullTime
+	if err := scanner.Scan(&rec.CompanyKey, &rec.Status, &scorecardRaw, &valuationRaw, &briefRaw, &payloadRaw, &rec.ErrorCode, &rec.UpdatedAt, &briefGeneratedAt); err != nil {
 		return nil, err
+	}
+	if briefGeneratedAt.Valid {
+		rec.BriefGeneratedAt = &briefGeneratedAt.Time
 	}
 	if len(scorecardRaw) > 0 {
 		var v MADeepScorecard
@@ -5221,6 +5236,10 @@ type maDeepBriefRow struct {
 	CompanyKey string
 	Payload    json.RawMessage
 	Valuation  *MADeepValuation
+	// VATCode/TaxCode carry the fiscal identity so brief regeneration can resolve the canonical
+	// filing for the optional filing context (F7). Empty when the row was keyed without them.
+	VATCode string
+	TaxCode string
 }
 
 // ListMADeepReadyForBrief returns ready rows with their cached payload + valuation, for
@@ -5230,7 +5249,7 @@ func (s *SQLStore) ListMADeepReadyForBrief(ctx context.Context) ([]maDeepBriefRo
 		return nil, errors.New("binocolo ma store not configured")
 	}
 	rows, err := s.db.QueryContext(ctx, `
-SELECT company_key, itfull_payload, valuation
+SELECT company_key, itfull_payload, valuation, COALESCE(vat_code, ''), COALESCE(tax_code, '')
 FROM binocolo.ma_deep_analysis
 WHERE status = 'ready' AND itfull_payload IS NOT NULL AND itfull_payload <> 'null'::jsonb
 ORDER BY updated_at
@@ -5243,7 +5262,7 @@ ORDER BY updated_at
 	for rows.Next() {
 		var row maDeepBriefRow
 		var payload, valuationRaw []byte
-		if err := rows.Scan(&row.CompanyKey, &payload, &valuationRaw); err != nil {
+		if err := rows.Scan(&row.CompanyKey, &payload, &valuationRaw, &row.VATCode, &row.TaxCode); err != nil {
 			return nil, fmt.Errorf("scan ma deep brief row: %w", err)
 		}
 		row.Payload = json.RawMessage(payload)
@@ -5275,9 +5294,12 @@ func (s *SQLStore) UpdateMADeepBrief(ctx context.Context, companyKey string, bri
 		}
 		raw = b
 	}
+	// brief_generated_at is re-stamped here too (the second and last brief-write point) so a
+	// regenerated brief resets the staleness clock.
 	if _, err := s.db.ExecContext(ctx, `
 UPDATE binocolo.ma_deep_analysis
-SET brief = $2::jsonb, model_id = $3::uuid, prompt_id = $4::uuid, updated_at = now()
+SET brief = $2::jsonb, model_id = $3::uuid, prompt_id = $4::uuid,
+    brief_generated_at = now(), updated_at = now()
 WHERE company_key = $1
 `, companyKey, []byte(raw), nullString(modelID), nullString(promptID)); err != nil {
 		return fmt.Errorf("update ma deep brief: %w", err)

@@ -96,6 +96,8 @@ type maFilingStore interface {
 	HasMAFilingDocuEngineAcquisition(ctx context.Context, filingID string) (bool, error)
 	GetMAFilingExtractsByFiscalKey(ctx context.Context, fiscalKey, excludeFilingID string, exerciseDates []time.Time) ([]maFilingPeerExtract, error)
 	SweepMAFilingIngestOrphans(ctx context.Context, olderThan time.Duration) ([]maFilingIngestOrphan, error)
+	// on-read adjusted view (F7): the canonical filing is resolved from the fiscal key's filings.
+	ListMAFilingsByFiscalKey(ctx context.Context, fiscalKey string) ([]maFiling, error)
 	// NI reading (F6): reading run + immutable proposals + append-only decisions.
 	CreateMANIReadingRun(ctx context.Context, filingID, processingRunID, promptID, modelID, requestID string) (string, error)
 	GetActiveMANIReadingRun(ctx context.Context, filingID string) (*maNIReadingRun, error)
@@ -105,6 +107,8 @@ type maFilingStore interface {
 	ListMANIDecisionsByProposals(ctx context.Context, proposalIDs []string) ([]maNIDecision, error)
 	ListMANIProposalsWithDecisions(ctx context.Context, filingID string) ([]maNIProposalWithDecisions, error)
 	ListMANIAutoReconfirmCandidates(ctx context.Context, filingID, runID string) ([]maNIAutoReconfirm, error)
+	// brief staleness (F7): newest decision timestamp on the filing's active reading run.
+	GetMaxMANIDecisionCreatedAt(ctx context.Context, filingID string) (*time.Time, error)
 }
 
 // maDocuEngine is the DocuEngine sub-client seam the filing jobs drive. *openapiit.

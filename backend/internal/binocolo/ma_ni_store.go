@@ -406,6 +406,36 @@ func (s *SQLStore) ListMANIProposalsWithDecisions(ctx context.Context, filingID 
 	return out, nil
 }
 
+// GetMaxMANIDecisionCreatedAt returns the newest decision timestamp across the proposals of a
+// filing's ACTIVE reading run (nil when the filing has no active run or no decisions). It backs
+// the on-read brief staleness check (maDeepBriefStale): a decision newer than the brief stamp
+// means the cached brief predates the analyst's latest ratification on the canonical filing.
+func (s *SQLStore) GetMaxMANIDecisionCreatedAt(ctx context.Context, filingID string) (*time.Time, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	var maxAt sql.NullTime
+	err := s.db.QueryRowContext(ctx, `
+WITH active_run AS (
+  SELECT id FROM binocolo.ma_ni_reading_run
+  WHERE filing_id = $1::uuid AND status = 'active'
+  ORDER BY created_at DESC
+  LIMIT 1
+)
+SELECT max(d.created_at)
+FROM binocolo.ma_ni_decision d
+JOIN binocolo.ma_ni_proposal p ON p.id = d.proposal_id
+WHERE p.run_id IN (SELECT id FROM active_run)
+`, filingID).Scan(&maxAt)
+	if err != nil {
+		return nil, fmt.Errorf("get max ma ni decision created_at: %w", err)
+	}
+	if !maxAt.Valid {
+		return nil, nil
+	}
+	return &maxAt.Time, nil
+}
+
 // ---------------------------------------------------------------------------
 // Cross-run auto-reconfirmation.
 // ---------------------------------------------------------------------------
