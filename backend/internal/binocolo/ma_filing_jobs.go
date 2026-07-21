@@ -80,6 +80,21 @@ type maFilingStore interface {
 	CreateOrMergeMAFiling(ctx context.Context, in maFilingCreate) (string, bool, error)
 	// reconciliation exclusion set (pre-POST idempotency)
 	ListMAFilingReferencedRequestIDs(ctx context.Context, excludeSearchID, excludeAcquisitionID string) (map[string]bool, error)
+	// ingest (F5): OCR/parse pipeline on a downloaded filing.
+	GetMAFiling(ctx context.Context, id string) (*maFiling, error)
+	GetMAFilingBlob(ctx context.Context, md5Hex string) ([]byte, string, int64, error)
+	CreateMAFilingProcessingRun(ctx context.Context, filingID, ocrModel, ocrParamsVersion, parseVersion, requestID string) (string, error)
+	InsertMAFilingPages(ctx context.Context, runID string, pages []maFilingPage) error
+	GetMAFilingPages(ctx context.Context, runID string) ([]maFilingPage, error)
+	GetMAFilingPageMarkdown(ctx context.Context, runID string, pageNo int) (string, error)
+	SetMAFilingPageCount(ctx context.Context, id string, pageCount int) error
+	UpdateMAFilingStatus(ctx context.Context, id, status, errMsg string) error
+	SetMAFilingParsed(ctx context.Context, id string, closingDate *time.Time, balanceSheetType, taxonomyVersion string, pageCount int) error
+	SetMAFilingIdentityStatus(ctx context.Context, id, identityStatus string) error
+	UpsertMAFilingExtract(ctx context.Context, runID string, exerciseDate time.Time, sp, ce, checks, docai, docaiDiff []byte) error
+	HasMAFilingDocuEngineAcquisition(ctx context.Context, filingID string) (bool, error)
+	GetMAFilingExtractsByFiscalKey(ctx context.Context, fiscalKey, excludeFilingID string, exerciseDates []time.Time) ([]maFilingPeerExtract, error)
+	SweepMAFilingIngestOrphans(ctx context.Context, olderThan time.Duration) ([]maFilingIngestOrphan, error)
 }
 
 // maDocuEngine is the DocuEngine sub-client seam the filing jobs drive. *openapiit.

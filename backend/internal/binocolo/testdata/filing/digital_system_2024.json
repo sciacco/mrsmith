@@ -1,0 +1,309 @@
+{
+  "comment": "Fixture congelata simulante output Mistral OCR (table_format=markdown) — generata una tantum trascrivendo il PDF campione apps/binocolo/docs/bilanci/'Bilancio e NI 2024.pdf' pagina per pagina; sostituibile col primo run OCR reale. Numeri di verita' (dallo smoke della issue #78): totale attivo = totale passivo = 1.039.105; A-B = 260.530; NI: conto corrente vincolato 250.000 (p.10), compensi amministratori 31.750 (p.17), canoni verso soci 18.000 (p.17). Fascicolo 2024 in forma abbreviata, tassonomia itcc-ci-2018-11-04, DIGITAL SYSTEM SRL CF/P.IVA 00888440252, due colonne esercizio (2024 corrente + 2023 comparativa).",
+  "source": "apps/binocolo/docs/bilanci/Bilancio e NI 2024.pdf",
+  "pages": [
+    {
+      "pageNo": 1,
+      "lines": [
+        "# DIGITAL SYSTEM SRL",
+        "",
+        "## Bilancio di esercizio al 31-12-2024",
+        "",
+        "| Dati anagrafici | |",
+        "| --- | --- |",
+        "| Sede in | VIA MONDIN 7 32100 BELLUNO (BL) |",
+        "| Codice Fiscale | 00888440252 |",
+        "| Numero Rea | BL 80705 |",
+        "| P.I. | 00888440252 |",
+        "| Capitale Sociale Euro | 10.920 i.v. |",
+        "| Forma giuridica | Societa' A Responsabilita' Limitata |",
+        "| Settore di attivita' prevalente (ATECO) | Commercio all'ingrosso di computer, unita' periferiche e software (46.50.10) |",
+        "| Societa' in liquidazione | no |",
+        "",
+        "Generato automaticamente - Conforme alla tassonomia itcc-ci-2018-11-04"
+      ]
+    },
+    {
+      "pageNo": 2,
+      "lines": [
+        "# Stato patrimoniale",
+        "",
+        "| | 31-12-2024 | 31-12-2023 |",
+        "| --- | --- | --- |",
+        "| Stato patrimoniale | | |",
+        "| Attivo | | |",
+        "| B) Immobilizzazioni | | |",
+        "| I - Immobilizzazioni immateriali | 19.310 | 28.382 |",
+        "| II - Immobilizzazioni materiali | 24.952 | 211 |",
+        "| Totale immobilizzazioni (B) | 44.262 | 28.593 |",
+        "| C) Attivo circolante | | |",
+        "| I - Rimanenze | 29.718 | 25.211 |",
+        "| II - Crediti | | |",
+        "| esigibili entro l'esercizio successivo | 416.556 | 508.521 |",
+        "| esigibili oltre l'esercizio successivo | 300 | 300 |",
+        "| Totale crediti | 416.856 | 508.821 |",
+        "| IV - Disponibilita' liquide | 539.223 | 346.869 |",
+        "| Totale attivo circolante (C) | 985.797 | 880.901 |",
+        "| D) Ratei e risconti | 9.046 | 11.092 |",
+        "| Totale attivo | 1.039.105 | 920.586 |",
+        "| Passivo | | |",
+        "| A) Patrimonio netto | | |",
+        "| I - Capitale | 10.920 | 10.920 |",
+        "| IV - Riserva legale | 4.344 | 4.344 |",
+        "| VI - Altre riserve | 623.851 | 389.685 |",
+        "| IX - Utile (perdita) dell'esercizio | 191.760 | 234.166 |",
+        "| Totale patrimonio netto | 830.875 | 639.115 |",
+        "| C) Trattamento di fine rapporto di lavoro subordinato | 53.389 | 48.018 |",
+        "| D) Debiti | | |",
+        "| esigibili entro l'esercizio successivo | 154.605 | 233.446 |",
+        "| Totale debiti | 154.605 | 233.446 |",
+        "| E) Ratei e risconti | 236 | 7 |",
+        "| Totale passivo | 1.039.105 | 920.586 |"
+      ]
+    },
+    {
+      "pageNo": 3,
+      "lines": [
+        "# Conto economico",
+        "",
+        "| | 31-12-2024 | 31-12-2023 |",
+        "| --- | --- | --- |",
+        "| Conto economico | | |",
+        "| A) Valore della produzione | | |",
+        "| 1) ricavi delle vendite e delle prestazioni | 1.147.405 | 1.289.927 |",
+        "| 5) altri ricavi e proventi | | |",
+        "| contributi in conto esercizio | - | 402 |",
+        "| altri | 1.131 | 1.428 |",
+        "| Totale altri ricavi e proventi | 1.131 | 1.830 |",
+        "| Totale valore della produzione | 1.148.536 | 1.291.757 |",
+        "| B) Costi della produzione | | |",
+        "| 6) per materie prime, sussidiarie, di consumo e di merci | 533.032 | 611.333 |",
+        "| 7) per servizi | 123.953 | 182.701 |",
+        "| 8) per godimento di beni di terzi | 19.805 | 21.964 |",
+        "| 9) per il personale | 167.028 | 145.935 |",
+        "| 10) ammortamenti e svalutazioni | 11.928 | 9.169 |",
+        "| 11) variazioni delle rimanenze di materie prime | (4.506) | (6.709) |",
+        "| 14) oneri diversi di gestione | 36.766 | 12.488 |",
+        "| Totale costi della produzione | 888.006 | 976.881 |",
+        "| Differenza tra valore e costi della produzione (A - B) | 260.530 | 314.876 |",
+        "| C) Proventi e oneri finanziari | | |",
+        "| Totale proventi e oneri finanziari (15 + 16 - 17 + - 17-bis) | 11.093 | 7.250 |",
+        "| Risultato prima delle imposte (A - B + C + - D) | 271.623 | 322.126 |",
+        "| 20) Imposte sul reddito dell'esercizio, correnti, differite e anticipate | 79.863 | 87.960 |",
+        "| 21) Utile (perdita) dell'esercizio | 191.760 | 234.166 |"
+      ]
+    },
+    {
+      "pageNo": 4,
+      "lines": [
+        "# Nota integrativa al Bilancio di esercizio chiuso al 31-12-2024",
+        "",
+        "## Nota integrativa, parte iniziale",
+        "",
+        "Signori soci,",
+        "il 31.12.2024 costituisce la data di chiusura del 27 esercizio sociale della nostra societa'. La societa' si occupa di servizi informatici, telematici e progettazione e realizzazione di infrastrutture informatiche e relativa manutenzione, nonche' svolge attivita' di commercio all'ingrosso e al dettaglio di prodotti hardware, software ed attrezzatura per ufficio.",
+        "",
+        "Il bilancio chiuso al 31.12.2024 e' costituito dallo stato patrimoniale, dal conto economico, dalla nota integrativa e dal rendiconto finanziario. Ci siamo avvalsi dell'art. 2435-bis del Codice Civile che prevede la redazione del bilancio in forma abbreviata, non avendo la nostra societa' superato per due esercizi successivi i limiti di cui al 1 comma del succitato articolo."
+      ]
+    },
+    {
+      "pageNo": 5,
+      "lines": [
+        "## Criteri di valutazione",
+        "",
+        "I criteri applicati nelle valutazioni delle poste del bilancio dell'esercizio 2024 sono stati correttamente determinati sulla base dei principi di redazione indicati dall'art. 2423-bis C.C. e dei criteri di valutazione accolti dall'art. 2426 C.C.",
+        "",
+        "### Immobilizzazioni immateriali",
+        "Le immobilizzazioni immateriali sono state iscritte nell'attivo dello stato patrimoniale sulla base di una prudente valutazione della loro utilita' pluriennale.",
+        "",
+        "### Rimanenze",
+        "Trattasi di rimanenze di merci valutate col metodo F.I.F.O."
+      ]
+    },
+    {
+      "pageNo": 6,
+      "lines": [
+        "### Crediti",
+        "Sono iscritti in bilancio al presunto valore di realizzo.",
+        "",
+        "### Debiti",
+        "I debiti risultano iscritti per importi corrispondenti al loro valore nominale."
+      ]
+    },
+    {
+      "pageNo": 7,
+      "lines": [
+        "### Imposte correnti",
+        "Lo stanziamento delle imposte correnti e' determinato in base ad una prudente previsione dell'onere di imposta, in applicazione della vigente normativa fiscale."
+      ]
+    },
+    {
+      "pageNo": 8,
+      "lines": [
+        "## Nota integrativa abbreviata, attivo",
+        "",
+        "## Immobilizzazioni",
+        "",
+        "### Movimenti delle immobilizzazioni",
+        "",
+        "| | Immobilizzazioni immateriali | Immobilizzazioni materiali | Totale immobilizzazioni |",
+        "| --- | --- | --- | --- |",
+        "| Valore di fine esercizio | 19.310 | 24.952 | 44.262 |",
+        "",
+        "B I Immobilizzazioni Immateriali. La voce comprende software per Euro 4.915,00 e lavori straordinari su beni di terzi per Euro 108.899,18."
+      ]
+    },
+    {
+      "pageNo": 9,
+      "lines": [
+        "## Attivo circolante",
+        "",
+        "### Rimanenze",
+        "La voce rimanenze ammonta ad Euro 29.717,69 ed e' composta dalla rilevazione di fine esercizio delle rimanenze di merci.",
+        "",
+        "## Crediti iscritti nell'attivo circolante"
+      ]
+    },
+    {
+      "pageNo": 10,
+      "lines": [
+        "| | Valore di inizio esercizio | Variazione nell'esercizio | Valore di fine esercizio | Quota scadente entro l'esercizio | Quota scadente oltre l'esercizio |",
+        "| --- | --- | --- | --- | --- | --- |",
+        "| Crediti iscritti nell'attivo circolante | 508.821 | (91.965) | 416.856 | 416.556 | 300 |",
+        "",
+        "### Esigibili entro esercizio",
+        "La voce crediti esigibili entro l'esercizio ammonta ad Euro 416.555,81 ed e' composta per Euro 153.952,84 da crediti verso clienti, per Euro 8.151,00 da credito verso Erario per IRES, per Euro 2.084,00 da credito verso Regione Veneto per IRAP e per Euro 250.000,00 dalla liquidita' presente in un conto corrente vincolato.",
+        "",
+        "### Esigibili oltre esercizio",
+        "La voce crediti esigibili oltre l'esercizio ammonta ad Euro 300,00 ed e' composta da cauzioni corrisposte a fornitori.",
+        "",
+        "## Disponibilita' liquide",
+        "La voce disponibilita' liquide ammonta ad Euro 539.223,13 e comprende la liquidita' presente presso le banche per Euro 538.473,62 e denaro in cassa per Euro 749,51.",
+        "",
+        "## Ratei e risconti attivi",
+        "La voce Ratei e Risconti attivi ammonta ad Euro 9.046,45."
+      ]
+    },
+    {
+      "pageNo": 11,
+      "lines": [
+        "## Nota integrativa abbreviata, passivo e patrimonio netto",
+        "",
+        "## Patrimonio netto",
+        "La voce Altre Riserve ammonta ad Euro 623.851,29 ed e' composta interamente da Riserva Straordinaria."
+      ]
+    },
+    {
+      "pageNo": 12,
+      "lines": [
+        "## Trattamento di fine rapporto di lavoro subordinato",
+        "",
+        "| | Trattamento di fine rapporto di lavoro subordinato |",
+        "| --- | --- |",
+        "| Valore di inizio esercizio | 48.018 |",
+        "| Accantonamento nell'esercizio | 5.371 |",
+        "| Valore di fine esercizio | 53.389 |",
+        "",
+        "L'aumento trattasi della quota di indennita' di fine rapporto accantonata al fondo nel corso del 2024."
+      ]
+    },
+    {
+      "pageNo": 13,
+      "lines": [
+        "## Debiti",
+        "",
+        "| | Valore di inizio esercizio | Variazione nell'esercizio | Valore di fine esercizio | Quota scadente entro l'esercizio | Quota scadente oltre l'esercizio |",
+        "| --- | --- | --- | --- | --- | --- |",
+        "| Debiti | 233.446 | (78.841) | 154.605 | 154.605 | 0 |",
+        "",
+        "### Esigibili entro l'esercizio",
+        "La voce debiti esigibili entro l'esercizio ammonta ad Euro 154.605,47 e si riferisce per Euro 6.816,50 a carte di credito, per Euro 69.817,07 a debiti verso fornitori, per Euro 1.320,00 a debito verso INPS compensi amministratore e per Euro 15.931,66 a debito verso dipendenti per stipendi da pagare."
+      ]
+    },
+    {
+      "pageNo": 14,
+      "lines": [
+        "## Nota integrativa abbreviata, conto economico",
+        "",
+        "## Valore della produzione",
+        "",
+        "| Saldo al 31/12/2024 | Saldo al 31/12/2023 | Variazioni |",
+        "| --- | --- | --- |",
+        "| 1.148.536 | 1.291.757 | (143.221) |",
+        "",
+        "| Descrizione | 31/12/2024 | 31/12/2023 | Variazioni |",
+        "| --- | --- | --- | --- |",
+        "| Ricavi vendite e prestazioni | 1.147.405 | 1.289.927 | (142.522) |",
+        "| Altri ricavi e proventi | 1.131 | 1.830 | (699) |",
+        "| Totale | 1.148.536 | 1.291.757 | (143.221) |",
+        "",
+        "Si evidenzia che il valore della produzione, pur subendo un decremento rispetto all'esercizio 2023 pari ad Euro 143.221, presenta un valore superiore agli esercizi 2022 e 2021.",
+        "",
+        "## Costi della produzione",
+        "",
+        "| Saldo al 31/12/2024 | Saldo al 31/12/2023 | Variazioni |",
+        "| --- | --- | --- |",
+        "| 888.006 | 976.881 | (88.875) |",
+        "",
+        "I costi della produzione presentano un andamento in linea con il valore della produzione."
+      ]
+    },
+    {
+      "pageNo": 15,
+      "lines": [
+        "## Importo e natura dei singoli elementi di ricavo/costo di entita' o incidenza eccezionali",
+        "Non vi sono elementi di ricavo di entita' o incidenza eccezionale. Non vi sono elementi di costo di entita' o incidenza eccezionale.",
+        "",
+        "## Imposte sul reddito d'esercizio, correnti, differite e anticipate",
+        "Le imposte dovute per l'esercizio 2024 ammontano ad Euro 12.278 per IRAP, mentre l'IRES ammonta ad Euro 67.585."
+      ]
+    },
+    {
+      "pageNo": 16,
+      "lines": [
+        "## Nota integrativa abbreviata, altre informazioni",
+        "",
+        "## Dati sull'occupazione",
+        "La Societa' nel corso del 2024 ha avuto in media n. 4,28 dipendenti.",
+        "",
+        "## Compensi, anticipazioni e crediti concessi ad amministratori e sindaci e impegni assunti per loro conto"
+      ]
+    },
+    {
+      "pageNo": 17,
+      "lines": [
+        "| | Amministratori |",
+        "| --- | --- |",
+        "| Compensi | 31.750 |",
+        "",
+        "L'ammontare dei compensi lordi annui corrisposti agli amministratori ammonta ad Euro 31.750,00, oltre ai contributi previdenziali ed assistenziali previsti per legge.",
+        "",
+        "## Impegni, garanzie e passivita' potenziali non risultanti dallo stato patrimoniale",
+        "Non esistono garanzie prestate da parte della societa' a favore di terzi, altri conti d'ordine, rischi e impegni.",
+        "",
+        "## Informazioni sulle operazioni con parti correlate",
+        "La societa' ha stipulato un contratto di affitto dell'immobile sito a Belluno in Via Mondin, n. 7, i cui proprietari, tra gli altri, risultano essere i due soci. In particolare, per l'anno 2024 i canoni di locazione pagati per l'immobile in questione ammontano ad Euro 18.000, di cui Euro 9.000 spettanti al socio De Nadal Massimo ed Euro 1.800 spettanti al socio Zerbinati Rudi. Si precisa che detto rapporto e' avvenuto a normali condizioni di mercato.",
+        "",
+        "## Informazioni sui fatti di rilievo avvenuti dopo la chiusura dell'esercizio",
+        "Non vi sono da segnalare fatti significativi accaduti successivamente alla chiusura dell'esercizio."
+      ]
+    },
+    {
+      "pageNo": 18,
+      "lines": [
+        "## Proposta di destinazione degli utili o di copertura delle perdite",
+        "Vi invitiamo ad approvare il bilancio proponendoVi la destinazione dell'utile d'esercizio di Euro 191.760,43 come segue: Euro 191.760,43 a Riserva Straordinaria.",
+        "",
+        "L'AMMINISTRATORE UNICO",
+        "FIRMATO IN ORIGINALE ZERBINATI RUDI"
+      ]
+    },
+    {
+      "pageNo": 19,
+      "lines": [
+        "## Dichiarazione di conformita' del bilancio",
+        "Il sottoscritto Alberton Matteo, ai sensi dell'art. 31 comma 2-quinquies della Legge 340/2000, dichiara che il presente documento e' conforme all'originale depositato presso la societa'."
+      ]
+    }
+  ]
+}

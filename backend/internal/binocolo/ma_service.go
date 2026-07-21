@@ -112,6 +112,12 @@ type maLLMProvider interface {
 	// resolves by (app, scope); Rerank returns one yes-probability per document.
 	ResolveRerankModel(ctx context.Context, scope, modelID string) (llm.RerankModel, error)
 	Rerank(ctx context.Context, m llm.RerankModel, instruction, query string, documents []string) ([]float64, llm.Usage, error)
+	// OCR / DocAI (deposited-filing ingest, issue #78). OCR reads a filing PDF to
+	// per-page markdown (Mistral OCR, scope binocolo/ma_filing_ocr) and returns the
+	// resolved model for the processing-run snapshot; DocAI is the annotated-OCR
+	// control branch (same registry) behind Deps.FilingDocAICompare.
+	OCR(ctx context.Context, call llm.OCRCall) (llm.OCRResponse, llm.OCRModel, error)
+	DocAI(ctx context.Context, call llm.DocAICall) (llm.OCRAnnotatedResponse, llm.OCRModel, error)
 }
 
 type maLLMAdapter struct{ svc *llm.Service }
@@ -167,6 +173,14 @@ func (a maLLMAdapter) Rerank(ctx context.Context, m llm.RerankModel, instruction
 	return a.svc.Rerank(ctx, m, instruction, query, documents)
 }
 
+func (a maLLMAdapter) OCR(ctx context.Context, call llm.OCRCall) (llm.OCRResponse, llm.OCRModel, error) {
+	return a.svc.OCR(ctx, call)
+}
+
+func (a maLLMAdapter) DocAI(ctx context.Context, call llm.DocAICall) (llm.OCRAnnotatedResponse, llm.OCRModel, error) {
+	return a.svc.DocAI(ctx, call)
+}
+
 type maService struct {
 	store         maWorkspaceStore
 	searchCache   companySearchCacheStore
@@ -209,6 +223,10 @@ type maService struct {
 	// not configured for this environment — a filing_search fails definitively rather
 	// than POSTing an invalid request. Set post-construction from the handler deps.
 	filingDocumentID string
+	// filingDocAICompare gates the DocAI (annotated-OCR) control branch in the filing
+	// ingest (config Deps.FilingDocAICompare). Off by default: the deterministic markdown
+	// parse is the record; DocAI, when on, only writes a best-effort docai/docai_diff.
+	filingDocAICompare bool
 	// compareSnippetCache memoizes re-gathered neutral web snippets per domain for the
 	// model-comparison harness (sector-eval-models with includeSnippets). Test-support
 	// only; persists for the process lifetime so a multi-request eval pays Brave once.

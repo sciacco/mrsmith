@@ -1385,6 +1385,14 @@ func (f *fakeMALLMProvider) Rerank(context.Context, llm.RerankModel, string, str
 	return nil, llm.Usage{}, errors.New("rerank not configured")
 }
 
+func (f *fakeMALLMProvider) OCR(context.Context, llm.OCRCall) (llm.OCRResponse, llm.OCRModel, error) {
+	return llm.OCRResponse{}, llm.OCRModel{}, errors.New("ocr not configured")
+}
+
+func (f *fakeMALLMProvider) DocAI(context.Context, llm.DocAICall) (llm.OCRAnnotatedResponse, llm.OCRModel, error) {
+	return llm.OCRAnnotatedResponse{}, llm.OCRModel{}, errors.New("docai not configured")
+}
+
 type fakeMAWorkspaceStore struct {
 	traces []maTraceStart
 	links  []maTraceLink
@@ -1562,6 +1570,10 @@ func (f *fakeMAWorkspaceStore) FindMACompanySnapshotByKey(context.Context, strin
 
 func (f *fakeMAWorkspaceStore) EnqueueMADeepAnalysis(context.Context, string, string, string, string) error {
 	return nil
+}
+
+func (f *fakeMAWorkspaceStore) EnqueueMADeepAnalysisIfAbsent(context.Context, string, string, string, string) (bool, string, error) {
+	return false, "", nil
 }
 
 func (f *fakeMAWorkspaceStore) ListMADeepReadyPayloads(context.Context) ([]maDeepPayloadRow, error) {

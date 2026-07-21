@@ -140,6 +140,27 @@ const (
 	// window alone.
 	maFilingReconcileWindow = 30 * time.Minute
 
+	// maFilingOCRParamsVersion / maFilingParseVersion are the immutable provenance
+	// snapshots stamped on a ma_filing_processing_run: which pinned OCR parameter set
+	// produced the pages and which deterministic parser produced the extracts. Bump
+	// either when the pinned OCR params (llm/ocr.go) or the CEE parser (ma_filing_parse.go)
+	// change, so a re-run is distinguishable from a prior one.
+	maFilingOCRParamsVersion = "mistral-ocr/markdown+blocks+page-conf/v1"
+	maFilingParseVersion     = "itcc-ci/prospetti-cee/v1"
+
+	// maFilingIngestOrphanAge is how long a filing may sit in a non-terminal ingest
+	// state (queued/ocr/parse) with NO filing_ingest job inflight before the worker's
+	// sweeper re-enqueues it (idempotent: the mig-115 inflight index on filingId
+	// dedups). Guards the QA-F4 gap where a post-acquire ingest enqueue failed and left
+	// the filing orphaned. ma_filing has no updated_at, so created_at is the anchor; the
+	// "no inflight job" condition is the primary correctness guard (an actively-processed
+	// filing always has a pending/processing job).
+	maFilingIngestOrphanAge = 15 * time.Minute
+
+	// maFilingIngestSweepEveryTicks is how often (in worker ticks, ~2s each) the orphan
+	// sweep runs — ~every 60s, cheap and rare relative to the queue drain.
+	maFilingIngestSweepEveryTicks = 30
+
 	// --- Bilanci depositati (issue #78) --------------------------------------
 	// State-machine enums for the deposited-filing pipeline. The canonical source
 	// of these strings is the CHECK constraints in migrations 113/114 (DB enum in

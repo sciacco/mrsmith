@@ -41,6 +41,9 @@ type maJobWorker struct {
 	interval time.Duration
 	batch    int
 	jobTypes []string
+	// ticks counts elapsed ticks so the deposited-filing orphan sweep runs only every
+	// maFilingIngestSweepEveryTicks (cheap, rare) rather than every tick.
+	ticks int
 }
 
 func newMAJobWorker(svc *maService, store maJobWorkerStore, owner string) *maJobWorker {
@@ -61,9 +64,7 @@ func newMAJobWorker(svc *maService, store maJobWorkerStore, owner string) *maJob
 			maJobTypeCardDomainVerify,
 			maJobTypeFilingSearch,
 			maJobTypeFilingAcquire,
-			// maJobTypeFilingIngest is intentionally absent: F4 enqueues it but F5 owns
-			// its dispatch. Excluding it here keeps the row 'pending' (never claimed by
-			// this build) instead of falling into the default "unknown job type" branch.
+			maJobTypeFilingIngest, // F5 activates the ingest dispatch (F4 only enqueued it).
 		},
 	}
 }
@@ -90,6 +91,13 @@ func (w *maJobWorker) tick(ctx context.Context) {
 	}
 	for _, job := range jobs {
 		w.process(ctx, job)
+	}
+	// Periodic re-aggancio of orphaned filing_ingest work (QA-F4 gap): a filing left in a
+	// non-terminal ingest state with no job inflight is re-enqueued (idempotent via the
+	// mig-115 inflight index). Rare relative to the drain, so it does not slow the tick.
+	w.ticks++
+	if w.ticks%maFilingIngestSweepEveryTicks == 0 {
+		w.svc.sweepFilingIngestOrphans(ctx)
 	}
 }
 
@@ -135,6 +143,8 @@ func (w *maJobWorker) process(ctx context.Context, job maJob) {
 		traceID, err = w.svc.runFilingSearchJob(ctx, job)
 	case maJobTypeFilingAcquire:
 		traceID, err = w.svc.runFilingAcquireJob(ctx, job)
+	case maJobTypeFilingIngest:
+		traceID, err = w.svc.runFilingIngestJob(ctx, job)
 	default:
 		logging.FromContext(ctx).Warn("binocolo job worker skipped unknown job type", "component", "binocolo", "job_id", job.ID, "job_type", job.JobType)
 		return
@@ -196,6 +206,10 @@ func (w *maJobWorker) retryOrFail(ctx context.Context, job maJob, code string) {
 		// row, but NEVER resolve an 'unknown' vendor outcome heuristically — unknown stays
 		// unknown for a future manual/dev reconciliation.
 		w.svc.failFilingJobIfNotUnknown(ctx, job, code)
+	case maJobTypeFilingIngest:
+		// Terminal give-up on an infra error: fail the filing UNLESS it is identity_blocked
+		// (awaits a manual override). There is no 'unknown' state for the ingest.
+		w.svc.failFilingIngestIfNotBlocked(ctx, job, code)
 	}
 }
 
@@ -260,6 +274,8 @@ func classifyMAJobError(err error, jobType string) string {
 			return "filing_search_failed"
 		case maJobTypeFilingAcquire:
 			return "filing_acquire_failed"
+		case maJobTypeFilingIngest:
+			return "filing_ingest_failed"
 		default:
 			return "estimate_failed"
 		}

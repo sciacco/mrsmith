@@ -61,6 +61,7 @@ type maWorkspaceStore interface {
 	FindMACompanySnapshotByIdentity(ctx context.Context, vatOrTax string) (*maCompanySnapshot, error)
 	FindMACompanySnapshotByKey(ctx context.Context, companyKey string) (*maCompanySnapshot, error)
 	EnqueueMADeepAnalysis(ctx context.Context, companyKey, vatCode, taxCode, email string) error
+	EnqueueMADeepAnalysisIfAbsent(ctx context.Context, companyKey, vat, tax, email string) (bool, string, error)
 	ListMADeepReadyPayloads(ctx context.Context) ([]maDeepPayloadRow, error)
 	CountMADeepByStatus(ctx context.Context) (map[string]int, error)
 	CountMADeepBriefFormats(ctx context.Context) (map[string]int, []string, error)

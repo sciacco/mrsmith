@@ -490,15 +490,16 @@ WHERE id = $1::uuid
 }
 
 // ApplyMAFilingIdentityOverride records a one-shot, non-revocable manual acceptance of a
-// filing whose fiscal identity could not be auto-validated. Set-once: it succeeds (rows
+// filing whose fiscal identity could NOT be READ from page 1. Set-once: it succeeds (rows
 // affected == 1) only while identity_override_at IS NULL.
 //
-// Decision (spec left this open): the override is allowed from BOTH 'pending_validation'
-// AND 'mismatch'. The contract is "machine-readable mismatch = hard block;
-// non-readable = explicit auditable override" — i.e. the override is the escape hatch for
-// identities that could not be validated automatically, which is exactly the
-// pending_validation and mismatch states. 'validated' needs no override and 'override' is
-// already terminal, so both are excluded.
+// Contract (orchestrator, correcting the earlier F3 decision): the override is allowed
+// ONLY from 'pending_validation' (the identity was unreadable). A 'mismatch' — a readable
+// page-1 identity that DIFFERS from the expected one — is a HARD BLOCK and is NEVER
+// overridable ("Mismatch leggibile = blocco duro; illeggibile = override esplicito
+// auditabile"): accepting a document that self-declares a different company would defeat
+// the identity guarantee. 'validated' needs no override and 'override' is already
+// terminal, so both are excluded too.
 func (s *SQLStore) ApplyMAFilingIdentityOverride(ctx context.Context, id, subject, email, reason string) (bool, error) {
 	if s == nil || s.db == nil {
 		return false, errors.New("binocolo ma store not configured")
@@ -512,7 +513,7 @@ SET identity_status = 'override',
     identity_override_at = now()
 WHERE id = $1::uuid
   AND identity_override_at IS NULL
-  AND identity_status IN ('pending_validation', 'mismatch')
+  AND identity_status = 'pending_validation'
 `, id, subject, email, reason)
 	if err != nil {
 		return false, fmt.Errorf("apply ma filing identity override: %w", err)
@@ -1194,6 +1195,161 @@ ORDER BY exercise_date
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate ma filing extracts: %w", err)
+	}
+	return out, nil
+}
+
+// SetMAFilingPageCount records the OCR page count on a filing (authoritative from the
+// OCR stage, unlike SetMAFilingParsed which only fills it when still NULL).
+func (s *SQLStore) SetMAFilingPageCount(ctx context.Context, id string, pageCount int) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	if _, err := s.db.ExecContext(ctx, `
+UPDATE binocolo.ma_filing
+SET page_count = $2
+WHERE id = $1::uuid
+`, id, pageCount); err != nil {
+		return fmt.Errorf("set ma filing page count: %w", err)
+	}
+	return nil
+}
+
+// HasMAFilingDocuEngineAcquisition reports whether a filing was procured through the
+// DocuEngine channel (an acquisition with origin='docuengine' that reached
+// downloaded/done). The ingest treats such a filing's fiscal identity as ASSERTED by
+// the channel (the search matched on the codice fiscale), so page-1 identity validation
+// is skipped — only uploads must prove identity from the document itself.
+func (s *SQLStore) HasMAFilingDocuEngineAcquisition(ctx context.Context, filingID string) (bool, error) {
+	if s == nil || s.db == nil {
+		return false, errors.New("binocolo ma store not configured")
+	}
+	var exists bool
+	if err := s.db.QueryRowContext(ctx, `
+SELECT EXISTS (
+  SELECT 1 FROM binocolo.ma_filing_acquisition
+  WHERE filing_id = $1::uuid AND origin = 'docuengine' AND status IN ('downloaded', 'done')
+)
+`, filingID).Scan(&exists); err != nil {
+		return false, fmt.Errorf("check ma filing docuengine acquisition: %w", err)
+	}
+	return exists, nil
+}
+
+// GetMAFilingExtractsByFiscalKey returns the SP total-attivo of the ACTIVE processing
+// run of OTHER filings sharing this fiscal identity, restricted to the given exercise
+// dates. It feeds detectAdaptedComparative: a prior deposit may restate a comparative
+// column that diverges from a later fascicolo. Excludes the caller's own filing.
+// exerciseDates empty ⇒ no work (returns nil). The numeric is read straight from the
+// stored sp jsonb (json tag totaleAttivo), so the pure helper needs no re-parse.
+func (s *SQLStore) GetMAFilingExtractsByFiscalKey(ctx context.Context, fiscalKey, excludeFilingID string, exerciseDates []time.Time) ([]maFilingPeerExtract, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	if len(exerciseDates) == 0 {
+		return nil, nil
+	}
+	dates := make([]string, 0, len(exerciseDates))
+	for _, d := range exerciseDates {
+		dates = append(dates, maDateValue(d))
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT e.exercise_date, f.closing_date, (e.sp->>'totaleAttivo')::float8
+FROM binocolo.ma_filing_extract e
+JOIN binocolo.ma_filing_processing_run r
+  ON r.id = e.processing_run_id AND r.status = 'active'
+JOIN binocolo.ma_filing f
+  ON f.id = r.filing_id
+WHERE f.fiscal_key = $1
+  AND ($2 = '' OR f.id <> $2::uuid)
+  AND e.exercise_date = ANY(string_to_array($3, ',')::date[])
+`, fiscalKey, excludeFilingID, strings.Join(dates, ","))
+	if err != nil {
+		return nil, fmt.Errorf("get ma filing extracts by fiscal key: %w", err)
+	}
+	defer rows.Close()
+	var out []maFilingPeerExtract
+	for rows.Next() {
+		var peer maFilingPeerExtract
+		var closing sql.NullTime
+		var totale sql.NullFloat64
+		if err := rows.Scan(&peer.ExerciseDate, &closing, &totale); err != nil {
+			return nil, fmt.Errorf("scan ma filing peer extract: %w", err)
+		}
+		if closing.Valid {
+			peer.ClosingDate = &closing.Time
+		}
+		if totale.Valid {
+			v := totale.Float64
+			peer.TotaleAttivo = &v
+		}
+		out = append(out, peer)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma filing peer extracts: %w", err)
+	}
+	return out, nil
+}
+
+// maFilingIngestOrphan is one filing the sweeper found stuck in a non-terminal ingest
+// state with no job working it. Carries what enqueueFilingIngest needs to re-drive it.
+type maFilingIngestOrphan struct {
+	FilingID          string
+	FiscalKey         string
+	ContextCompanyKey string
+	ActorSubject      string
+	ActorEmail        string
+}
+
+// SweepMAFilingIngestOrphans returns filings in a non-terminal ingest state
+// (queued/ocr/parse) that have NO filing_ingest job inflight (pending/processing) and
+// were created more than olderThan ago. The worker re-enqueues each (idempotent via the
+// mig-115 inflight index) to recover the QA-F4 gap where a post-acquire ingest enqueue
+// failed. context_company_key/actor are recovered from the filing's most recent
+// acquisition so the re-enqueued job matches the original. identity_blocked/failed/
+// ready/degraded are terminal or await manual action and are never swept.
+func (s *SQLStore) SweepMAFilingIngestOrphans(ctx context.Context, olderThan time.Duration) ([]maFilingIngestOrphan, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	minutes := int(olderThan.Minutes())
+	if minutes < 0 {
+		minutes = 0
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT f.id::text, f.fiscal_key,
+       COALESCE(a.context_company_key, ''), COALESCE(a.actor_subject, ''), COALESCE(a.actor_email, '')
+FROM binocolo.ma_filing f
+LEFT JOIN LATERAL (
+  SELECT context_company_key, actor_subject, actor_email
+  FROM binocolo.ma_filing_acquisition
+  WHERE filing_id = f.id
+  ORDER BY updated_at DESC
+  LIMIT 1
+) a ON true
+WHERE f.status IN ('queued', 'ocr', 'parse')
+  AND f.created_at < now() - make_interval(mins => $1)
+  AND NOT EXISTS (
+    SELECT 1 FROM binocolo.ma_job j
+    WHERE j.job_type = 'filing_ingest'
+      AND j.status IN ('pending', 'processing')
+      AND j.payload->>'filingId' = f.id::text
+  )
+`, minutes)
+	if err != nil {
+		return nil, fmt.Errorf("sweep ma filing ingest orphans: %w", err)
+	}
+	defer rows.Close()
+	var out []maFilingIngestOrphan
+	for rows.Next() {
+		var o maFilingIngestOrphan
+		if err := rows.Scan(&o.FilingID, &o.FiscalKey, &o.ContextCompanyKey, &o.ActorSubject, &o.ActorEmail); err != nil {
+			return nil, fmt.Errorf("scan ma filing ingest orphan: %w", err)
+		}
+		out = append(out, o)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma filing ingest orphans: %w", err)
 	}
 	return out, nil
 }

@@ -225,6 +225,60 @@ func (f *fakeFilingStore) ListMAFilingReferencedRequestIDs(_ context.Context, ex
 	return out, nil
 }
 
+// F5 ingest surface — unused by the F4 search/acquire tests (which drive the work
+// functions directly), so these are minimal stubs kept only to satisfy maFilingStore.
+func (f *fakeFilingStore) GetMAFiling(context.Context, string) (*maFiling, error) { return nil, nil }
+
+func (f *fakeFilingStore) GetMAFilingBlob(context.Context, string) ([]byte, string, int64, error) {
+	return nil, "", 0, nil
+}
+
+func (f *fakeFilingStore) CreateMAFilingProcessingRun(context.Context, string, string, string, string, string) (string, error) {
+	return "", nil
+}
+
+func (f *fakeFilingStore) InsertMAFilingPages(context.Context, string, []maFilingPage) error {
+	return nil
+}
+
+func (f *fakeFilingStore) GetMAFilingPages(context.Context, string) ([]maFilingPage, error) {
+	return nil, nil
+}
+
+func (f *fakeFilingStore) GetMAFilingPageMarkdown(context.Context, string, int) (string, error) {
+	return "", nil
+}
+
+func (f *fakeFilingStore) SetMAFilingPageCount(context.Context, string, int) error { return nil }
+
+func (f *fakeFilingStore) UpdateMAFilingStatus(context.Context, string, string, string) error {
+	return nil
+}
+
+func (f *fakeFilingStore) SetMAFilingParsed(context.Context, string, *time.Time, string, string, int) error {
+	return nil
+}
+
+func (f *fakeFilingStore) SetMAFilingIdentityStatus(context.Context, string, string) error {
+	return nil
+}
+
+func (f *fakeFilingStore) UpsertMAFilingExtract(context.Context, string, time.Time, []byte, []byte, []byte, []byte, []byte) error {
+	return nil
+}
+
+func (f *fakeFilingStore) HasMAFilingDocuEngineAcquisition(context.Context, string) (bool, error) {
+	return false, nil
+}
+
+func (f *fakeFilingStore) GetMAFilingExtractsByFiscalKey(context.Context, string, string, []time.Time) ([]maFilingPeerExtract, error) {
+	return nil, nil
+}
+
+func (f *fakeFilingStore) SweepMAFilingIngestOrphans(context.Context, time.Duration) ([]maFilingIngestOrphan, error) {
+	return nil, nil
+}
+
 // fakeDocuEngine counts calls per method and lets each test script the paid mutations
 // (create/submit/select). GET/list are pure reads over the in-memory request state.
 type fakeDocuEngine struct {

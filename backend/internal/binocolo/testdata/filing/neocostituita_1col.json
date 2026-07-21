@@ -1,0 +1,60 @@
+{
+  "comment": "Fixture SINTETICA (non da PDF reale) — simula l'output Mistral OCR di un fascicolo di societa' neocostituita con UNA SOLA colonna esercizio (art. 2423-ter c.5: la comparativa manca al primo bilancio). Serve solo al caso 1-colonna del test parser; numeri arrotondati inventati. Sostituibile col primo run OCR reale di un caso analogo.",
+  "source": "sintetica",
+  "pages": [
+    {
+      "pageNo": 1,
+      "lines": [
+        "# NUOVA IMPRESA SRL",
+        "",
+        "## Bilancio di esercizio al 31-12-2024",
+        "",
+        "| Dati anagrafici | |",
+        "| --- | --- |",
+        "| Codice Fiscale | 09999990968 |",
+        "| P.I. | 09999990968 |",
+        "",
+        "Conforme alla tassonomia itcc-ci-2018-11-04"
+      ]
+    },
+    {
+      "pageNo": 2,
+      "lines": [
+        "# Stato patrimoniale",
+        "",
+        "| | 31-12-2024 |",
+        "| --- | --- |",
+        "| Attivo | |",
+        "| Totale immobilizzazioni (B) | 40.000 |",
+        "| Totale attivo circolante (C) | 60.000 |",
+        "| Totale attivo | 100.000 |",
+        "| Passivo | |",
+        "| Totale patrimonio netto | 80.000 |",
+        "| Totale debiti | 20.000 |",
+        "| Totale passivo | 100.000 |"
+      ]
+    },
+    {
+      "pageNo": 3,
+      "lines": [
+        "# Conto economico",
+        "",
+        "| | 31-12-2024 |",
+        "| --- | --- |",
+        "| Totale valore della produzione | 50.000 |",
+        "| Totale costi della produzione | 30.000 |",
+        "| Differenza tra valore e costi della produzione (A - B) | 20.000 |",
+        "| 21) Utile (perdita) dell'esercizio | 12.000 |"
+      ]
+    },
+    {
+      "pageNo": 4,
+      "lines": [
+        "# Nota integrativa al Bilancio di esercizio chiuso al 31-12-2024",
+        "",
+        "## Nota integrativa, parte iniziale",
+        "Primo esercizio della societa': non e' presente la colonna comparativa."
+      ]
+    }
+  ]
+}
