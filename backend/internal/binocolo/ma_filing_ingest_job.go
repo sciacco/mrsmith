@@ -95,11 +95,13 @@ func (s *maService) filingIngestTrace(ctx context.Context, eventType, externalSy
 	_ = s.traceEvent(ctx, event)
 }
 
-// maFilingSysMistral / maFilingSysInternal label ingest trace events by where the work
-// happens: the OCR/DocAI calls hit Mistral; parse/identity/dispatch run in-process.
+// maFilingSysMistral / maFilingSysInternal / maFilingSysLLM label ingest trace events by where
+// the work happens: the OCR/DocAI calls hit Mistral; the NI reading hits the chat LLM provider;
+// parse/identity/dispatch run in-process.
 const (
 	maFilingSysMistral  = "mistral"
 	maFilingSysInternal = "binocolo"
+	maFilingSysLLM      = "llm"
 )
 
 func (s *maService) filingIngestWork(ctx context.Context, job maJob, requestID string) error {
@@ -132,9 +134,9 @@ func (s *maService) filingIngestWork(ctx context.Context, job maJob, requestID s
 		// override was applied (or still blocked). Both re-run the identity → parse stage.
 		return s.filingIngestIdentityAndParse(ctx, job, payload, filing, requestID)
 	case maFilingStatusParse:
-		return s.filingIngestToNIReading(ctx, filing)
+		return s.filingIngestToNIReading(ctx, filing, requestID)
 	case maFilingStatusNIReading:
-		return s.filingIngestNIReadingPending(ctx)
+		return s.filingIngestNIReading(ctx, filing, requestID)
 	case maFilingStatusReady, maFilingStatusDegraded, maFilingStatusFailed:
 		return nil // terminal for the ingest job (ready/degraded closed by F6)
 	default:
@@ -300,27 +302,18 @@ func (s *maService) filingIngestParse(ctx context.Context, filing *maFiling, run
 	if err := s.filing.UpdateMAFilingStatus(ctx, filing.ID, maFilingStatusParse, ""); err != nil {
 		return err
 	}
-	return s.filingIngestToNIReading(ctx, filing)
+	filing.Status = maFilingStatusParse
+	return s.filingIngestToNIReading(ctx, filing, requestID)
 }
 
-// filingIngestToNIReading moves parse → ni_reading and delegates to the NI stage. F6
-// replaces the delegate with the real nota-integrativa reading.
-func (s *maService) filingIngestToNIReading(ctx context.Context, filing *maFiling) error {
+// filingIngestToNIReading moves parse → ni_reading and delegates to the real NI reading stage
+// in the same tick (no extra poll), so a parsed filing closes to ready|degraded without waiting.
+func (s *maService) filingIngestToNIReading(ctx context.Context, filing *maFiling, requestID string) error {
 	if err := s.filing.UpdateMAFilingStatus(ctx, filing.ID, maFilingStatusNIReading, ""); err != nil {
 		return err
 	}
-	return s.filingIngestNIReadingPending(ctx)
-}
-
-// filingIngestNIReadingPending is the F5 placeholder for the NI reading stage: it emits a
-// trace note and returns the poll-pending sentinel so the worker keeps the row alive
-// without a stub that pretends to have read anything. It never fabricates a result.
-//
-// F6 sostituisce questo ramo con la lettura NI reale (run LLM su ma_ni_reading_run,
-// proposte in ma_ni_proposal, chiusura a ready|degraded).
-func (s *maService) filingIngestNIReadingPending(ctx context.Context) error {
-	s.filingIngestTrace(ctx, "ni_dispatch", maFilingSysInternal, maTraceEventInfo, map[string]any{"note": "ni handled in F6"}, "")
-	return errMAFilingPollPending
+	filing.Status = maFilingStatusNIReading
+	return s.filingIngestNIReading(ctx, filing, requestID)
 }
 
 // enqueueFilingDeepBaseline dispatches the IT-full deep-dive baseline for the filing's

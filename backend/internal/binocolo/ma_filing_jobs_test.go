@@ -279,6 +279,42 @@ func (f *fakeFilingStore) SweepMAFilingIngestOrphans(context.Context, time.Durat
 	return nil, nil
 }
 
+func (f *fakeFilingStore) GetMAFilingExtracts(context.Context, string) ([]maFilingExtract, error) {
+	return nil, nil
+}
+
+func (f *fakeFilingStore) CreateMANIReadingRun(context.Context, string, string, string, string, string) (string, error) {
+	return "", nil
+}
+
+func (f *fakeFilingStore) GetActiveMANIReadingRun(context.Context, string) (*maNIReadingRun, error) {
+	return nil, nil
+}
+
+func (f *fakeFilingStore) InsertMANIProposals(context.Context, string, []maNIProposal) (int, error) {
+	return 0, nil
+}
+
+func (f *fakeFilingStore) ListMANIProposalsByRun(context.Context, string) ([]maNIProposal, error) {
+	return nil, nil
+}
+
+func (f *fakeFilingStore) InsertMANIDecision(context.Context, maNIDecisionCreate) (string, error) {
+	return "", nil
+}
+
+func (f *fakeFilingStore) ListMANIDecisionsByProposals(context.Context, []string) ([]maNIDecision, error) {
+	return nil, nil
+}
+
+func (f *fakeFilingStore) ListMANIProposalsWithDecisions(context.Context, string) ([]maNIProposalWithDecisions, error) {
+	return nil, nil
+}
+
+func (f *fakeFilingStore) ListMANIAutoReconfirmCandidates(context.Context, string, string) ([]maNIAutoReconfirm, error) {
+	return nil, nil
+}
+
 // fakeDocuEngine counts calls per method and lets each test script the paid mutations
 // (create/submit/select). GET/list are pure reads over the in-memory request state.
 type fakeDocuEngine struct {

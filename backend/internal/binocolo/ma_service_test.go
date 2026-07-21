@@ -1576,6 +1576,10 @@ func (f *fakeMAWorkspaceStore) EnqueueMADeepAnalysisIfAbsent(context.Context, st
 	return false, "", nil
 }
 
+func (f *fakeMAWorkspaceStore) GetMADeepByFiscalIdentity(context.Context, string, string) (*maDeepVATRecord, error) {
+	return nil, nil
+}
+
 func (f *fakeMAWorkspaceStore) ListMADeepReadyPayloads(context.Context) ([]maDeepPayloadRow, error) {
 	return nil, nil
 }

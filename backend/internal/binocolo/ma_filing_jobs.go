@@ -92,9 +92,19 @@ type maFilingStore interface {
 	SetMAFilingParsed(ctx context.Context, id string, closingDate *time.Time, balanceSheetType, taxonomyVersion string, pageCount int) error
 	SetMAFilingIdentityStatus(ctx context.Context, id, identityStatus string) error
 	UpsertMAFilingExtract(ctx context.Context, runID string, exerciseDate time.Time, sp, ce, checks, docai, docaiDiff []byte) error
+	GetMAFilingExtracts(ctx context.Context, runID string) ([]maFilingExtract, error)
 	HasMAFilingDocuEngineAcquisition(ctx context.Context, filingID string) (bool, error)
 	GetMAFilingExtractsByFiscalKey(ctx context.Context, fiscalKey, excludeFilingID string, exerciseDates []time.Time) ([]maFilingPeerExtract, error)
 	SweepMAFilingIngestOrphans(ctx context.Context, olderThan time.Duration) ([]maFilingIngestOrphan, error)
+	// NI reading (F6): reading run + immutable proposals + append-only decisions.
+	CreateMANIReadingRun(ctx context.Context, filingID, processingRunID, promptID, modelID, requestID string) (string, error)
+	GetActiveMANIReadingRun(ctx context.Context, filingID string) (*maNIReadingRun, error)
+	InsertMANIProposals(ctx context.Context, runID string, proposals []maNIProposal) (int, error)
+	ListMANIProposalsByRun(ctx context.Context, runID string) ([]maNIProposal, error)
+	InsertMANIDecision(ctx context.Context, in maNIDecisionCreate) (string, error)
+	ListMANIDecisionsByProposals(ctx context.Context, proposalIDs []string) ([]maNIDecision, error)
+	ListMANIProposalsWithDecisions(ctx context.Context, filingID string) ([]maNIProposalWithDecisions, error)
+	ListMANIAutoReconfirmCandidates(ctx context.Context, filingID, runID string) ([]maNIAutoReconfirm, error)
 }
 
 // maDocuEngine is the DocuEngine sub-client seam the filing jobs drive. *openapiit.

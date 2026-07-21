@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/sciacco/mrsmith/internal/platform/logging"
 )
 
 type maWorkspaceStore interface {
@@ -62,6 +63,7 @@ type maWorkspaceStore interface {
 	FindMACompanySnapshotByKey(ctx context.Context, companyKey string) (*maCompanySnapshot, error)
 	EnqueueMADeepAnalysis(ctx context.Context, companyKey, vatCode, taxCode, email string) error
 	EnqueueMADeepAnalysisIfAbsent(ctx context.Context, companyKey, vat, tax, email string) (bool, string, error)
+	GetMADeepByFiscalIdentity(ctx context.Context, vat, tax string) (*maDeepVATRecord, error)
 	ListMADeepReadyPayloads(ctx context.Context) ([]maDeepPayloadRow, error)
 	CountMADeepByStatus(ctx context.Context) (map[string]int, error)
 	CountMADeepBriefFormats(ctx context.Context) (map[string]int, []string, error)
@@ -5152,6 +5154,15 @@ func (s *SQLStore) GetMADeepByFiscalIdentity(ctx context.Context, vat, tax strin
 func (s *SQLStore) EnqueueMADeepAnalysisIfAbsent(ctx context.Context, companyKey, vat, tax, email string) (bool, string, error) {
 	if s == nil || s.db == nil {
 		return false, "", errors.New("binocolo ma store not configured")
+	}
+	// Guard (QA-F5 pendenza): an empty company_key must NEVER be inserted — it is the
+	// conflict key, so a blank value would collide across distinct fiscal identities (a sweeper
+	// re-driving an orphan upload can carry an empty context). Skip, best-effort (no error).
+	companyKey = strings.TrimSpace(companyKey)
+	if companyKey == "" {
+		logging.FromContext(ctx).Warn("binocolo deep enqueue-if-absent skipped: empty company key",
+			"component", "binocolo", "operation", "ma_deep_analysis")
+		return false, "", nil
 	}
 	fiscalKey := buildMAFiscalKey(vat, tax)
 	if fiscalKey == "" {

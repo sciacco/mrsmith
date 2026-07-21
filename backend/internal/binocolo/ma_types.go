@@ -231,6 +231,7 @@ const (
 	maModelScopeSectorClassification   = "ma_sector_classification"
 	maModelScopeDeepBrief              = "ma_deep_brief"
 	maModelScopeThesisReading          = "ma_thesis_reading"
+	maModelScopeNIReading              = "ma_ni_reading"
 	maModelScopeWebSearchScorer        = "web_search_scorer"
 	maModelScopeCandidateMatchAnalyst  = "candidate_match_analyst"
 
