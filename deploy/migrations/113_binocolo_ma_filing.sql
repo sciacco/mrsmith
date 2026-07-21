@@ -44,7 +44,17 @@ CREATE TABLE IF NOT EXISTS binocolo.ma_filing (
   fiscal_key                   text NOT NULL,   -- vat_clean se presente, altrimenti tax_clean
   vat_clean                    text,
   tax_clean                    text,
-  closing_date                 date NOT NULL,   -- chiusura dell'esercizio più recente del fascicolo (dal documento)
+  -- Chiusura dell'esercizio più recente del fascicolo. NULLABLE per asimmetria tra
+  -- canali di acquisizione: il canale UPLOAD scopre la data di chiusura SOLO al parse
+  -- (dal documento — pagina 1 / prospetti CEE), quindi alla creazione è NULL e viene
+  -- valorizzata da SetMAFilingParsed; il canale DOCUENGINE la conosce già alla
+  -- creazione (dal risultato della search, campo balanceSheetDate) e la scrive subito.
+  -- L'UNIQUE parziale su (fiscal_key, closing_date, balance_sheet_id) WHERE
+  -- balance_sheet_id IS NOT NULL resta invariato: i filing del canale upload nascono con
+  -- balance_sheet_id NULL, quindi NON partecipano a quel vincolo (si dedup invece su
+  -- UNIQUE(fiscal_key, blob_md5)); il canale docuengine porta sempre closing_date +
+  -- balance_sheet_id insieme, così la tripla dell'indice non contiene mai NULL.
+  closing_date                 date,
   balance_sheet_id             text,
   balance_sheet_type           text,
   taxonomy_version             text,
@@ -192,5 +202,11 @@ ALTER TABLE binocolo.ma_filing DROP CONSTRAINT IF EXISTS ma_filing_active_proces
 ALTER TABLE binocolo.ma_filing
   ADD CONSTRAINT ma_filing_active_processing_run_id_fkey
   FOREIGN KEY (active_processing_run_id) REFERENCES binocolo.ma_filing_processing_run(id);
+
+-- closing_date è NULLABLE (canale upload la scopre al parse). CREATE TABLE IF NOT
+-- EXISTS non altera una tabella già esistente, quindi se una versione pre-emendamento
+-- della 113 (con closing_date NOT NULL) fosse già stata applicata altrove, la colonna
+-- resterebbe NOT NULL: questo ALTER idempotente riallinea in ogni caso.
+ALTER TABLE binocolo.ma_filing ALTER COLUMN closing_date DROP NOT NULL;
 
 COMMIT;

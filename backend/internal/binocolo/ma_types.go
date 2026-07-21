@@ -103,6 +103,59 @@ const (
 	// (parallelized probe fan-out); a crashed worker's row is reclaimed after it.
 	maJobLeaseSeconds = 300
 
+	// --- Bilanci depositati (issue #78) --------------------------------------
+	// State-machine enums for the deposited-filing pipeline. The canonical source
+	// of these strings is the CHECK constraints in migrations 113/114 (DB enum in
+	// English; the Italian B2B copy lives in the frontend). Kept here alongside the
+	// job enums so every ma_* state constant is discoverable in one place.
+
+	// ma_filing.status — the ingest pipeline. `degraded` = pipeline completed but the
+	// deep-dive baseline is absent/failed (no adjustment stage can run); `identity_blocked`
+	// = a machine-readable fiscal mismatch (hard stop until an override is applied).
+	maFilingStatusQueued          = "queued"
+	maFilingStatusOCR             = "ocr"
+	maFilingStatusParse           = "parse"
+	maFilingStatusNIReading       = "ni_reading"
+	maFilingStatusReady           = "ready"
+	maFilingStatusDegraded        = "degraded"
+	maFilingStatusFailed          = "failed"
+	maFilingStatusIdentityBlocked = "identity_blocked"
+
+	// ma_filing.identity_status — a column separate from status.
+	maFilingIdentityPendingValidation = "pending_validation"
+	maFilingIdentityValidated         = "validated"
+	maFilingIdentityMismatch          = "mismatch"
+	maFilingIdentityOverride          = "override"
+
+	// ma_filing_acquisition.status — one attempt to procure a filing (upload or
+	// DocuEngine download). `unknown` = indeterminate vendor outcome, never resolved
+	// heuristically (only via explicit reconciliation → requested).
+	maFilingAcquisitionIntent     = "intent"
+	maFilingAcquisitionRequested  = "requested"
+	maFilingAcquisitionDownloaded = "downloaded"
+	maFilingAcquisitionDone       = "done"
+	maFilingAcquisitionFailed     = "failed"
+	maFilingAcquisitionUnknown    = "unknown"
+
+	// ma_filing_search.status — durable DocuEngine search state machine. Consumption
+	// (search → acquisition) is a CAS claim results→consumed on consumed_by_acquisition_id.
+	maFilingSearchIntent    = "intent"
+	maFilingSearchRequested = "requested"
+	maFilingSearchUnknown   = "unknown"
+	maFilingSearchResults   = "results"
+	maFilingSearchConsumed  = "consumed"
+	maFilingSearchFailed    = "failed"
+
+	// run status — shared by ma_filing_processing_run and ma_ni_reading_run: a new
+	// pass supersedes the old one (re-OCR / re-read never mutates a prior run).
+	maFilingRunActive     = "active"
+	maFilingRunSuperseded = "superseded"
+
+	// ma_filing_acquisition.origin — the channel a filing came in through. Lives on
+	// the acquisition, never on ma_filing (which is identified purely by fiscal key).
+	maFilingOriginUpload     = "upload"
+	maFilingOriginDocuEngine = "docuengine"
+
 	// maEstimateProbeConcurrency caps concurrent dry-run probes against OpenAPI.it
 	// during an estimate fan-out: polite to the upstream while collapsing the
 	// previously-sequential wall-clock from ~90s to seconds.

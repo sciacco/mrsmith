@@ -5047,6 +5047,164 @@ LIMIT 1
 	return &rec, nil
 }
 
+// maRowQuerier is satisfied by both *sql.DB and *sql.Tx, so the fiscal-identity lookup can
+// run either standalone or inside the identity-aware enqueue transaction.
+type maRowQuerier interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+// maDeepVATRecordColumns backs maDeepVATRecord (same shape scanned by GetMADeepByVAT),
+// reused by the fiscal-identity lookups.
+const maDeepVATRecordColumns = `company_key, status, scorecard, valuation, brief, itfull_payload, COALESCE(error_code, ''), updated_at`
+
+// maDeepFiscalIdentityMatch is the WHERE predicate matching a ma_deep_analysis row to a
+// canonical fiscal_key ($1). It mirrors the finder's normalization (ma_store.go source_clean
+// / source_rows CTEs): vat_code is cleaned then IT-stripped to its stable form, tax_code is
+// cleaned, and a row matches when EITHER equals the key. A company anchored by CF only (no
+// VAT) is reached via the tax_code branch, since buildMAFiscalKey falls back to the cleaned
+// tax code as the key.
+const maDeepFiscalIdentityMatch = `(
+  CASE WHEN regexp_replace(upper(btrim(COALESCE(vat_code, ''))), '[[:space:].]', '', 'g') ~ '^IT[0-9]{11}$'
+       THEN substr(regexp_replace(upper(btrim(COALESCE(vat_code, ''))), '[[:space:].]', '', 'g'), 3)
+       ELSE regexp_replace(upper(btrim(COALESCE(vat_code, ''))), '[[:space:].]', '', 'g')
+  END = $1
+  OR regexp_replace(upper(btrim(COALESCE(tax_code, ''))), '[[:space:].]', '', 'g') = $1
+)`
+
+func scanMADeepVATRecord(scanner interface{ Scan(...any) error }) (*maDeepVATRecord, error) {
+	var rec maDeepVATRecord
+	var scorecardRaw, valuationRaw, briefRaw, payloadRaw []byte
+	if err := scanner.Scan(&rec.CompanyKey, &rec.Status, &scorecardRaw, &valuationRaw, &briefRaw, &payloadRaw, &rec.ErrorCode, &rec.UpdatedAt); err != nil {
+		return nil, err
+	}
+	if len(scorecardRaw) > 0 {
+		var v MADeepScorecard
+		if json.Unmarshal(scorecardRaw, &v) == nil {
+			rec.Scorecard = &v
+		}
+	}
+	if len(valuationRaw) > 0 {
+		var v MADeepValuation
+		if json.Unmarshal(valuationRaw, &v) == nil {
+			rec.Valuation = &v
+		}
+	}
+	if len(briefRaw) > 0 {
+		var v MADeepBrief
+		if json.Unmarshal(briefRaw, &v) == nil {
+			rec.Brief = &v
+		}
+	}
+	if len(payloadRaw) > 0 && string(payloadRaw) != "null" {
+		rec.Payload = json.RawMessage(payloadRaw)
+	}
+	return &rec, nil
+}
+
+// lookupMADeepByFiscalKey resolves the most significant deep analysis for a canonical
+// fiscal_key: a ready row wins over an in-flight/failed one, then most recent. A failed row
+// is included (the caller decides what to do with it). Returns (nil, nil) when absent.
+func lookupMADeepByFiscalKey(ctx context.Context, q maRowQuerier, fiscalKey string) (*maDeepVATRecord, error) {
+	rec, err := scanMADeepVATRecord(q.QueryRowContext(ctx, `
+SELECT `+maDeepVATRecordColumns+`
+FROM binocolo.ma_deep_analysis
+WHERE `+maDeepFiscalIdentityMatch+`
+ORDER BY (status = 'ready') DESC, updated_at DESC
+LIMIT 1
+`, fiscalKey))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("lookup ma deep by fiscal identity: %w", err)
+	}
+	return rec, nil
+}
+
+// GetMADeepByFiscalIdentity resolves a deep analysis by fiscal identity, matching against
+// BOTH vat_code (stable, IT-stripped) and tax_code with the finder's normalization — so a
+// company anchored only by CF is still found. Returns (nil, nil) when the identity is empty
+// or absent.
+func (s *SQLStore) GetMADeepByFiscalIdentity(ctx context.Context, vat, tax string) (*maDeepVATRecord, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	fiscalKey := buildMAFiscalKey(vat, tax)
+	if fiscalKey == "" {
+		return nil, nil
+	}
+	return lookupMADeepByFiscalKey(ctx, s.db, fiscalKey)
+}
+
+// EnqueueMADeepAnalysisIfAbsent queues an IT-full deep analysis for a company ONLY when no
+// analysis already exists for its fiscal identity — the filing pipeline's automatic
+// baseline trigger. Unlike EnqueueMADeepAnalysis (the explicit deep-dive button, which
+// re-queues failed rows), this NEVER re-charges: any existing row — ready/queued/running AND
+// failed — is a no-op returning that row's status.
+//
+// One transaction: (1) an advisory transaction lock on the canonical fiscal_key serializes
+// concurrent callers so two of them can't both pass the "absent" check and double-insert
+// (their company_key differs, so the company_key unique index would not catch it); (2) the
+// identity-aware lookup runs inside the lock; (3) an existing row short-circuits; (4)
+// otherwise INSERT ON CONFLICT (company_key) DO NOTHING. companyKey is the caller's context
+// reference (non-identifying); the fiscal identity comes from vat/tax.
+func (s *SQLStore) EnqueueMADeepAnalysisIfAbsent(ctx context.Context, companyKey, vat, tax, email string) (bool, string, error) {
+	if s == nil || s.db == nil {
+		return false, "", errors.New("binocolo ma store not configured")
+	}
+	fiscalKey := buildMAFiscalKey(vat, tax)
+	if fiscalKey == "" {
+		return false, "", errors.New("enqueue ma deep analysis if absent: empty fiscal identity (vat and tax both blank)")
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, "", fmt.Errorf("begin enqueue ma deep analysis if absent: %w", err)
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, fiscalKey); err != nil {
+		return false, "", fmt.Errorf("advisory lock ma deep fiscal key: %w", err)
+	}
+
+	existing, err := lookupMADeepByFiscalKey(ctx, tx, fiscalKey)
+	if err != nil {
+		return false, "", err
+	}
+	if existing != nil {
+		return false, existing.Status, nil
+	}
+
+	res, err := tx.ExecContext(ctx, `
+INSERT INTO binocolo.ma_deep_analysis (company_key, vat_code, tax_code, status, refreshed_by_email)
+VALUES ($1, $2, $3, 'queued', $4)
+ON CONFLICT (company_key) DO NOTHING
+`, companyKey, nullString(vat), nullString(tax), nullString(email))
+	if err != nil {
+		return false, "", fmt.Errorf("insert ma deep analysis if absent: %w", err)
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return false, "", fmt.Errorf("insert ma deep analysis if absent rows: %w", err)
+	}
+	if affected == 0 {
+		// company_key already present under a row whose fiscal identity didn't match the key
+		// (blank/other vat/tax): surface its status without creating a duplicate.
+		var status string
+		if err := tx.QueryRowContext(ctx, `SELECT status FROM binocolo.ma_deep_analysis WHERE company_key = $1`, companyKey).Scan(&status); err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return false, "", fmt.Errorf("read existing ma deep status: %w", err)
+		}
+		if err := tx.Commit(); err != nil {
+			return false, "", fmt.Errorf("commit enqueue ma deep analysis if absent: %w", err)
+		}
+		return false, status, nil
+	}
+	if err := tx.Commit(); err != nil {
+		return false, "", fmt.Errorf("commit enqueue ma deep analysis if absent: %w", err)
+	}
+	return true, "", nil
+}
+
 type maDeepBriefRow struct {
 	CompanyKey string
 	Payload    json.RawMessage
