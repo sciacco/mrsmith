@@ -53,6 +53,13 @@ var errMAFilingPollPending = errors.New("ma filing poll pending")
 // acquisition (a corrupt fetch) without re-charging.
 var errMAFilingMD5Mismatch = errors.New("ma filing download md5 mismatch")
 
+// errMAFilingRequestNotFound is an internal sentinel: GET /requests/{id} returned HTTP 404,
+// i.e. the request id we persisted no longer exists at the vendor. This is a DEFINITIVE
+// anomaly, NOT a transient poll: a dead id will 404 forever, so it must NOT be re-polled as
+// errMAFilingPollPending. The requested path routes the row to 'unknown' (with reason); the
+// id-based reconcile drops the dead id and falls back to id-less ListRequests matching.
+var errMAFilingRequestNotFound = errors.New("ma filing docuengine request not found")
+
 // maFilingStore is the deposited-filing persistence the filing jobs need (the F3
 // lifecycle methods only). Kept narrow so the jobs stay testable with an in-memory fake;
 // *SQLStore satisfies it.
@@ -147,6 +154,63 @@ func (s *maService) docuEngine() maDocuEngine {
 	return s.openapiit.DocuEngine()
 }
 
+// maFilingJobIDContextKey carries the filing job id down to the vendor-call log helper so
+// every DocuEngine call a filing job makes is correlated to its job row (diagnostics).
+type maFilingJobIDContextKey struct{}
+
+func withMAFilingJobID(ctx context.Context, jobID string) context.Context {
+	if strings.TrimSpace(jobID) == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, maFilingJobIDContextKey{}, jobID)
+}
+
+func maFilingJobIDFromContext(ctx context.Context) string {
+	id, _ := ctx.Value(maFilingJobIDContextKey{}).(string)
+	return id
+}
+
+// logFilingVendorCall emits one Info line per ACTUAL DocuEngine call a filing job makes
+// (paid mutations, GET/List reads, document listing/download). It exists to diagnose why a
+// job would not leave the poll (the incident): operation + job_id + the call's key + the
+// observed state are enough to reconstruct the vendor traffic from the logs alone.
+func (s *maService) logFilingVendorCall(ctx context.Context, operation string, kv ...any) {
+	args := make([]any, 0, len(kv)+6)
+	args = append(args, "component", "binocolo", "operation", operation, "job_id", maFilingJobIDFromContext(ctx))
+	args = append(args, kv...)
+	logging.FromContext(ctx).Info("binocolo filing vendor call", args...)
+}
+
+// filingVendorPollAllowed rate-limits a filing job's DocuEngine polling to at most one pass
+// per maFilingVendorPollInterval, keyed by job id. The FIRST pass for a job (no recorded
+// timestamp) is always allowed; afterwards a pass is allowed only once the interval has
+// elapsed since the last allowed pass. When it allows, it records s.now() as the new anchor.
+// The map is per-process, which is correct because filing jobs are pre-leased to this
+// instance; a restart costs at most one extra poll. Placed at a branch INGRESS so it can
+// never sit between a vendor call and the persist of that call's outcome.
+func (s *maService) filingVendorPollAllowed(jobID string) bool {
+	s.filingVendorPollMu.Lock()
+	defer s.filingVendorPollMu.Unlock()
+	if s.filingVendorPollLast == nil {
+		s.filingVendorPollLast = map[string]time.Time{}
+	}
+	now := s.now()
+	if last, ok := s.filingVendorPollLast[jobID]; ok && now.Sub(last) < maFilingVendorPollInterval {
+		return false
+	}
+	s.filingVendorPollLast[jobID] = now
+	return true
+}
+
+// clearFilingVendorPoll drops a job's throttle entry when the job terminates (ready/failed)
+// so the map does not grow without bound. A no-op for a job with no entry (non-filing jobs,
+// or a job that never polled), so the worker can call it unconditionally on completion.
+func (s *maService) clearFilingVendorPoll(jobID string) {
+	s.filingVendorPollMu.Lock()
+	defer s.filingVendorPollMu.Unlock()
+	delete(s.filingVendorPollLast, jobID)
+}
+
 // maFilingSearchJobPayload is the filing_search job's self-contained args. FiscalKey keys
 // the intent row and the inflight dedup (mig 115); TaxCode is the value POSTed to
 // DocuEngine (the codice fiscale — see maVendorTaxCode).
@@ -218,6 +282,17 @@ func maDocuErrorDefinitive(err error) bool {
 			return false
 		}
 		return apiErr.StatusCode >= 400 && apiErr.StatusCode < 500
+	}
+	return false
+}
+
+// maDocuErrorNotFound reports whether a DocuEngine error is an HTTP 404 (the request id we
+// GET does not exist at the vendor). Used only on GET /requests/{id}: a 404 there is a dead
+// id, routed to 'unknown', never re-polled.
+func maDocuErrorNotFound(err error) bool {
+	var apiErr *openapiit.APIError
+	if errors.As(err, &apiErr) {
+		return apiErr.StatusCode == http.StatusNotFound
 	}
 	return false
 }
@@ -416,6 +491,7 @@ func (s *maService) runFilingSearchJob(ctx context.Context, job maJob) (string, 
 		return "", err
 	}
 	ctx = withMATrace(ctx, trace)
+	ctx = withMAFilingJobID(ctx, job.ID)
 	workErr := s.filingSearchWork(ctx, job)
 	s.completeFilingTrace(ctx, workErr)
 	return trace.id, workErr
@@ -443,6 +519,17 @@ func (s *maService) filingSearchWork(ctx context.Context, job maJob) error {
 	if search == nil {
 		return fmt.Errorf("%w: search %s not found", errMAStrategyInvalid, searchID)
 	}
+	// Terminal statuses do no vendor work, so they NEVER pass through the throttle gate.
+	switch search.Status {
+	case maFilingSearchResults, maFilingSearchConsumed, maFilingSearchFailed:
+		return nil // terminal for the search job (results ready / consumed / failed recorded)
+	}
+	// Every remaining branch (intent/requested/unknown) touches DocuEngine. Gate at the branch
+	// INGRESS: if this job polled the vendor too recently, wait — no vendor call this tick. The
+	// gate is never between a vendor call and its persist, so it cannot skip a decided transition.
+	if !s.filingVendorPollAllowed(job.ID) {
+		return errMAFilingPollPending
+	}
 	// Resume ALWAYS from the durable row status, never from an in-flight call.
 	switch search.Status {
 	case maFilingSearchIntent:
@@ -451,8 +538,6 @@ func (s *maService) filingSearchWork(ctx context.Context, job maJob) error {
 		return s.filingSearchRequested(ctx, docu, search, payload)
 	case maFilingSearchUnknown:
 		return s.filingSearchReconcile(ctx, docu, search, payload)
-	case maFilingSearchResults, maFilingSearchConsumed, maFilingSearchFailed:
-		return nil // terminal for the search job (results ready / consumed / failed recorded)
 	default:
 		return fmt.Errorf("%w: unexpected search status %q", errMAStrategyInvalid, search.Status)
 	}
@@ -500,6 +585,7 @@ func (s *maService) filingSearchIntent(ctx context.Context, docu maDocuEngine, s
 	req, err := docu.CreateRequest(ctx, docuSearchCreateBody(s.filingDocumentID, payload.TaxCode))
 	if err != nil {
 		s.filingTrace(ctx, "docuengine_create_request", maTraceEventFailed, nil, err.Error())
+		s.logFilingVendorCall(ctx, "docuengine_create_request", "search_id", search.ID, "error", err.Error())
 		if maDocuErrorDefinitive(err) {
 			if ferr := s.filing.FailMAFilingSearch(ctx, search.ID, err.Error()); ferr != nil {
 				return ferr
@@ -518,6 +604,7 @@ func (s *maService) filingSearchIntent(ctx context.Context, docu maDocuEngine, s
 		}
 		return errMAFilingPollPending
 	}
+	s.logFilingVendorCall(ctx, "docuengine_create_request", "search_id", search.ID, "request_id", requestID, "state", req.State)
 	if err := s.filing.SetMAFilingSearchRequested(ctx, search.ID, requestID); err != nil {
 		return s.filingSearchPersistFailedUnknown(ctx, search.ID, requestID, err)
 	}
@@ -552,6 +639,14 @@ func (s *maService) filingSearchRequested(ctx context.Context, docu maDocuEngine
 	}
 	req, err := s.docuGetRequest(ctx, docu, requestID)
 	if err != nil {
+		if errors.Is(err, errMAFilingRequestNotFound) {
+			// The persisted request id 404s: route to 'unknown' (with reason) so the reconcile
+			// path can recover via ListRequests instead of polling a dead id in 'requested'.
+			if uerr := s.filing.SetMAFilingSearchUnknown(ctx, search.ID, "docuengine request not found"); uerr != nil {
+				return uerr
+			}
+			return errMAFilingPollPending
+		}
 		return err
 	}
 	return s.filingSearchAdvance(ctx, docu, search.ID, payload.TaxCode, req)
@@ -566,13 +661,18 @@ func (s *maService) filingSearchReconcile(ctx context.Context, docu maDocuEngine
 	requestID := strings.TrimSpace(search.DocuEngineRequestID)
 	if requestID != "" {
 		req, err := s.docuGetRequest(ctx, docu, requestID)
-		if err != nil {
-			return err
+		switch {
+		case err == nil:
+			if aerr := s.filing.AdoptMAFilingSearchRequest(ctx, search.ID, requestID); aerr != nil {
+				return aerr
+			}
+			return s.filingSearchAdvance(ctx, docu, search.ID, payload.TaxCode, req)
+		case errors.Is(err, errMAFilingRequestNotFound):
+			// Dead persisted id: do NOT re-adopt / re-poll it. Fall through to id-less
+			// ListRequests matching below, which can still recover a real request.
+		default:
+			return err // transient GET → poll-pending
 		}
-		if err := s.filing.AdoptMAFilingSearchRequest(ctx, search.ID, requestID); err != nil {
-			return err
-		}
-		return s.filingSearchAdvance(ctx, docu, search.ID, payload.TaxCode, req)
 	}
 	exclude, _ := s.filing.ListMAFilingReferencedRequestIDs(ctx, search.ID, "")
 	matches, err := s.reconcileFilingRequestMatches(ctx, docu, payload.TaxCode, search.UpdatedAt, exclude)
@@ -609,6 +709,7 @@ func (s *maService) filingSearchAdvance(ctx context.Context, docu maDocuEngine, 
 		submitted, err := docu.SubmitSearch(ctx, req.ID, taxCode)
 		if err != nil {
 			s.filingTrace(ctx, "docuengine_submit_search", maTraceEventFailed, nil, err.Error())
+			s.logFilingVendorCall(ctx, "docuengine_submit_search", "search_id", searchID, "request_id", req.ID, "error", err.Error())
 			if maDocuErrorDefinitive(err) {
 				if ferr := s.filing.FailMAFilingSearch(ctx, searchID, err.Error()); ferr != nil {
 					return ferr
@@ -623,6 +724,7 @@ func (s *maService) filingSearchAdvance(ctx context.Context, docu maDocuEngine, 
 			return errMAFilingPollPending
 		}
 		s.filingTrace(ctx, "docuengine_submit_search", maTraceEventSucceeded, map[string]any{"state": submitted.State}, "")
+		s.logFilingVendorCall(ctx, "docuengine_submit_search", "search_id", searchID, "request_id", req.ID, "state", submitted.State)
 		if len(submitted.Results) > 0 || submitted.State == openapiit.DocuStateDone {
 			return s.filingSearchStoreResults(ctx, searchID, submitted.Results)
 		}
@@ -659,6 +761,7 @@ func (s *maService) runFilingAcquireJob(ctx context.Context, job maJob) (string,
 		return "", err
 	}
 	ctx = withMATrace(ctx, trace)
+	ctx = withMAFilingJobID(ctx, job.ID)
 	workErr := s.filingAcquireWork(ctx, job)
 	s.completeFilingTrace(ctx, workErr)
 	return trace.id, workErr
@@ -686,6 +789,17 @@ func (s *maService) filingAcquireWork(ctx context.Context, job maJob) error {
 	if acq == nil {
 		return fmt.Errorf("%w: acquisition %s not found", errMAStrategyInvalid, acquisitionID)
 	}
+	// Terminal statuses do no vendor work, so they NEVER pass through the throttle gate.
+	switch acq.Status {
+	case maFilingAcquisitionDone, maFilingAcquisitionFailed:
+		return nil
+	}
+	// Every remaining branch touches DocuEngine (GET/List, and the paid POST/PATCH on the
+	// intent path). Gate at the branch INGRESS: too-recent a poll ⇒ wait, no vendor call this
+	// tick. Never sits between a vendor call and its persist, so no decided transition is skipped.
+	if !s.filingVendorPollAllowed(job.ID) {
+		return errMAFilingPollPending
+	}
 	switch acq.Status {
 	case maFilingAcquisitionIntent:
 		return s.filingAcquireIntent(ctx, docu, acq, payload)
@@ -695,8 +809,6 @@ func (s *maService) filingAcquireWork(ctx context.Context, job maJob) error {
 		return s.filingAcquireRequested(ctx, docu, acq, payload)
 	case maFilingAcquisitionUnknown:
 		return s.filingAcquireReconcile(ctx, docu, acq, payload)
-	case maFilingAcquisitionDone, maFilingAcquisitionFailed:
-		return nil
 	default:
 		return fmt.Errorf("%w: unexpected acquisition status %q", errMAStrategyInvalid, acq.Status)
 	}
@@ -790,6 +902,7 @@ func (s *maService) filingAcquireCreateRequest(ctx context.Context, docu maDocuE
 	req, err := docu.CreateRequest(ctx, docuSearchCreateBody(s.filingDocumentID, taxCode))
 	if err != nil {
 		s.filingTrace(ctx, "docuengine_create_request", maTraceEventFailed, nil, err.Error())
+		s.logFilingVendorCall(ctx, "docuengine_create_request", "acquisition_id", acq.ID, "error", err.Error())
 		if maDocuErrorDefinitive(err) {
 			if ferr := s.filing.FailMAFilingAcquisition(ctx, acq.ID, err.Error()); ferr != nil {
 				return ferr
@@ -808,6 +921,7 @@ func (s *maService) filingAcquireCreateRequest(ctx context.Context, docu maDocuE
 		}
 		return errMAFilingPollPending
 	}
+	s.logFilingVendorCall(ctx, "docuengine_create_request", "acquisition_id", acq.ID, "request_id", requestID, "state", req.State)
 	if err := s.filing.SetMAFilingAcquisitionRequested(ctx, acq.ID, requestID); err != nil {
 		return s.filingAcquirePersistFailedUnknown(ctx, acq.ID, requestID, err)
 	}
@@ -838,6 +952,14 @@ func (s *maService) filingAcquireRequested(ctx context.Context, docu maDocuEngin
 	}
 	req, err := s.docuGetRequest(ctx, docu, requestID)
 	if err != nil {
+		if errors.Is(err, errMAFilingRequestNotFound) {
+			// The persisted request id 404s: route to 'unknown' (with reason) so the reconcile
+			// path can recover via ListRequests instead of polling a dead id in 'requested'.
+			if uerr := s.filing.SetMAFilingAcquisitionUnknown(ctx, acq.ID, "docuengine request not found"); uerr != nil {
+				return uerr
+			}
+			return errMAFilingPollPending
+		}
 		return err
 	}
 	return s.filingAcquireAdvance(ctx, docu, acq, req, payload)
@@ -851,13 +973,18 @@ func (s *maService) filingAcquireReconcile(ctx context.Context, docu maDocuEngin
 	requestID := strings.TrimSpace(acq.DocuEngineRequestID)
 	if requestID != "" {
 		req, err := s.docuGetRequest(ctx, docu, requestID)
-		if err != nil {
-			return err
+		switch {
+		case err == nil:
+			if aerr := s.filing.AdoptMAFilingAcquisitionRequest(ctx, acq.ID, requestID); aerr != nil {
+				return aerr
+			}
+			return s.filingAcquireAdvance(ctx, docu, acq, req, payload)
+		case errors.Is(err, errMAFilingRequestNotFound):
+			// Dead persisted id: do NOT re-adopt / re-poll it. Fall through to id-less
+			// ListRequests matching below, which can still recover a real request.
+		default:
+			return err // transient GET → poll-pending
 		}
-		if err := s.filing.AdoptMAFilingAcquisitionRequest(ctx, acq.ID, requestID); err != nil {
-			return err
-		}
-		return s.filingAcquireAdvance(ctx, docu, acq, req, payload)
 	}
 	exclude, _ := s.filing.ListMAFilingReferencedRequestIDs(ctx, "", acq.ID)
 	matches, err := s.reconcileFilingRequestMatches(ctx, docu, payload.TaxCode, acq.UpdatedAt, exclude)
@@ -915,6 +1042,7 @@ func (s *maService) filingAcquireSubmitSearch(ctx context.Context, docu maDocuEn
 	s.filingTrace(ctx, "docuengine_submit_search", maTraceEventStarted, map[string]any{"request_id": requestID}, "")
 	if _, err := docu.SubmitSearch(ctx, requestID, taxCode); err != nil {
 		s.filingTrace(ctx, "docuengine_submit_search", maTraceEventFailed, nil, err.Error())
+		s.logFilingVendorCall(ctx, "docuengine_submit_search", "acquisition_id", acq.ID, "request_id", requestID, "error", err.Error())
 		if maDocuErrorDefinitive(err) {
 			if ferr := s.filing.FailMAFilingAcquisition(ctx, acq.ID, err.Error()); ferr != nil {
 				return ferr
@@ -927,6 +1055,7 @@ func (s *maService) filingAcquireSubmitSearch(ctx context.Context, docu maDocuEn
 		return errMAFilingPollPending
 	}
 	s.filingTrace(ctx, "docuengine_submit_search", maTraceEventSucceeded, nil, "")
+	s.logFilingVendorCall(ctx, "docuengine_submit_search", "acquisition_id", acq.ID, "request_id", requestID)
 	// Results appear on a later poll; the requested path selects them then.
 	return errMAFilingPollPending
 }
@@ -935,6 +1064,7 @@ func (s *maService) filingAcquireSelect(ctx context.Context, docu maDocuEngine, 
 	s.filingTrace(ctx, "docuengine_select_result", maTraceEventStarted, map[string]any{"request_id": requestID}, "")
 	if _, err := docu.SelectResult(ctx, requestID, resultID); err != nil {
 		s.filingTrace(ctx, "docuengine_select_result", maTraceEventFailed, nil, err.Error())
+		s.logFilingVendorCall(ctx, "docuengine_select_result", "acquisition_id", acq.ID, "request_id", requestID, "error", err.Error())
 		if maDocuErrorDefinitive(err) {
 			if ferr := s.filing.FailMAFilingAcquisition(ctx, acq.ID, err.Error()); ferr != nil {
 				return ferr
@@ -949,6 +1079,7 @@ func (s *maService) filingAcquireSelect(ctx context.Context, docu maDocuEngine, 
 		return errMAFilingPollPending
 	}
 	s.filingTrace(ctx, "docuengine_select_result", maTraceEventSucceeded, nil, "")
+	s.logFilingVendorCall(ctx, "docuengine_select_result", "acquisition_id", acq.ID, "request_id", requestID)
 	// Selected; the next poll observes DONE and downloads.
 	return errMAFilingPollPending
 }
@@ -962,8 +1093,10 @@ func (s *maService) filingAcquireDownload(ctx context.Context, docu maDocuEngine
 	docs, err := docu.ListRequestDocuments(ctx, req.ID)
 	if err != nil {
 		s.filingTrace(ctx, "docuengine_list_documents", maTraceEventFailed, nil, err.Error())
+		s.logFilingVendorCall(ctx, "docuengine_list_documents", "acquisition_id", acq.ID, "request_id", req.ID, "error", err.Error())
 		return fmt.Errorf("docuengine list documents %s failed: %v: %w", req.ID, err, errMAFilingPollPending)
 	}
+	s.logFilingVendorCall(ctx, "docuengine_list_documents", "acquisition_id", acq.ID, "request_id", req.ID, "documents", len(docs))
 	download, ok := pickMAFilingDownload(docs)
 	if !ok {
 		return errMAFilingPollPending // DONE but the document is not materialized yet
@@ -1027,8 +1160,10 @@ func (s *maService) downloadAndVerifyMAFiling(ctx context.Context, docu maDocuEn
 	for attempt := 0; attempt < 2; attempt++ {
 		pdf, derr := docu.DownloadFile(ctx, download.DownloadURL)
 		if derr != nil {
+			s.logFilingVendorCall(ctx, "docuengine_download_file", "attempt", attempt+1, "error", derr.Error())
 			return nil, "", fmt.Errorf("download file failed: %v: %w", derr, errMAFilingPollPending)
 		}
+		s.logFilingVendorCall(ctx, "docuengine_download_file", "attempt", attempt+1, "bytes", len(pdf))
 		got := fmt.Sprintf("%x", md5.Sum(pdf))
 		if got == want {
 			return pdf, got, nil
@@ -1051,9 +1186,16 @@ func (s *maService) docuGetRequest(ctx context.Context, docu maDocuEngine, reque
 	req, err := docu.GetRequest(ctx, requestID)
 	if err != nil {
 		s.filingTrace(ctx, "docuengine_get_request", maTraceEventFailed, nil, err.Error())
+		s.logFilingVendorCall(ctx, "docuengine_get_request", "request_id", requestID, "error", err.Error())
+		if maDocuErrorNotFound(err) {
+			// HTTP 404: the persisted request id is gone at the vendor. Definitive anomaly, not
+			// a transient poll — polling it would 404 every tick. The caller routes to 'unknown'.
+			return openapiit.DocuRequest{}, fmt.Errorf("docuengine get request %s not found: %v: %w", requestID, err, errMAFilingRequestNotFound)
+		}
 		return openapiit.DocuRequest{}, fmt.Errorf("docuengine get request %s failed: %v: %w", requestID, err, errMAFilingPollPending)
 	}
 	s.filingTrace(ctx, "docuengine_get_request", maTraceEventSucceeded, map[string]any{"state": req.State}, "")
+	s.logFilingVendorCall(ctx, "docuengine_get_request", "request_id", requestID, "state", req.State)
 	return req, nil
 }
 
@@ -1068,12 +1210,15 @@ func (s *maService) reconcileFilingRequestMatches(ctx context.Context, docu maDo
 	summaries, err := docu.ListRequests(ctx)
 	if err != nil {
 		s.filingTrace(ctx, "docuengine_list_requests", maTraceEventFailed, nil, err.Error())
+		s.logFilingVendorCall(ctx, "docuengine_list_requests", "error", err.Error())
 		return nil, fmt.Errorf("docuengine list requests failed: %v: %w", err, errMAFilingPollPending)
 	}
+	s.logFilingVendorCall(ctx, "docuengine_list_requests", "summaries", len(summaries))
 	wantTax := normalizeMAFiscalValue(taxCode)
 	lo := anchor.Add(-maFilingReconcileWindow).Unix()
 	hi := anchor.Add(maFilingReconcileWindow).Unix()
-	var matches []openapiit.DocuRequest
+	// First pass: shortlist by name + window + exclude WITHOUT paying for a per-candidate GET.
+	var candidates []openapiit.DocuRequestSummary
 	for _, summary := range summaries {
 		if exclude[summary.ID] {
 			continue // a request already owned by another search/acquisition row
@@ -1084,10 +1229,30 @@ func (s *maService) reconcileFilingRequestMatches(ctx context.Context, docu maDo
 		if ts := summary.Timestamps.Max(); ts != 0 && (ts < lo || ts > hi) {
 			continue // outside the intent window
 		}
+		candidates = append(candidates, summary)
+	}
+	// Defensive cap: never fan out a GetRequest per candidate. Past the cap the reconcile
+	// refuses to deref and reports the shortlist as "multiple" (len>1 ⇒ the caller keeps the
+	// row unknown, never a heuristic pick) — the contents are unused on the multiple path.
+	if len(candidates) > maFilingReconcileMaxDerefs {
+		logging.FromContext(ctx).Info("binocolo filing reconcile candidate cap exceeded",
+			"component", "binocolo", "operation", "docuengine_reconcile", "job_id", maFilingJobIDFromContext(ctx),
+			"summaries", len(summaries), "candidates", len(candidates), "cap", maFilingReconcileMaxDerefs)
+		s.filingTrace(ctx, "docuengine_reconcile", maTraceEventInfo, map[string]any{"candidates": len(candidates), "capped": true}, "")
+		capped := make([]openapiit.DocuRequest, 0, len(candidates))
+		for _, c := range candidates {
+			capped = append(capped, openapiit.DocuRequest{ID: c.ID, Name: c.Name, State: c.State})
+		}
+		return capped, nil
+	}
+	var matches []openapiit.DocuRequest
+	for _, summary := range candidates {
 		req, err := docu.GetRequest(ctx, summary.ID)
 		if err != nil {
+			s.logFilingVendorCall(ctx, "docuengine_get_request", "request_id", summary.ID, "context", "reconcile", "error", err.Error())
 			continue // a transient per-candidate GET must not abort the whole sweep
 		}
+		s.logFilingVendorCall(ctx, "docuengine_get_request", "request_id", summary.ID, "context", "reconcile", "state", req.State)
 		if normalizeMAFiscalValue(docuReadableTaxCode(req)) == wantTax {
 			matches = append(matches, req)
 		}

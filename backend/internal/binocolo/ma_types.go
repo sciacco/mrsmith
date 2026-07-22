@@ -126,6 +126,19 @@ const (
 	// Starting value — recalibrate on the real DocuEngine smoke (vendor spend = user).
 	maFilingPollWindow = 45 * time.Minute
 
+	// maFilingVendorPollInterval is the minimum cadence, per filing job, of real DocuEngine
+	// calls. The worker's 2s tick still drives the DB-side work every tick; this only throttles
+	// the paid/vendor path so a job WAITING on DocuEngine (errMAFilingPollPending) does not
+	// re-hit the vendor every 2s. Bounds the incident where a stuck poll (requested GET, or the
+	// unknown/pre-POST reconcile with its per-candidate GetRequest fan-out) drained the vendor
+	// quota in minutes. Jobs are pre-leased to this instance, so per-process throttle state is
+	// correct (a restart costs at most one extra poll).
+	//
+	// QUOTA: the DocuEngine free tier is ~1440 GET/day PER endpoint (~1/min). At 30s a single
+	// job polling for the whole maFilingPollWindow (45min) spends ~90 GET — acceptable for
+	// analyst-triggered volumes. Do not lower without re-checking that budget.
+	maFilingVendorPollInterval = 30 * time.Second
+
 	// docuBilancioOtticoName is the exact GET /requests name of the "Bilancio Ottico"
 	// document, the only client-side filter available when reconciling an 'unknown'
 	// search whose request id was lost (GET /requests exposes neither documentId nor
@@ -139,6 +152,13 @@ const (
 	// definitive match is still readableSearch.taxCode on the per-request GET, never the
 	// window alone.
 	maFilingReconcileWindow = 30 * time.Minute
+
+	// maFilingReconcileMaxDerefs caps how many windowed GET /requests candidates a single
+	// reconcile invocation will de-reference with a per-candidate GetRequest. An account with
+	// many historical requests must not fan out into a GetRequest per candidate (a quota
+	// amplifier). Past the cap the reconcile refuses to deref and reports the candidates as
+	// "multiple" (⇒ the row stays unknown), never a heuristic pick.
+	maFilingReconcileMaxDerefs = 5
 
 	// maFilingOCRParamsVersion / maFilingParseVersion are the immutable provenance
 	// snapshots stamped on a ma_filing_processing_run: which pinned OCR parameter set

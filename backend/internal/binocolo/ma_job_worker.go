@@ -166,6 +166,8 @@ func (w *maJobWorker) process(ctx context.Context, job maJob) {
 	if err := w.store.CompleteMAJob(ctx, job.ID); err != nil {
 		logging.FromContext(ctx).Warn("binocolo job worker complete failed", "component", "binocolo", "job_id", job.ID, "error", err)
 	}
+	// Job reached 'ready': drop any filing vendor-poll throttle entry (no-op for other types).
+	w.svc.clearFilingVendorPoll(job.ID)
 }
 
 // retryOrFail bumps the attempt counter and either leaves the row running (the
@@ -211,6 +213,8 @@ func (w *maJobWorker) retryOrFail(ctx context.Context, job maJob, code string) {
 		// (awaits a manual override). There is no 'unknown' state for the ingest.
 		w.svc.failFilingIngestIfNotBlocked(ctx, job, code)
 	}
+	// Terminal give-up: drop any filing vendor-poll throttle entry (no-op for other types).
+	w.svc.clearFilingVendorPoll(job.ID)
 }
 
 // pollAgainOrTimeout advances a filing job that is still waiting on DocuEngine. The poll
@@ -239,6 +243,8 @@ func (w *maJobWorker) pollAgainOrTimeout(ctx context.Context, job maJob) {
 		logging.FromContext(ctx).Warn("binocolo job worker fail failed", "component", "binocolo", "job_id", job.ID, "error", err)
 	}
 	w.svc.markFilingJobUnknownOnPollTimeout(ctx, job)
+	// Poll window elapsed: drop the filing vendor-poll throttle entry so the map stays bounded.
+	w.svc.clearFilingVendorPoll(job.ID)
 }
 
 // classifyMAJobError maps an internal error to a short, stable error_code stored

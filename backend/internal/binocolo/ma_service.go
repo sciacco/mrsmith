@@ -231,6 +231,13 @@ type maService struct {
 	// model-comparison harness (sector-eval-models with includeSnippets). Test-support
 	// only; persists for the process lifetime so a multi-request eval pays Brave once.
 	compareSnippetCache sync.Map
+	// filingVendorPollMu guards filingVendorPollLast: the per-job timestamp of the last
+	// ALLOWED DocuEngine poll (see filingVendorPollAllowed). The worker's 2s tick still drives
+	// DB progress every tick; this throttles only the paid/vendor path to at most one pass per
+	// maFilingVendorPollInterval per job. Filing jobs are pre-leased to this instance, so a
+	// per-process map is correct; entries are dropped when the job terminates (ready/failed).
+	filingVendorPollMu   sync.Mutex
+	filingVendorPollLast map[string]time.Time
 }
 
 func newMAService(store maWorkspaceStore, searchCache companySearchCacheStore, provinceCache provinceCacheStore, ateco atecoStore, openapiitClient *openapiit.Client, llmp maLLMProvider) *maService {

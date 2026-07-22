@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -37,6 +38,13 @@ const (
 // un bilancio depositato è tipicamente < 5 MB, 50 MiB copre casi estremi senza
 // esporre il processo a un body ostile.
 const docuEngineMaxDownloadBytes = 50 << 20
+
+// docuEngineCodeNoRequests è il codice di business che DocuEngine restituisce quando
+// l'account non ha ALCUNA richiesta. SEMANTICA VENDOR OSSERVATA (prod, account
+// vergine): il vendor serve la lista VUOTA di GET /requests come ERRORE — HTTP 404
+// con envelope error=221, message "no requests related to your account" — non come
+// array vuoto. ListRequests mappa questo caso a lista vuota (vedi lì).
+const docuEngineCodeNoRequests = 221
 
 // DocuEngineError è un errore di business restituito nell'envelope anche con
 // HTTP 200 (success=false oppure error!=nil). Distinto da APIError (che porta uno
@@ -250,8 +258,43 @@ func (dc *DocuEngineClient) ListRequestDocuments(ctx context.Context, id string)
 
 // ListRequests elenca in forma sintetica tutte le richieste (GET /requests). NON ha
 // filtri server-side: la riconciliazione unknown filtra client-side.
+//
+// Account VERGINE (nessuna richiesta): il vendor serve la lista vuota come 404/221
+// ("no requests related to your account"), NON come array vuoto. Lo mappiamo a lista
+// vuota, non a errore: senza questo la riconciliazione pre-POST fallirebbe a ogni tick
+// e la POST non partirebbe mai (il job resterebbe a girare sulla GET /requests).
 func (dc *DocuEngineClient) ListRequests(ctx context.Context) ([]DocuRequestSummary, error) {
-	return docuEngineCall[[]DocuRequestSummary](ctx, dc, http.MethodGet, "/requests", nil, nil)
+	summaries, err := docuEngineCall[[]DocuRequestSummary](ctx, dc, http.MethodGet, "/requests", nil, nil)
+	if err != nil {
+		if isDocuEngineNoRequests(err) {
+			return []DocuRequestSummary{}, nil
+		}
+		return nil, err
+	}
+	return summaries, nil
+}
+
+// isDocuEngineNoRequests riconosce il caso "account senza richieste" in entrambe le
+// forme osservabili: HTTP 404 (APIError sul collection endpoint) oppure il codice di
+// business 221 (portato da APIError.Code quando il 404 include l'envelope, o da un
+// eventuale DocuEngineError con envelope error=221 su HTTP 200).
+func isDocuEngineNoRequests(err error) bool {
+	var apiErr *APIError
+	if errors.As(err, &apiErr) {
+		if apiErr.StatusCode == http.StatusNotFound {
+			return true
+		}
+		if apiErr.Code != nil && *apiErr.Code == docuEngineCodeNoRequests {
+			return true
+		}
+	}
+	var docuErr *DocuEngineError
+	if errors.As(err, &docuErr) {
+		if docuErr.Code != nil && *docuErr.Code == docuEngineCodeNoRequests {
+			return true
+		}
+	}
+	return false
 }
 
 // DownloadFile scarica un URL GCS pre-firmato. NESSUN header Authorization: l'URL

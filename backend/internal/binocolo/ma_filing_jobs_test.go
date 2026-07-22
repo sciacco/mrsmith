@@ -457,6 +457,15 @@ func (f *fakeDocuEngine) DownloadFile(_ context.Context, _ string) ([]byte, erro
 // ---------------------------------------------------------------------------
 
 func newFilingTestService(filing *fakeFilingStore, docu *fakeDocuEngine) *maService {
+	// Auto-advancing clock: each s.now() read jumps forward by more than
+	// maFilingVendorPollInterval. The per-job vendor-poll throttle keys on s.now(), so the
+	// direct-work-function tests below (which fire consecutive ticks with no explicit clock
+	// step) each clear the throttle and reach the vendor exactly as before the hotfix — without
+	// threading a manual clock through every tick. Vendor-call COUNT assertions are unaffected:
+	// the fake store stamps its own timestamps (f.clock) and reconciliation anchors on those,
+	// not on s.now(); s.now() feeds ONLY the throttle. A test that needs to exercise the
+	// throttle itself overrides svc.now with a manually-stepped clock (see the throttle test).
+	clock := time.Date(2026, 7, 21, 12, 0, 0, 0, time.UTC)
 	return &maService{
 		// store is a no-op fake: the direct-work-function tests never set a trace in ctx
 		// (so tracing is skipped), but the acquire finalize enqueues filing_ingest, which
@@ -465,18 +474,25 @@ func newFilingTestService(filing *fakeFilingStore, docu *fakeDocuEngine) *maServ
 		filing:           filing,
 		docu:             docu,
 		filingDocumentID: "doc-bilancio",
-		now:              func() time.Time { return time.Date(2026, 7, 21, 12, 0, 0, 0, time.UTC) },
+		now: func() time.Time {
+			t := clock
+			clock = clock.Add(maFilingVendorPollInterval + time.Second)
+			return t
+		},
 	}
 }
 
 func filingSearchTestJob(searchID, fiscalKey, taxCode string) maJob {
 	payload, _ := json.Marshal(maFilingSearchJobPayload{FiscalKey: fiscalKey, SearchID: searchID, TaxCode: taxCode})
-	return maJob{JobType: maJobTypeFilingSearch, Payload: payload}
+	// A distinct, stable job ID per search is required: the vendor-poll throttle keys on it.
+	return maJob{ID: "job-" + searchID, JobType: maJobTypeFilingSearch, Payload: payload}
 }
 
 func filingAcquireTestJob(acqID, searchID, fiscalKey, bsid, taxCode string) maJob {
 	payload, _ := json.Marshal(maFilingAcquireJobPayload{FiscalKey: fiscalKey, AcquisitionID: acqID, SearchID: searchID, BalanceSheetID: bsid, TaxCode: taxCode, Tax: taxCode})
-	return maJob{JobType: maJobTypeFilingAcquire, Payload: payload}
+	// A distinct, stable job ID per acquisition is required: the vendor-poll throttle keys on it
+	// (two concurrent acquisitions of one search must not share a throttle entry).
+	return maJob{ID: "job-" + acqID, JobType: maJobTypeFilingAcquire, Payload: payload}
 }
 
 func filingResultData(bsid int, date, typeCode string) json.RawMessage {
@@ -794,5 +810,132 @@ func TestFilingAcquireFinalizeStoreErrorResumesWithoutRecharge(t *testing.T) {
 	}
 	if docu.selectCalls != 1 {
 		t.Fatalf("selectCalls = %d, want exactly 1 (selected once, never re-selected on finalize retry)", docu.selectCalls)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 6) THROTTLE (idempotency / vendor-call family) — the per-job vendor-poll gate: two ticks
+//    inside maFilingVendorPollInterval make a SINGLE GetRequest; only once the clock passes
+//    the interval does the second GET fire. Guards the incident where a job WAITING on
+//    DocuEngine re-hit the vendor on every 2s worker tick and drained the quota.
+// ---------------------------------------------------------------------------
+
+func TestFilingVendorPollThrottleSkipsVendorWithinInterval(t *testing.T) {
+	const taxCode = "12345678901"
+	filing := newFakeFilingStore()
+	docu := newFakeDocuEngine()
+	// A request still SEARCHing (no results yet): the requested path makes exactly one
+	// GetRequest per ALLOWED tick and then polls (no paid mutation), isolating the GET count.
+	r := docu.newRequest(taxCode)
+	r.State = openapiit.DocuStateSearch
+	filing.searches["s-thr"] = &maFilingSearch{
+		ID: "s-thr", FiscalKey: "IT" + taxCode, Status: maFilingSearchRequested,
+		DocuEngineRequestID: r.ID, CreatedAt: filing.clock, UpdatedAt: filing.clock,
+	}
+	svc := newFilingTestService(filing, docu)
+	// Override the auto-advancing test clock with a MANUALLY-stepped one so the throttle
+	// interval is exercised deterministically.
+	clock := time.Date(2026, 7, 21, 12, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return clock }
+	ctx := context.Background()
+	job := filingSearchTestJob("s-thr", "IT"+taxCode, taxCode)
+
+	// Tick 1: the first pass for this job is always allowed => one GetRequest.
+	assertPollPending(t, "tick1", svc.filingSearchWork(ctx, job))
+	if docu.getCalls != 1 {
+		t.Fatalf("getCalls after tick1 = %d, want 1", docu.getCalls)
+	}
+	// Tick 2: same instant, within the interval => gated, NO vendor call.
+	assertPollPending(t, "tick2", svc.filingSearchWork(ctx, job))
+	if docu.getCalls != 1 {
+		t.Fatalf("getCalls after tick2 = %d, want still 1 (throttled within interval)", docu.getCalls)
+	}
+	// Advance the clock past the interval => the next tick is allowed to poll again.
+	clock = clock.Add(maFilingVendorPollInterval + time.Second)
+	assertPollPending(t, "tick3", svc.filingSearchWork(ctx, job))
+	if docu.getCalls != 2 {
+		t.Fatalf("getCalls after tick3 = %d, want 2 (interval elapsed => second GET)", docu.getCalls)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 7) VIRGIN ACCOUNT (vendor-call family, root cause of the incident) — DocuEngine serves the
+//    empty request list as 404/221, which the client now maps to an empty list. With zero
+//    existing requests the pre-POST reconcile finds no candidates and the POST fires exactly
+//    once — it does NOT loop the GET /requests forever without ever POSTing.
+// ---------------------------------------------------------------------------
+
+func TestFilingSearchVirginAccountPostsOnceNoLoop(t *testing.T) {
+	const taxCode = "12345678901"
+	filing := newFakeFilingStore()
+	docu := newFakeDocuEngine() // no requests: ListRequests returns an empty list (the mapped 404/221)
+	svc := newFilingTestService(filing, docu)
+	ctx := context.Background()
+
+	searchID, _ := filing.CreateMAFilingSearchIntent(ctx, "IT"+taxCode, "", "")
+	job := filingSearchTestJob(searchID, "IT"+taxCode, taxCode)
+
+	// Tick 1: reconcile sees an empty list => zero candidates => POST fires once => requested.
+	assertPollPending(t, "tick1", svc.filingSearchWork(ctx, job))
+	if docu.listCalls == 0 {
+		t.Fatalf("listCalls after tick1 = 0, want the pre-POST reconcile to have listed")
+	}
+	if docu.createCalls != 1 {
+		t.Fatalf("createCalls after tick1 = %d, want 1 (empty list => POST fires)", docu.createCalls)
+	}
+	if s := filing.searches[searchID]; s.Status != maFilingSearchRequested {
+		t.Fatalf("search after tick1 = %+v, want requested", s)
+	}
+
+	// Tick 2: from 'requested' the job advances (GET NEW => SubmitSearch); it does NOT re-POST.
+	assertPollPending(t, "tick2", svc.filingSearchWork(ctx, job))
+	if docu.createCalls != 1 {
+		t.Fatalf("createCalls after tick2 = %d, want 1 (never re-POST, no loop)", docu.createCalls)
+	}
+	if docu.submitCalls != 1 {
+		t.Fatalf("submitCalls after tick2 = %d, want 1 (search launched once)", docu.submitCalls)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 8) DEAD REQUEST ID (vendor-call family) — GET /requests/{id} returns 404 (the persisted id
+//    no longer exists): the row is routed to 'unknown' with a reason, not polled forever in
+//    'requested'; the id-based reconcile then drops the dead id and falls back to ListRequests
+//    (no re-adopt of the dead id, no re-POST).
+// ---------------------------------------------------------------------------
+
+func TestFilingSearchRequestedNotFoundRoutesToUnknown(t *testing.T) {
+	const taxCode = "12345678901"
+	filing := newFakeFilingStore()
+	docu := newFakeDocuEngine()
+	// 'requested' referencing a request id absent from the vendor => GetRequest 404s.
+	filing.searches["s-404"] = &maFilingSearch{
+		ID: "s-404", FiscalKey: "IT" + taxCode, Status: maFilingSearchRequested,
+		DocuEngineRequestID: "req-gone", CreatedAt: filing.clock, UpdatedAt: filing.clock,
+	}
+	svc := newFilingTestService(filing, docu)
+	ctx := context.Background()
+	job := filingSearchTestJob("s-404", "IT"+taxCode, taxCode)
+
+	// Tick 1: GET 404 => 'unknown' with reason (not an endless poll in 'requested').
+	assertPollPending(t, "tick1", svc.filingSearchWork(ctx, job))
+	if got := filing.searches["s-404"].Status; got != maFilingSearchUnknown {
+		t.Fatalf("status after GET 404 = %q, want unknown", got)
+	}
+	if docu.getCalls != 1 {
+		t.Fatalf("getCalls after tick1 = %d, want 1", docu.getCalls)
+	}
+
+	// Tick 2: reconcile with the still-persisted dead id must NOT re-adopt it — it falls back
+	// to id-less ListRequests matching (empty here) and stays unknown, no re-POST.
+	assertPollPending(t, "tick2", svc.filingSearchWork(ctx, job))
+	if got := filing.searches["s-404"].Status; got != maFilingSearchUnknown {
+		t.Fatalf("status after tick2 = %q, want still unknown (dead id not adopted)", got)
+	}
+	if docu.listCalls == 0 {
+		t.Fatalf("listCalls after tick2 = 0, want the reconcile to fall back to ListRequests")
+	}
+	if docu.createCalls != 0 {
+		t.Fatalf("createCalls = %d, want 0 (a reconcile never POSTs)", docu.createCalls)
 	}
 }
