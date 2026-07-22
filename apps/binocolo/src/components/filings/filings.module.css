@@ -576,6 +576,42 @@
   text-transform: uppercase;
 }
 
+.niRegen {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-faint);
+  font: inherit;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  cursor: pointer;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+.niRegen:hover:not(:disabled) {
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.niRegen:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.niRegen:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.niHead .niRunning {
+  margin-left: auto;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
 .niCount {
   display: inline-flex;
   align-items: center;

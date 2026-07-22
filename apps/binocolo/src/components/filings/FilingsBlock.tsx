@@ -221,8 +221,9 @@ export function FilingsBlock({
         const n = narrativeByFiling.get(filingId);
         const confirmed =
           n?.status === 'running' ||
-          n?.status === 'ready' ||
-          (n?.status === 'failed' && n.generatedAt !== undefined && new Date(n.generatedAt).getTime() >= at);
+          ((n?.status === 'ready' || n?.status === 'failed') &&
+            n.generatedAt !== undefined &&
+            new Date(n.generatedAt).getTime() >= at);
         if (confirmed) {
           delete next[filingId];
           changed = true;
@@ -1114,6 +1115,21 @@ function NarrativeSection({
       <div className={styles.niHead}>
         <span>Lettura nota integrativa</span>
         {observations.length > 0 ? <span className={styles.niCount}>{observations.length}</span> : null}
+        {kickedOff ? (
+          <span className={styles.niRunning}>
+            <Icon name="loader" size={13} /> aggiornamento…
+          </span>
+        ) : (
+          <button
+            type="button"
+            className={styles.niRegen}
+            disabled={generating}
+            onClick={() => onGenerate(filing.id)}
+            title="Rilegge la nota integrativa (le osservazioni attuali vengono sostituite)"
+          >
+            Rigenera
+          </button>
+        )}
       </div>
       {observations.length === 0 ? (
         <div className={styles.exRow}>
