@@ -3362,6 +3362,92 @@ type maBriefRegenSkip struct {
 	Error      string `json:"error"`
 }
 
+// Sentinels for the per-company brief regeneration endpoint (issue #78, Fase 9). The global
+// batch reports scorecard failures inside its report; the per-company endpoint maps them to
+// HTTP codes (deep_absent 404 / deep_not_ready 409 / brief_not_regenerable 409).
+var (
+	errMADeepBriefDeepAbsent           = errors.New("ma deep analysis absent")
+	errMADeepBriefDeepNotReady         = errors.New("ma deep analysis not ready")
+	errMADeepBriefScorecardUnavailable = errors.New("ma deep scorecard not computable from payload")
+)
+
+// buildMADeepBriefForRow rebuilds a cached analysis's LLM brief from its stored payload +
+// valuation (scorecard recomputed deterministically, filing context enriched exactly like the
+// worker). It is the single home of the brief prompt assembly, shared by the global regen loop and
+// the per-company endpoint, so the assembly is never duplicated. It does NOT persist — callers own
+// the UpdateMADeepBrief so each keeps its own skip/abort policy. A payload that can't produce a
+// scorecard ⇒ errMADeepBriefScorecardUnavailable.
+func (s *maService) buildMADeepBriefForRow(ctx context.Context, row maDeepBriefRow, model llm.Model, prompt llm.Prompt, pricing maPricing) (*MADeepBrief, error) {
+	scorecard, _, _, _ := computeMADeepScorecard(ctx, s.store, row.Payload, row.CompanyKey, row.VATCode, row.TaxCode, pricing)
+	if scorecard == nil {
+		return nil, errMADeepBriefScorecardUnavailable
+	}
+	// Best-effort filing context (nil when no canonical filing): the regeneration path enriches
+	// the brief with the deposited-filing reading just like the worker.
+	filingCtx := s.buildMADeepBriefFilingContext(ctx, maDeepDiveIdentity{VATCode: row.VATCode, TaxCode: row.TaxCode}, &maDeepVATRecord{Payload: row.Payload, Scorecard: scorecard, Valuation: row.Valuation})
+	return buildMADeepBriefLLM(ctx, s.llmp, model, prompt, row.Payload, scorecard, row.Valuation, filingCtx)
+}
+
+// regenerateMADeepBriefForCompany re-runs the LLM brief for a SINGLE company resolved from its
+// fiscal identity, reusing the exact per-row assembly of the global regen (buildMADeepBriefForRow):
+// no IT-full call, scorecard recomputed, filing context enriched, brief_generated_at re-stamped.
+// The company must have a ready deep analysis — absent ⇒ errMADeepBriefDeepAbsent (404), any other
+// status ⇒ errMADeepBriefDeepNotReady (409). Returns the fresh brief_generated_at stamp.
+func (s *maService) regenerateMADeepBriefForCompany(ctx context.Context, companyKey string) (*time.Time, error) {
+	if s.store == nil {
+		return nil, errMAStoreUnavailable
+	}
+	if s.llmp == nil {
+		return nil, errMAOpenRouterUnavailable
+	}
+	identity, _, err := s.resolveCompanyDeepDiveIdentity(ctx, companyKey)
+	if err != nil {
+		return nil, errMAFilingIdentityUnresolved
+	}
+	deep, err := s.store.GetMADeepByFiscalIdentity(ctx, identity.VATCode, identity.TaxCode)
+	if err != nil {
+		return nil, err
+	}
+	if deep == nil {
+		return nil, errMADeepBriefDeepAbsent
+	}
+	if deep.Status != maDeepStatusReady {
+		return nil, errMADeepBriefDeepNotReady
+	}
+	model, err := s.llmp.ResolveModel(ctx, maModelScopeDeepBrief, "")
+	if err != nil {
+		return nil, err
+	}
+	prompt, err := s.llmp.ResolvePrompt(ctx, maModelScopeDeepBrief, "")
+	if err != nil {
+		return nil, err
+	}
+	row := maDeepBriefRow{
+		CompanyKey: deep.CompanyKey,
+		Payload:    deep.Payload,
+		Valuation:  deep.Valuation,
+		VATCode:    identity.VATCode,
+		TaxCode:    identity.TaxCode,
+	}
+	brief, err := s.buildMADeepBriefForRow(ctx, row, model, prompt, s.loadPricing(ctx))
+	if err != nil {
+		return nil, err
+	}
+	if err := s.store.UpdateMADeepBrief(ctx, row.CompanyKey, brief, model.ID, prompt.ID); err != nil {
+		return nil, err
+	}
+	// Re-read the fresh brief_generated_at stamp UpdateMADeepBrief printed (same fiscal lookup as
+	// the overview extension, so the UI's staleness row reconciles against the same value).
+	updated, err := s.store.GetMADeepByFiscalIdentity(ctx, identity.VATCode, identity.TaxCode)
+	if err != nil {
+		return nil, err
+	}
+	if updated != nil {
+		return updated.BriefGeneratedAt, nil
+	}
+	return nil, nil
+}
+
 // regenerateMADeepBriefs re-runs the LLM brief for cached analyses from their stored
 // payload + valuation (scorecard rebuilt deterministically). No IT-full call — used to
 // roll out a new brief prompt to already-analyzed companies. With companyKey the run is
@@ -3402,16 +3488,12 @@ func (s *maService) regenerateMADeepBriefs(ctx context.Context, companyKey strin
 	}
 	pricing := s.loadPricing(ctx)
 	for _, row := range rows {
-		scorecard, _, _, _ := computeMADeepScorecard(ctx, s.store, row.Payload, row.CompanyKey, row.VATCode, row.TaxCode, pricing)
-		if scorecard == nil {
-			report.Skipped = append(report.Skipped, maBriefRegenSkip{CompanyKey: row.CompanyKey, Error: "scorecard non calcolabile dal payload"})
-			continue
-		}
-		// Best-effort filing context (nil when no canonical filing): the regeneration path enriches
-		// the brief with the deposited-filing reading just like the worker.
-		filingCtx := s.buildMADeepBriefFilingContext(ctx, maDeepDiveIdentity{VATCode: row.VATCode, TaxCode: row.TaxCode}, &maDeepVATRecord{Payload: row.Payload, Scorecard: scorecard, Valuation: row.Valuation})
-		brief, err := buildMADeepBriefLLM(ctx, s.llmp, model, prompt, row.Payload, scorecard, row.Valuation, filingCtx)
+		brief, err := s.buildMADeepBriefForRow(ctx, row, model, prompt, pricing)
 		if err != nil {
+			if errors.Is(err, errMADeepBriefScorecardUnavailable) {
+				report.Skipped = append(report.Skipped, maBriefRegenSkip{CompanyKey: row.CompanyKey, Error: "scorecard non calcolabile dal payload"})
+				continue
+			}
 			logging.FromContext(ctx).Warn("binocolo brief regenerate failed", "component", "binocolo", "operation", "ma_deep_regenerate_briefs", "company_key", row.CompanyKey, "error", err)
 			report.Skipped = append(report.Skipped, maBriefRegenSkip{CompanyKey: row.CompanyKey, Error: err.Error()})
 			continue

@@ -21,6 +21,8 @@ import { ShareholdersDetail, hasShareholdersDetail } from '../../components/comp
 import { VendorFinancials, hasVendorFinancialsData, vendorFinancialSheetsCount } from '../../components/company/VendorFinancials';
 import { WebVerificationDetail, hasWebVerificationDetail } from '../../components/company/WebVerificationDetail';
 import { DeepAnalysisContent, formatDeepCompactEuro } from '../../components/deep/DeepComponents';
+import { FilingsBlock } from '../../components/filings/FilingsBlock';
+import { DepositedValuationView } from '../../components/filings/DepositedValuationView';
 import { LabeledDisclosure } from '../../components/scheda/LabeledDisclosure';
 import { resolveCohortPosition, readCohort } from '../../components/scheda/cohort';
 import { LensBar, type LensKeyNumber, type LensOption } from '../../components/scheda/LensBar';
@@ -48,7 +50,13 @@ type OwnershipSummary =
   | { kind: 'tie'; label: 'Soci principali' | 'Soci'; shareholders: Shareholder[]; residualNote?: string }
   | { kind: 'singleTop'; label: 'Socio principale'; shareholders: Shareholder[]; residualNote?: string };
 
-const SPINE_IDS = ['scheda-identita-title', 'scheda-deep-title', 'scheda-controllo-title', 'scheda-storia-title'] as const;
+const SPINE_IDS = [
+  'scheda-identita-title',
+  'scheda-deep-title',
+  'scheda-controllo-title',
+  'scheda-storia-title',
+  'scheda-bilanci-title',
+] as const;
 
 // Etichette degli EVENTI del diario (storico append-only, mai riscritto). Lo
 // stato e l'esito della card usano invece il dominio condiviso (stateLabel/
@@ -427,7 +435,7 @@ export function SchedaAziendaPage() {
         goToCohortKey(cohortPosition.prevKey);
         return;
       }
-      const index = ['1', '2', '3', '4'].indexOf(event.key);
+      const index = ['1', '2', '3', '4', '5'].indexOf(event.key);
       const targetId = SPINE_IDS[index];
       if (!targetId) return;
       event.preventDefault();
@@ -655,6 +663,19 @@ export function SchedaAziendaPage() {
       title: 'Cosa ne sappiamo',
       meta: `${overview.appearances.length} ricerche · ${overview.cards.length} iniziative`,
     },
+    {
+      id: SPINE_IDS[4],
+      index: 5,
+      title: 'Bilanci depositati',
+      // Exception-only meta: flag review only when something needs attention (a stale brief or an
+      // ambiguous exercise), otherwise stay silent (no decorative count of fascicoli).
+      meta:
+        overview.briefStale || overview.adjusted?.status === 'ambiguous' ? (
+          <StatusBadge value="Da rivedere" variant="warning" dot={false} />
+        ) : overview.filingsCount === 0 ? (
+          '—'
+        ) : undefined,
+    },
   ];
 
   return (
@@ -815,6 +836,13 @@ export function SchedaAziendaPage() {
           </div>
         )}
 
+        <DepositedValuationView
+          overview={overview}
+          companyKey={companyKey ?? ''}
+          baselineValuation={valuation}
+          onGoToFilings={() => scrollToSection('scheda-bilanci-title')}
+        />
+
         {target && showVendorFinancials ? (
           <LabeledDisclosure
             title="Bilanci (fonte camerale)"
@@ -907,6 +935,17 @@ export function SchedaAziendaPage() {
         ) : null}
         <HistorySection appearances={overview.appearances} companyKey={identity.companyKey} />
         <CardsSection cards={overview.cards} companyKey={identity.companyKey} activeInitiativeId={lens.type === 'iniziativa' ? lens.id : undefined} />
+      </section>
+
+      <section className={styles.block} aria-labelledby="scheda-bilanci-title">
+        <div className={styles.blockHeader}>
+          <span className={styles.blockIndex}>5</span>
+          <div>
+            <h2 id="scheda-bilanci-title">Bilanci depositati</h2>
+            <p>Fascicoli camerali, rettifiche di nota integrativa, valutazione aggiustata.</p>
+          </div>
+        </div>
+        <FilingsBlock companyKey={companyKey ?? ''} baselineExercise={overview.adjusted?.baselineExercise} />
       </section>
         </div>
       </div>

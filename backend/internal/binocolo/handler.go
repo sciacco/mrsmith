@@ -157,6 +157,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/irl/export", h.handleExportCardIRL)
 	handle("GET /binocolo/v1/ma/companies", h.handleSearchMACompanies)
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/deep-dive", h.handleDeepDiveMACompany)
+	handle("POST /binocolo/v1/ma/companies/{companyKey}/brief/regenerate", h.handleRegenerateMACompanyBrief)
 	handle("GET /binocolo/v1/ma/companies/{companyKey}/overview", h.handleGetMACompanyOverview)
 	handle("GET /binocolo/v1/ma/companies/{companyKey}/registry", h.handleGetMACompanyRegistry)
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/registry/facts", h.handleCreateMACompanyFact)
@@ -1628,6 +1629,39 @@ func (h *Handler) handleRegenerateMADeepBriefs(w http.ResponseWriter, r *http.Re
 	httputil.JSON(w, http.StatusOK, report)
 }
 
+// handleRegenerateMACompanyBrief re-runs the LLM brief for ONE company (issue #78, Fase 9): the
+// analyst action behind the scheda's "brief stale" row. It reuses the global regen's per-row
+// assembly (single LLM call, no IT-full call) and re-stamps brief_generated_at. 404 when the
+// company has no deep analysis, 409 when the analysis is not ready. Gated by the access role.
+func (h *Handler) handleRegenerateMACompanyBrief(w http.ResponseWriter, r *http.Request) {
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	var traceOK bool
+	r, traceOK = h.startMATrace(w, r, "ma_company_brief_regenerate", "", map[string]any{"companyKey": companyKey}, subject, email)
+	if !traceOK {
+		return
+	}
+	// A single LLM call still risks the server WriteTimeout on a slow model; clear the per-request
+	// deadlines like the batch endpoint so the connection isn't cut mid-generation.
+	rc := http.NewResponseController(w)
+	if err := rc.SetReadDeadline(time.Time{}); err != nil {
+		logging.FromContext(r.Context()).Warn("binocolo regenerate company brief: clear read deadline", "component", "binocolo", "error", err)
+	}
+	if err := rc.SetWriteDeadline(time.Time{}); err != nil {
+		logging.FromContext(r.Context()).Warn("binocolo regenerate company brief: clear write deadline", "component", "binocolo", "error", err)
+	}
+	briefGeneratedAt, err := h.ma.regenerateMADeepBriefForCompany(r.Context(), companyKey)
+	if err != nil {
+		h.maFailure(w, r, "ma_company_brief_regenerate", err, "company_key", companyKey)
+		return
+	}
+	h.completeMATraceSuccess(r, http.StatusOK)
+	httputil.JSON(w, http.StatusOK, map[string]any{"status": "regenerated", "briefGeneratedAt": briefGeneratedAt})
+}
+
 // handleInspectMADeep computes the Fase 0 read-only diagnostics over the cached deep
 // payloads (division mix, granularity, delta coverage, vendor-vs-CEE reconciliation).
 // No vendor call, nothing persisted. Gated by the standard binocolo access role.
@@ -2061,6 +2095,16 @@ func maHTTPError(err error) (int, string, string) {
 	}
 	if errors.Is(err, errMANIRatifiedAmountRequired) {
 		return http.StatusUnprocessableEntity, "ratified_amount_required", "warn"
+	}
+	// Per-company brief regeneration (issue #78, Fase 9).
+	if errors.Is(err, errMADeepBriefDeepAbsent) {
+		return http.StatusNotFound, "deep_absent", "warn"
+	}
+	if errors.Is(err, errMADeepBriefDeepNotReady) {
+		return http.StatusConflict, "deep_not_ready", "warn"
+	}
+	if errors.Is(err, errMADeepBriefScorecardUnavailable) {
+		return http.StatusConflict, "brief_not_regenerable", "warn"
 	}
 	if errors.Is(err, sql.ErrNoRows) || strings.Contains(err.Error(), "no rows in result set") {
 		return http.StatusNotFound, "ma_session_not_found", "warn"

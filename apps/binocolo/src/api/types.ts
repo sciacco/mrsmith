@@ -728,6 +728,185 @@ export interface MACompanyOverview {
   deep?: MADeepAnalysis;
   appearances: MACompanyOverviewAppearance[];
   cards: MACompanyOverviewCard[];
+  // Deposited-filing extension (issue #78, additive). adjusted = on-read adjusted valuation
+  // (absent when no deep analysis exists for the fiscal identity); briefStale = a ratified NI
+  // decision is newer than the cached brief; filingsCount = deposited fascicoli for the identity.
+  adjusted?: MAAdjustedView;
+  briefStale: boolean;
+  briefGeneratedAt?: string;
+  filingsCount: number;
+}
+
+// --- Deposited filings (issue #78, Fase 9) ---
+// Shapes mirror the backend response structs 1:1 (ma_filing_endpoints.go / ma_deep_adjusted.go).
+// camelCase, NO price/cost fields (operator-only data never reaches the UI). DB enums stay in
+// English; the UI composes Italian copy from these facts.
+
+export type MAFilingStatus =
+  | 'queued'
+  | 'ocr'
+  | 'parse'
+  | 'ni_reading'
+  | 'ready'
+  | 'degraded'
+  | 'failed'
+  | 'identity_blocked';
+export type MAFilingIdentityStatus = 'pending_validation' | 'validated' | 'mismatch' | 'override';
+export type MAFilingAcquisitionStatus = 'intent' | 'requested' | 'downloaded' | 'done' | 'failed' | 'unknown';
+export type MAFilingSearchStatus = 'intent' | 'requested' | 'unknown' | 'results' | 'consumed' | 'failed';
+export type MANIProposalState = 'effective' | 'rejected' | 'revoked' | 'pending';
+export type MANITreatment = 'ebitda' | 'pfn' | 'dd_only';
+export type MANIDirection = 'increase' | 'decrease' | 'uncertain';
+export type MANIIncertezza = 'low' | 'medium' | 'high';
+export type MANIDecisionAction = 'ratify' | 'reject' | 'revoke';
+
+export interface MAFilingIdentityRef {
+  vat?: string;
+  tax?: string;
+  fiscalKey: string;
+}
+
+export interface MAFilingRow {
+  id: string;
+  closingDate?: string; // YYYY-MM-DD
+  balanceSheetId?: string;
+  balanceSheetType?: string;
+  taxonomyVersion?: string;
+  status: MAFilingStatus | string;
+  identityStatus: MAFilingIdentityStatus | string;
+  pageCount?: number;
+  error?: string;
+  createdAt: string;
+  origins: string[];
+}
+
+export interface MAFilingSearchResultView {
+  balanceSheetId: string;
+  closingDate?: string;
+  balanceSheetType?: string;
+}
+
+export interface MAFilingSearchView {
+  id: string;
+  status: MAFilingSearchStatus | string;
+  results: MAFilingSearchResultView[];
+  updatedAt: string;
+}
+
+export interface MAFilingAcquisitionView {
+  id: string;
+  status: MAFilingAcquisitionStatus | string;
+  balanceSheetId?: string;
+}
+
+export interface MAFilingsResponse {
+  identity: MAFilingIdentityRef;
+  filings: MAFilingRow[];
+  latestSearch: MAFilingSearchView | null;
+  acquisitionsInflight: MAFilingAcquisitionView[];
+}
+
+export interface MAFilingUploadResponse {
+  filingId: string;
+  merged: boolean;
+}
+
+export interface MAFilingSearchStartResponse {
+  searchId: string;
+  status: MAFilingSearchStatus | string;
+}
+
+export interface MAFilingAcquireResponse {
+  acquisitionIds: string[];
+}
+
+export interface MAFilingIdentityOverrideResponse {
+  status: string;
+}
+
+export interface MANIDecisionView {
+  id: string;
+  action: MANIDecisionAction | string;
+  ratifiedAmount?: number;
+  ratifiedTreatment?: string;
+  reason?: string;
+  actor?: string;
+  createdAt: string;
+  autoReconfirmedFrom?: string;
+}
+
+export interface MANIProposalView {
+  id: string;
+  exerciseDate?: string;
+  fattoOsservato: string;
+  importoLordo?: number;
+  trattamentoCandidato: MANITreatment | string;
+  direction: MANIDirection | string;
+  importoRettifica?: number;
+  incertezza?: MANIIncertezza | string;
+  quote?: string;
+  pageNo?: number;
+  section?: string;
+  label?: string;
+  rationale?: string;
+  state: MANIProposalState | string;
+  decisions: MANIDecisionView[];
+}
+
+export interface MAFilingProposalsResponse {
+  runId?: string;
+  processingRunId?: string;
+  proposals: MANIProposalView[];
+}
+
+export interface MANIDecisionResponse {
+  decisionId: string;
+  state: MANIProposalState | string;
+}
+
+// Adjusted valuation (on-read, Fase 7). Facts-only; the UI composes the sentences.
+export type MAAdjustedStatus = 'active' | 'not_aligned' | 'ambiguous' | 'no_filing' | 'no_effects';
+
+export interface MAAdjustedEffect {
+  proposalId: string;
+  label?: string;
+  treatment: 'ebitda' | 'pfn' | string;
+  amount: number; // signed
+  exerciseDate?: string;
+  pageNo?: number;
+}
+
+export interface MAAdjustedReconField {
+  name: string;
+  filing?: number;
+  vendor?: number;
+  delta?: number; // filing − vendor
+}
+
+export interface MAAdjustedReconciliation {
+  exercise?: string;
+  fields: MAAdjustedReconField[];
+  divergent: boolean;
+}
+
+export interface MAAdjustedView {
+  baselineExercise?: string; // YYYY-MM-DD (vendor baseline closing date)
+  filingId?: string;
+  status: MAAdjustedStatus | string;
+  ambiguousCount?: number;
+  // Present only when status === "active": the baseline valuation re-run with EBITDA_adj/PFN_adj.
+  adjustedValuation?: MADeepValuation;
+  effects: MAAdjustedEffect[];
+  deltaEbitda: number;
+  deltaPfn: number;
+  evSalesDeltaEbitdaNotApplied: boolean;
+  reconciliation?: MAAdjustedReconciliation;
+  pendingCount: number;
+}
+
+export interface MABriefRegenerateResponse {
+  status: string;
+  briefGeneratedAt?: string;
 }
 
 export interface MACompanySearchResponse {
