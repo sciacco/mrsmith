@@ -154,19 +154,23 @@ type DocuDownload struct {
 
 // DocuRequest è la vista completa di una richiesta (GET /requests/{id}).
 type DocuRequest struct {
-	ID                 string            `json:"id"`
-	DocumentID         string            `json:"documentId"`
-	Name               string            `json:"name"`
-	State              string            `json:"state"`
-	ReadableSearch     map[string]string `json:"readableSearch"`
-	Results            []DocuResult      `json:"results"`
-	ResultID           *string           `json:"resultId"`
-	Documents          []DocuDownload    `json:"documents"`
-	CancellationReason string            `json:"cancellationReason"`
-	Timestamps         DocuTimestamps    `json:"timestamps"`
-	SearchPrice        float64           `json:"searchPrice"`
-	DocumentPrice      float64           `json:"documentPrice"`
-	TotalPrice         float64           `json:"totalPrice"`
+	ID             string            `json:"id"`
+	DocumentID     string            `json:"documentId"`
+	Name           string            `json:"name"`
+	State          string            `json:"state"`
+	ReadableSearch map[string]string `json:"readableSearch"`
+	Results        []DocuResult      `json:"results"`
+	ResultID       *string           `json:"resultId"`
+	// Documents è un array di NOMI FILE (stringhe, es. "<requestId>_0.pdf"), come da
+	// spec e come osservato in produzione — NON oggetti Download: quelli arrivano da
+	// GET /requests/{id}/documents (ListRequestDocuments). Tipizzarlo diversamente
+	// rompe il decode dell'intera DocuRequest.
+	Documents          []string       `json:"documents"`
+	CancellationReason string         `json:"cancellationReason"`
+	Timestamps         DocuTimestamps `json:"timestamps"`
+	SearchPrice        float64        `json:"searchPrice"`
+	DocumentPrice      float64        `json:"documentPrice"`
+	TotalPrice         float64        `json:"totalPrice"`
 }
 
 // DocuRequestSummary è la vista sintetica di GET /requests (la lista NON ha filtri
