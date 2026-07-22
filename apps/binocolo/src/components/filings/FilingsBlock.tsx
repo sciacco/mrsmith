@@ -52,6 +52,8 @@ import styles from './filings.module.css';
 
 const UPLOAD_MAX_BYTES = 30 * 1024 * 1024;
 const NARROW_QUERY = '(max-width: 1000px)';
+// How long a «Genera lettura» 202 may present as «in corso» before the backend confirms the run.
+const maNIKickoffWindowMs = 30_000;
 
 // Work is in flight when any filing is non-terminal, an acquisition has a LIVE job (inflight), or
 // the latest search is still resolving. A stalled/failed acquisition (inflight=false) is NOT work
@@ -183,14 +185,25 @@ export function FilingsBlock({
   // 'running' (~5s); nothing polls otherwise. A GET transport error resolves to no data → the
   // section renders nothing (assenza silenziosa, no toast); the backend answers 'absent' (200) when
   // mig 118 is not applied, so a genuinely undefined narrative is a real transport failure. ──
+  // Kickoff window: after a 202 on «Genera lettura», the worker creates the run within ~2s, so the
+  // backend keeps answering 'absent' for a moment. During the window the UI presents «in corso…»
+  // and polls tighter; the window closes when the backend confirms (effect below) or expires.
+  const [narrativeKickoffs, setNarrativeKickoffs] = useState<Record<string, number>>({});
+  const narrativeKickoffActive = (filingId: string) => {
+    const at = narrativeKickoffs[filingId];
+    return at !== undefined && Date.now() - at < maNIKickoffWindowMs;
+  };
   const narrativeResults = useQueries({
     queries: readyFilings.map((f) => ({
       queryKey: ['ma-filing-narrative', f.id],
       queryFn: () => api.get<MAFilingNarrativeResponse>(`/binocolo/v1/ma/filings/${encodeURIComponent(f.id)}/narrative`),
       // A GET failure is silent absence, not a transient to retry — one attempt, no retry storm.
       retry: false,
-      refetchInterval: (q: { state: { data?: MAFilingNarrativeResponse } }) =>
-        q.state.data?.status === 'running' ? 5000 : false,
+      refetchInterval: (q: { state: { data?: MAFilingNarrativeResponse } }) => {
+        if (q.state.data?.status === 'running') return 5000;
+        if (narrativeKickoffActive(f.id)) return 2000;
+        return false;
+      },
     })),
   });
   const narrativeByFiling = useMemo(() => {
@@ -198,6 +211,40 @@ export function FilingsBlock({
     readyFilings.forEach((f, i) => map.set(f.id, narrativeResults[i]?.data));
     return map;
   }, [readyFilings, narrativeResults]);
+  // Close a kickoff window as soon as the backend confirms the new run — 'running'/'ready', or a
+  // 'failed' run born after the kickoff (its «Riprova» must not stay masked as «in corso»).
+  useEffect(() => {
+    setNarrativeKickoffs((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const [filingId, at] of Object.entries(prev)) {
+        const n = narrativeByFiling.get(filingId);
+        const confirmed =
+          n?.status === 'running' ||
+          n?.status === 'ready' ||
+          (n?.status === 'failed' && n.generatedAt !== undefined && new Date(n.generatedAt).getTime() >= at);
+        if (confirmed) {
+          delete next[filingId];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [narrativeByFiling]);
+  // Expire stale kickoffs (worker down, migration missing): the button quietly comes back.
+  useEffect(() => {
+    const entries = Object.entries(narrativeKickoffs);
+    if (entries.length === 0) return;
+    const earliest = Math.min(...entries.map(([, at]) => at));
+    const timer = window.setTimeout(() => {
+      setNarrativeKickoffs((prev) => {
+        const now = Date.now();
+        const kept = Object.entries(prev).filter(([, at]) => now - at < maNIKickoffWindowMs);
+        return kept.length === Object.entries(prev).length ? prev : Object.fromEntries(kept);
+      });
+    }, Math.max(0, earliest + maNIKickoffWindowMs - Date.now()) + 100);
+    return () => window.clearTimeout(timer);
+  }, [narrativeKickoffs]);
 
   // ── Group by exercise ──
   const { datedGroups, undatedFilings, undatedAcquisitions } = useMemo(() => {
@@ -460,14 +507,17 @@ export function FilingsBlock({
   });
 
   // ── Generate / regenerate the NI narrative reading (issue #80). An explicit analyst gesture on
-  // a ready filing's «Genera lettura» / «Riprova»; on success the filing's narrative GET is
-  // refetched so the «in corso» state (and then the observations) appear via the poll. ──
+  // a ready filing's «Genera lettura» / «Riprova». The 202 only enqueues: the run row is created
+  // by the WORKER a tick (~2s) later, so an immediate refetch still reads 'absent' and the
+  // running-only poll would never start — the kickoff window (set on success, consumed above by
+  // the narrative queries) bridges that gap. ──
   const [narrativeBusyId, setNarrativeBusyId] = useState<string | null>(null);
   const regenerateNarrative = useMutation({
     mutationFn: (filingId: string) =>
       api.post<MAFilingNarrativeRegenerateResponse>(`/binocolo/v1/ma/filings/${encodeURIComponent(filingId)}/narrative/regenerate`, {}),
     onMutate: (filingId) => setNarrativeBusyId(filingId),
     onSuccess: (_res, filingId) => {
+      setNarrativeKickoffs((prev) => ({ ...prev, [filingId]: Date.now() }));
       void queryClient.invalidateQueries({ queryKey: ['ma-filing-narrative', filingId] });
     },
     onError: (error) => toast(filingErrorMessage(error), 'error'),
@@ -663,6 +713,7 @@ export function FilingsBlock({
                   retryErrors={retryErrors}
                   isDraftDirty={isDraftDirty}
                   narrativeBusyId={regenerateNarrative.isPending ? narrativeBusyId : null}
+                  narrativeKickedOff={Boolean(group.primary && narrativeKickoffActive(group.primary.id))}
                   onSelect={(id) => (isNarrow ? selectAndOpen(id) : selectInline(id))}
                   onDownload={(row) => void downloadPdf(row)}
                   onOverride={(row) => setOverrideTarget(row)}
@@ -829,6 +880,7 @@ function YearGroupSection({
   retryErrors,
   isDraftDirty,
   narrativeBusyId,
+  narrativeKickedOff,
   onSelect,
   onDownload,
   onOverride,
@@ -843,6 +895,7 @@ function YearGroupSection({
   retryErrors: Record<string, string>;
   isDraftDirty: (p: MANIProposalView) => boolean;
   narrativeBusyId: string | null;
+  narrativeKickedOff: boolean;
   onSelect: (id: string) => void;
   onDownload: (row: MAFilingRow) => void;
   onOverride: (row: MAFilingRow) => void;
@@ -910,6 +963,7 @@ function YearGroupSection({
             filing={primary}
             selectedId={selectedId}
             generating={narrativeBusyId === primary.id}
+            kickedOff={narrativeKickedOff}
             onSelect={onSelect}
             onGenerate={onGenerateNarrative}
           />
@@ -988,6 +1042,7 @@ function NarrativeSection({
   filing,
   selectedId,
   generating,
+  kickedOff,
   onSelect,
   onGenerate,
 }: {
@@ -995,9 +1050,23 @@ function NarrativeSection({
   filing: MAFilingRow;
   selectedId: string | null;
   generating: boolean;
+  kickedOff: boolean;
   onSelect: (id: string) => void;
   onGenerate: (filingId: string) => void;
 }) {
+  // Kickoff window: the 202 landed but the worker hasn't materialized the run yet — the analyst
+  // must see immediate feedback, not a mute button. Stale 'absent'/'failed' are presented as
+  // running until the backend confirms (or the window expires and the action quietly returns).
+  if (kickedOff && (!narrative || narrative.status === 'absent' || narrative.status === 'failed')) {
+    return (
+      <div className={styles.niTail}>
+        <span className={styles.niRunning}>
+          <Icon name="loader" size={13} /> Lettura nota integrativa in corso…
+        </span>
+      </div>
+    );
+  }
+
   if (!narrative) return null; // loading or transport error → assenza silenziosa
 
   if (narrative.status === 'absent') {
