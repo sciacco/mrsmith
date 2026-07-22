@@ -2,6 +2,7 @@ package openapiit
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -69,6 +70,42 @@ func TestDocuEngineListRequestsMapsNoRequests404ToEmpty(t *testing.T) {
 		}
 		if len(got) != 1 || got[0].ID != "req-1" {
 			t.Fatalf("ListRequests = %+v, want one summary req-1", got)
+		}
+	})
+}
+
+// Il vendor è incoerente tra esempi e produzione sui tipi scalari (fileSize stringa
+// nella spec, numero in produzione; documents come stringhe): il decode dei Download
+// e della Request deve tollerare entrambe le forme.
+func TestDocuEngineFlexibleDecoding(t *testing.T) {
+	t.Run("download with numeric fileSize and urlExpire", func(t *testing.T) {
+		var d DocuDownload
+		payload := `{"fileName":"req_0.pdf","mimeType":"application/pdf","fileSize":34144,"md5":"IPJJgdrAt4xrvGR4ve7oTg==","urlExpire":1767000000,"downloadUrl":"https://example"}`
+		if err := json.Unmarshal([]byte(payload), &d); err != nil {
+			t.Fatalf("decode numeric forms: %v", err)
+		}
+		if d.FileSize != "34144" || d.URLExpire != 1767000000 {
+			t.Fatalf("decoded %+v, want fileSize 34144 urlExpire 1767000000", d)
+		}
+	})
+	t.Run("download with string fileSize and urlExpire", func(t *testing.T) {
+		var d DocuDownload
+		payload := `{"fileSize":"34144","urlExpire":"1767000000"}`
+		if err := json.Unmarshal([]byte(payload), &d); err != nil {
+			t.Fatalf("decode string forms: %v", err)
+		}
+		if d.FileSize != "34144" || d.URLExpire != 1767000000 {
+			t.Fatalf("decoded %+v, want fileSize 34144 urlExpire 1767000000", d)
+		}
+	})
+	t.Run("request documents are file-name strings", func(t *testing.T) {
+		var r DocuRequest
+		payload := `{"id":"req-1","state":"DONE","documents":["req-1_0.pdf"],"resultId":"abc"}`
+		if err := json.Unmarshal([]byte(payload), &r); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if len(r.Documents) != 1 || r.Documents[0] != "req-1_0.pdf" {
+			t.Fatalf("decoded %+v, want one document name", r.Documents)
 		}
 	})
 }

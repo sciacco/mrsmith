@@ -140,16 +140,71 @@ func (r DocuResult) BalanceSheet() (DocuBalanceSheet, bool) {
 	return bs, ok
 }
 
+// DocuFlexString decodifica indifferentemente una stringa o un numero JSON.
+// SEMANTICA VENDOR OSSERVATA: la spec esemplifica fileSize come stringa ("34144"),
+// la produzione lo manda come numero — il vendor è incoerente e un tipo rigido
+// rompe il decode dell'intero Download.
+type DocuFlexString string
+
+func (s *DocuFlexString) UnmarshalJSON(b []byte) error {
+	trimmed := strings.TrimSpace(string(b))
+	if trimmed == "" || trimmed == "null" {
+		*s = ""
+		return nil
+	}
+	if trimmed[0] == '"' {
+		var v string
+		if err := json.Unmarshal(b, &v); err != nil {
+			return err
+		}
+		*s = DocuFlexString(v)
+		return nil
+	}
+	*s = DocuFlexString(trimmed)
+	return nil
+}
+
+// DocuFlexInt64 decodifica un intero da numero o stringa JSON (stessa incoerenza
+// vendor di DocuFlexString); valori vuoti/null/inparsabili degradano a 0 — i campi
+// che lo usano sono informativi, mai decisionali.
+type DocuFlexInt64 int64
+
+func (n *DocuFlexInt64) UnmarshalJSON(b []byte) error {
+	trimmed := strings.TrimSpace(string(b))
+	if trimmed == "" || trimmed == "null" {
+		*n = 0
+		return nil
+	}
+	if trimmed[0] == '"' {
+		var v string
+		if err := json.Unmarshal(b, &v); err != nil {
+			return err
+		}
+		trimmed = strings.TrimSpace(v)
+		if trimmed == "" {
+			*n = 0
+			return nil
+		}
+	}
+	f, err := strconv.ParseFloat(trimmed, 64)
+	if err != nil {
+		*n = 0
+		return nil
+	}
+	*n = DocuFlexInt64(int64(f))
+	return nil
+}
+
 // DocuDownload è un file scaricabile (GET /requests/{id}/documents). md5 arriva in
-// BASE64 (usa CanonicalMD5FromBase64 per il confronto); fileSize è una STRINGA nel
-// payload vendor; downloadUrl è un URL GCS pre-firmato con validità ~24h.
+// BASE64 (usa CanonicalMD5FromBase64 per il confronto); downloadUrl è un URL GCS
+// pre-firmato con validità ~24h. fileSize/urlExpire sono flessibili (vedi sopra).
 type DocuDownload struct {
-	FileName    string `json:"fileName"`
-	MimeType    string `json:"mimeType"`
-	FileSize    string `json:"fileSize"`
-	MD5         string `json:"md5"`
-	URLExpire   int64  `json:"urlExpire"`
-	DownloadURL string `json:"downloadUrl"`
+	FileName    string         `json:"fileName"`
+	MimeType    string         `json:"mimeType"`
+	FileSize    DocuFlexString `json:"fileSize"`
+	MD5         string         `json:"md5"`
+	URLExpire   DocuFlexInt64  `json:"urlExpire"`
+	DownloadURL string         `json:"downloadUrl"`
 }
 
 // DocuRequest è la vista completa di una richiesta (GET /requests/{id}).
