@@ -344,6 +344,22 @@ func buildMAFilingSearchView(search *maFilingSearch) *MAFilingSearchView {
 // 2. POST filings (upload).
 // ---------------------------------------------------------------------------
 
+// maFilingIngestRecoverable reports whether a re-uploaded identical filing should restart the
+// ingest: a `failed` pipeline, or an `identity_blocked` one still awaiting validation
+// (pending_validation — the soft/unreadable block). A hard `mismatch` (a readable but
+// different fiscal code) is NOT recoverable by re-uploading the same bytes — it stays blocked
+// until an explicit override.
+func maFilingIngestRecoverable(f *maFiling) bool {
+	switch f.Status {
+	case maFilingStatusFailed:
+		return true
+	case maFilingStatusIdentityBlocked:
+		return f.IdentityStatus == maFilingIdentityPendingValidation
+	default:
+		return false
+	}
+}
+
 // uploadCompanyFiling ingests an analyst-supplied balance-sheet PDF. Free synchronous guards
 // (mime sniff + declared header, size cap, digests) run first. Dedup: a bit-identical filing for
 // the same fiscal identity is returned as merged=true WITHOUT a new ingest, unless it is failed
@@ -376,12 +392,21 @@ func (s *maService) uploadCompanyFiling(ctx context.Context, companyKey, declare
 	md5Hex := hex.EncodeToString(md5Sum[:])
 	sha256Hex := hex.EncodeToString(sha256Sum[:])
 
-	// Dedup pre-check: identical bytes for the same fiscal identity. Non-failed ⇒ no re-ingest;
-	// failed ⇒ re-enqueue the ingest so a previously broken pipeline can retry the same bytes.
+	// Dedup pre-check: identical bytes for the same fiscal identity. A filing stuck in a
+	// RECOVERABLE broken state — `failed`, or `identity_blocked` still `pending_validation`
+	// (the soft, unreadable block — never a hard `mismatch`) — is reset to `queued` and the
+	// ingest is re-enqueued: re-uploading the same PDF is the analyst's clean restart. It
+	// re-runs OCR from scratch (a few cents), guaranteeing fresh pages WITH the vendor's
+	// table `extras`, so the fixed identity/parse pipeline can now read the fiscal code out
+	// of the frontespizio table and clear the gate that previously blocked it. Any other
+	// state ⇒ merged, no re-ingest.
 	if existing, derr := s.filing.GetMAFilingByBlob(ctx, fiscalKey, md5Hex); derr != nil {
 		return MAFilingUploadResponse{}, derr
 	} else if existing != nil {
-		if existing.Status == maFilingStatusFailed {
+		if maFilingIngestRecoverable(existing) {
+			if uerr := s.filing.UpdateMAFilingStatus(ctx, existing.ID, maFilingStatusQueued, ""); uerr != nil {
+				return MAFilingUploadResponse{}, uerr
+			}
 			if eerr := s.enqueueFilingIngest(ctx, existing.ID, fiscalKey, companyKey, subject, email); eerr != nil {
 				return MAFilingUploadResponse{}, eerr
 			}

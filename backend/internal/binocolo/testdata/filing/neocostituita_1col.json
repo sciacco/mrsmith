@@ -1,60 +1,44 @@
 {
-  "comment": "Fixture SINTETICA (non da PDF reale) — simula l'output Mistral OCR di un fascicolo di societa' neocostituita con UNA SOLA colonna esercizio (art. 2423-ter c.5: la comparativa manca al primo bilancio). Serve solo al caso 1-colonna del test parser; numeri arrotondati inventati. Sostituibile col primo run OCR reale di un caso analogo.",
-  "source": "sintetica",
+  "comment": "Fixture 1-COLONNA (societa' neocostituita, art. 2423-ter c.5: nessuna comparativa al primo bilancio) nel FORMATO REALE Mistral OCR: tabelle esternalizzate come link [tbl-N.md] + extras.tables[{id,format,content}]. Numeri sintetici arrotondati. Serve al caso 1-colonna del parser.",
+  "source": "sintetica in formato reale",
   "pages": [
     {
-      "pageNo": 1,
-      "lines": [
-        "# NUOVA IMPRESA SRL",
-        "",
-        "## Bilancio di esercizio al 31-12-2024",
-        "",
-        "| Dati anagrafici | |",
-        "| --- | --- |",
-        "| Codice Fiscale | 09999990968 |",
-        "| P.I. | 09999990968 |",
-        "",
-        "Conforme alla tassonomia itcc-ci-2018-11-04"
+      "page": 1,
+      "markdown": "v.2.14.1\n\nNUOVA IMPRESA SRL\n\n# NUOVA IMPRESA SRL\n\n## Bilancio di esercizio al 31-12-2024\n\n[tbl-0.md](tbl-0.md)\n\nBilancio di esercizio al 31-12-2024\n\nPag. 1 di 8\n\nGenerato automaticamente - Conforme alla tassonomia itcc-ci-2018-11-04",
+      "tables": [
+        {
+          "id": "tbl-0.md",
+          "format": "markdown",
+          "content": "|  Dati anagrafici  |   |\n| --- | --- |\n|  Sede in | VIA ROMA 1 20100 MILANO (MI)  |\n|  Codice Fiscale | 09999990968  |\n|  P.I. | 09999990968  |\n|  Forma giuridica | Societa' A Responsabilita' Limitata  |"
+        }
       ]
     },
     {
-      "pageNo": 2,
-      "lines": [
-        "# Stato patrimoniale",
-        "",
-        "| | 31-12-2024 |",
-        "| --- | --- |",
-        "| Attivo | |",
-        "| Totale immobilizzazioni (B) | 40.000 |",
-        "| Totale attivo circolante (C) | 60.000 |",
-        "| Totale attivo | 100.000 |",
-        "| Passivo | |",
-        "| Totale patrimonio netto | 80.000 |",
-        "| Totale debiti | 20.000 |",
-        "| Totale passivo | 100.000 |"
+      "page": 2,
+      "markdown": "v.2.14.1\n\nNUOVA IMPRESA SRL\n\n# Stato patrimoniale\n\n[tbl-1.md](tbl-1.md)\n\nBilancio di esercizio al 31-12-2024\n\nPag. 2 di 8",
+      "tables": [
+        {
+          "id": "tbl-1.md",
+          "format": "markdown",
+          "content": "|   | 31-12-2024  |\n| --- | --- |\n|  Stato patrimoniale |   |\n|  Attivo |   |\n|  Totale immobilizzazioni (B) | 40.000  |\n|  Totale attivo circolante (C) | 60.000  |\n|  Totale attivo | 100.000  |\n|  Passivo |   |\n|  Totale patrimonio netto | 80.000  |\n|  Totale debiti | 20.000  |\n|  Totale passivo | 100.000  |"
+        }
       ]
     },
     {
-      "pageNo": 3,
-      "lines": [
-        "# Conto economico",
-        "",
-        "| | 31-12-2024 |",
-        "| --- | --- |",
-        "| Totale valore della produzione | 50.000 |",
-        "| Totale costi della produzione | 30.000 |",
-        "| Differenza tra valore e costi della produzione (A - B) | 20.000 |",
-        "| 21) Utile (perdita) dell'esercizio | 12.000 |"
+      "page": 3,
+      "markdown": "v.2.14.1\n\nNUOVA IMPRESA SRL\n\n# Conto economico\n\n[tbl-2.md](tbl-2.md)\n\nBilancio di esercizio al 31-12-2024\n\nPag. 3 di 8",
+      "tables": [
+        {
+          "id": "tbl-2.md",
+          "format": "markdown",
+          "content": "|   | 31-12-2024  |\n| --- | --- |\n|  Conto economico |   |\n|  Totale valore della produzione | 50.000  |\n|  Totale costi della produzione | 30.000  |\n|  Differenza tra valore e costi della produzione (A - B) | 20.000  |\n|  21) Utile (perdita) dell'esercizio | 12.000  |"
+        }
       ]
     },
     {
-      "pageNo": 4,
-      "lines": [
-        "# Nota integrativa al Bilancio di esercizio chiuso al 31-12-2024",
-        "",
-        "## Nota integrativa, parte iniziale",
-        "Primo esercizio della societa': non e' presente la colonna comparativa."
-      ]
+      "page": 4,
+      "markdown": "v.2.14.1\n\nNUOVA IMPRESA SRL\n\n# Nota integrativa al Bilancio di esercizio chiuso al 31-12-2024\n\n## Nota integrativa, parte iniziale\n\nPrimo esercizio della società: non è presente la colonna comparativa ai sensi dell'art. 2423-ter, comma 5, del codice civile.",
+      "tables": []
     }
   ]
 }

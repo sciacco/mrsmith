@@ -94,7 +94,6 @@ type maFilingStore interface {
 	CreateMAFilingProcessingRun(ctx context.Context, filingID, ocrModel, ocrParamsVersion, parseVersion, requestID string) (string, error)
 	InsertMAFilingPages(ctx context.Context, runID string, pages []maFilingPage) error
 	GetMAFilingPages(ctx context.Context, runID string) ([]maFilingPage, error)
-	GetMAFilingPageMarkdown(ctx context.Context, runID string, pageNo int) (string, error)
 	SetMAFilingPageCount(ctx context.Context, id string, pageCount int) error
 	UpdateMAFilingStatus(ctx context.Context, id, status, errMsg string) error
 	SetMAFilingParsed(ctx context.Context, id string, closingDate *time.Time, balanceSheetType, taxonomyVersion string, pageCount int) error

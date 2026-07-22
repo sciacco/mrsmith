@@ -228,11 +228,11 @@ func (s *maService) filingIngestIdentityAndParse(ctx context.Context, job maJob,
 			}
 			s.filingIngestTrace(ctx, "identity", maFilingSysInternal, maTraceEventSucceeded, map[string]any{"filing_id": filing.ID, "source": "docuengine"}, "")
 		} else {
-			page1, err := s.filing.GetMAFilingPageMarkdown(ctx, runID, 1)
+			pages, err := s.filing.GetMAFilingPages(ctx, runID)
 			if err != nil {
 				return err
 			}
-			res := validateMAFilingIdentityPage1(page1, filing.VATClean, filing.TaxClean)
+			res := validateMAFilingIdentity(pages, filing.VATClean, filing.TaxClean)
 			switch res.Outcome {
 			case maIdentityMatch:
 				if err := s.filing.SetMAFilingIdentityStatus(ctx, filing.ID, maFilingIdentityValidated); err != nil {

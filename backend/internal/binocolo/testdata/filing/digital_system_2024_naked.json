@@ -1,0 +1,49 @@
+{
+  "comment": "Fixture layout NUDO (PDF 2024 generato da XBRL, SENZA copertina CCIAA): CF/P.IVA vive SOLO dentro tbl-0.md. Markdown pagine 1-3+10+17 dall'output REALE Mistral OCR (run 64669af9). Le tabelle SP/CE reali NON sono state dumpate: tbl-0/1/2 qui sono SINTETICHE sui NUMERI VERI del PDF 2024 (attivo=passivo=1.039.105, A-B=260.530, utile 191.760; comparativa 2023 dai numeri reali del fascicolo 2023), nello STESSO formato reale (header '|   | 31-12-2024 | 31-12-2023  |', padding, parentesi per i negativi). SOSTITUIRE con il dump extras del run 2024 quando disponibile. Le tabelle di dettaglio NI (tbl-5/6/7/21) restano link non risolti come nel reale.",
+  "source": "Mistral OCR run 64669af9 (markdown reale) + tbl-0/1/2 sintetiche su numeri reali",
+  "pages": [
+    {
+      "page": 1,
+      "markdown": "v.2.14.1\n\nDIGITAL SYSTEM SRL\n\n# DIGITAL SYSTEM SRL\n\n## Bilancio di esercizio al 31-12-2024\n\n[tbl-0.md](tbl-0.md)\n\nBilancio di esercizio al 31-12-2024\n\nPag. 1 di 19\n\nGenerato automaticamente - Conforme alla tassonomia itcc-ci-2018-11-04",
+      "tables": [
+        {
+          "id": "tbl-0.md",
+          "format": "markdown",
+          "content": "|  Dati anagrafici  |   |\n| --- | --- |\n|  Sede in | VIA MONDIN 7 32100 BELLUNO (BL)  |\n|  Codice Fiscale | 00888440252  |\n|  Numero Rea | BL 80705  |\n|  P.I. | 00888440252  |\n|  Capitale Sociale Euro | 10.920 i.v.  |\n|  Forma giuridica | Societa' A Responsabilita' Limitata  |\n|  Settore di attività prevalente (ATECO) | Commercio all'ingrosso di computer, apparecchiature informatiche periferiche e di software (46.51.00)  |\n|  Società in liquidazione | no  |"
+        }
+      ]
+    },
+    {
+      "page": 2,
+      "markdown": "v.2.14.1\n\nDIGITAL SYSTEM SRL\n\n# Stato patrimoniale\n\n[tbl-1.md](tbl-1.md)\n\nBilancio di esercizio al 31-12-2024\n\nPag. 2 di 19\n\nGenerato automaticamente - Conforme alla tassonomia itcc-ci-2018-11-04",
+      "tables": [
+        {
+          "id": "tbl-1.md",
+          "format": "markdown",
+          "content": "|   | 31-12-2024 | 31-12-2023  |\n| --- | --- | --- |\n|  Stato patrimoniale |  |   |\n|  Attivo |  |   |\n|  B) Immobilizzazioni |  |   |\n|  I - Immobilizzazioni immateriali | 19.310 | 28.382  |\n|  II - Immobilizzazioni materiali | 24.952 | 211  |\n|  Totale immobilizzazioni (B) | 44.262 | 28.593  |\n|  C) Attivo circolante |  |   |\n|  I - Rimanenze | 29.718 | 25.211  |\n|  II - Crediti |  |   |\n|  esigibili entro l'esercizio successivo | 416.556 | 508.521  |\n|  esigibili oltre l'esercizio successivo | 300 | 300  |\n|  Totale crediti | 416.856 | 508.821  |\n|  IV - Disponibilità liquide | 539.223 | 346.869  |\n|  Totale attivo circolante (C) | 985.797 | 880.901  |\n|  D) Ratei e risconti | 9.046 | 11.092  |\n|  Totale attivo | 1.039.105 | 920.586  |\n|  Passivo |  |   |\n|  A) Patrimonio netto |  |   |\n|  I - Capitale | 10.920 | 10.920  |\n|  IV - Riserva legale | 4.344 | 4.344  |\n|  VI - Altre riserve | 623.851 | 389.685  |\n|  IX - Utile (perdita) dell'esercizio | 191.760 | 234.166  |\n|  Totale patrimonio netto | 830.875 | 639.115  |\n|  C) Trattamento di fine rapporto di lavoro subordinato | 53.389 | 48.018  |\n|  D) Debiti |  |   |\n|  esigibili entro l'esercizio successivo | 154.605 | 233.446  |\n|  Totale debiti | 154.605 | 233.446  |\n|  E) Ratei e risconti | 236 | 7  |\n|  Totale passivo | 1.039.105 | 920.586  |"
+        }
+      ]
+    },
+    {
+      "page": 3,
+      "markdown": "v.2.14.1\n\nDIGITAL SYSTEM SRL\n\n# Conto economico\n\n[tbl-2.md](tbl-2.md)\n\nBilancio di esercizio al 31-12-2024\n\nPag. 3 di 19\n\nGenerato automaticamente - Conforme alla tassonomia itcc-ci-2018-11-04",
+      "tables": [
+        {
+          "id": "tbl-2.md",
+          "format": "markdown",
+          "content": "|   | 31-12-2024 | 31-12-2023  |\n| --- | --- | --- |\n|  Conto economico |  |   |\n|  A) Valore della produzione |  |   |\n|  1) ricavi delle vendite e delle prestazioni | 1.147.405 | 1.289.927  |\n|  5) altri ricavi e proventi |  |   |\n|  contributi in conto esercizio | - | 402  |\n|  altri | 1.131 | 1.428  |\n|  Totale altri ricavi e proventi | 1.131 | 1.830  |\n|  Totale valore della produzione | 1.148.536 | 1.291.757  |\n|  B) Costi della produzione |  |   |\n|  6) per materie prime, sussidiarie, di consumo e di merci | 533.032 | 611.333  |\n|  7) per servizi | 123.953 | 182.701  |\n|  8) per godimento di beni di terzi | 19.805 | 21.964  |\n|  9) per il personale | 167.028 | 145.935  |\n|  10) ammortamenti e svalutazioni | 11.928 | 9.169  |\n|  11) variazioni delle rimanenze di materie prime, sussidiarie, di consumo e merci | (4.506) | (6.709)  |\n|  14) oneri diversi di gestione | 36.766 | 12.488  |\n|  Totale costi della produzione | 888.006 | 976.881  |\n|  Differenza tra valore e costi della produzione (A - B) | 260.530 | 314.876  |\n|  C) Proventi e oneri finanziari |  |   |\n|  Totale proventi e oneri finanziari (15 + 16 - 17 + - 17-bis) | 11.093 | 7.250  |\n|  Risultato prima delle imposte (A - B + - C + - D) | 271.623 | 322.126  |\n|  20) Imposte sul reddito dell'esercizio, correnti, differite e anticipate | 79.863 | 87.960  |\n|  21) Utile (perdita) dell'esercizio | 191.760 | 234.166  |"
+        }
+      ]
+    },
+    {
+      "page": 10,
+      "markdown": "v.2.14.1\n\nDIGITAL SYSTEM SRL\n\n[tbl-5.md](tbl-5.md)\n\n### Esigibili entro esercizio\n\nLa voce crediti esigibili entro l'esercizio ammonta ad Euro 416.555,81 ed è composta per Euro 153.952,84 da crediti verso clienti (i crediti verso clienti ammontano ad Euro 154.091,84 a cui sono state sottratte le note di credito da emettere per Euro 139,00), per Euro 2.367,97 da fatture da emettere, per Euro 8.151,00 da credito verso Erario per IRES, per Euro 2.084,00 da credito verso Regione Veneto per IRAP e per Euro 250.000,00 dalla liquidità presente in un conto corrente vincolato.\n\n### Esigibili oltre esercizio\n\nLa voce crediti esigibili oltre l'esercizio ammonta ad Euro 300,00 ed è composta da cauzioni corrisposte e fornitori.\n\n### Disponibilità liquide\n\n[tbl-6.md](tbl-6.md)\n\nLa voce disponibilità liquide ammonta ad Euro 539.223,13 e comprende la liquidità presente presso le banche per Euro 538.473,62 e denaro in cassa per Euro 749,51.\n\n### Ratei e risconti attivi\n\n[tbl-7.md](tbl-7.md)\n\nLa voce Ratei e Risconti attivi ammonta ad Euro 9.046,45 ed è composta per Euro 6.734,32 da risconti attivi e per Euro 2.312,13 da ratei attivi.\n\nLa voce risconti comprende per Euro 1.276,28 assicurazioni, per Euro 566,28 licenze uso software, per Euro 14,56 tasse di proprietà autoveicoli, per Euro 35,53 imposta di registro e per Euro 4.841,67 servizi destinati alla rivendita o altri costi per servizi.\n\nLa voce ratei attivi si riferisce ad interessi di attivi di competenza dell'esercizio, ma avranno manifestazione finanziaria nel successivo.\n\nI ratei e risconti attivi sono stati assunti e rilevati in conformità alle norme tecnico-contabili e nel rispetto del principio di competenza.\n\nBilancio di esercizio al 31-12-2024\n\nPag. 10 di 19\n\nGenerato automaticamente - Conforme alla tassonomia itcc-ci-2018-11-04",
+      "tables": []
+    },
+    {
+      "page": 17,
+      "markdown": "v.2.14.1\n\nDIGITAL SYSTEM SRL\n\n[tbl-21.md](tbl-21.md)\n\nL'ammontare dei compensi lordi annui corrisposti agli amministratori ammonta ad Euro 31.750,00, oltre ai contributi previdenziali ed assistenziali previsti per legge.\n\n## **Impegni, garanzie e passività potenziali non risultanti dallo stato patrimoniale**\n\nIn conformità con quanto disposto dall'art. 2427, primo comma, n. 9) del codice civile si forniscono le seguenti informazioni in merito agli impegni, alle garanzie e alle passività potenziali non risultanti dallo stato patrimoniale\n\nNon esistono garanzie prestate da parte della società a favore di terzi, altri conti d'ordine, rischi e impegni.\n\n## **Informazioni sulle operazioni con parti correlate**\n\nLa società ha stipulato un contratto di affitto dell'immobile sito a Belluno in Via Mondin, n. 7, i cui proprietari, tra gli altri, risultano essere i due soci. In particolare, per l'anno 2024 i canoni di locazione pagati per l'immobile in questione ammontano ad Euro 18.000, di cui Euro 9.000 spettanti al socio De Nadal Massimo ed Euro 1.800 spettanti al socio Zerbinati Rudi. Si precisa che detto rapporto è avvenuto a normali condizioni di mercato (sia per quanto concerne l'ammontare delle prestazioni, sia per quanto attiene a termini e modalità di pagamento), ma per esigenze di trasparenza e chiarezza se ne da' in ogni caso notizia nella presente Nota Integrativa.\n\n## **Informazioni sui fatti di rilievo avvenuti dopo la chiusura dell'esercizio**\n\nNon vi sono da segnalare fatti significativi accaduti successivamente alla chiusura dell'esercizio.\n\nBilancio di esercizio al 31-12-2024\n\nPag. 17 di 19\n\nGenerato automaticamente - Conforme alla tassonomia itcc-ci-2018-11-04",
+      "tables": []
+    }
+  ]
+}

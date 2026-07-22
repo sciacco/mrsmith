@@ -161,6 +161,117 @@ func parseItalianNumber(raw string) (float64, bool) {
 }
 
 // ---------------------------------------------------------------------------
+// Table reassembly (Mistral OCR contract): with include_blocks/table_format=markdown
+// the page markdown does NOT inline the tables — each table is a link [tbl-N.md](tbl-N.md)
+// and its full markdown lives in extras.tables[{id,format,content}] (extras.blocks carries
+// the same table typed with a table_id as a fallback). maFilingPageText reassembles the
+// page for READING only: every link is replaced with its table content in place; the
+// PERSISTED markdown is never rewritten (fidelity to the vendor). EVERY consumer that needs
+// the page's textual content — prospetti parse, identity, NI sectioning, NI citation
+// grounding — goes through this helper, so a quote/figure that lives in a table anchors.
+// ---------------------------------------------------------------------------
+
+// maTableLinkRe matches an OCR table placeholder link "[tbl-N.md](tbl-N.md)".
+var maTableLinkRe = regexp.MustCompile(`\[(tbl-[0-9A-Za-z._-]+)\]\((tbl-[0-9A-Za-z._-]+)\)`)
+
+// maFilingExtras is the per-page raw structured payload we persist verbatim from the OCR
+// vendor. Only the fields the reassembly needs are decoded (defensively — unknown fields
+// and shapes are ignored, never an error).
+type maFilingExtras struct {
+	Tables []struct {
+		ID      string `json:"id"`
+		Format  string `json:"format"`
+		Content string `json:"content"`
+	} `json:"tables"`
+	Blocks []struct {
+		Type     string `json:"type"`
+		TableID  string `json:"table_id"`
+		Markdown string `json:"markdown"`
+		Content  string `json:"content"`
+		Text     string `json:"text"`
+	} `json:"blocks"`
+}
+
+// maTableKey canonicalizes a table id/link target so "tbl-0.md" (link/tables id) and
+// "tbl-0" (a block's table_id) resolve to the same key.
+func maTableKey(s string) string {
+	return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(s)), ".md")
+}
+
+// maFilingExtraTables indexes a page's extras into canonical-key → table markdown. tables[]
+// is authoritative; a type=table block with a table_id fills any id tables[] does not cover
+// (the fallback the brief mandates for a run whose top-level tables[] is absent).
+func maFilingExtraTables(extras json.RawMessage) map[string]string {
+	out := map[string]string{}
+	if len(extras) == 0 {
+		return out
+	}
+	var decoded maFilingExtras
+	if err := json.Unmarshal(extras, &decoded); err != nil {
+		return out
+	}
+	for _, t := range decoded.Tables {
+		if t.ID == "" || strings.TrimSpace(t.Content) == "" {
+			continue
+		}
+		out[maTableKey(t.ID)] = t.Content
+	}
+	for _, b := range decoded.Blocks {
+		if !strings.EqualFold(strings.TrimSpace(b.Type), "table") {
+			continue
+		}
+		id := strings.TrimSpace(b.TableID)
+		if id == "" {
+			continue
+		}
+		content := firstNonEmptyTrimmed(b.Markdown, b.Content, b.Text)
+		if content == "" {
+			continue
+		}
+		if _, ok := out[maTableKey(id)]; !ok {
+			out[maTableKey(id)] = content
+		}
+	}
+	return out
+}
+
+func firstNonEmptyTrimmed(values ...string) string {
+	for _, v := range values {
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// maFilingPageText returns the page markdown with every [tbl-N.md] link replaced by the
+// corresponding table content (a newline before and after so it flattens into rows). A link
+// with no matching table is left verbatim. Pure: the input maFilingPage is never mutated and
+// nothing is persisted. Fast-paths pages that carry no table link.
+func maFilingPageText(page maFilingPage) string {
+	md := page.Markdown
+	if !strings.Contains(md, "](tbl-") {
+		return md
+	}
+	tables := maFilingExtraTables(page.Extras)
+	if len(tables) == 0 {
+		return md
+	}
+	return maTableLinkRe.ReplaceAllStringFunc(md, func(match string) string {
+		m := maTableLinkRe.FindStringSubmatch(match)
+		if m == nil {
+			return match
+		}
+		for _, id := range []string{m[2], m[1]} { // link target first, then the label
+			if content, ok := tables[maTableKey(id)]; ok && strings.TrimSpace(content) != "" {
+				return "\n" + strings.TrimSpace(content) + "\n"
+			}
+		}
+		return match // no matching table: leave the link untouched
+	})
+}
+
+// ---------------------------------------------------------------------------
 // Markdown line/table primitives.
 // ---------------------------------------------------------------------------
 
@@ -170,13 +281,14 @@ type maDocLine struct {
 	Text string
 }
 
-// maFlattenPages returns every markdown line across all pages in page order.
+// maFlattenPages returns every REASSEMBLED markdown line across all pages in page order —
+// so table rows that the vendor externalized into extras.tables are present as lines.
 func maFlattenPages(pages []maFilingPage) []maDocLine {
 	sorted := append([]maFilingPage(nil), pages...)
 	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].PageNo < sorted[j].PageNo })
 	var out []maDocLine
 	for _, p := range sorted {
-		for _, line := range strings.Split(p.Markdown, "\n") {
+		for _, line := range strings.Split(maFilingPageText(p), "\n") {
 			out = append(out, maDocLine{Page: p.PageNo, Text: line})
 		}
 	}
@@ -266,11 +378,33 @@ func maHeaderColumns(header []string) []maExerciseColumn {
 
 var maMarkdownHeadingRe = regexp.MustCompile(`^\s*#{1,6}\s+\S`)
 
-// maNIStartIndex returns the flat-line index where the nota integrativa begins (the
-// first line mentioning it), or len(lines) when there is no NI region.
+// maNIStartIndex returns the flat-line index where the nota integrativa begins. Real
+// fascicoli do not always emit an explicit "Nota integrativa al Bilancio…" heading before
+// the NI detail pages (a subset/naked layout can jump straight into the note sections), so
+// the boundary is: the FIRST heading (or canonical NI title) that appears AFTER the Conto
+// Economico prospetto heading, OR the explicit "nota integrativa" phrase, whichever comes
+// first. This keeps the SP/CE prospetti (which precede it) in the parse region while pulling
+// every NI detail page — including the first note pages that carry the citation quotes —
+// into the NI region. Falls back to the explicit phrase, else len(lines) (no NI). The
+// "conto economico"/canonical-title probes only look at NON-table lines, so the many
+// "Totale valore della produzione"-style table rows never trip the boundary.
 func maNIStartIndex(lines []maDocLine) int {
+	ceIdx := -1
 	for i, l := range lines {
-		if strings.Contains(strings.ToLower(l.Text), "nota integrativa") {
+		if _, isRow := maMarkdownRow(l.Text); isRow {
+			continue
+		}
+		norm := maNormalizeLabel(l.Text)
+		if strings.Contains(norm, "nota integrativa") {
+			return i
+		}
+		if ceIdx < 0 {
+			if strings.Contains(norm, "conto economico") {
+				ceIdx = i
+			}
+			continue
+		}
+		if maMarkdownHeadingRe.MatchString(l.Text) || maIsCanonicalNITitle(norm) {
 			return i
 		}
 	}
@@ -634,8 +768,9 @@ const (
 	maIdentityMismatch                            // codes found but none match (hard block)
 )
 
-// maIdentityResult is the page-1 identity verdict plus the closing date read from the
-// frontespizio ("Bilancio ... al 31-12-2024").
+// maIdentityResult is the identity verdict (scanned across the leading pages) plus the
+// closing date read from the front matter ("Bilancio … al 31-12-2024", "Data chiusura
+// esercizio 31/12/2023").
 type maIdentityResult struct {
 	Outcome     maIdentityOutcome
 	FoundCodes  []string
@@ -644,45 +779,52 @@ type maIdentityResult struct {
 
 var (
 	// maFiscalCodeRe matches an 11-digit P.IVA/CF or a 16-char personal codice fiscale in
-	// UPPERCASED page text.
+	// UPPERCASED page text. It catches every real identity carrier once tables are
+	// reassembled: "Codice fiscale: X" (copertina/header), "| Codice Fiscale | X |" and
+	// "| P.I. | X |" (frontespizio tabellare), and "Cod. Fisc. e Partita IVA X" (verbale).
 	maFiscalCodeRe = regexp.MustCompile(`\b([0-9]{11}|[A-Z]{6}[0-9]{2}[A-Z][0-9]{2}[A-Z][0-9]{3}[A-Z])\b`)
-	// maFrontClosingRe reads the closing date after "al" on the frontespizio.
-	maFrontClosingRe = regexp.MustCompile(`(?i)\bal\s+(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})`)
+	// maClosingDateRes read the exercise closing date across the fascicolo's front matter,
+	// covering every real phrasing: "Bilancio di esercizio al 31-12-2024" / "Bilancio
+	// aggiornato al 31/12/2023" (the "al" form, both separators) and "Data chiusura
+	// esercizio 31/12/2023" (the copertina form, no "al"). Ordered: the "al" form wins when
+	// both appear on the same page (it is the one on the bilancio title).
+	maClosingDateRes = []*regexp.Regexp{
+		regexp.MustCompile(`(?i)\bal\s+(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})`),
+		regexp.MustCompile(`(?i)chiusura(?:\s+dell['’])?\s*esercizio\s+(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})`),
+	}
+	// maIdentityScanPages is how many leading pages the identity scan reads (copertina +
+	// frontespizio tabellare + first prospetto cover every layout).
+	maIdentityScanPages = 3
 )
 
-// validateMAFilingIdentityPage1 checks page-1 fiscal identity against the expected VAT/CF
-// (already-normalized clean columns). match ⇒ a found code equals the expected VAT
-// (stable form) or tax; mismatch ⇒ readable codes found but none match (hard block, non
-// overridable); unreadable ⇒ no code found (override possible). Also returns the
-// frontespizio closing date when present.
-func validateMAFilingIdentityPage1(page1Markdown, vatClean, taxClean string) maIdentityResult {
-	res := maIdentityResult{Outcome: maIdentityUnreadable}
-	if m := maFrontClosingRe.FindStringSubmatch(page1Markdown); m != nil {
-		day, _ := strconv.Atoi(m[1])
-		month, _ := strconv.Atoi(m[2])
-		year, _ := strconv.Atoi(m[3])
-		if month >= 1 && month <= 12 && day >= 1 && day <= 31 {
-			d := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC)
-			res.ClosingDate = &d
+// maExtractClosingDate reads the first closing date matching any known front-matter phrasing
+// (both dd-mm-yyyy and dd/mm/yyyy separators normalized), ok=false when none is present.
+func maExtractClosingDate(text string) (time.Time, bool) {
+	for _, re := range maClosingDateRes {
+		if m := re.FindStringSubmatch(text); m != nil {
+			day, _ := strconv.Atoi(m[1])
+			month, _ := strconv.Atoi(m[2])
+			year, _ := strconv.Atoi(m[3])
+			if month >= 1 && month <= 12 && day >= 1 && day <= 31 && year >= 1900 && year <= 2100 {
+				return time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC), true
+			}
 		}
 	}
+	return time.Time{}, false
+}
 
-	upper := strings.ToUpper(page1Markdown)
-	seen := map[string]bool{}
-	var found []string
-	for _, m := range maFiscalCodeRe.FindAllStringSubmatch(upper, -1) {
-		code := normalizeMAFiscalValue(m[1])
-		if code == "" || seen[code] {
-			continue
-		}
-		seen[code] = true
-		found = append(found, code)
-	}
-	res.FoundCodes = found
-	if len(found) == 0 {
-		res.Outcome = maIdentityUnreadable
-		return res
-	}
+// validateMAFilingIdentity checks the fascicolo's fiscal identity against the expected VAT/CF
+// (already-normalized clean columns) by scanning the REASSEMBLED text of the first few pages —
+// so the code is found whether it sits in clear on the copertina/header, inside the
+// frontespizio table (tbl-0), or in the verbale. match ⇒ a found code equals the expected VAT
+// (stable form) or tax; mismatch ⇒ readable codes found but none match (hard block, non
+// overridable); unreadable ⇒ no code found anywhere in the scanned pages (override / re-upload
+// possible). Also returns the closing date read from the front matter when present.
+func validateMAFilingIdentity(pages []maFilingPage, vatClean, taxClean string) maIdentityResult {
+	res := maIdentityResult{Outcome: maIdentityUnreadable}
+
+	sorted := append([]maFilingPage(nil), pages...)
+	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].PageNo < sorted[j].PageNo })
 
 	expected := map[string]bool{}
 	addExpected := func(v string) {
@@ -695,6 +837,33 @@ func validateMAFilingIdentityPage1(page1Markdown, vatClean, taxClean string) maI
 	addExpected(taxClean)
 	addExpected(maStableVAT(taxClean))
 
+	seen := map[string]bool{}
+	var found []string
+	for i, p := range sorted {
+		if i >= maIdentityScanPages {
+			break
+		}
+		text := maFilingPageText(p)
+		if res.ClosingDate == nil {
+			if d, ok := maExtractClosingDate(text); ok {
+				res.ClosingDate = &d
+			}
+		}
+		upper := strings.ToUpper(text)
+		for _, m := range maFiscalCodeRe.FindAllStringSubmatch(upper, -1) {
+			code := normalizeMAFiscalValue(m[1])
+			if code == "" || seen[code] {
+				continue
+			}
+			seen[code] = true
+			found = append(found, code)
+		}
+	}
+	res.FoundCodes = found
+	if len(found) == 0 {
+		res.Outcome = maIdentityUnreadable
+		return res
+	}
 	for _, code := range found {
 		if expected[code] || expected[maStableVAT(code)] {
 			res.Outcome = maIdentityMatch

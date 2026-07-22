@@ -213,11 +213,12 @@ func TestMatchMANIAutoReconfirm(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestValidateMANICitation(t *testing.T) {
-	pages := loadFilingFixture(t, "digital_system_2024.json")
+	pages := loadFilingFixture(t, "digital_system_2024_naked.json")
 	idx := buildMANIPageIndex(pages)
 
-	// The real p.10 conto-corrente-vincolato quote (verbatim substring of the fixture).
-	quote10 := "per Euro 250.000,00 dalla liquidita' presente in un conto corrente vincolato"
+	// The real p.10 conto-corrente-vincolato quote (verbatim substring of the OCR output —
+	// note "liquidità" with the accented à, as the vendor emits it).
+	quote10 := "per Euro 250.000,00 dalla liquidità presente in un conto corrente vincolato"
 
 	// (a) Grounded quote + amount present ⇒ valid.
 	if v := validateMANICitation(maNIProposalLLM{Quote: quote10, PageNo: niInt(10), ImportoLordo: niF(250000)}, idx); v.Discard || v.AmountMissing {
@@ -235,7 +236,7 @@ func TestValidateMANICitation(t *testing.T) {
 	}
 
 	// (d) Same quote, different whitespace/case ⇒ still valid (normalization).
-	messy := "   PER   EURO  250.000,00   dalla LIQUIDITA' presente in un  CONTO corrente vincolato  "
+	messy := "   PER   EURO  250.000,00   dalla LIQUIDITÀ presente in un  CONTO corrente vincolato  "
 	if v := validateMANICitation(maNIProposalLLM{Quote: messy, PageNo: niInt(10), ImportoLordo: niF(250000)}, idx); v.Discard || v.AmountMissing {
 		t.Errorf("whitespace/case-different quote must be valid, got %+v", v)
 	}

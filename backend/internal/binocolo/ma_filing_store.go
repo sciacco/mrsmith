@@ -1117,27 +1117,6 @@ ORDER BY page_no
 	return out, nil
 }
 
-// GetMAFilingPageMarkdown returns the markdown of a single page. Returns ("", nil) when
-// the page is absent.
-func (s *SQLStore) GetMAFilingPageMarkdown(ctx context.Context, runID string, pageNo int) (string, error) {
-	if s == nil || s.db == nil {
-		return "", errors.New("binocolo ma store not configured")
-	}
-	var markdown string
-	err := s.db.QueryRowContext(ctx, `
-SELECT COALESCE(markdown, '')
-FROM binocolo.ma_filing_page
-WHERE processing_run_id = $1::uuid AND page_no = $2
-`, runID, pageNo).Scan(&markdown)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", nil
-	}
-	if err != nil {
-		return "", fmt.Errorf("get ma filing page markdown: %w", err)
-	}
-	return markdown, nil
-}
-
 // UpsertMAFilingExtract writes a per-exercise CEE extract for a run. The extract is written
 // in stages (parse writes sp/ce/checks, then the docai stage writes docai/docai_diff), so
 // ON CONFLICT DO UPDATE COALESCEs each column: a nil/empty argument leaves the stored value

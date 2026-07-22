@@ -467,11 +467,13 @@ type maNIPageIndex struct {
 }
 
 // buildMANIPageIndex normalizes every OCR page once (lowercase + whitespace-collapsed) so the
-// quote-grounding check is a cheap substring test per proposal.
+// quote-grounding check is a cheap substring test per proposal. It indexes the REASSEMBLED
+// page text (tables inlined from extras), so a quote that cites a figure living in a table
+// still anchors — otherwise every table-sourced citation would be discarded.
 func buildMANIPageIndex(pages []maFilingPage) maNIPageIndex {
 	idx := maNIPageIndex{norm: make(map[int]string, len(pages))}
 	for _, p := range pages {
-		idx.norm[p.PageNo] = maNormalizeQuote(p.Markdown)
+		idx.norm[p.PageNo] = maNormalizeQuote(maFilingPageText(p))
 		idx.order = append(idx.order, p.PageNo)
 	}
 	sort.Ints(idx.order)

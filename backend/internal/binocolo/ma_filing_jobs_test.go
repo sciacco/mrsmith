@@ -245,10 +245,6 @@ func (f *fakeFilingStore) GetMAFilingPages(context.Context, string) ([]maFilingP
 	return nil, nil
 }
 
-func (f *fakeFilingStore) GetMAFilingPageMarkdown(context.Context, string, int) (string, error) {
-	return "", nil
-}
-
 func (f *fakeFilingStore) SetMAFilingPageCount(context.Context, string, int) error { return nil }
 
 func (f *fakeFilingStore) UpdateMAFilingStatus(context.Context, string, string, string) error {
