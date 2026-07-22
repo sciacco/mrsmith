@@ -63,7 +63,7 @@ export function WebValidationTab({ target }: { target: MATarget }) {
             <dt>domainScore <HiddenField label="domainScore" /></dt>
             <dd>{wv.domainScore ?? '—'}</dd>
             <dt>identityState <HiddenField label="identityState" /></dt>
-            <dd>{wv.webValidationState}</dd>
+            <dd>{wv.identityState ?? '—'}</dd>
           </dl>
         </div>
 

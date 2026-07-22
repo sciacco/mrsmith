@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useApiClient } from '../../api/client';
 import { stateLabel, esitoLabel, isTerminalState } from '../../lib/cardStates';
+import { presentDomainIdentity } from '../../lib/domainIdentity';
 import type {
   CandidateMatchAnalysisResponse,
   MACompanyOverview,
@@ -263,10 +264,6 @@ function groupLabel(target?: MATarget): string | undefined {
   if (parts.length > 0) return parts.join(' · ');
   if (group.belongsToGroup) return 'Appartiene a un gruppo';
   return undefined;
-}
-
-function targetDomain(target?: MATarget): string | undefined {
-  return target?.webValidation?.selectedDomain || target?.vendorPayload?.webAndSocial?.website || target?.vendorPayload?.website;
 }
 
 function evidenceFromTarget(target?: MATarget): CandidateMatchAnalysisResponse | undefined {
@@ -544,7 +541,8 @@ export function SchedaAziendaPage() {
 
   const analysis = evidenceFromTarget(target);
   const legalForm = getLegalForm(target);
-  const domain = identity.domain || targetDomain(target);
+  const domainIdentity = presentDomainIdentity(identity, target);
+  const domain = domainIdentity.domain;
   const thesisNotGenerated = thesisQuery.isError && thesisQuery.error instanceof ApiError && thesisQuery.error.status === 404;
   const thesisQueryError = thesisQuery.isError && !thesisNotGenerated ? errorLabel(thesisQuery.error) : null;
   const shareholders = extractShareholders(target);
@@ -558,7 +556,7 @@ export function SchedaAziendaPage() {
   const showWebVerification = hasWebVerificationDetail(target);
   const showVendorFinancials = hasVendorFinancialsData(target);
   const showShareholdersDetail = hasShareholdersDetail(target);
-  const verificationDensity = target?.webValidation?.selectedDomain ? 'dominio confermato' : undefined;
+  const verificationDensity = domainIdentity.density;
   const financialSheetsCount = vendorFinancialSheetsCount(target);
   const showIRL = lens.type === 'iniziativa' && Boolean(initiativeCard && identity.companyKey);
   const companyName = identity.companyName || identity.companyKey;
@@ -752,9 +750,7 @@ export function SchedaAziendaPage() {
                   <a href={normalizeDomainHref(domain)} target="_blank" rel="noopener noreferrer" className={styles.externalLink}>
                     {domain} <Icon name="external-link" size={13} />
                   </a>
-                  {identity.domainMethod === 'manual' && identity.identityState !== 'verified' ? (
-                    <StatusBadge value="Dominio non confermato" variant="warning" dot={false} />
-                  ) : null}
+                  <StatusBadge value={domainIdentity.label} variant={domainIdentity.variant} dot={false} />
                 </span>
               ) : (
                 'n.d.'
@@ -795,7 +791,7 @@ export function SchedaAziendaPage() {
 
         {target && showWebVerification ? (
           <LabeledDisclosure title="Dettaglio della verifica" density={verificationDensity}>
-            <WebVerificationDetail target={target} />
+            <WebVerificationDetail target={target} domainIdentity={domainIdentity} />
           </LabeledDisclosure>
         ) : null}
       </section>

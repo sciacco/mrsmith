@@ -836,14 +836,28 @@ func (s *maService) associateDomainWork(ctx context.Context, job maJob) error {
 	case "no_website":
 		s.registerCompanyDomainRecord(ctx, *target, "", maDomainMethodNoWebsite, false, job.CreatedBySubject, job.CreatedByEmail)
 	case "group_site":
-		s.registerCompanyDomainRecord(ctx, *target, payload.Domain, maDomainMethodManual, true, job.CreatedBySubject, job.CreatedByEmail)
+		// A group site remains analyst-vouched: finding the group's fiscal identity must
+		// not promote it to verified identity for the target company.
+		if err := s.registerCompanyDomainWithIdentityState(ctx, *target, payload.Domain, maDomainMethodManual, maIdentityStateVouched, true, job.CreatedBySubject, job.CreatedByEmail); err != nil {
+			return fmt.Errorf("register associated group domain: %w", err)
+		}
 	default:
-		s.registerCompanyDomain(ctx, *target, payload.Domain, maDomainMethodManual, job.CreatedBySubject, job.CreatedByEmail)
+		identityState := body.IdentityState
+		if !validMADomainIdentityState(identityState) {
+			identityState = maIdentityStateVouched
+		}
+		if err := s.registerCompanyDomainWithIdentityState(ctx, *target, payload.Domain, maDomainMethodManual, identityState, false, job.CreatedBySubject, job.CreatedByEmail); err != nil {
+			return fmt.Errorf("register associated domain: %w", err)
+		}
+		logging.FromContext(ctx).Info("binocolo associated domain registry synchronized",
+			"component", "binocolo", "operation", "ma_company_domain_upsert", "domain", payload.Domain,
+			"method", maDomainMethodManual, "identity_state", identityState,
+			"identity_transition", map[bool]string{true: "vouched -> verified", false: "none"}[identityState == maIdentityStateVerified])
 	}
 	_ = s.traceEvent(ctx, maTraceEventWrite{
 		EventType: "ma_target_domain_associated",
 		Status:    maTraceEventSucceeded,
-		Metadata:  maTraceJSON(map[string]any{"session_id": job.SessionID, "company_key": companyKey, "action": action, "final_action": body.FinalDecision.FinalAction}),
+		Metadata:  maTraceJSON(map[string]any{"session_id": job.SessionID, "company_key": companyKey, "action": action, "domain": payload.Domain, "method": maDomainMethodManual, "identity_state": body.IdentityState, "final_action": body.FinalDecision.FinalAction}),
 	})
 
 	// Reload so the target carries the fresh verdict, then enrich (this company only) +

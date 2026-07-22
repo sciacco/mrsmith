@@ -193,6 +193,15 @@ Alyante ERP ID
 - Used by: `apps/binocolo` `/target`.
 - Open questions: whether the threshold should become an admin-configurable value after real usage data.
 
+### Binocolo Domain Identity, Provenance, and Thesis Fit Are Separate Axes
+
+- Context: Binocolo company overview, web-validation detail, domain registry, and `associate_domain` jobs.
+- Discovery: `identity_state` describes certainty in the company↔domain relationship; `method` describes who or what associated the domain; `web_validation_state` describes whether the site's activity is coherent with the acquisition thesis. A manual association can therefore be authoritative (`method=manual`, `identity_state=vouched`) while the business activity is independently `confirmed` or rejected.
+- Practical rule: never derive identity copy or badges from `selected_domain` or `web_validation_state`, and never translate `confirmed` as “sito/dominio confermato”. Use the global registry as the canonical current identity, retain session validation as historical context, and preserve an on-page fiscal-identity upgrade to `verified` without changing `method=manual`.
+- Evidence: domain presenter in `apps/binocolo/src/lib/domainIdentity.ts`, company verification UI, and strict registry synchronization in `backend/internal/binocolo/ma_gated_search_job.go`.
+- Used by: `apps/binocolo` company overview and Binocolo M&A domain-association jobs.
+- Open questions: none.
+
 ### Binocolo M&A Long Session Work Uses `ma_job`
 
 - Context: async Binocolo M&A work that operates on a whole session after strategy creation or target acquisition.

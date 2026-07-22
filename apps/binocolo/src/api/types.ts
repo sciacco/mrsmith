@@ -155,6 +155,8 @@ export interface CandidateMatchFinalDecision {
   analystAction?: string;
 }
 
+export type MADomainIdentityState = 'verified' | 'vouched' | 'assumed';
+
 export interface MAWebValidation {
   sessionId: string;
   companyKey: string;
@@ -170,6 +172,7 @@ export interface MAWebValidation {
   staleAfter: string;
   expiresAt: string;
   selectedDomain?: string;
+  identityState?: MADomainIdentityState;
   domainConfidence?: string;
   domainScore?: number;
   webScore: number;
@@ -960,7 +963,7 @@ export interface MACompanyOverviewIdentity {
   atecoDescription?: string;
   domain?: string;
   domainMethod?: string;
-  identityState?: 'verified' | 'vouched' | 'assumed';
+  identityState?: MADomainIdentityState;
 }
 
 export interface MABucketReason {

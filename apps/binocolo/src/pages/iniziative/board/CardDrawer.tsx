@@ -58,9 +58,9 @@ export function eventLabel(event: MACardEvent, sessionMap: Map<string, string>):
       return 'Rimossa dalla lavorazione';
     case 'dominio_verificato': {
       const esito = p && typeof p.esito === 'string' ? p.esito : 'non_verificabile';
-      if (esito === 'confermato') return 'Dominio confermato';
-      if (esito === 'non_confermato') return 'Dominio non confermato';
-      return 'Dominio non verificabile';
+      if (esito === 'confermato') return 'Verifica automatica dominio: confermata';
+      if (esito === 'non_confermato') return 'Verifica automatica dominio: non confermata';
+      return 'Verifica automatica dominio: non disponibile';
     }
     case 'nota':
       return event.note ?? 'Nota';

@@ -543,9 +543,36 @@ func (s *maService) lookupCompanyDomain(ctx context.Context, target MATarget) *m
 	return record
 }
 
-// registerCompanyDomain upserts a registry entry. Soft dependency: a write
-// failure logs and moves on — the session-scoped validation already carries the
-// domain, the registry only loses the cross-session reuse for this company.
+func validMADomainIdentityState(state string) bool {
+	return state == maIdentityStateVerified || state == maIdentityStateVouched || state == maIdentityStateAssumed
+}
+
+// registerCompanyDomainWithIdentityState is the strict registry write used by workflows
+// whose success requires the session validation and global identity to stay synchronized.
+func (s *maService) registerCompanyDomainWithIdentityState(ctx context.Context, target MATarget, domain, method, identityState string, groupSite bool, subject, email string) error {
+	if s.store == nil {
+		return fmt.Errorf("domain registry store unavailable")
+	}
+	if !validMADomainIdentityState(identityState) {
+		return fmt.Errorf("invalid domain identity state %q", identityState)
+	}
+	companyKey := normalizeMACompanyKey(target.CompanyKey)
+	if companyKey == "" {
+		companyKey = normalizeMACompanyKey(maTargetDedupeKey(target))
+	}
+	normalized, ok := normalizeDomain(domain)
+	if companyKey == "" || !ok {
+		return fmt.Errorf("invalid company domain registry record")
+	}
+	return s.store.UpsertMACompanyDomain(ctx, maCompanyDomain{
+		CompanyKey: companyKey, VATCode: strings.ToUpper(strings.TrimSpace(target.VATCode)),
+		TaxCode: strings.ToUpper(strings.TrimSpace(target.TaxCode)), CompanyName: strings.TrimSpace(target.CompanyName),
+		Domain: normalized, Method: method, GroupSite: groupSite, IdentityState: identityState,
+		CreatedBySubject: subject, CreatedByEmail: email,
+	})
+}
+
+// registerCompanyDomain upserts a registry entry as a soft dependency for automatic paths.
 func (s *maService) registerCompanyDomain(ctx context.Context, target MATarget, domain, method, subject, email string) {
 	if s.store == nil {
 		return
@@ -564,17 +591,7 @@ func (s *maService) registerCompanyDomain(ctx context.Context, target MATarget, 
 	} else if method == maDomainMethodManual {
 		identityState = maIdentityStateVouched
 	}
-	err := s.store.UpsertMACompanyDomain(ctx, maCompanyDomain{
-		CompanyKey:       companyKey,
-		VATCode:          strings.ToUpper(strings.TrimSpace(target.VATCode)),
-		TaxCode:          strings.ToUpper(strings.TrimSpace(target.TaxCode)),
-		CompanyName:      strings.TrimSpace(target.CompanyName),
-		Domain:           normalized,
-		Method:           method,
-		IdentityState:    identityState,
-		CreatedBySubject: subject,
-		CreatedByEmail:   email,
-	})
+	err := s.registerCompanyDomainWithIdentityState(ctx, target, normalized, method, identityState, false, subject, email)
 	if err != nil {
 		logging.FromContext(ctx).Warn("binocolo domain registry write failed",
 			"component", "binocolo", "operation", "ma_company_domain_upsert",
