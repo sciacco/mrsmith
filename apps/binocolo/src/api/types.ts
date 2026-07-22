@@ -793,17 +793,27 @@ export interface MAFilingSearchView {
   updatedAt: string;
 }
 
+// One still-open acquisition (procurement not yet bound to a filing). closingDate/
+// balanceSheetType are resolved server-side from the linked search (facts, never a price);
+// `inflight` is true only while a live job works it — a false `inflight` on a non-terminal row
+// is a stalled procurement the analyst resumes with Riprendi.
 export interface MAFilingAcquisitionView {
   id: string;
   status: MAFilingAcquisitionStatus | string;
   balanceSheetId?: string;
+  closingDate?: string; // YYYY-MM-DD
+  balanceSheetType?: string;
+  error?: string;
+  inflight: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface MAFilingsResponse {
   identity: MAFilingIdentityRef;
   filings: MAFilingRow[];
   latestSearch: MAFilingSearchView | null;
-  acquisitionsInflight: MAFilingAcquisitionView[];
+  acquisitionsOpen: MAFilingAcquisitionView[];
 }
 
 export interface MAFilingUploadResponse {

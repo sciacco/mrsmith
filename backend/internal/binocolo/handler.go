@@ -170,6 +170,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/filings", h.handleUploadMAFiling)
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/filings/search", h.handleSearchMAFilings)
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/filings/acquire", h.handleAcquireMAFilings)
+	handle("POST /binocolo/v1/ma/companies/{companyKey}/filings/acquisitions/{id}/retry", h.handleRetryMAFilingAcquisition)
 	handle("POST /binocolo/v1/ma/filings/{id}/identity-override", h.handleOverrideMAFilingIdentity)
 	handle("GET /binocolo/v1/ma/filings/{id}/pdf", h.handleGetMAFilingPDF)
 	handle("GET /binocolo/v1/ma/filings/{id}/proposals", h.handleGetMAFilingProposals)
@@ -2080,6 +2081,12 @@ func maHTTPError(err error) (int, string, string) {
 	}
 	if errors.Is(err, errMAFilingBalanceSheetsRequired) {
 		return http.StatusUnprocessableEntity, "balance_sheet_ids_required", "warn"
+	}
+	if errors.Is(err, errMAFilingAcquisitionNotFound) {
+		return http.StatusNotFound, "acquisition_not_found", "warn"
+	}
+	if errors.Is(err, errMAFilingAcquisitionNotRetryable) {
+		return http.StatusConflict, "acquisition_not_retryable", "warn"
 	}
 	if errors.Is(err, errMANIProposalNotFound) {
 		return http.StatusNotFound, "proposal_not_found", "warn"

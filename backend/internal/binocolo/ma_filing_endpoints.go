@@ -41,6 +41,8 @@ var (
 	errMAFilingIdentityOverrideNotApplicable = errors.New("ma filing identity override not applicable")
 	errMAFilingSearchIDRequired              = errors.New("ma filing search id required")
 	errMAFilingBalanceSheetsRequired         = errors.New("ma filing balance sheet ids required")
+	errMAFilingAcquisitionNotFound           = errors.New("ma filing acquisition not found")
+	errMAFilingAcquisitionNotRetryable       = errors.New("ma filing acquisition not retryable")
 	errMANIProposalNotFound                  = errors.New("ma ni proposal not found")
 	errMANIActionInvalid                     = errors.New("ma ni action invalid")
 	errMANIRatifiedTreatmentInvalid          = errors.New("ma ni ratified treatment invalid")
@@ -53,13 +55,14 @@ var (
 // ---------------------------------------------------------------------------
 
 // MAFilingsResponse is the deposited-filing panel of the scheda: the fiscal identity, the
-// fascicoli ordered by closing date DESC, the latest search offer, and the acquisitions still
-// in flight (so the UI can show progress without exposing any vendor cost).
+// fascicoli ordered by closing date DESC, the latest search offer, and every still-OPEN
+// acquisition (a procurement not yet bound to a filing) — so an in-progress acquire, or a
+// stalled/failed one that needs a manual resume, never vanishes from the UI. No vendor cost.
 type MAFilingsResponse struct {
-	Identity             MAFilingIdentity          `json:"identity"`
-	Filings              []MAFilingRow             `json:"filings"`
-	LatestSearch         *MAFilingSearchView       `json:"latestSearch"`
-	AcquisitionsInflight []MAFilingAcquisitionView `json:"acquisitionsInflight"`
+	Identity         MAFilingIdentity          `json:"identity"`
+	Filings          []MAFilingRow             `json:"filings"`
+	LatestSearch     *MAFilingSearchView       `json:"latestSearch"`
+	AcquisitionsOpen []MAFilingAcquisitionView `json:"acquisitionsOpen"`
 }
 
 // MAFilingIdentity is the fiscal identity the filings are keyed by.
@@ -101,11 +104,20 @@ type MAFilingSearchResultView struct {
 	BalanceSheetType string `json:"balanceSheetType,omitempty"`
 }
 
-// MAFilingAcquisitionView is one in-flight acquisition (procurement of a balance-sheet PDF).
+// MAFilingAcquisitionView is one still-open acquisition (procurement of a balance-sheet PDF not
+// yet bound to a filing). closingDate/balanceSheetType are resolved at read from the linked
+// search (a fact, never a price); Inflight is true only while a live filing_acquire job works
+// it — a false Inflight on a non-terminal row is a stalled procurement the analyst can resume.
 type MAFilingAcquisitionView struct {
-	ID             string `json:"id"`
-	Status         string `json:"status"`
-	BalanceSheetID string `json:"balanceSheetId,omitempty"`
+	ID               string    `json:"id"`
+	Status           string    `json:"status"`
+	BalanceSheetID   string    `json:"balanceSheetId,omitempty"`
+	ClosingDate      string    `json:"closingDate,omitempty"`
+	BalanceSheetType string    `json:"balanceSheetType,omitempty"`
+	Error            string    `json:"error,omitempty"`
+	Inflight         bool      `json:"inflight"`
+	CreatedAt        time.Time `json:"createdAt"`
+	UpdatedAt        time.Time `json:"updatedAt"`
 }
 
 // MAFilingUploadResponse is the result of an upload: the (possibly merged) filing id.
@@ -239,9 +251,9 @@ func (s *maService) listCompanyFilings(ctx context.Context, companyKey string) (
 		return MAFilingsResponse{}, err
 	}
 	resp := MAFilingsResponse{
-		Identity:             MAFilingIdentity{VAT: identity.VATCode, Tax: identity.TaxCode, FiscalKey: fiscalKey},
-		Filings:              make([]MAFilingRow, 0, len(filings)),
-		AcquisitionsInflight: []MAFilingAcquisitionView{},
+		Identity:         MAFilingIdentity{VAT: identity.VATCode, Tax: identity.TaxCode, FiscalKey: fiscalKey},
+		Filings:          make([]MAFilingRow, 0, len(filings)),
+		AcquisitionsOpen: []MAFilingAcquisitionView{},
 	}
 	for i := range filings {
 		f := filings[i]
@@ -282,13 +294,21 @@ func (s *maService) listCompanyFilings(ctx context.Context, companyKey string) (
 		resp.LatestSearch = buildMAFilingSearchView(search)
 	}
 
-	inflight, err := s.filing.ListMAFilingAcquisitionsInflight(ctx, fiscalKey)
+	open, err := s.filing.ListMAFilingAcquisitionsOpen(ctx, fiscalKey)
 	if err != nil {
 		return MAFilingsResponse{}, err
 	}
-	for _, a := range inflight {
-		resp.AcquisitionsInflight = append(resp.AcquisitionsInflight, MAFilingAcquisitionView{
-			ID: a.ID, Status: a.Status, BalanceSheetID: a.BalanceSheetID,
+	for _, a := range open {
+		resp.AcquisitionsOpen = append(resp.AcquisitionsOpen, MAFilingAcquisitionView{
+			ID:               a.ID,
+			Status:           a.Status,
+			BalanceSheetID:   a.BalanceSheetID,
+			ClosingDate:      a.ClosingDate,
+			BalanceSheetType: a.BalanceSheetType,
+			Error:            a.Error,
+			Inflight:         a.HasInflightJob,
+			CreatedAt:        a.CreatedAt,
+			UpdatedAt:        a.UpdatedAt,
 		})
 	}
 	return resp, nil
@@ -470,6 +490,96 @@ func (s *maService) acquireCompanyFilings(ctx context.Context, companyKey, searc
 		ids = []string{}
 	}
 	return MAFilingAcquireResponse{AcquisitionIDs: ids}, nil
+}
+
+// ---------------------------------------------------------------------------
+// 4b. POST filings/acquisitions/{id}/retry.
+// ---------------------------------------------------------------------------
+
+// retryFilingAcquisition re-drives a still-open acquisition that lost its worker (a job killed by
+// poll_timeout / exhausted attempts, or an intent orphan left by an enqueue dedup) — the paid
+// acquisition never had a filing to show, so without this it was invisible AND unrecoverable.
+//
+// It re-enqueues a filing_acquire job with the SAME acquisitionId, so the resume starts from the
+// PERSISTED acquisition status, never a fresh spend by default:
+//   - requested/unknown with a docuengine_request_id ⇒ the resume GETs/reconciles that request
+//     (never a new POST — the vendor call was already paid);
+//   - failed BEFORE any request id ⇒ a clean 'intent' restart, where the explicit analyst gesture
+//     authorises a possible new spend (the deep-dive-retry contract);
+//   - failed WITH a request id ⇒ reopened to 'unknown' so the reconcile adopts the paid request.
+//
+// The mig-115 inflight index dedups a racing enqueue. 409 when the row is done / already bound to
+// a filing / already worked by a live job; 404 when it does not exist.
+func (s *maService) retryFilingAcquisition(ctx context.Context, companyKey, acquisitionID, subject, email string) (MAFilingAcquireResponse, error) {
+	if s.store == nil || s.filing == nil {
+		return MAFilingAcquireResponse{}, errMAStoreUnavailable
+	}
+	identity, fiscalKey, err := s.resolveFilingIdentity(ctx, companyKey)
+	if err != nil {
+		return MAFilingAcquireResponse{}, err
+	}
+	acq, err := s.filing.GetMAFilingAcquisition(ctx, acquisitionID)
+	if err != nil {
+		return MAFilingAcquireResponse{}, err
+	}
+	if acq == nil {
+		return MAFilingAcquireResponse{}, errMAFilingAcquisitionNotFound
+	}
+	// Not retryable: already procured (done / bound to a filing) or actively being worked.
+	if acq.Status == maFilingAcquisitionDone || strings.TrimSpace(acq.FilingID) != "" {
+		return MAFilingAcquireResponse{}, errMAFilingAcquisitionNotRetryable
+	}
+	inflight, err := s.filing.HasInflightMAFilingAcquireJob(ctx, acquisitionID)
+	if err != nil {
+		return MAFilingAcquireResponse{}, err
+	}
+	if inflight {
+		return MAFilingAcquireResponse{}, errMAFilingAcquisitionNotRetryable
+	}
+	switch acq.Status {
+	case maFilingAcquisitionFailed:
+		// The ONLY sanctioned exit from a terminal 'failed' row, on the explicit retry gesture:
+		// resume via the persisted request when there is one, else restart clean.
+		if strings.TrimSpace(acq.DocuEngineRequestID) != "" {
+			if rerr := s.filing.ReopenMAFilingAcquisitionUnknown(ctx, acquisitionID); rerr != nil {
+				return MAFilingAcquireResponse{}, rerr
+			}
+		} else if rerr := s.filing.ReopenMAFilingAcquisitionIntent(ctx, acquisitionID); rerr != nil {
+			return MAFilingAcquireResponse{}, rerr
+		}
+	case maFilingAcquisitionIntent, maFilingAcquisitionRequested, maFilingAcquisitionDownloaded, maFilingAcquisitionUnknown:
+		// A non-terminal open row with no live job: re-enqueue and let the job resume from the
+		// persisted status — no state mutation needed.
+	default:
+		return MAFilingAcquireResponse{}, errMAFilingAcquisitionNotRetryable
+	}
+	// Rebuild the acquire payload as startFilingAcquisitions would: the searchId is the acquisition's
+	// linked (consumed) search when it has one, so a resume re-uses that request; "" otherwise.
+	searchID, _ := s.filing.GetMAFilingSearchIDConsumedByAcquisition(ctx, acquisitionID)
+	payload, err := json.Marshal(maFilingAcquireJobPayload{
+		FiscalKey:         fiscalKey,
+		AcquisitionID:     acquisitionID,
+		SearchID:          searchID,
+		BalanceSheetID:    acq.BalanceSheetID,
+		ContextCompanyKey: companyKey,
+		TaxCode:           maVendorTaxCode(identity.VATCode, identity.TaxCode),
+		VAT:               normalizeMAFiscalValue(identity.VATCode),
+		Tax:               normalizeMAFiscalValue(identity.TaxCode),
+	})
+	if err != nil {
+		return MAFilingAcquireResponse{}, err
+	}
+	if _, _, err := s.store.EnqueueMAJob(ctx, maJobEnqueue{
+		JobType: maJobTypeFilingAcquire,
+		Status:  maJobStatusPending,
+		Subject: subject,
+		Email:   email,
+		Payload: payload,
+		Owner:   s.owner,
+	}); err != nil {
+		return MAFilingAcquireResponse{}, err
+	}
+	return MAFilingAcquireResponse{AcquisitionIDs: []string{acquisitionID}}, nil
 }
 
 // ---------------------------------------------------------------------------

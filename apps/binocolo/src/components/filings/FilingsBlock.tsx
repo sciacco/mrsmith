@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from 'r
 import { useApiClient } from '../../api/client';
 import type {
   MAFilingAcquireResponse,
+  MAFilingAcquisitionView,
   MAFilingIdentityOverrideResponse,
   MAFilingRow,
   MAFilingSearchStartResponse,
@@ -13,6 +14,10 @@ import type {
 import { dateLabel, downloadBlob, errorLabel } from '../../pages/ricerche/helpers';
 import { ProposalsPanel } from './ProposalsPanel';
 import {
+  acquisitionExceptionBadge,
+  acquisitionExceptionFact,
+  acquisitionInProgress,
+  acquisitionProgressLabel,
   exerciseLabel,
   filingErrorMessage,
   filingExceptionBadge,
@@ -27,12 +32,13 @@ import styles from './filings.module.css';
 
 const UPLOAD_MAX_BYTES = 30 * 1024 * 1024;
 
-// Work is in flight when any filing is non-terminal, an acquisition is inflight, or the latest
-// search is still resolving. Drives the poll cadence; a fully-terminal surface stops polling.
+// Work is in flight when any filing is non-terminal, an acquisition has a LIVE job (inflight), or
+// the latest search is still resolving. A stalled/failed acquisition (inflight=false) is NOT work
+// in progress — it waits on the analyst's Riprendi, so it must not keep the block polling forever.
 function filingsWorkInProgress(data: MAFilingsResponse | undefined): boolean {
   if (!data) return false;
   if (data.filings.some((f) => isFilingInProgress(f.status))) return true;
-  if (data.acquisitionsInflight.length > 0) return true;
+  if (data.acquisitionsOpen.some((a) => a.inflight)) return true;
   const s = data.latestSearch?.status;
   return s === 'intent' || s === 'requested';
 }
@@ -155,6 +161,35 @@ export function FilingsBlock({ companyKey, baselineExercise }: { companyKey: str
     onError: (error) => toast(filingErrorMessage(error), 'error'),
   });
 
+  // ── Resume a stalled/failed acquisition ──
+  // The paid acquisition is re-driven from its persisted state (no re-charge by default); the
+  // error is kept inline per row (persistent) so the analyst can act on it, not only via the toast.
+  const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [retryErrors, setRetryErrors] = useState<Record<string, string>>({});
+  const retry = useMutation({
+    mutationFn: (acquisitionId: string) =>
+      api.post<MAFilingAcquireResponse>(
+        `/binocolo/v1/ma/companies/${encodedKey}/filings/acquisitions/${encodeURIComponent(acquisitionId)}/retry`,
+        {},
+      ),
+    onMutate: (acquisitionId) => setRetryingId(acquisitionId),
+    onSuccess: (_res, acquisitionId) => {
+      setRetryErrors((prev) => {
+        const next = { ...prev };
+        delete next[acquisitionId];
+        return next;
+      });
+      toast('Ripresa avviata.', 'success');
+      refetchFilings();
+    },
+    onError: (error, acquisitionId) => {
+      const message = filingErrorMessage(error);
+      setRetryErrors((prev) => ({ ...prev, [acquisitionId]: message }));
+      toast(message, 'error');
+    },
+    onSettled: () => setRetryingId(null),
+  });
+
   // ── Identity override ──
   const [overrideTarget, setOverrideTarget] = useState<MAFilingRow | null>(null);
 
@@ -188,13 +223,19 @@ export function FilingsBlock({ companyKey, baselineExercise }: { companyKey: str
 
   const presentBsIds = new Set(data.filings.map((f) => f.balanceSheetId).filter(Boolean) as string[]);
   const presentExercises = new Set(data.filings.map((f) => f.closingDate).filter(Boolean) as string[]);
-  const inflightBsIds = new Set(data.acquisitionsInflight.map((a) => a.balanceSheetId).filter(Boolean) as string[]);
+  const openByBsId = new Map<string, MAFilingAcquisitionView>();
+  for (const a of data.acquisitionsOpen) {
+    if (a.balanceSheetId) openByBsId.set(a.balanceSheetId, a);
+  }
 
   const search0 = data.latestSearch;
   const searchResolving = search0?.status === 'intent' || search0?.status === 'requested';
   const searchResults = search0?.status === 'results' ? search0.results : [];
   const selectableResults = searchResults.filter(
-    (r) => !presentBsIds.has(r.balanceSheetId) && !(r.closingDate && presentExercises.has(r.closingDate)),
+    (r) =>
+      !presentBsIds.has(r.balanceSheetId) &&
+      !(r.closingDate && presentExercises.has(r.closingDate)) &&
+      !openByBsId.has(r.balanceSheetId),
   );
 
   const uploadDropzone = (
@@ -212,8 +253,9 @@ export function FilingsBlock({ companyKey, baselineExercise }: { companyKey: str
 
   return (
     <div className={styles.body}>
-      {/* Fascicoli */}
-      {data.filings.length === 0 ? (
+      {/* Fascicoli — empty only when there is neither a filing nor an open acquisition (an
+          in-progress/stalled acquisition must never leave the block looking empty). */}
+      {data.filings.length === 0 && data.acquisitionsOpen.length === 0 ? (
         <div className={styles.empty}>
           <span className={styles.emptyIcon} aria-hidden="true">
             <Icon name="file-text" size={28} />
@@ -221,7 +263,7 @@ export function FilingsBlock({ companyKey, baselineExercise }: { companyKey: str
           <h3>Nessun bilancio depositato</h3>
           <p>Carica un fascicolo o cerca i depositi camerali per questa identità fiscale.</p>
         </div>
-      ) : (
+      ) : data.filings.length > 0 ? (
         <div className={styles.filingList}>
           {data.filings.map((row) => {
             const badge = filingExceptionBadge(row);
@@ -278,7 +320,51 @@ export function FilingsBlock({ companyKey, baselineExercise }: { companyKey: str
             );
           })}
         </div>
-      )}
+      ) : null}
+
+      {/* Acquisizioni aperte — procurements not yet bound to a filing: in-progress (calm pill) or
+          stalled/failed (exception + Riprendi). Sits between the fascicoli and the search so an
+          "in acquisizione" — the only in-flight signal — never disappears with the search results. */}
+      {data.acquisitionsOpen.length > 0 ? (
+        <div className={styles.filingList}>
+          {data.acquisitionsOpen.map((acq) => {
+            const inProgress = acquisitionInProgress(acq);
+            const badge = inProgress ? null : acquisitionExceptionBadge(acq);
+            const retryError = retryErrors[acq.id];
+            return (
+              <div key={acq.id} className={styles.filingRow}>
+                <div className={styles.filingTop}>
+                  <div className={styles.rowMainStatic}>
+                    <span className={styles.rowFacts}>
+                      <span className={styles.rowExercise}>{exerciseLabel(acq.closingDate)}</span>
+                      <span className={styles.rowMeta}>{filingTypeLabel(acq.balanceSheetType)}</span>
+                    </span>
+                  </div>
+                  <div className={styles.rowSide}>
+                    {inProgress ? <span className={styles.processingPill}>{acquisitionProgressLabel(acq)}</span> : null}
+                    {badge ? <StatusBadge value={badge.label} variant={badge.variant} dot={false} /> : null}
+                  </div>
+                </div>
+                {!inProgress ? (
+                  <div className={styles.filingFact}>
+                    <span>{acquisitionExceptionFact(acq)}</span>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      loading={retry.isPending && retryingId === acq.id}
+                      disabled={acq.inflight || (retry.isPending && retryingId !== acq.id)}
+                      onClick={() => retry.mutate(acq.id)}
+                    >
+                      Riprendi
+                    </Button>
+                  </div>
+                ) : null}
+                {retryError ? <p className={styles.inlineError}>{retryError}</p> : null}
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
 
       {/* Carica un bilancio */}
       <div className={styles.subBlock}>
@@ -309,22 +395,26 @@ export function FilingsBlock({ companyKey, baselineExercise }: { companyKey: str
           <div className={styles.searchResults}>
             {searchResults.map((r) => {
               const already = presentBsIds.has(r.balanceSheetId) || Boolean(r.closingDate && presentExercises.has(r.closingDate));
-              const acquiring = inflightBsIds.has(r.balanceSheetId);
+              // An open acquisition already owns this deposit: don't offer a duplicate acquire — the
+              // acquisitions section above shows its progress (or a Riprendi for a stalled one).
+              const open = openByBsId.get(r.balanceSheetId);
+              const muted = already || Boolean(open);
               return (
-                <label key={r.balanceSheetId} className={`${styles.resultRow} ${already ? styles.resultRowMuted : ''}`}>
+                <label key={r.balanceSheetId} className={`${styles.resultRow} ${muted ? styles.resultRowMuted : ''}`}>
                   <input
                     type="radio"
                     name="ma-filing-acquire"
                     className={styles.radio}
                     checked={selectedBsId === r.balanceSheetId}
-                    disabled={already || acquiring}
+                    disabled={muted}
                     onChange={() => setSelectedBsId(r.balanceSheetId)}
                   />
                   <span className={styles.resultLabel}>
                     {exerciseLabel(r.closingDate)} · {filingTypeLabel(r.balanceSheetType)}
                   </span>
                   {already ? <span className={styles.resultTag}>già presente</span> : null}
-                  {acquiring ? <span className={styles.processingPill}>In acquisizione…</span> : null}
+                  {!already && open?.inflight ? <span className={styles.processingPill}>In acquisizione…</span> : null}
+                  {!already && open && !open.inflight ? <span className={styles.resultTag}>da riprendere</span> : null}
                 </label>
               );
             })}

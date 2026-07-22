@@ -5,7 +5,7 @@
 
 import { ApiError } from '@mrsmith/api-client';
 import type { StatusBadgeVariant } from '@mrsmith/ui';
-import type { MAFilingRow, MANIProposalView } from '../../api/types';
+import type { MAFilingAcquisitionView, MAFilingRow, MANIProposalView } from '../../api/types';
 import { formatDeepCompactEuro } from '../deep/DeepComponents';
 
 // Factual, action-oriented messages for the filing-surface error codes (snake_case from the
@@ -46,6 +46,10 @@ export function filingErrorMessage(error: unknown, fallback = 'Operazione non ri
         return 'Scegli il trattamento (EBITDA o PFN) per ratificare.';
       case 'invalid_ratified_treatment':
         return 'Trattamento non valido.';
+      case 'acquisition_not_retryable':
+        return 'Acquisizione non ripristinabile: è già completata o in lavorazione.';
+      case 'acquisition_not_found':
+        return 'Acquisizione non trovata.';
       default:
         break;
     }
@@ -229,4 +233,40 @@ export function proposalNeedsTreatmentChoice(p: MANIProposalView): boolean {
 export function pageCiteLabel(pageNo?: number): string | null {
   if (pageNo == null) return null;
   return `p. ${pageNo}`;
+}
+
+// ── Open acquisitions (procurements not yet bound to a filing) ──
+// Surface every open acquisition so an in-progress procurement — or a stalled/failed one — never
+// disappears with its search results. An acquisition is "in progress" only while a live job works
+// it (inflight) in a pre-completion state; unknown/failed or a lost job is an exception to resume.
+
+// The exercise fragment of an acquisition sentence ("esercizio 2023" | "bilancio").
+function acquisitionExercisePhrase(a: MAFilingAcquisitionView): string {
+  const year = a.closingDate ? a.closingDate.slice(0, 4) : '';
+  return year ? `esercizio ${year}` : 'bilancio';
+}
+
+// True while a live job is actively procuring the balance sheet (calm "in corso" pill).
+export function acquisitionInProgress(a: MAFilingAcquisitionView): boolean {
+  return a.inflight && (a.status === 'intent' || a.status === 'requested' || a.status === 'downloaded');
+}
+
+// The factual "in corso" line for an actively-procuring acquisition. No counters.
+export function acquisitionProgressLabel(a: MAFilingAcquisitionView): string {
+  return `Acquisizione ${acquisitionExercisePhrase(a)} in corso…`;
+}
+
+// The exception badge for a stalled/failed acquisition (danger for failed, warning otherwise).
+export function acquisitionExceptionBadge(a: MAFilingAcquisitionView): { variant: StatusBadgeVariant; label: string } {
+  if (a.status === 'failed') return { variant: 'danger', label: 'Acquisizione non riuscita' };
+  return { variant: 'warning', label: 'Acquisizione interrotta' };
+}
+
+// The composed factual sentence for a stalled/failed acquisition, with the vendor error appended
+// when present. "failed" reads as non riuscita; anything else (unknown, or a lost job) as interrotta.
+export function acquisitionExceptionFact(a: MAFilingAcquisitionView): string {
+  const phrase = acquisitionExercisePhrase(a);
+  const base = a.status === 'failed' ? `Acquisizione ${phrase} non riuscita.` : `Acquisizione ${phrase} interrotta.`;
+  const detail = a.error?.trim();
+  return detail ? `${base} ${detail}` : base;
 }

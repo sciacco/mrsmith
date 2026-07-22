@@ -340,8 +340,47 @@ func (f *fakeFilingStore) GetLatestMAFilingSearch(context.Context, string) (*maF
 func (f *fakeFilingStore) GetInflightMAFilingSearchID(context.Context, string) (string, error) {
 	return "", nil
 }
-func (f *fakeFilingStore) ListMAFilingAcquisitionsInflight(context.Context, string) ([]maFilingAcquisitionInflight, error) {
-	return nil, nil
+func (f *fakeFilingStore) ListMAFilingAcquisitionsOpen(_ context.Context, _ string) ([]maFilingAcquisitionOpen, error) {
+	// The fake has no ma_job table; project open acquisitions by status only (HasInflightJob
+	// stays false). Tests that need the full read projection drive the SQL store.
+	out := []maFilingAcquisitionOpen{}
+	for _, a := range f.acquisitions {
+		if a.FilingID != "" {
+			continue
+		}
+		switch a.Status {
+		case maFilingAcquisitionIntent, maFilingAcquisitionRequested, maFilingAcquisitionDownloaded, maFilingAcquisitionUnknown, maFilingAcquisitionFailed:
+			out = append(out, maFilingAcquisitionOpen{ID: a.ID, Status: a.Status, BalanceSheetID: a.BalanceSheetID, Error: a.Error, CreatedAt: a.CreatedAt, UpdatedAt: a.UpdatedAt})
+		}
+	}
+	return out, nil
+}
+func (f *fakeFilingStore) HasInflightMAFilingAcquireJob(context.Context, string) (bool, error) {
+	return false, nil
+}
+func (f *fakeFilingStore) GetMAFilingSearchIDConsumedByAcquisition(_ context.Context, acquisitionID string) (string, error) {
+	for id, s := range f.searches {
+		if s.ConsumedByAcquisitionID == acquisitionID {
+			return id, nil
+		}
+	}
+	return "", nil
+}
+func (f *fakeFilingStore) ReopenMAFilingAcquisitionUnknown(_ context.Context, id string) error {
+	if a := f.acquisitions[id]; a != nil && a.Status == maFilingAcquisitionFailed && a.FilingID == "" && a.DocuEngineRequestID != "" {
+		a.Status = maFilingAcquisitionUnknown
+		a.Error = ""
+		a.UpdatedAt = f.clock
+	}
+	return nil
+}
+func (f *fakeFilingStore) ReopenMAFilingAcquisitionIntent(_ context.Context, id string) error {
+	if a := f.acquisitions[id]; a != nil && a.Status == maFilingAcquisitionFailed && a.FilingID == "" && a.DocuEngineRequestID == "" {
+		a.Status = maFilingAcquisitionIntent
+		a.Error = ""
+		a.UpdatedAt = f.clock
+	}
+	return nil
 }
 func (f *fakeFilingStore) GetMAFilingLatestAcquisitionContext(context.Context, string) (string, error) {
 	return "", nil
@@ -937,5 +976,54 @@ func TestFilingSearchRequestedNotFoundRoutesToUnknown(t *testing.T) {
 	}
 	if docu.createCalls != 0 {
 		t.Fatalf("createCalls = %d, want 0 (a reconcile never POSTs)", docu.createCalls)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 9) RETRY RESUME (idempotency / the incident's recovery) — the analyst's Riprendi re-enqueues a
+//    filing_acquire job with the SAME acquisitionId (mig-115-deduped EnqueueMAJob). When the row
+//    was stranded at 'unknown' with a persisted request id (a paid+selected request left by a
+//    poll_timeout), the re-enqueued job's tick resumes from that state via GET and completes —
+//    it NEVER re-issues CreateRequest/SubmitSearch/SelectResult, so the paid acquisition is
+//    recovered without a second charge. This drives the resumed job's work function directly (the
+//    enqueue is covered by the shared dedup index); the invariant under test is zero re-charge.
+// ---------------------------------------------------------------------------
+
+func TestFilingAcquireRetryResumesUnknownViaGetWithoutRecharge(t *testing.T) {
+	const taxCode = "12345678901"
+	filing := newFakeFilingStore()
+	docu := newFakeDocuEngine()
+	// The paid request already carries the selected result and is DONE at the vendor: the resume
+	// only needs to GET it and download — never a fresh create/submit/select.
+	selected := "r100"
+	docu.requests["req-s"] = &openapiit.DocuRequest{
+		ID: "req-s", Name: docuBilancioOtticoName, State: openapiit.DocuStateDone,
+		ReadableSearch: map[string]string{"taxCode": taxCode},
+		ResultID:       &selected,
+		Results:        []openapiit.DocuResult{{ID: "r100", Data: filingResultData(100, "2023-12-31", "710")}},
+	}
+	// The acquisition was stranded 'unknown' with the request id persisted (a poll_timeout after
+	// the paid select) and its linked search consumed — exactly the incident's invisible state.
+	filing.searches["s1"] = &maFilingSearch{ID: "s1", FiscalKey: "IT" + taxCode, Status: maFilingSearchConsumed, ConsumedByAcquisitionID: "acq-1", DocuEngineRequestID: "req-s", UpdatedAt: filing.clock}
+	filing.acquisitions["acq-1"] = &maFilingAcquisition{ID: "acq-1", Origin: maFilingOriginDocuEngine, Status: maFilingAcquisitionUnknown, DocuEngineRequestID: "req-s", BalanceSheetID: "100", CreatedAt: filing.clock, UpdatedAt: filing.clock}
+	svc := newFilingTestService(filing, docu)
+	ctx := context.Background()
+	job := filingAcquireTestJob("acq-1", "s1", "IT"+taxCode, "100", taxCode)
+
+	// The re-enqueued job's tick: reconcile the unknown from the persisted request id (one GET),
+	// adopt → requested, observe DONE+selected, download → done. All resume, zero re-charge.
+	assertJobDone(t, "resume tick", svc.filingAcquireWork(ctx, job))
+	if got := filing.acquisitions["acq-1"].Status; got != maFilingAcquisitionDone {
+		t.Fatalf("status after resume = %q, want done", got)
+	}
+	if filing.filings != 1 {
+		t.Fatalf("filings created = %d, want 1", filing.filings)
+	}
+	if docu.getCalls == 0 {
+		t.Fatalf("getCalls = 0, want the resume to GET the persisted request")
+	}
+	if docu.createCalls != 0 || docu.submitCalls != 0 || docu.selectCalls != 0 {
+		t.Fatalf("resume re-charged the vendor: create=%d submit=%d select=%d, want 0/0/0",
+			docu.createCalls, docu.submitCalls, docu.selectCalls)
 	}
 }

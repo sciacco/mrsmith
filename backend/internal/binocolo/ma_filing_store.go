@@ -1465,46 +1465,247 @@ LIMIT 1`, fiscalKey, maJobTypeFilingSearch).Scan(&searchID)
 	return strings.TrimSpace(searchID), nil
 }
 
-// maFilingAcquisitionInflight is the compact acquisition status the scheda polls: which
-// balance sheets are still being procured for a fiscal identity.
-type maFilingAcquisitionInflight struct {
-	ID             string
-	Status         string
-	BalanceSheetID string
+// maFilingAcquisitionOpen is one still-open acquisition (procurement not yet bound to a
+// filing) the scheda surfaces so an "in acquisizione" — or a stalled/failed one — never
+// disappears from the UI. closingDate/balanceSheetType are resolved at READ time from the
+// linked search jsonb (no dedicated columns, no migration); HasInflightJob distinguishes a
+// live procurement from a dead one (poll_timeout / attempts exhausted) that needs a manual
+// resume. NO price is ever carried.
+type maFilingAcquisitionOpen struct {
+	ID               string
+	Status           string
+	BalanceSheetID   string
+	ClosingDate      string // resolved at read (YYYY-MM-DD); "" when the deposit isn't in any search
+	BalanceSheetType string
+	Error            string
+	HasInflightJob   bool
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
-// ListMAFilingAcquisitionsInflight returns the acquisitions still being worked for a fiscal
-// identity — joined through the in-flight filing_acquire jobs (pending|processing) on
-// payload->>'fiscalKey', since an acquisition row is bound to its filing only on completion and
-// carries no fiscal_key of its own. Ordered oldest-first for a stable UI list.
-func (s *SQLStore) ListMAFilingAcquisitionsInflight(ctx context.Context, fiscalKey string) ([]maFilingAcquisitionInflight, error) {
+// maFilingSearchDeposit is the (closingDate, type) of one deposited balance sheet, resolved
+// from a search's stored results jsonb for the open-acquisition view.
+type maFilingSearchDeposit struct {
+	closingDate      string
+	balanceSheetType string
+}
+
+// ListMAFilingAcquisitionsOpen returns EVERY still-open acquisition for a fiscal identity: any
+// row with filing_id IS NULL still in a non-terminal-for-the-filing state
+// (intent/requested/downloaded/unknown/failed). Unlike the old inflight view it does NOT hide a
+// row whose filing_acquire job has died — the row is selected via ANY filing_acquire job (any
+// status) that carries its acquisitionId + this fiscalKey (the only fiscal linkage an
+// acquisition has before it binds a filing), while HasInflightJob is a SEPARATE EXISTS over the
+// pending|processing jobs. So a job killed by poll_timeout leaves a visible, recoverable row.
+// closingDate/balanceSheetType are resolved in-process from the linked search's results jsonb
+// (consumed-by-this-acquisition first, else the most recent search whose results carry the
+// balance sheet). Ordered oldest-first for a stable list.
+func (s *SQLStore) ListMAFilingAcquisitionsOpen(ctx context.Context, fiscalKey string) ([]maFilingAcquisitionOpen, error) {
 	if s == nil || s.db == nil {
 		return nil, errors.New("binocolo ma store not configured")
 	}
 	rows, err := s.db.QueryContext(ctx, `
-SELECT a.id::text, a.status, COALESCE(a.balance_sheet_id, '')
-FROM binocolo.ma_job j
-JOIN binocolo.ma_filing_acquisition a ON a.id = (j.payload->>'acquisitionId')::uuid
-WHERE j.job_type = $2
-  AND j.status IN ('pending', 'processing')
-  AND j.payload->>'fiscalKey' = $1
+SELECT a.id::text, a.status, COALESCE(a.balance_sheet_id, ''), COALESCE(a.error, ''),
+       a.created_at, a.updated_at,
+       EXISTS (
+         SELECT 1 FROM binocolo.ma_job ij
+         WHERE ij.job_type = $2
+           AND ij.status IN ('pending', 'processing')
+           AND ij.payload->>'acquisitionId' = a.id::text
+       ) AS has_inflight_job
+FROM binocolo.ma_filing_acquisition a
+WHERE a.filing_id IS NULL
+  AND a.status IN ('intent', 'requested', 'downloaded', 'unknown', 'failed')
+  AND EXISTS (
+    SELECT 1 FROM binocolo.ma_job j
+    WHERE j.job_type = $2
+      AND j.payload->>'acquisitionId' = a.id::text
+      AND j.payload->>'fiscalKey' = $1
+  )
 ORDER BY a.created_at`, fiscalKey, maJobTypeFilingAcquire)
 	if err != nil {
-		return nil, fmt.Errorf("list ma filing acquisitions inflight: %w", err)
+		return nil, fmt.Errorf("list ma filing acquisitions open: %w", err)
 	}
 	defer rows.Close()
-	out := []maFilingAcquisitionInflight{}
+	out := []maFilingAcquisitionOpen{}
 	for rows.Next() {
-		var a maFilingAcquisitionInflight
-		if err := rows.Scan(&a.ID, &a.Status, &a.BalanceSheetID); err != nil {
-			return nil, fmt.Errorf("scan ma filing acquisition inflight: %w", err)
+		var a maFilingAcquisitionOpen
+		if err := rows.Scan(&a.ID, &a.Status, &a.BalanceSheetID, &a.Error, &a.CreatedAt, &a.UpdatedAt, &a.HasInflightJob); err != nil {
+			return nil, fmt.Errorf("scan ma filing acquisition open: %w", err)
 		}
 		out = append(out, a)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate ma filing acquisitions inflight: %w", err)
+		return nil, fmt.Errorf("iterate ma filing acquisitions open: %w", err)
+	}
+	if len(out) == 0 {
+		return out, nil
+	}
+	if err := s.resolveMAFilingAcquisitionDeposits(ctx, fiscalKey, out); err != nil {
+		return nil, err
 	}
 	return out, nil
+}
+
+// resolveMAFilingAcquisitionDeposits fills closingDate/balanceSheetType on each open acquisition
+// from the fiscal key's search results jsonb, at read time (no persisted column). The search
+// this acquisition consumed wins; otherwise the most recent search whose results carry the
+// balance sheet id. Best-effort per row: an unresolvable deposit simply stays blank.
+func (s *SQLStore) resolveMAFilingAcquisitionDeposits(ctx context.Context, fiscalKey string, acqs []maFilingAcquisitionOpen) error {
+	searchRows, err := s.db.QueryContext(ctx, `
+SELECT COALESCE(consumed_by_acquisition_id::text, ''), COALESCE(results, '[]'::jsonb)
+FROM binocolo.ma_filing_search
+WHERE fiscal_key = $1 AND status IN ('results', 'consumed')
+ORDER BY updated_at DESC, created_at DESC`, fiscalKey)
+	if err != nil {
+		return fmt.Errorf("list ma filing searches for deposit resolve: %w", err)
+	}
+	defer searchRows.Close()
+	// Parsed searches kept in updated_at DESC order so the fallback picks the most recent match.
+	type parsedSearch struct {
+		consumedByAcqID string
+		byBSID          map[string]maFilingSearchDeposit
+	}
+	var searches []parsedSearch
+	for searchRows.Next() {
+		var consumedByAcqID string
+		var results []byte
+		if err := searchRows.Scan(&consumedByAcqID, &results); err != nil {
+			return fmt.Errorf("scan ma filing search for deposit resolve: %w", err)
+		}
+		byBSID := map[string]maFilingSearchDeposit{}
+		var parsed []maFilingSearchResultRow
+		if len(results) > 0 {
+			_ = json.Unmarshal(results, &parsed) // defensive: a malformed row simply resolves nothing
+		}
+		for _, r := range parsed {
+			if r.BalanceSheetID == "" {
+				continue
+			}
+			deposit := maFilingSearchDeposit{balanceSheetType: r.BalanceSheetType}
+			if t, ok := parseMAFilingDate(r.BalanceSheetDate); ok {
+				deposit.closingDate = maDateValue(t)
+			} else {
+				deposit.closingDate = strings.TrimSpace(r.BalanceSheetDate)
+			}
+			byBSID[r.BalanceSheetID] = deposit
+		}
+		searches = append(searches, parsedSearch{consumedByAcqID: consumedByAcqID, byBSID: byBSID})
+	}
+	if err := searchRows.Err(); err != nil {
+		return fmt.Errorf("iterate ma filing searches for deposit resolve: %w", err)
+	}
+	for i := range acqs {
+		bsid := acqs[i].BalanceSheetID
+		if bsid == "" {
+			continue
+		}
+		// Direct link: the search this acquisition consumed.
+		resolved := false
+		for _, sr := range searches {
+			if sr.consumedByAcqID == acqs[i].ID {
+				if d, ok := sr.byBSID[bsid]; ok {
+					acqs[i].ClosingDate, acqs[i].BalanceSheetType = d.closingDate, d.balanceSheetType
+					resolved = true
+				}
+				break
+			}
+		}
+		if resolved {
+			continue
+		}
+		// Fallback: the most recent search (searches are DESC) carrying this balance sheet.
+		for _, sr := range searches {
+			if d, ok := sr.byBSID[bsid]; ok {
+				acqs[i].ClosingDate, acqs[i].BalanceSheetType = d.closingDate, d.balanceSheetType
+				break
+			}
+		}
+	}
+	return nil
+}
+
+// HasInflightMAFilingAcquireJob reports whether a pending|processing filing_acquire job carries
+// this acquisitionId — i.e. the acquisition is actively being worked. The retry endpoint uses it
+// as the "already in flight ⇒ not retryable (409)" guard so an explicit resume never races a
+// live job (the mig-115 inflight index would dedup the enqueue anyway, but the 409 is legible).
+func (s *SQLStore) HasInflightMAFilingAcquireJob(ctx context.Context, acquisitionID string) (bool, error) {
+	if s == nil || s.db == nil {
+		return false, errors.New("binocolo ma store not configured")
+	}
+	var exists bool
+	if err := s.db.QueryRowContext(ctx, `
+SELECT EXISTS (
+  SELECT 1 FROM binocolo.ma_job
+  WHERE job_type = $2
+    AND status IN ('pending', 'processing')
+    AND payload->>'acquisitionId' = $1
+)`, acquisitionID, maJobTypeFilingAcquire).Scan(&exists); err != nil {
+		return false, fmt.Errorf("has inflight ma filing acquire job: %w", err)
+	}
+	return exists, nil
+}
+
+// GetMAFilingSearchIDConsumedByAcquisition returns the id of the search this acquisition
+// consumed (its linked search), or "" when it consumed none. The retry rebuilds the acquire
+// payload's searchId from it (matching startFilingAcquisitions), so a resume re-uses the same
+// vendor request via the consumed-by-me short-circuit instead of opening a new one.
+func (s *SQLStore) GetMAFilingSearchIDConsumedByAcquisition(ctx context.Context, acquisitionID string) (string, error) {
+	if s == nil || s.db == nil {
+		return "", errors.New("binocolo ma store not configured")
+	}
+	var id string
+	err := s.db.QueryRowContext(ctx, `
+SELECT id::text FROM binocolo.ma_filing_search
+WHERE consumed_by_acquisition_id = $1::uuid
+LIMIT 1`, acquisitionID).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("get ma filing search consumed by acquisition: %w", err)
+	}
+	return strings.TrimSpace(id), nil
+}
+
+// ReopenMAFilingAcquisitionUnknown moves a FAILED acquisition that still holds a DocuEngine
+// request id back to 'unknown' (a RESUME: the reconcile path GETs the persisted request and
+// adopts it — it NEVER re-POSTs, so no re-charge). This — with ReopenMAFilingAcquisitionIntent —
+// is the ONLY sanctioned mutation OUT of the terminal 'failed' state, and only ever on the
+// analyst's explicit retry gesture. Guarded on status='failed' AND filing_id IS NULL AND a
+// non-null request id so it can never disturb a completed or clean row; the error is cleared for
+// the fresh attempt.
+func (s *SQLStore) ReopenMAFilingAcquisitionUnknown(ctx context.Context, id string) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	if _, err := s.db.ExecContext(ctx, `
+UPDATE binocolo.ma_filing_acquisition
+SET status = 'unknown', error = NULL, updated_at = now()
+WHERE id = $1::uuid AND status = 'failed' AND filing_id IS NULL AND docuengine_request_id IS NOT NULL
+`, id); err != nil {
+		return fmt.Errorf("reopen ma filing acquisition unknown: %w", err)
+	}
+	return nil
+}
+
+// ReopenMAFilingAcquisitionIntent moves a FAILED acquisition with NO persisted request id back
+// to 'intent' (a CLEAN restart: the intent path reconciles free before paying — the analyst's
+// explicit gesture authorises a possible fresh spend, like a deep-dive retry). Guarded on
+// status='failed' AND filing_id IS NULL AND a null request id (the request-id case belongs to
+// ReopenMAFilingAcquisitionUnknown); the error is cleared for the fresh attempt.
+func (s *SQLStore) ReopenMAFilingAcquisitionIntent(ctx context.Context, id string) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	if _, err := s.db.ExecContext(ctx, `
+UPDATE binocolo.ma_filing_acquisition
+SET status = 'intent', error = NULL, updated_at = now()
+WHERE id = $1::uuid AND status = 'failed' AND filing_id IS NULL AND docuengine_request_id IS NULL
+`, id); err != nil {
+		return fmt.Errorf("reopen ma filing acquisition intent: %w", err)
+	}
+	return nil
 }
 
 // GetMAFilingLatestAcquisitionContext returns the context_company_key of the most recent

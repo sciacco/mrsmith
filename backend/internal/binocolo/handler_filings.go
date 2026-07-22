@@ -36,6 +36,16 @@ func maProposalID(w http.ResponseWriter, r *http.Request) (string, bool) {
 	return id, true
 }
 
+// maAcquisitionID validates the {id} path segment as a uuid (the ma_filing_acquisition id).
+func maAcquisitionID(w http.ResponseWriter, r *http.Request) (string, bool) {
+	id := strings.TrimSpace(r.PathValue("id"))
+	if _, err := uuid.Parse(id); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_ma_acquisition_id")
+		return "", false
+	}
+	return id, true
+}
+
 // handleListMAFilings — GET /ma/companies/{companyKey}/filings.
 func (h *Handler) handleListMAFilings(w http.ResponseWriter, r *http.Request) {
 	companyKey, ok := maCompanyKeyPath(w, r)
@@ -151,6 +161,31 @@ func (h *Handler) handleAcquireMAFilings(w http.ResponseWriter, r *http.Request)
 	result, err := h.ma.acquireCompanyFilings(r.Context(), companyKey, body.SearchID, body.BalanceSheetIDs, subject, email)
 	if err != nil {
 		h.maFailure(w, r, "ma_filing_acquire", err, "company_key", companyKey)
+		return
+	}
+	h.completeMATraceSuccess(r, http.StatusAccepted)
+	httputil.JSON(w, http.StatusAccepted, result)
+}
+
+// handleRetryMAFilingAcquisition — POST /ma/companies/{companyKey}/filings/acquisitions/{id}/retry.
+func (h *Handler) handleRetryMAFilingAcquisition(w http.ResponseWriter, r *http.Request) {
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	id, ok := maAcquisitionID(w, r)
+	if !ok {
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	var traceOK bool
+	r, traceOK = h.startMATrace(w, r, "ma_filing_acquire_retry", "", map[string]any{"companyKey": companyKey, "acquisitionId": id}, subject, email)
+	if !traceOK {
+		return
+	}
+	result, err := h.ma.retryFilingAcquisition(r.Context(), companyKey, id, subject, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_filing_acquire_retry", err, "company_key", companyKey, "acquisition_id", id)
 		return
 	}
 	h.completeMATraceSuccess(r, http.StatusAccepted)

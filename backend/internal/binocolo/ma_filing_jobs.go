@@ -112,7 +112,11 @@ type maFilingStore interface {
 	GetLatestMAFilingSearchWithResults(ctx context.Context, fiscalKey string) (*maFilingSearch, error)
 	GetLatestMAFilingSearch(ctx context.Context, fiscalKey string) (*maFilingSearch, error)
 	GetInflightMAFilingSearchID(ctx context.Context, fiscalKey string) (string, error)
-	ListMAFilingAcquisitionsInflight(ctx context.Context, fiscalKey string) ([]maFilingAcquisitionInflight, error)
+	ListMAFilingAcquisitionsOpen(ctx context.Context, fiscalKey string) ([]maFilingAcquisitionOpen, error)
+	HasInflightMAFilingAcquireJob(ctx context.Context, acquisitionID string) (bool, error)
+	GetMAFilingSearchIDConsumedByAcquisition(ctx context.Context, acquisitionID string) (string, error)
+	ReopenMAFilingAcquisitionUnknown(ctx context.Context, id string) error
+	ReopenMAFilingAcquisitionIntent(ctx context.Context, id string) error
 	GetMAFilingLatestAcquisitionContext(ctx context.Context, filingID string) (string, error)
 	ApplyMAFilingIdentityOverride(ctx context.Context, id, subject, email, reason string) (bool, error)
 	GetMANIProposal(ctx context.Context, id string) (*maNIProposal, error)
