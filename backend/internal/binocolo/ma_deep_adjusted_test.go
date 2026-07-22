@@ -181,6 +181,7 @@ type adjFakeFiling struct {
 	*fakeFilingStore
 	filings   []maFiling
 	proposals map[string][]maNIProposalWithDecisions
+	extracts  map[string][]maFilingExtract // keyed by processing run id
 }
 
 func (f *adjFakeFiling) ListMAFilingsByFiscalKey(context.Context, string) ([]maFiling, error) {
@@ -189,8 +190,15 @@ func (f *adjFakeFiling) ListMAFilingsByFiscalKey(context.Context, string) ([]maF
 func (f *adjFakeFiling) ListMANIProposalsWithDecisions(_ context.Context, filingID string) ([]maNIProposalWithDecisions, error) {
 	return f.proposals[filingID], nil
 }
-func (f *adjFakeFiling) GetMAFilingExtracts(context.Context, string) ([]maFilingExtract, error) {
-	return nil, nil // reconciliation not under test here
+func (f *adjFakeFiling) GetMAFilingExtracts(_ context.Context, runID string) ([]maFilingExtract, error) {
+	return f.extracts[runID], nil
+}
+
+// adjExtract builds one exercise extract with the key figures the duplicate resolution compares.
+func adjExtract(runID string, exercise time.Time, ta, tp, dab, utile *float64) maFilingExtract {
+	spb, _ := json.Marshal(maFilingSP{TotaleAttivo: ta, TotalePassivo: tp})
+	ceb, _ := json.Marshal(maFilingCE{DifferenzaAB: dab, UtileEsercizio: utile})
+	return maFilingExtract{ProcessingRunID: runID, ExerciseDate: exercise, SP: spb, CE: ceb}
 }
 
 func adjDeepRecord() *maDeepVATRecord {
@@ -300,6 +308,153 @@ func TestComputeMAAdjustedViewResolution(t *testing.T) {
 	}
 	if view.Effects[0].ProposalID != "p-2024" || view.Effects[0].Treatment != maNITrattamentoEbitda || view.Effects[0].PageNo == nil || *view.Effects[0].PageNo != 17 {
 		t.Errorf("effect provenance mismatch: %+v", view.Effects[0])
+	}
+}
+
+// ---------------------------------------------------------------------------
+// (3b) Baseline exercise date: vendor off-by-one TZ correction (issue #78 post-smoke fix).
+// ---------------------------------------------------------------------------
+
+func TestMABaselineExerciseDate(t *testing.T) {
+	payload := func(v string) json.RawMessage {
+		return json.RawMessage(`{"ecofin":{"balanceSheetDate":"` + v + `"}}`)
+	}
+	cases := []struct {
+		name  string
+		value string
+		wantY int
+		wantM time.Month
+		wantD int
+	}{
+		{"winter off-by-one (23:00 = local midnight UTC+1)", "2025-12-30T23:00:00", 2025, time.December, 31},
+		{"summer off-by-one (22:00 = local midnight UTC+2)", "2025-06-30T22:00:00", 2025, time.July, 1},
+		{"bare date unchanged", "2025-12-31", 2025, time.December, 31},
+		{"midnight Z unchanged", "2025-12-31T00:00:00.000Z", 2025, time.December, 31},
+	}
+	for _, c := range cases {
+		got, ok := maBaselineExerciseDate(payload(c.value))
+		if !ok {
+			t.Fatalf("%s: expected ok=true for %q", c.name, c.value)
+		}
+		y, m, d := got.Date()
+		if y != c.wantY || m != c.wantM || d != c.wantD {
+			t.Errorf("%s: %q → %04d-%02d-%02d, want %04d-%02d-%02d", c.name, c.value, y, m, d, c.wantY, c.wantM, c.wantD)
+		}
+	}
+	if _, ok := maBaselineExerciseDate(payload("not-a-date")); ok {
+		t.Errorf("garbage balanceSheetDate must yield ok=false")
+	}
+	if _, ok := maBaselineExerciseDate(json.RawMessage(`{"ecofin":{}}`)); ok {
+		t.Errorf("absent balanceSheetDate must yield ok=false")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// (3c) Duplicate resolution: same deposit via two channels vs a real re-deposit (post-smoke fix).
+// ---------------------------------------------------------------------------
+
+func TestComputeMAAdjustedViewDuplicateResolution(t *testing.T) {
+	ctx := context.Background()
+	baseline := niDate(2024, 12, 31)
+	identity := maDeepDiveIdentity{VATCode: "IT01234567890"}
+	deep := adjDeepRecord()
+
+	// A filing at the baseline exercise, parameterized by channel (balance_sheet_id) + created_at.
+	filing := func(id, bsid string, createdAt time.Time) maFiling {
+		c := baseline
+		return maFiling{ID: id, IdentityStatus: maFilingIdentityValidated, ClosingDate: &c, ActiveProcessingRunID: id + "-run", FiscalKey: "01234567890", BalanceSheetID: bsid, CreatedAt: createdAt}
+	}
+	// Same key CEE figures for both channels of ONE deposit.
+	ta, tp, dab, utile := niF(3_000_000), niF(3_000_000), niF(400_000), niF(120_000)
+
+	// (a) Identical upload (bsid NULL) + camerale (bsid set) ⇒ ONE deposit: canonical = the
+	//     vendor-anchored filing, NO ambiguity, and the ratified effect flows (status active).
+	upload := filing("f-upload", "", niTS(2)) // more recent, but not vendor-anchored
+	camerale := filing("f-camerale", "36508684", niTS(1))
+	svc := &maService{filing: &adjFakeFiling{
+		fakeFilingStore: newFakeFilingStore(),
+		filings:         []maFiling{upload, camerale},
+		proposals:       map[string][]maNIProposalWithDecisions{"f-camerale": {adjRatifiedProp("p-dup", baseline, 50_000)}},
+		extracts: map[string][]maFilingExtract{
+			"f-upload-run":   {adjExtract("f-upload-run", baseline, ta, tp, dab, utile)},
+			"f-camerale-run": {adjExtract("f-camerale-run", baseline, ta, tp, dab, utile)},
+		},
+	}}
+	view, err := svc.computeMAAdjustedView(ctx, identity, deep)
+	if err != nil {
+		t.Fatalf("identical duplicates: %v", err)
+	}
+	if view.Status != maAdjustedStatusActive || view.AmbiguousCount != 0 {
+		t.Fatalf("same-deposit pair must resolve (no ambiguity) and be active: %+v", view)
+	}
+	if view.FilingID != "f-camerale" {
+		t.Errorf("canonical must be the vendor-anchored (balance_sheet_id) filing: %q", view.FilingID)
+	}
+	if len(view.Effects) != 1 || view.DeltaEbitda != 50_000 {
+		t.Errorf("effects must flow onto the resolved canonical: effects=%d ΔEBITDA=%v", len(view.Effects), view.DeltaEbitda)
+	}
+	if view.AdjustedValuation == nil || view.AdjustedValuation.EVHigh <= deep.Valuation.EVHigh {
+		t.Errorf("adjusted valuation must be present and above baseline: %+v", view.AdjustedValuation)
+	}
+
+	// (b) DIVERGENT numbers (real re-deposit) ⇒ ambiguous, count 2, zero effect — even with a
+	//     ratified proposal on one filing the conservative invariant holds.
+	up2 := filing("f-up2", "", niTS(1))
+	cam2 := filing("f-cam2", "999", niTS(2))
+	svc = &maService{filing: &adjFakeFiling{
+		fakeFilingStore: newFakeFilingStore(),
+		filings:         []maFiling{up2, cam2},
+		proposals:       map[string][]maNIProposalWithDecisions{"f-cam2": {adjRatifiedProp("p-x", baseline, 50_000)}},
+		extracts: map[string][]maFilingExtract{
+			"f-up2-run":  {adjExtract("f-up2-run", baseline, niF(3_000_000), tp, dab, utile)},
+			"f-cam2-run": {adjExtract("f-cam2-run", baseline, niF(3_100_000), tp, dab, utile)}, // totale attivo differs
+		},
+	}}
+	view, _ = svc.computeMAAdjustedView(ctx, identity, deep)
+	if view.Status != maAdjustedStatusAmbiguous || view.AmbiguousCount != 2 {
+		t.Fatalf("divergent figures must stay ambiguous: %+v", view)
+	}
+	if view.FilingID != "" || view.AdjustedValuation != nil || len(view.Effects) != 0 || view.DeltaEbitda != 0 {
+		t.Fatalf("ambiguous ⇒ zero effect, no canonical: %+v", view)
+	}
+
+	// (c) A missing extract on ONE candidate ⇒ cannot confirm same deposit ⇒ ambiguous.
+	up3 := filing("f-up3", "", niTS(1))
+	cam3 := filing("f-cam3", "111", niTS(2))
+	svc = &maService{filing: &adjFakeFiling{
+		fakeFilingStore: newFakeFilingStore(),
+		filings:         []maFiling{up3, cam3},
+		extracts: map[string][]maFilingExtract{
+			"f-up3-run": {adjExtract("f-up3-run", baseline, ta, tp, dab, utile)},
+			// f-cam3-run absent ⇒ that candidate has no readable extract
+		},
+	}}
+	view, _ = svc.computeMAAdjustedView(ctx, identity, deep)
+	if view.Status != maAdjustedStatusAmbiguous || view.AmbiguousCount != 2 {
+		t.Fatalf("a missing extract on a candidate must stay ambiguous: %+v", view)
+	}
+
+	// (d) Pure decision edges: tie-break by created_at; utile absence symmetric; utile-presence mismatch.
+	both := []*maFiling{
+		{ID: "old", BalanceSheetID: "1", CreatedAt: niTS(1)},
+		{ID: "new", BalanceSheetID: "2", CreatedAt: niTS(2)},
+	}
+	dFull := maFilingDigest{totaleAttivo: niF(1), totalePassivo: niF(1), differenzaAB: niF(1), utile: niF(1), present: true}
+	if c, ok := decideMADuplicateCanonical(both, []maFilingDigest{dFull, dFull}); !ok || c == nil || c.ID != "new" {
+		t.Fatalf("both vendor-anchored ⇒ most-recent wins: ok=%v c=%+v", ok, c)
+	}
+	dNoUtile := maFilingDigest{totaleAttivo: niF(2), totalePassivo: niF(2), differenzaAB: niF(1), present: true}
+	if _, ok := decideMADuplicateCanonical(both, []maFilingDigest{dNoUtile, dNoUtile}); !ok {
+		t.Errorf("identical figures with utile absent on BOTH must resolve")
+	}
+	dWithUtile := dNoUtile
+	dWithUtile.utile = niF(120_000)
+	if _, ok := decideMADuplicateCanonical(both, []maFilingDigest{dNoUtile, dWithUtile}); ok {
+		t.Errorf("a utile presence mismatch must stay ambiguous")
+	}
+	dEmpty := maFilingDigest{present: true} // present but no comparable figure ⇒ unreadable
+	if _, ok := decideMADuplicateCanonical(both, []maFilingDigest{dEmpty, dEmpty}); ok {
+		t.Errorf("a present-but-empty extract must not confirm same deposit")
 	}
 }
 

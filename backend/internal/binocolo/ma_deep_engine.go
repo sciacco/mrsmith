@@ -310,6 +310,12 @@ func deepPayloadReady(data json.RawMessage) bool {
 // (as YYYY-MM-DD) plus the turnover year. The date is taken LITERALLY from the vendor
 // string — no timezone parsing, because "2025-12-31T00:00:00+01:00" read as an instant
 // and rendered in UTC would shift the closing date to Dec 30.
+//
+// NOTE — this literal raw[:10] key is PERSISTED as-is (vendor vintage keying / historical
+// continuity) and must NOT change. The adjusted-view path needs the TRUE closing date to line
+// up with a deposited filing, so it does the opposite (off-by-one TZ correction) in a dedicated,
+// read-only helper: maBaselineExerciseDate (ma_deep_adjusted.go). The two are deliberately
+// different — do not unify them.
 func deepVintageKey(payload json.RawMessage) (string, *int, bool) {
 	object, err := decodeVendorObject(payload)
 	if err != nil || object == nil {

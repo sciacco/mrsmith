@@ -17,9 +17,12 @@ import (
 //
 // The effective set is deliberately narrow: only the effective decisions of the ACTIVE reading
 // run of the ACTIVE processing run of the CANONICAL filing (the filing whose fiscal identity is
-// validated|override and whose closing_date equals the current vendor baseline exercise). If
-// more than one validated filing exists for that exercise (a re-deposit not resolved by the
-// blob/deposit merge), the canonical filing is UNDEFINED ⇒ zero effect + declared ambiguity.
+// validated|override and whose closing_date equals the current vendor baseline exercise). If more
+// than one validated filing exists for that exercise, they are the SAME deposit acquired through
+// two channels (analyst upload + camerale acquisition) when their key CEE figures are identical —
+// then one is elected canonical (vendor-anchored, then most recent) with no ambiguity; a genuine
+// re-deposit (figures diverge, or an extract is missing) leaves the canonical UNDEFINED ⇒ zero
+// effect + declared ambiguity.
 //
 // Formula (conservative, screening): EBITDA_adj = EBITDA_baseline + Σ signed ΔEBITDA; the SAME Δ
 // enters BOTH band extremes (reported×haircut high, prudential low). PFN_adj = PFN + Σ signed
@@ -30,7 +33,7 @@ import (
 const (
 	maAdjustedStatusActive     = "active"      // canonical filing + at least one aligned effect
 	maAdjustedStatusNotAligned = "not_aligned" // filings exist but none is validated+aligned
-	maAdjustedStatusAmbiguous  = "ambiguous"   // >1 validated filing for the baseline exercise
+	maAdjustedStatusAmbiguous  = "ambiguous"   // >1 validated filing for the baseline exercise, not a same-deposit pair (real re-deposit)
 	maAdjustedStatusNoFiling   = "no_filing"   // no filing at all for the fiscal identity
 	maAdjustedStatusNoEffects  = "no_effects"  // canonical filing but no aligned effective adjustment
 )
@@ -103,11 +106,58 @@ func sameMADay(a, b time.Time) bool {
 	return ay == by && am == bm && ad == bd
 }
 
-// selectMACanonicalFiling picks the canonical filing for an exercise (pure): among filings whose
-// identity is validated|override AND whose closing_date matches baselineExercise, exactly one ⇒
-// canonical; zero ⇒ (nil, 0); more than one ⇒ (nil, n) — the conservative ambiguity rule (a
-// re-deposit not resolved by the blob/deposit merge yields no effect + a declared ambiguity).
-func selectMACanonicalFiling(filings []maFiling, baselineExercise time.Time) (*maFiling, int) {
+// maBaselineExerciseDate resolves the baseline exercise date for the ADJUSTED-VIEW path from the
+// vendor payload's ecofin.balanceSheetDate, correcting a vendor timezone-serialization quirk. The
+// vendor renders the LOCAL Europe/Rome midnight of the closing date WITHOUT a zone suffix, so a
+// 31-Dec close appears as "2025-12-30T23:00:00" (UTC+1 winter) and a 30-Jun close as
+// "2025-06-30T22:00:00" (UTC+2 summer) — a bare instant that reads as the DAY BEFORE the real
+// closing date. We parse the full value (RFC3339, then no-zone datetime, then bare date) and, when
+// the clock component is ≥ 12:00 — a late-evening instant that is really the next local midnight —
+// round UP to the following day; otherwise we truncate to the day. Returns ok=false when the field
+// is absent or unparseable. The result is a UTC midnight so it compares exactly (sameMADay) with a
+// filing's ::date closing_date and with an effective adjustment's ::date exercise date.
+//
+// NOTE — deliberately DIFFERENT from deepVintageKey (ma_deep_engine.go): that function takes the
+// literal raw[:10] prefix and its output is PERSISTED as-is in the DB (vendor vintage keying /
+// historical continuity), so it must NOT be changed. This function is read-only and used ONLY by
+// the adjusted view / brief-context path, where the exercise must line up with a deposited filing's
+// closing_date — hence the off-by-one correction lives here alone.
+func maBaselineExerciseDate(payload json.RawMessage) (time.Time, bool) {
+	object, err := decodeVendorObject(payload)
+	if err != nil || object == nil {
+		return time.Time{}, false
+	}
+	root := deepFullRoot(object)
+	raw := firstVendorString(root, "ecofin.balanceSheetDate")
+	if raw == "" {
+		return time.Time{}, false
+	}
+	var parsed time.Time
+	ok := false
+	for _, layout := range []string{time.RFC3339, "2006-01-02T15:04:05", "2006-01-02"} {
+		if t, err := time.Parse(layout, raw); err == nil {
+			parsed = t
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return time.Time{}, false
+	}
+	y, m, d := parsed.Date()
+	day := time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+	if parsed.Hour() >= 12 {
+		day = day.AddDate(0, 0, 1) // late-evening instant = next local midnight = the true closing date
+	}
+	return day, true
+}
+
+// selectMACanonicalMatches returns the aligned validated filings for an exercise (pure): those
+// whose identity is validated|override AND whose closing_date matches baselineExercise. Zero ⇒ no
+// canonical; one ⇒ the unique canonical; more than one ⇒ candidates for the duplicate resolution
+// (decideMADuplicateCanonical) — the blob bytes differ across channels so a merge never collapsed
+// them, and only comparing the parsed figures can tell a same-deposit pair from a real re-deposit.
+func selectMACanonicalMatches(filings []maFiling, baselineExercise time.Time) []*maFiling {
 	var matches []*maFiling
 	for i := range filings {
 		f := &filings[i]
@@ -119,19 +169,92 @@ func selectMACanonicalFiling(filings []maFiling, baselineExercise time.Time) (*m
 		}
 		matches = append(matches, f)
 	}
-	switch len(matches) {
-	case 0:
-		return nil, 0
-	case 1:
-		return matches[0], 0
-	default:
-		return nil, len(matches)
-	}
+	return matches
 }
 
-// resolveMACanonicalFilingDetail is the shared list+select path (one SELECT): it lists the
-// fiscal identity's filings and applies selectMACanonicalFiling, also returning the total filing
-// count so the caller can tell "no filing at all" from "filings present but none aligned".
+// maFilingDigest is the set of key CEE figures used to decide whether two aligned validated filings
+// are the SAME deposit acquired through two channels (analyst upload + camerale acquisition) rather
+// than a genuine re-deposit. Read straight from the parsed exercise extract (no arithmetic here),
+// so equality is EXACT (zero tolerance). present=false means the exercise extract was missing;
+// readable means it was present AND yielded at least one comparable figure.
+type maFilingDigest struct {
+	totaleAttivo  *float64
+	totalePassivo *float64
+	differenzaAB  *float64 // conto economico A−B as declared in the prospetto
+	utile         *float64 // utile d'esercizio — compared only when present on both sides
+	present       bool
+}
+
+func (d maFilingDigest) readable() bool {
+	return d.present && (d.totaleAttivo != nil || d.totalePassivo != nil || d.differenzaAB != nil || d.utile != nil)
+}
+
+// sameMAFloatPtr reports exact equality of two optional figures: both absent, or both present with
+// equal value. A presence mismatch (one nil, one set) is a divergence.
+func sameMAFloatPtr(a, b *float64) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
+}
+
+func sameMAFilingDigest(a, b maFilingDigest) bool {
+	return sameMAFloatPtr(a.totaleAttivo, b.totaleAttivo) &&
+		sameMAFloatPtr(a.totalePassivo, b.totalePassivo) &&
+		sameMAFloatPtr(a.differenzaAB, b.differenzaAB) &&
+		sameMAFloatPtr(a.utile, b.utile)
+}
+
+// decideMADuplicateCanonical is the pure "vendor merge" of the plan for >1 aligned validated
+// candidates, given each candidate's already-loaded digest (aligned by index; the loading happens
+// in the caller so this stays testable). The upload and the camerale acquisition of the SAME
+// deposit produce different blob bytes — the DocuEngine PDF carries a per-request cover header ⇒
+// distinct md5 ⇒ never blob-merged — so they legitimately co-exist as two filings for one exercise.
+// When every candidate's key CEE figures are byte-for-byte identical it is ONE deposit ⇒ canonical
+// = the vendor-anchored filing (balance_sheet_id set), tie-broken by the most-recent created_at,
+// with NO ambiguity. Any divergence — different figures, or a missing/unreadable extract on any
+// candidate — is a genuine re-deposit and stays conservatively ambiguous (resolved=false ⇒ zero
+// effect). Returns (canonical, resolved).
+func decideMADuplicateCanonical(candidates []*maFiling, digests []maFilingDigest) (*maFiling, bool) {
+	if len(candidates) < 2 || len(candidates) != len(digests) {
+		return nil, false
+	}
+	for _, d := range digests {
+		if !d.readable() {
+			return nil, false // missing or unreadable extract ⇒ cannot confirm same deposit
+		}
+	}
+	for i := 1; i < len(digests); i++ {
+		if !sameMAFilingDigest(digests[0], digests[i]) {
+			return nil, false // figures diverge ⇒ real re-deposit ⇒ ambiguous
+		}
+	}
+	var canonical *maFiling
+	for _, c := range candidates {
+		if canonical == nil || betterMACanonicalDuplicate(c, canonical) {
+			canonical = c
+		}
+	}
+	return canonical, true
+}
+
+// betterMACanonicalDuplicate ranks two same-deposit candidates: the vendor-anchored filing
+// (balance_sheet_id set) wins over an upload; on a tie the most-recent created_at wins.
+func betterMACanonicalDuplicate(a, b *maFiling) bool {
+	aVendor := a.BalanceSheetID != ""
+	bVendor := b.BalanceSheetID != ""
+	if aVendor != bVendor {
+		return aVendor
+	}
+	return a.CreatedAt.After(b.CreatedAt)
+}
+
+// resolveMACanonicalFilingDetail is the shared list+select path: it lists the fiscal identity's
+// filings and resolves the canonical one, also returning the total filing count so the caller can
+// tell "no filing at all" from "filings present but none aligned". Zero aligned ⇒ (nil,0); exactly
+// one ⇒ that filing; more than one ⇒ the duplicate resolution — the same deposit acquired through
+// two channels (upload + camerale) collapses to one canonical filing, while a real re-deposit stays
+// ambiguous. Only the >1 branch reads the extracts (the common single-filing path stays one SELECT).
 func (s *maService) resolveMACanonicalFilingDetail(ctx context.Context, vat, tax string, baselineExercise time.Time) (canonical *maFiling, ambiguous, total int, err error) {
 	fiscalKey := buildMAFiscalKey(vat, tax)
 	if fiscalKey == "" || s.filing == nil {
@@ -141,8 +264,42 @@ func (s *maService) resolveMACanonicalFilingDetail(ctx context.Context, vat, tax
 	if err != nil {
 		return nil, 0, 0, err
 	}
-	canonical, ambiguous = selectMACanonicalFiling(filings, baselineExercise)
-	return canonical, ambiguous, len(filings), nil
+	matches := selectMACanonicalMatches(filings, baselineExercise)
+	switch len(matches) {
+	case 0:
+		return nil, 0, len(filings), nil
+	case 1:
+		return matches[0], 0, len(filings), nil
+	default:
+		// >1 aligned validated filings: load each candidate's key CEE figures (from its ACTIVE
+		// processing run) and let the pure decision tell a same-deposit pair from a real re-deposit.
+		digests := make([]maFilingDigest, len(matches))
+		for i, m := range matches {
+			digests[i] = s.maFilingDigestForExercise(ctx, m, baselineExercise)
+		}
+		if resolved, ok := decideMADuplicateCanonical(matches, digests); ok {
+			return resolved, 0, len(filings), nil
+		}
+		return nil, len(matches), len(filings), nil
+	}
+}
+
+// maFilingDigestForExercise loads one candidate's parsed key CEE figures for an exercise (from its
+// active processing run) into a maFilingDigest. present=false when the exercise extract is absent
+// or unreadable; the figures are read straight from the parse (no arithmetic), so a later exact
+// comparison across candidates is a byte-for-byte deposit-identity check.
+func (s *maService) maFilingDigestForExercise(ctx context.Context, canonical *maFiling, exercise time.Time) maFilingDigest {
+	sp, ce, found := s.maFilingExtractForExercise(ctx, canonical, exercise)
+	if !found {
+		return maFilingDigest{}
+	}
+	return maFilingDigest{
+		totaleAttivo:  sp.TotaleAttivo,
+		totalePassivo: sp.TotalePassivo,
+		differenzaAB:  ce.DifferenzaAB,
+		utile:         ce.UtileEsercizio,
+		present:       true,
+	}
 }
 
 // maAdjustedLowUsesPrudential reconstructs whether the BASELINE ev_ebitda band derived its low
@@ -310,13 +467,13 @@ func (s *maService) resolveMAAdjustedInputs(ctx context.Context, identity maDeep
 		return in, nil
 	}
 	// Baseline exercise = the vendor baseline's balance-sheet closing date (ecofin.balanceSheetDate
-	// in the IT-full payload), read verbatim via deepVintageKey. This is the exercise the current
-	// vendor scorecard/valuation describes, so it is the exercise a deposited filing must match.
-	if dateStr, _, ok := deepVintageKey(deep.Payload); ok {
-		if d, err := time.Parse("2006-01-02", dateStr); err == nil {
-			in.baselineExercise = d
-			in.hasExercise = true
-		}
+	// in the IT-full payload). This is the exercise the current vendor scorecard/valuation describes,
+	// so it is the exercise a deposited filing must match — hence maBaselineExerciseDate (NOT
+	// deepVintageKey) is used here: it corrects the vendor's off-by-one TZ serialization so a
+	// 31-Dec close does not read as 30-Dec and wrongly flag an aligned filing as not_aligned.
+	if d, ok := maBaselineExerciseDate(deep.Payload); ok {
+		in.baselineExercise = d
+		in.hasExercise = true
 	}
 	fiscalKey := buildMAFiscalKey(identity.VATCode, identity.TaxCode)
 	if !in.hasExercise || fiscalKey == "" || s.filing == nil {
