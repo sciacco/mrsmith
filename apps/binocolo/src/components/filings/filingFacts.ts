@@ -41,7 +41,7 @@ export function filingErrorMessage(error: unknown, fallback = 'Operazione non ri
       case 'brief_not_regenerable':
         return 'Brief non rigenerabile: dati di base non ricostruibili.';
       case 'ratified_amount_required':
-        return 'Serve un importo firmato per ratificare.';
+        return 'Serve un importo con segno (+ o −) diverso da zero per ratificare.';
       case 'ratified_treatment_required':
         return 'Scegli il trattamento (EBITDA o PFN) per ratificare.';
       case 'invalid_ratified_treatment':
@@ -198,14 +198,20 @@ export function directionLabel(direction: string): string {
 export function incertezzaLabel(incertezza?: string): string | null {
   switch (incertezza) {
     case 'low':
-      return 'Incertezza bassa';
+      return 'bassa';
     case 'medium':
-      return 'Incertezza media';
+      return 'media';
     case 'high':
-      return 'Incertezza alta';
+      return 'alta';
     default:
       return null;
   }
+}
+
+// The candidate treatment as a pre-selected value for the ratify form: only ebitda/pfn are valid
+// targets; a dd_only/uncertain candidate leaves the choice empty (the analyst must promote it).
+export function defaultTreatmentChoice(p: MANIProposalView): string {
+  return p.trattamentoCandidato === 'ebitda' || p.trattamentoCandidato === 'pfn' ? p.trattamentoCandidato : '';
 }
 
 // Sober state badge for a proposal: effective is the only "positive" (success); everything else
@@ -228,6 +234,97 @@ export function proposalStateBadge(state: string): { variant: StatusBadgeVariant
 // EBITDA/PFN requires both a signed amount and a target treatment.
 export function proposalNeedsTreatmentChoice(p: MANIProposalView): boolean {
   return p.trattamentoCandidato === 'dd_only' || p.direction === 'uncertain';
+}
+
+// ── Proposal state (Fase N2, struttura A) ──
+// The backend derives four states from the append-only decision log (ma_filing_endpoints.go:
+// classifyMANIProposalState). For the year-group UI a proposal is either "decided" (spun down in
+// place, never removed) or still actionable. effective/rejected are decided; pending and revoked
+// (a prior decision undone) are back on the analyst's desk.
+export function proposalIsDecided(state: string): boolean {
+  return state === 'effective' || state === 'rejected';
+}
+
+export function proposalIsActionable(state: string): boolean {
+  return !proposalIsDecided(state);
+}
+
+// Factual one-word state for a row/panel. A revoked proposal is actionable again → "in attesa".
+export function proposalStateText(state: string): string {
+  switch (state) {
+    case 'effective':
+      return 'ratificata';
+    case 'rejected':
+      return 'scartata';
+    default:
+      return 'in attesa';
+  }
+}
+
+// The signed treatment amount shown on a decided proposal (the analyst's ratified figure) or, for
+// an actionable one, the machine estimate. Signed with the proper minus glyph; null → no figure.
+export function proposalDisplayAmount(p: MANIProposalView): number | null {
+  if (p.state === 'effective') {
+    const ratify = [...p.decisions].reverse().find((d) => d.action === 'ratify');
+    if (ratify?.ratifiedAmount != null) return ratify.ratifiedAmount;
+  }
+  return p.importoRettifica ?? null;
+}
+
+const absEuroFormat = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 0 });
+
+// "250.000 €" — magnitude only, it-IT grouping, no decimals (matches the deposited-filing surface).
+function absEuro(value: number): string {
+  return `${absEuroFormat.format(Math.abs(value))} €`;
+}
+
+// Signed full euro for the row amount column: "+18.000 €" / "−250.000 €" (proper minus glyph),
+// tabular-nums applied by the cell. "—" when there is no figure.
+export function formatSignedEuro(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return '—';
+  if (value === 0) return absEuro(0);
+  return `${value > 0 ? '+' : '−'}${absEuro(value)}`;
+}
+
+// The effect of a signed ratification, in plain words, computed live while the analyst types. The
+// sign carries the direction: on EBITDA a positive amount lifts it; on PFN a negative amount cuts
+// the debt (equity up) and a positive one raises it (equity down). dd_only with no target treatment
+// (or a zero/empty amount) has no effect → null (the preview stays as its placeholder). Mirrors the
+// reducer's sign semantics (reduceMANIEffectiveAdjustments) so the words never contradict the math.
+export function effectPhrase(treatment: string, amount: number | null | undefined, year?: string): string | null {
+  if (amount == null || !Number.isFinite(amount) || amount === 0) return null;
+  const a = absEuro(amount);
+  const y = year ? ` ${year}` : '';
+  if (treatment === 'ebitda') {
+    return amount > 0 ? `Aumenta l’EBITDA${y} di ${a}` : `Riduce l’EBITDA${y} di ${a}`;
+  }
+  if (treatment === 'pfn') {
+    return amount < 0 ? `Riduce la PFN${y} di ${a} — equity su` : `Aumenta la PFN${y} di ${a} — equity giù`;
+  }
+  return null;
+}
+
+// Same-theme heuristic (Fase N2): group a proposal to its counterpart in other exercises WITHOUT a
+// backend theme key. We normalize the human label (or the observed fact) — lowercased, accents and
+// punctuation stripped, digits/amounts dropped, whitespace collapsed — so "Compensi amministratori
+// (2024)" and "Compensi amministratori" collapse to the same key. Fallback to the NI section when
+// the label/fact is empty. This is presentation-only: it drives the "Stesso tema" jumps, never a
+// decision or a copied amount between years.
+export function proposalThemeKey(p: MANIProposalView): string {
+  const source = (p.label || p.fattoOsservato || '').trim();
+  const base = source || (p.section ? `sezione:${p.section}` : '');
+  return base
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // strip diacritics
+    .replace(/[0-9.,]+/g, ' ') // drop digits and amount separators
+    .replace(/[^a-z\s]/g, ' ') // drop punctuation
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function exerciseYearOf(closingDate?: string): string {
+  return closingDate ? closingDate.slice(0, 4) : '';
 }
 
 export function pageCiteLabel(pageNo?: number): string | null {

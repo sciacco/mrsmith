@@ -23,7 +23,6 @@ import { VendorFinancials, hasVendorFinancialsData, vendorFinancialSheetsCount }
 import { WebVerificationDetail, hasWebVerificationDetail } from '../../components/company/WebVerificationDetail';
 import { DeepAnalysisContent, formatDeepCompactEuro } from '../../components/deep/DeepComponents';
 import { FilingsBlock } from '../../components/filings/FilingsBlock';
-import { DepositedValuationView } from '../../components/filings/DepositedValuationView';
 import { LabeledDisclosure } from '../../components/scheda/LabeledDisclosure';
 import { resolveCohortPosition, readCohort } from '../../components/scheda/cohort';
 import { LensBar, type LensKeyNumber, type LensOption } from '../../components/scheda/LensBar';
@@ -832,12 +831,23 @@ export function SchedaAziendaPage() {
           </div>
         )}
 
-        <DepositedValuationView
-          overview={overview}
-          companyKey={companyKey ?? ''}
-          baselineValuation={valuation}
-          onGoToFilings={() => scrollToSection('scheda-bilanci-title')}
-        />
+        {/* The "Effetto dei bilanci depositati" synthesis now lives in block 5. A block-2 reader must
+            still learn that the valuation reads against the deposited filings — a single sober fact-row
+            with an anchor to block 5, shown ONLY when there is an active adjusted view or a stale brief
+            (no permanent badge, nothing when there is nothing to say). */}
+        {overview.adjusted?.status === 'active' || overview.briefStale ? (
+          <p className={styles.crossRef}>
+            <Icon name="chevron-down" size={14} aria-hidden="true" />
+            <span>
+              {overview.adjusted?.status === 'active'
+                ? 'Valutazione aggiustata dai bilanci depositati.'
+                : 'Il brief non riflette le ratifiche dei bilanci depositati.'}
+            </span>
+            <button type="button" className={styles.crossRefLink} onClick={() => scrollToSection('scheda-bilanci-title')}>
+              Vedi «Bilanci depositati»
+            </button>
+          </p>
+        ) : null}
 
         {target && showVendorFinancials ? (
           <LabeledDisclosure
@@ -933,15 +943,10 @@ export function SchedaAziendaPage() {
         <CardsSection cards={overview.cards} companyKey={identity.companyKey} activeInitiativeId={lens.type === 'iniziativa' ? lens.id : undefined} />
       </section>
 
+      {/* Block 5 owns its own header (index + title + title-row actions) so «Carica PDF» and «Cerca
+          depositi camerali» can sit on the title row; the h2 keeps id="scheda-bilanci-title". */}
       <section className={styles.block} aria-labelledby="scheda-bilanci-title">
-        <div className={styles.blockHeader}>
-          <span className={styles.blockIndex}>5</span>
-          <div>
-            <h2 id="scheda-bilanci-title">Bilanci depositati</h2>
-            <p>Fascicoli camerali, rettifiche di nota integrativa, valutazione aggiustata.</p>
-          </div>
-        </div>
-        <FilingsBlock companyKey={companyKey ?? ''} baselineExercise={overview.adjusted?.baselineExercise} />
+        <FilingsBlock companyKey={companyKey ?? ''} overview={overview} baselineValuation={valuation} />
       </section>
         </div>
       </div>
