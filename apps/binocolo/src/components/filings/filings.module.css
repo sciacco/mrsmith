@@ -560,6 +560,151 @@
   min-width: 0;
 }
 
+/* ── NI narrative reading (issue #80) ── */
+/* Sober divider heading the observation rows, mirroring the mockup's `.nihead` (dashed top rule,
+   uppercase micro-label). The count chip appears only when there are observations. */
+.niHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) var(--space-1);
+  border-top: 1px dashed var(--color-border);
+  color: var(--color-text-faint);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.niCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+/* Tail row for the non-ready narrative states (absent / running / failed): a dashed rule then a
+   label on the left and the affordance (Genera / Riprova) on the right. */
+.niTail {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px dashed var(--color-border);
+}
+
+.niTailLabel {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.niRunning {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.niRunning svg {
+  color: var(--color-accent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .niRunning svg {
+    animation: filingsNiSpin 1s linear infinite;
+  }
+}
+
+@keyframes filingsNiSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Discrete truncation note beneath the observations. */
+.niNote {
+  margin: 0;
+  padding: var(--space-1) var(--space-3) var(--space-2);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+/* Observation row: [dot spacer] [type chip] [claim, ellipsed] [page]. Mirrors the mockup `.nrow`;
+   quieter than a proposal row (no dot, muted text) since it carries no decision. */
+.nrow {
+  display: grid;
+  grid-template-columns: 14px auto minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-top: 1px solid var(--color-border-subtle);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.nrow:hover {
+  background: var(--color-surface);
+}
+
+.nrow[aria-current='true'] {
+  background: var(--color-accent-subtle);
+}
+
+.nrow:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.ntype {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.nclaim {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.8125rem;
+}
+
+.npage {
+  text-align: right;
+  white-space: nowrap;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Exception rows inside a year group (acquisitions, non-ready filings) ── */
 .exRow {
   display: flex;
@@ -957,26 +1102,6 @@
   font-size: 1rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-}
-
-.pendingLink {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--color-accent);
-  cursor: pointer;
-  font: inherit;
-  font-weight: 600;
-}
-
-.pendingLink:hover,
-.pendingLink:focus-visible {
-  color: var(--color-accent-hover);
-  text-decoration: underline;
-  outline: 1px solid transparent;
 }
 
 .reconRow {

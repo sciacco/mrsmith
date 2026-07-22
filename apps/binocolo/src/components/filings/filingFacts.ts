@@ -195,19 +195,6 @@ export function directionLabel(direction: string): string {
   }
 }
 
-export function incertezzaLabel(incertezza?: string): string | null {
-  switch (incertezza) {
-    case 'low':
-      return 'bassa';
-    case 'medium':
-      return 'media';
-    case 'high':
-      return 'alta';
-    default:
-      return null;
-  }
-}
-
 // The candidate treatment as a pre-selected value for the ratify form: only ebitda/pfn are valid
 // targets; a dd_only/uncertain candidate leaves the choice empty (the analyst must promote it).
 export function defaultTreatmentChoice(p: MANIProposalView): string {

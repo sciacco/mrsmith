@@ -8,6 +8,8 @@ import type {
   MAFilingAcquireResponse,
   MAFilingAcquisitionView,
   MAFilingIdentityOverrideResponse,
+  MAFilingNarrativeRegenerateResponse,
+  MAFilingNarrativeResponse,
   MAFilingProposalsResponse,
   MAFilingRow,
   MAFilingSearchStartResponse,
@@ -15,6 +17,7 @@ import type {
   MAFilingsResponse,
   MANIDecisionResponse,
   MANIDecisionView,
+  MANIObservationView,
   MANIProposalView,
 } from '../../api/types';
 import { dateLabel, downloadBlob, errorLabel } from '../../pages/ricerche/helpers';
@@ -37,7 +40,6 @@ import {
   filingTypeLabel,
   formatEuro,
   formatSignedEuro,
-  incertezzaLabel,
   isFilingInProgress,
   proposalDisplayAmount,
   proposalIsDecided,
@@ -86,6 +88,9 @@ interface YearGroup {
   primary?: MAFilingRow;
   proposals: MANIProposalView[];
   proposalsLoading: boolean;
+  // NI narrative reading of the primary filing (issue #80). Undefined while the lazy GET is in
+  // flight or on a transport error (rendered as silent absence — never blocks the proposals).
+  narrative?: MAFilingNarrativeResponse;
   exceptionFilings: MAFilingRow[];
   acquisitions: MAFilingAcquisitionView[];
 }
@@ -93,6 +98,13 @@ interface YearGroup {
 // A flat index entry for a selectable proposal row.
 interface ProposalEntry {
   proposal: MANIProposalView;
+  filing: MAFilingRow;
+  year: string;
+}
+
+// A flat index entry for a selectable NI narrative observation row (read-only in the panel).
+interface ObservationEntry {
+  observation: MANIObservationView;
   filing: MAFilingRow;
   year: string;
 }
@@ -166,6 +178,27 @@ export function FilingsBlock({
     return map;
   }, [readyFilings, proposalResults]);
 
+  // ── NI narrative reading for every ready/degraded filing (issue #80). Lazy + parallel, NEVER
+  // blocks the proposals render (a separate useQueries). Polls ONLY while a filing's own reading is
+  // 'running' (~5s); nothing polls otherwise. A GET transport error resolves to no data → the
+  // section renders nothing (assenza silenziosa, no toast); the backend answers 'absent' (200) when
+  // mig 118 is not applied, so a genuinely undefined narrative is a real transport failure. ──
+  const narrativeResults = useQueries({
+    queries: readyFilings.map((f) => ({
+      queryKey: ['ma-filing-narrative', f.id],
+      queryFn: () => api.get<MAFilingNarrativeResponse>(`/binocolo/v1/ma/filings/${encodeURIComponent(f.id)}/narrative`),
+      // A GET failure is silent absence, not a transient to retry — one attempt, no retry storm.
+      retry: false,
+      refetchInterval: (q: { state: { data?: MAFilingNarrativeResponse } }) =>
+        q.state.data?.status === 'running' ? 5000 : false,
+    })),
+  });
+  const narrativeByFiling = useMemo(() => {
+    const map = new Map<string, MAFilingNarrativeResponse | undefined>();
+    readyFilings.forEach((f, i) => map.set(f.id, narrativeResults[i]?.data));
+    return map;
+  }, [readyFilings, narrativeResults]);
+
   // ── Group by exercise ──
   const { datedGroups, undatedFilings, undatedAcquisitions } = useMemo(() => {
     const byYear = new Map<string, YearGroup>();
@@ -193,6 +226,7 @@ export function FilingsBlock({
         const p = proposalsByFiling.get(f.id);
         g.proposals = p?.proposals ?? [];
         g.proposalsLoading = p?.loading ?? false;
+        g.narrative = narrativeByFiling.get(f.id);
       } else {
         g.exceptionFilings.push(f);
       }
@@ -204,7 +238,7 @@ export function FilingsBlock({
     }
     const dated = [...byYear.values()].sort((a, b) => b.year.localeCompare(a.year));
     return { datedGroups: dated, undatedFilings: undatedF, undatedAcquisitions: undatedA };
-  }, [data?.filings, data?.acquisitionsOpen, proposalsByFiling]);
+  }, [data?.filings, data?.acquisitionsOpen, proposalsByFiling, narrativeByFiling]);
 
   // Flat index of selectable proposals in display order (for auto-advance + keyboard nav).
   const proposalEntries = useMemo(() => {
@@ -221,6 +255,23 @@ export function FilingsBlock({
     return m;
   }, [proposalEntries]);
 
+  // Flat index of selectable NI narrative observations (for the read-only panel + same-type jumps).
+  // Proposal ids and observation ids never collide (distinct tables), so a single selectedId keys
+  // both surfaces and the panel resolves the observation map first, then the proposal map.
+  const observationEntries = useMemo(() => {
+    const entries: ObservationEntry[] = [];
+    for (const g of datedGroups) {
+      if (!g.primary || g.narrative?.status !== 'ready') continue;
+      for (const o of g.narrative.observations) entries.push({ observation: o, filing: g.primary, year: g.year });
+    }
+    return entries;
+  }, [datedGroups]);
+  const observationById = useMemo(() => {
+    const m = new Map<string, ObservationEntry>();
+    for (const e of observationEntries) m.set(e.observation.id, e);
+    return m;
+  }, [observationEntries]);
+
   // ── Selection + drafts (kept per proposal so switching rows never loses in-progress work) ──
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -234,25 +285,22 @@ export function FilingsBlock({
   }, [companyKey]);
 
   // Auto-select the first actionable proposal once (never overrides a live selection, never opens
-  // the drawer — that stays an explicit gesture).
+  // the drawer — that stays an explicit gesture). A live selection is valid when it resolves to a
+  // proposal OR a narrative observation; a stale id (its row disappeared) is cleared to null.
   useEffect(() => {
-    if (selectedId && entryById.has(selectedId)) return;
-    if (selectedId && !entryById.has(selectedId)) {
+    if (selectedId && (entryById.has(selectedId) || observationById.has(selectedId))) return;
+    if (selectedId) {
       setSelectedId(null);
       return;
     }
     const first = proposalEntries.find((e) => !proposalIsDecided(e.proposal.state)) ?? proposalEntries[0];
     if (first) setSelectedId(first.proposal.id);
-  }, [proposalEntries, entryById, selectedId]);
+  }, [proposalEntries, entryById, observationById, selectedId]);
 
   const selectInline = (id: string) => setSelectedId(id);
   const selectAndOpen = (id: string) => {
     setSelectedId(id);
     if (isNarrow) setDrawerOpen(true);
-  };
-  const selectFirstActionable = () => {
-    const first = proposalEntries.find((e) => !proposalIsDecided(e.proposal.state)) ?? proposalEntries[0];
-    if (first) selectAndOpen(first.proposal.id);
   };
 
   function nextActionableAfter(id: string): string | null {
@@ -411,6 +459,21 @@ export function FilingsBlock({
     onSettled: () => setRetryingId(null),
   });
 
+  // ── Generate / regenerate the NI narrative reading (issue #80). An explicit analyst gesture on
+  // a ready filing's «Genera lettura» / «Riprova»; on success the filing's narrative GET is
+  // refetched so the «in corso» state (and then the observations) appear via the poll. ──
+  const [narrativeBusyId, setNarrativeBusyId] = useState<string | null>(null);
+  const regenerateNarrative = useMutation({
+    mutationFn: (filingId: string) =>
+      api.post<MAFilingNarrativeRegenerateResponse>(`/binocolo/v1/ma/filings/${encodeURIComponent(filingId)}/narrative/regenerate`, {}),
+    onMutate: (filingId) => setNarrativeBusyId(filingId),
+    onSuccess: (_res, filingId) => {
+      void queryClient.invalidateQueries({ queryKey: ['ma-filing-narrative', filingId] });
+    },
+    onError: (error) => toast(filingErrorMessage(error), 'error'),
+    onSettled: () => setNarrativeBusyId(null),
+  });
+
   // ── Identity override ──
   const [overrideTarget, setOverrideTarget] = useState<MAFilingRow | null>(null);
 
@@ -501,8 +564,17 @@ export function FilingsBlock({
   const nothingYet = data.filings.length === 0 && data.acquisitionsOpen.length === 0 && !search0;
 
   const selectedEntry = selectedId ? entryById.get(selectedId) : undefined;
+  const selectedObservation = selectedId ? observationById.get(selectedId) : undefined;
 
-  const workPanel = selectedEntry ? (
+  const workPanel = selectedObservation ? (
+    <ObservationPanel
+      entry={selectedObservation}
+      others={sameTypeJumps(selectedObservation, datedGroups)}
+      isBaseline={Boolean(baselineExercise && selectedObservation.filing.closingDate === baselineExercise)}
+      onSelect={(id) => (isNarrow ? selectAndOpen(id) : selectInline(id))}
+      onOpenPdf={() => void downloadPdf(selectedObservation.filing)}
+    />
+  ) : selectedEntry ? (
     <WorkPanel
       entry={selectedEntry}
       draft={draftFor(selectedEntry.proposal)}
@@ -520,7 +592,7 @@ export function FilingsBlock({
       onRevoke={(reason) => decide.mutate({ proposalId: selectedEntry.proposal.id, action: 'revoke', reason })}
     />
   ) : (
-    <p className={styles.panelEmpty}>Seleziona una rettifica per lavorarla qui.</p>
+    <p className={styles.panelEmpty}>Seleziona una rettifica o un’osservazione per lavorarla qui.</p>
   );
 
   return (
@@ -536,12 +608,7 @@ export function FilingsBlock({
 
       <div className={styles.body} onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
         {/* Adjusted-valuation summary — synthesis above the detail. */}
-        <DepositedValuationView
-          overview={overview}
-          companyKey={companyKey}
-          baselineValuation={baselineValuation}
-          onGoToFilings={selectFirstActionable}
-        />
+        <DepositedValuationView overview={overview} companyKey={companyKey} baselineValuation={baselineValuation} />
 
         {uploadError ? <p className={styles.inlineError}>{uploadError}</p> : null}
 
@@ -595,10 +662,12 @@ export function FilingsBlock({
                   retryPendingId={retry.isPending ? retryingId : null}
                   retryErrors={retryErrors}
                   isDraftDirty={isDraftDirty}
+                  narrativeBusyId={regenerateNarrative.isPending ? narrativeBusyId : null}
                   onSelect={(id) => (isNarrow ? selectAndOpen(id) : selectInline(id))}
                   onDownload={(row) => void downloadPdf(row)}
                   onOverride={(row) => setOverrideTarget(row)}
                   onRetry={(id) => retry.mutate(id)}
+                  onGenerateNarrative={(filingId) => regenerateNarrative.mutate(filingId)}
                 />
               ))}
             </div>
@@ -682,12 +751,18 @@ export function FilingsBlock({
           — and its ids — never coexist with the wide-layout aside. */}
       {isNarrow ? (
         <Drawer
-          open={drawerOpen && Boolean(selectedEntry)}
+          open={drawerOpen && Boolean(selectedEntry || selectedObservation)}
           onClose={() => setDrawerOpen(false)}
           size="sm"
           side="right"
-          title="Rettifica"
-          subtitle={selectedEntry ? `${selectedEntry.year} · ${filingTypeLabel(selectedEntry.filing.balanceSheetType)}` : undefined}
+          title={selectedObservation ? 'Lettura nota integrativa' : 'Rettifica'}
+          subtitle={
+            selectedObservation
+              ? `${selectedObservation.year} · lettura nota integrativa`
+              : selectedEntry
+                ? `${selectedEntry.year} · ${filingTypeLabel(selectedEntry.filing.balanceSheetType)}`
+                : undefined
+          }
         >
           <div className={styles.drawerBody}>{workPanel}</div>
         </Drawer>
@@ -753,10 +828,12 @@ function YearGroupSection({
   retryPendingId,
   retryErrors,
   isDraftDirty,
+  narrativeBusyId,
   onSelect,
   onDownload,
   onOverride,
   onRetry,
+  onGenerateNarrative,
 }: {
   group: YearGroup;
   isBaseline: boolean;
@@ -765,12 +842,14 @@ function YearGroupSection({
   retryPendingId: string | null;
   retryErrors: Record<string, string>;
   isDraftDirty: (p: MANIProposalView) => boolean;
+  narrativeBusyId: string | null;
   onSelect: (id: string) => void;
   onDownload: (row: MAFilingRow) => void;
   onOverride: (row: MAFilingRow) => void;
   onRetry: (id: string) => void;
+  onGenerateNarrative: (filingId: string) => void;
 }) {
-  const { primary, proposals, proposalsLoading, exceptionFilings, acquisitions } = group;
+  const { primary, proposals, proposalsLoading, narrative, exceptionFilings, acquisitions } = group;
   const pending = proposals.filter((p) => !proposalIsDecided(p.state)).length;
   const degradedNote = primary?.status === 'degraded' ? filingExceptionFact(primary) : null;
   const typeLine = primary
@@ -822,8 +901,19 @@ function YearGroupSection({
           />
         ))}
 
-        {/* NI narrative rows (divider «Lettura nota integrativa») are wired in Fase N3 and slot here,
-            beneath the rettifiche, once the narrative endpoint exists. */}
+        {/* NI narrative reading (issue #80): a sober divider «Lettura nota integrativa» + the
+            observation rows, beneath the rettifiche. Only for the primary (ready/degraded) filing;
+            filing-level states (absent / running / failed / empty / truncated) render here too. */}
+        {primary ? (
+          <NarrativeSection
+            narrative={narrative}
+            filing={primary}
+            selectedId={selectedId}
+            generating={narrativeBusyId === primary.id}
+            onSelect={onSelect}
+            onGenerate={onGenerateNarrative}
+          />
+        ) : null}
 
         {degradedNote ? <p className={styles.groupNote}>{degradedNote}</p> : null}
 
@@ -883,6 +973,118 @@ function ProposalRow({ proposal, selected, dirty, onSelect }: { proposal: MANIPr
         {stateText}
         {proposal.pageNo != null ? ` · p.${proposal.pageNo}` : ''}
       </span>
+    </button>
+  );
+}
+
+// ── NI narrative section (issue #80) ──
+// Rendered inside a year group, beneath the rettifiche. Silent while the lazy GET is loading or on
+// a transport error (narrative undefined) — the proposals must render regardless. The four states
+// map to sober surfaces: absent → «Genera lettura»; running → a light «in corso…» line; failed →
+// an exception line with «Riprova»; ready → the divider + observation rows (counter only when >0),
+// with a quiet «Nessuna osservazione rilevante» when empty and a discrete truncation note.
+function NarrativeSection({
+  narrative,
+  filing,
+  selectedId,
+  generating,
+  onSelect,
+  onGenerate,
+}: {
+  narrative?: MAFilingNarrativeResponse;
+  filing: MAFilingRow;
+  selectedId: string | null;
+  generating: boolean;
+  onSelect: (id: string) => void;
+  onGenerate: (filingId: string) => void;
+}) {
+  if (!narrative) return null; // loading or transport error → assenza silenziosa
+
+  if (narrative.status === 'absent') {
+    return (
+      <div className={styles.niTail}>
+        <span className={styles.niTailLabel}>Lettura nota integrativa</span>
+        <Button
+          size="sm"
+          variant="secondary"
+          loading={generating}
+          onClick={() => onGenerate(filing.id)}
+          leftIcon={<Icon name="sparkles" size={14} />}
+        >
+          Genera lettura
+        </Button>
+      </div>
+    );
+  }
+
+  if (narrative.status === 'running') {
+    return (
+      <div className={styles.niTail}>
+        <span className={styles.niRunning}>
+          <Icon name="loader" size={13} /> Lettura nota integrativa in corso…
+        </span>
+      </div>
+    );
+  }
+
+  if (narrative.status === 'failed') {
+    return (
+      <div className={styles.niTail}>
+        <span className={styles.niTailLabel}>Lettura nota integrativa non riuscita</span>
+        <Button size="sm" variant="secondary" loading={generating} onClick={() => onGenerate(filing.id)}>
+          Riprova
+        </Button>
+      </div>
+    );
+  }
+
+  // ready
+  const observations = narrative.observations;
+  return (
+    <>
+      <div className={styles.niHead}>
+        <span>Lettura nota integrativa</span>
+        {observations.length > 0 ? <span className={styles.niCount}>{observations.length}</span> : null}
+      </div>
+      {observations.length === 0 ? (
+        <div className={styles.exRow}>
+          <span className={styles.subtle}>Nessuna osservazione rilevante.</span>
+        </div>
+      ) : (
+        observations.map((o) => (
+          <ObservationRow key={o.id} observation={o} selected={selectedId === o.id} onSelect={() => onSelect(o.id)} />
+        ))
+      )}
+      {narrative.truncated ? <p className={styles.niNote}>Lettura parziale (nota molto lunga).</p> : null}
+    </>
+  );
+}
+
+// One NI observation row: type chip, claim ellipsed to one line, page right. Selectable and
+// keyboard-navigable exactly like a proposal row (shares data-prow / data-proposal-id so the
+// scoped ArrowUp/Down handler traverses proposals and observations together).
+function ObservationRow({
+  observation,
+  selected,
+  onSelect,
+}: {
+  observation: MANIObservationView;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      data-prow
+      data-proposal-id={observation.id}
+      className={styles.nrow}
+      aria-current={selected ? 'true' : undefined}
+      onClick={onSelect}
+    >
+      <span aria-hidden="true" />
+      <span className={styles.ntype}>{observation.tipo}</span>
+      <span className={styles.nclaim}>{observation.claim || '—'}</span>
+      <span className={styles.npage}>{observation.pageNo != null ? `p.${observation.pageNo}` : ''}</span>
     </button>
   );
 }
@@ -981,12 +1183,6 @@ function WorkPanel({
         ) : null}
         <dt>Trattamento candidato</dt>
         <dd>{treatmentLabel(p.trattamentoCandidato)}</dd>
-        {incertezzaLabel(p.incertezza) ? (
-          <>
-            <dt>Incertezza</dt>
-            <dd>{incertezzaLabel(p.incertezza)}</dd>
-          </>
-        ) : null}
       </dl>
 
       {decided ? (
@@ -1073,6 +1269,71 @@ function WorkPanel({
   );
 }
 
+// ── Observation panel (read-only, issue #80) ──
+// Reuses the work-panel chrome (context header, integral quote, page + «Apri il PDF», facts) but
+// carries NO form and NO action — a narrative observation is qualitative and never decided. The
+// quote is never truncated (it scrolls). Same-type jumps between exercises sit at the foot.
+function ObservationPanel({
+  entry,
+  others,
+  isBaseline,
+  onSelect,
+  onOpenPdf,
+}: {
+  entry: ObservationEntry;
+  others: SameTypeJump[];
+  isBaseline: boolean;
+  onSelect: (id: string) => void;
+  onOpenPdf: () => void;
+}) {
+  const { observation: o, year } = entry;
+  return (
+    <>
+      <div className={styles.pctx}>
+        <span className={styles.pctxYear}>{year}</span>
+        {isBaseline ? <span className={styles.baseTag}>Baseline</span> : null}
+        <span className={styles.pctxProv}>lettura nota integrativa</span>
+      </div>
+
+      {o.claim ? <p className={styles.pclaim}>{o.claim}</p> : null}
+
+      {o.quote ? <div className={styles.quote}>«{o.quote}»</div> : null}
+      <div className={styles.qmeta}>
+        {o.pageNo != null ? <span className={styles.qpage}>pag. {o.pageNo}</span> : null}
+        <button type="button" className={styles.openPdf} onClick={onOpenPdf}>
+          <Icon name="external-link" size={13} /> Apri il PDF
+        </button>
+      </div>
+
+      <dl className={styles.facts}>
+        <dt>Tipo</dt>
+        <dd>{o.tipo}</dd>
+      </dl>
+
+      <div className={styles.others}>
+        <p className={styles.othersLabel}>Stesso tema negli altri esercizi</p>
+        {others.length > 0 ? (
+          <div className={styles.othersBtns}>
+            {others.map((j) =>
+              j.observationId ? (
+                <button key={j.year} type="button" className={styles.obtn} onClick={() => onSelect(j.observationId as string)}>
+                  {j.year}
+                </button>
+              ) : (
+                <span key={j.year} className={`${styles.obtn} ${styles.obtnMiss}`}>
+                  {j.year}: non presente
+                </span>
+              ),
+            )}
+          </div>
+        ) : (
+          <p className={styles.subtle}>Nessun altro esercizio depositato.</p>
+        )}
+      </div>
+    </>
+  );
+}
+
 function DecisionHistory({ decisions }: { decisions: MANIDecisionView[] }) {
   return (
     <details className={styles.hist}>
@@ -1099,6 +1360,27 @@ function sameThemeJumps(entry: ProposalEntry, groups: YearGroup[]): SameThemeJum
     if (g.year === entry.year) continue;
     const match = g.primary ? g.proposals.find((p) => proposalThemeKey(p) === key) : undefined;
     out.push({ year: g.year, proposalId: match ? match.id : null });
+  }
+  return out;
+}
+
+// ── Same-type jumps for NI observations (issue #80) ──
+// The narrative counterpart of sameThemeJumps: link an observation to the FIRST observation of the
+// same TIPO in every other exercise, with an explicit "non presente" when that exercise has none
+// (or has no ready narrative). Presentation-only — it drives navigation, never copies anything.
+interface SameTypeJump {
+  year: string;
+  observationId: string | null;
+}
+
+function sameTypeJumps(entry: ObservationEntry, groups: YearGroup[]): SameTypeJump[] {
+  const tipo = entry.observation.tipo;
+  const out: SameTypeJump[] = [];
+  for (const g of groups) {
+    if (g.year === entry.year) continue;
+    const match =
+      g.narrative?.status === 'ready' ? g.narrative.observations.find((o) => o.tipo === tipo) : undefined;
+    out.push({ year: g.year, observationId: match ? match.id : null });
   }
   return out;
 }

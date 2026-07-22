@@ -1,4 +1,4 @@
-import { Button, Icon, useToast } from '@mrsmith/ui';
+import { Button, useToast } from '@mrsmith/ui';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { useApiClient } from '../../api/client';
@@ -17,12 +17,10 @@ export function DepositedValuationView({
   overview,
   companyKey,
   baselineValuation,
-  onGoToFilings,
 }: {
   overview: MACompanyOverview;
   companyKey: string;
   baselineValuation?: MADeepValuation;
-  onGoToFilings: () => void;
 }) {
   const api = useApiClient();
   const queryClient = useQueryClient();
@@ -57,11 +55,12 @@ export function DepositedValuationView({
     </div>
   ) : null;
 
-  const adjustedBody = adjusted ? renderAdjustedBody(adjusted, baselineValuation, onGoToFilings) : null;
+  const adjustedBody = adjusted ? renderAdjustedBody(adjusted, baselineValuation) : null;
 
   // No orphan header: render the wrapper + label only when there is real content — a stale brief
-  // OR an adjusted body that actually produced output (an active/ambiguous/not_aligned view, a
-  // pending-points link, or a divergent reconciliation). Pure normality shows nothing here.
+  // OR an adjusted body that actually produced output (an active/ambiguous/not_aligned view or a
+  // divergent reconciliation). Pure normality — including no_effects with only pending points, now
+  // that the pending-count link is gone (the year-group «N in attesa» chips carry it) — shows nothing.
   if (!staleRow && !adjustedBody) return null;
 
   return (
@@ -74,12 +73,12 @@ export function DepositedValuationView({
 }
 
 // renderAdjustedBody returns the adjusted-view facts, or null when there is nothing to say
-// (no_filing, or no_effects with no pending points and no divergent reconciliation) — the wrapper
-// gate above depends on this null to stay silent.
+// (no_filing, or no_effects with no divergent reconciliation) — the wrapper gate above depends on
+// this null to stay silent. Pending points are NOT surfaced here: they are visible one row below on
+// the year-group headers («N in attesa»), so a link back to them would be a decorative duplicate.
 function renderAdjustedBody(
   adjusted: NonNullable<MACompanyOverview['adjusted']>,
   baselineValuation: MADeepValuation | undefined,
-  onGoToFilings: () => void,
 ): ReactNode {
   const year = exerciseYear(adjusted.baselineExercise);
   const recon =
@@ -143,19 +142,8 @@ function renderAdjustedBody(
     return <p className={styles.factLine}>Nessun fascicolo allineato all’esercizio {year}.</p>;
   }
 
-  // no_effects: normality → announce nothing, UNLESS there are open DD points to ratify.
-  if (adjusted.status === 'no_effects' && adjusted.pendingCount > 0) {
-    return (
-      <>
-        <button type="button" className={styles.pendingLink} onClick={onGoToFilings}>
-          <Icon name="chevron-down" size={14} aria-hidden="true" />
-          {adjusted.pendingCount} {adjusted.pendingCount === 1 ? 'proposta in attesa' : 'proposte in attesa'} di ratifica
-        </button>
-        {recon}
-      </>
-    );
-  }
-
+  // no_effects: normality → announce nothing here. A divergent reconciliation still surfaces; open
+  // DD points are shown by the year-group «N in attesa» chips, not duplicated with a link.
   return recon;
 }
 

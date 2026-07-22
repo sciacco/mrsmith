@@ -877,6 +877,33 @@ export interface MANIDecisionResponse {
   state: MANIProposalState | string;
 }
 
+// --- NI narrative reading (issue #80, additive). Qualitative context observations read from the
+// nota integrativa — NO amounts, NO prices — separate from the ratifiche proposals. Shapes mirror
+// MAFilingNarrativeResponse / MANIObservationView (ma_filing_endpoints.go) 1:1. status 'absent' =
+// no run yet (mig 118 not applied, or a filing that predates the feature) → the UI offers "Genera". ---
+export type MANINarrativeStatus = 'absent' | 'running' | 'ready' | 'failed';
+export type MANIObservationTipo = 'attribuzione' | 'rischio' | 'piano' | 'profilo';
+
+export interface MANIObservationView {
+  id: string;
+  tipo: MANIObservationTipo | string;
+  claim?: string;
+  quote?: string;
+  pageNo?: number;
+}
+
+export interface MAFilingNarrativeResponse {
+  runId?: string;
+  status: MANINarrativeStatus | string;
+  generatedAt?: string;
+  truncated: boolean;
+  observations: MANIObservationView[];
+}
+
+export interface MAFilingNarrativeRegenerateResponse {
+  status: string;
+}
+
 // Adjusted valuation (on-read, Fase 7). Facts-only; the UI composes the sentences.
 export type MAAdjustedStatus = 'active' | 'not_aligned' | 'ambiguous' | 'no_filing' | 'no_effects';
 
