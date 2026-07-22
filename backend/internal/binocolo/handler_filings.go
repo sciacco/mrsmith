@@ -291,3 +291,38 @@ func (h *Handler) handleDecideMANIProposal(w http.ResponseWriter, r *http.Reques
 	h.completeMATraceSuccess(r, http.StatusOK)
 	httputil.JSON(w, http.StatusOK, result)
 }
+
+// handleGetMAFilingNarrative — GET /ma/filings/{id}/narrative (issue #80). Read-only.
+func (h *Handler) handleGetMAFilingNarrative(w http.ResponseWriter, r *http.Request) {
+	id, ok := maFilingID(w, r)
+	if !ok {
+		return
+	}
+	resp, err := h.ma.getFilingNarrative(r.Context(), id)
+	if err != nil {
+		h.maFailure(w, r, "ma_filing_narrative", err, "filing_id", id)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, resp)
+}
+
+// handleRegenerateMAFilingNarrative — POST /ma/filings/{id}/narrative/regenerate (issue #80).
+func (h *Handler) handleRegenerateMAFilingNarrative(w http.ResponseWriter, r *http.Request) {
+	id, ok := maFilingID(w, r)
+	if !ok {
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	var traceOK bool
+	r, traceOK = h.startMATrace(w, r, "ma_filing_narrative_regenerate", "", map[string]any{"filingId": id}, subject, email)
+	if !traceOK {
+		return
+	}
+	result, err := h.ma.regenerateFilingNarrative(r.Context(), id, subject, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_filing_narrative_regenerate", err, "filing_id", id)
+		return
+	}
+	h.completeMATraceSuccess(r, http.StatusAccepted)
+	httputil.JSON(w, http.StatusAccepted, result)
+}

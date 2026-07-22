@@ -130,6 +130,12 @@ type maFilingStore interface {
 	ListMANIAutoReconfirmCandidates(ctx context.Context, filingID, runID string) ([]maNIAutoReconfirm, error)
 	// brief staleness (F7): newest decision timestamp on the filing's active reading run.
 	GetMaxMANIDecisionCreatedAt(ctx context.Context, filingID string) (*time.Time, error)
+	// NI narrative reading (issue #80, Fase N1): versioned run + immutable observations.
+	CreateMANINarrativeRun(ctx context.Context, filingID, processingRunID, promptID, modelID, requestID string) (string, error)
+	GetActiveMANINarrativeRun(ctx context.Context, filingID string) (*maNINarrativeRun, error)
+	SetMANINarrativeRunStatus(ctx context.Context, runID, status string, truncated bool) error
+	InsertMANIObservations(ctx context.Context, runID string, observations []maNIObservation) (int, error)
+	ListMANIObservationsByRun(ctx context.Context, runID string) ([]maNIObservation, error)
 }
 
 // maDocuEngine is the DocuEngine sub-client seam the filing jobs drive. *openapiit.

@@ -137,8 +137,15 @@ func (s *maService) filingIngestWork(ctx context.Context, job maJob, requestID s
 		return s.filingIngestToNIReading(ctx, filing, requestID)
 	case maFilingStatusNIReading:
 		return s.filingIngestNIReading(ctx, filing, requestID)
-	case maFilingStatusReady, maFilingStatusDegraded, maFilingStatusFailed:
-		return nil // terminal for the ingest job (ready/degraded closed by F6)
+	case maFilingStatusReady, maFilingStatusDegraded:
+		// Terminal (ready/degraded closed by F6). A HARD CRASH of a prior tick of THIS job, mid
+		// narrative (issue #80), can leave the narrative run orphaned at 'running' (the filing was
+		// already closed, so this re-lease early-returns). Mark it failed (regenerable) before
+		// returning — best-effort, no-op when there is no running run.
+		s.failMANINarrativeRunIfRunning(ctx, filing.ID)
+		return nil
+	case maFilingStatusFailed:
+		return nil // terminal
 	default:
 		return fmt.Errorf("%w: unexpected filing status %q", errMAStrategyInvalid, filing.Status)
 	}

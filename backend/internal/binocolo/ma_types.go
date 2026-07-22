@@ -90,9 +90,13 @@ const (
 	//   - filing_ingest: OCR/parse del PDF scaricato (gestito da F5). L'acquire lo
 	//     accoda ma il worker NON lo dispaccia finché F5 non lo aggiunge a jobTypes,
 	//     così la riga resta 'pending' senza uno stub che finge di lavorare.
-	maJobTypeFilingSearch  = "filing_search"
-	maJobTypeFilingAcquire = "filing_acquire"
-	maJobTypeFilingIngest  = "filing_ingest"
+	//   - filing_narrative: rigenerazione asincrona della lettura narrativa NI (issue
+	//     #80) sulle pagine già persistite (mai re-OCR, mai vendor — solo LLM). Dedup
+	//     inflight su payload->>'filingId' (migrazione 118).
+	maJobTypeFilingSearch    = "filing_search"
+	maJobTypeFilingAcquire   = "filing_acquire"
+	maJobTypeFilingIngest    = "filing_ingest"
+	maJobTypeFilingNarrative = "filing_narrative"
 
 	maJobStatusQueued  = "queued"
 	maJobStatusRunning = "running"

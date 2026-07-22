@@ -319,6 +319,28 @@ func (f *fakeFilingStore) ListMANIAutoReconfirmCandidates(context.Context, strin
 	return nil, nil
 }
 
+// NI narrative reading (issue #80, Fase N1): stubs keep the fake satisfying maFilingStore. The
+// narrative runner is unit-tested against the SQL store / exercised end-to-end elsewhere.
+func (f *fakeFilingStore) CreateMANINarrativeRun(context.Context, string, string, string, string, string) (string, error) {
+	return "", nil
+}
+
+func (f *fakeFilingStore) GetActiveMANINarrativeRun(context.Context, string) (*maNINarrativeRun, error) {
+	return nil, nil
+}
+
+func (f *fakeFilingStore) SetMANINarrativeRunStatus(context.Context, string, string, bool) error {
+	return nil
+}
+
+func (f *fakeFilingStore) InsertMANIObservations(context.Context, string, []maNIObservation) (int, error) {
+	return 0, nil
+}
+
+func (f *fakeFilingStore) ListMANIObservationsByRun(context.Context, string) ([]maNIObservation, error) {
+	return nil, nil
+}
+
 // F8 HTTP-endpoint interface additions (unused by the F4–F7 job tests; stubs keep the fake
 // satisfying maFilingStore).
 func (f *fakeFilingStore) GetMAFilingByBlob(context.Context, string, string) (*maFiling, error) {

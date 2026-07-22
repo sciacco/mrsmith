@@ -48,6 +48,7 @@ var (
 	errMANIRatifiedTreatmentInvalid          = errors.New("ma ni ratified treatment invalid")
 	errMANIRatifiedTreatmentRequired         = errors.New("ma ni ratified treatment required")
 	errMANIRatifiedAmountRequired            = errors.New("ma ni ratified amount required")
+	errMANINarrativeNotRegenerable           = errors.New("ma ni narrative not regenerable")
 )
 
 // ---------------------------------------------------------------------------
@@ -903,4 +904,138 @@ func validateMANIRatify(p maNIProposal, amount *float64, ratifiedTreatment strin
 		}
 	}
 	return nil
+}
+
+// ---------------------------------------------------------------------------
+// 9. GET filings/{id}/narrative  +  10. POST filings/{id}/narrative/regenerate (issue #80).
+// ---------------------------------------------------------------------------
+
+// MAFilingNarrativeResponse is the nota-integrativa NARRATIVE reading of a filing's current run:
+// its status + budget-truncation flag + the immutable context observations (attribuzioni | rischi
+// | piani | profilo). Additive to the filing surface; carries no numbers and no prices.
+type MAFilingNarrativeResponse struct {
+	RunID        string                `json:"runId,omitempty"`
+	Status       string                `json:"status"` // absent | running | ready | failed
+	GeneratedAt  *time.Time            `json:"generatedAt,omitempty"`
+	Truncated    bool                  `json:"truncated"`
+	Observations []MANIObservationView `json:"observations"`
+}
+
+// MANIObservationView is one narrative observation for the UI (no amount — qualitative by design).
+type MANIObservationView struct {
+	ID     string `json:"id"`
+	Tipo   string `json:"tipo"`
+	Claim  string `json:"claim,omitempty"`
+	Quote  string `json:"quote,omitempty"`
+	PageNo *int   `json:"pageNo,omitempty"`
+}
+
+// MAFilingNarrativeRegenerateResponse acknowledges an enqueued regeneration ("in corso").
+type MAFilingNarrativeRegenerateResponse struct {
+	Status string `json:"status"`
+}
+
+// maNINarrativeStatusAbsent is the GET status when a filing has no narrative run yet (the mig-118
+// binding is not applied, or the ingest predates the narrative feature): the UI offers "Genera".
+const maNINarrativeStatusAbsent = "absent"
+
+// getFilingNarrative returns the filing's current narrative run + its observations (SELECT-only).
+// 'absent' when no run exists yet. 404 when the filing itself is unknown.
+func (s *maService) getFilingNarrative(ctx context.Context, filingID string) (MAFilingNarrativeResponse, error) {
+	if s.store == nil || s.filing == nil {
+		return MAFilingNarrativeResponse{}, errMAStoreUnavailable
+	}
+	filing, err := s.filing.GetMAFiling(ctx, filingID)
+	if err != nil {
+		return MAFilingNarrativeResponse{}, err
+	}
+	if filing == nil {
+		return MAFilingNarrativeResponse{}, errMAFilingNotFound
+	}
+	resp := MAFilingNarrativeResponse{Status: maNINarrativeStatusAbsent, Observations: []MANIObservationView{}}
+	run, err := s.filing.GetActiveMANINarrativeRun(ctx, filingID)
+	if err != nil {
+		// mig 118 not applied ⇒ narrative tables absent (42P01): report "absent", never 500 —
+		// the whole scheda would otherwise error on every open before the migration lands.
+		if maNINarrativeSchemaMissing(err) {
+			return resp, nil
+		}
+		return MAFilingNarrativeResponse{}, err
+	}
+	if run == nil {
+		return resp, nil
+	}
+	resp.RunID = run.ID
+	resp.Status = run.Status
+	resp.Truncated = run.Truncated
+	generatedAt := run.CreatedAt
+	resp.GeneratedAt = &generatedAt
+	observations, err := s.filing.ListMANIObservationsByRun(ctx, run.ID)
+	if err != nil {
+		// Defensive symmetry: both tables ship in mig 118 together, so if the run table resolved
+		// the observation table is present too — but tolerate 42P01 here as well (run kept, no
+		// observations) rather than 500.
+		if maNINarrativeSchemaMissing(err) {
+			return resp, nil
+		}
+		return MAFilingNarrativeResponse{}, err
+	}
+	for _, o := range observations {
+		resp.Observations = append(resp.Observations, MANIObservationView{
+			ID:     o.ID,
+			Tipo:   o.Tipo,
+			Claim:  o.Claim,
+			Quote:  o.Quote,
+			PageNo: o.PageNo,
+		})
+	}
+	return resp, nil
+}
+
+// regenerateFilingNarrative enqueues an async narrative regeneration for a ready|degraded filing.
+// It works ONLY on the persisted OCR pages (never re-OCR, never a vendor call — LLM only). The
+// registry binding (scope ma_ni_narrative) is resolved SYNCHRONOUSLY here so a missing binding
+// (mig 118 not applied) fails the POST with a clear config error instead of silently enqueuing a
+// job that would never produce a narrative. The durable filing_narrative job is deduped on the
+// filing id (mig-118 inflight index) so a double-click enqueues at most one; the «in corso» state
+// becomes observable via GET once the worker opens the run.
+func (s *maService) regenerateFilingNarrative(ctx context.Context, filingID, subject, email string) (MAFilingNarrativeRegenerateResponse, error) {
+	if s.store == nil || s.filing == nil {
+		return MAFilingNarrativeRegenerateResponse{}, errMAStoreUnavailable
+	}
+	if s.llmp == nil {
+		return MAFilingNarrativeRegenerateResponse{}, errMALLMConfigUnavailable
+	}
+	filing, err := s.filing.GetMAFiling(ctx, filingID)
+	if err != nil {
+		return MAFilingNarrativeRegenerateResponse{}, err
+	}
+	if filing == nil {
+		return MAFilingNarrativeRegenerateResponse{}, errMAFilingNotFound
+	}
+	if filing.Status != maFilingStatusReady && filing.Status != maFilingStatusDegraded {
+		return MAFilingNarrativeRegenerateResponse{}, errMANINarrativeNotRegenerable
+	}
+	// Config guard: a missing model/prompt binding surfaces a clear error at the POST (not silent).
+	if _, err := s.llmp.ResolveModel(ctx, maModelScopeNINarrative, ""); err != nil {
+		return MAFilingNarrativeRegenerateResponse{}, llmConfigError(err)
+	}
+	if _, err := s.llmp.ResolvePrompt(ctx, maModelScopeNINarrative, ""); err != nil {
+		return MAFilingNarrativeRegenerateResponse{}, llmConfigError(err)
+	}
+	payload, err := json.Marshal(maFilingNarrativeJobPayload{FilingID: filingID})
+	if err != nil {
+		return MAFilingNarrativeRegenerateResponse{}, err
+	}
+	if _, _, err := s.store.EnqueueMAJob(ctx, maJobEnqueue{
+		JobType: maJobTypeFilingNarrative,
+		Status:  maJobStatusPending,
+		Subject: subject,
+		Email:   email,
+		Payload: payload,
+		Owner:   s.owner,
+	}); err != nil {
+		return MAFilingNarrativeRegenerateResponse{}, err
+	}
+	return MAFilingNarrativeRegenerateResponse{Status: maNINarrativeStatusRunning}, nil
 }

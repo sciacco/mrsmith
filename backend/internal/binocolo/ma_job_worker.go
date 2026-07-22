@@ -64,7 +64,8 @@ func newMAJobWorker(svc *maService, store maJobWorkerStore, owner string) *maJob
 			maJobTypeCardDomainVerify,
 			maJobTypeFilingSearch,
 			maJobTypeFilingAcquire,
-			maJobTypeFilingIngest, // F5 activates the ingest dispatch (F4 only enqueued it).
+			maJobTypeFilingIngest,    // F5 activates the ingest dispatch (F4 only enqueued it).
+			maJobTypeFilingNarrative, // #80: async NI narrative regeneration (persisted pages only).
 		},
 	}
 }
@@ -145,6 +146,8 @@ func (w *maJobWorker) process(ctx context.Context, job maJob) {
 		traceID, err = w.svc.runFilingAcquireJob(ctx, job)
 	case maJobTypeFilingIngest:
 		traceID, err = w.svc.runFilingIngestJob(ctx, job)
+	case maJobTypeFilingNarrative:
+		traceID, err = w.svc.runFilingNarrativeJob(ctx, job)
 	default:
 		logging.FromContext(ctx).Warn("binocolo job worker skipped unknown job type", "component", "binocolo", "job_id", job.ID, "job_type", job.JobType)
 		return
@@ -212,6 +215,11 @@ func (w *maJobWorker) retryOrFail(ctx context.Context, job maJob, code string) {
 		// Terminal give-up on an infra error: fail the filing UNLESS it is identity_blocked
 		// (awaits a manual override). There is no 'unknown' state for the ingest.
 		w.svc.failFilingIngestIfNotBlocked(ctx, job, code)
+	case maJobTypeFilingNarrative:
+		// Terminal give-up on an infra error (the LLM/generation failure is swallowed inside
+		// the job and never reaches here): mark any 'running' narrative run 'failed' so it is
+		// regenerable. The filing outcome is never touched by the narrative.
+		w.svc.failMANINarrativeOnGiveUp(ctx, job)
 	}
 	// Terminal give-up: drop any filing vendor-poll throttle entry (no-op for other types).
 	w.svc.clearFilingVendorPoll(job.ID)
@@ -282,6 +290,8 @@ func classifyMAJobError(err error, jobType string) string {
 			return "filing_acquire_failed"
 		case maJobTypeFilingIngest:
 			return "filing_ingest_failed"
+		case maJobTypeFilingNarrative:
+			return "filing_narrative_failed"
 		default:
 			return "estimate_failed"
 		}

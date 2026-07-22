@@ -215,6 +215,12 @@ func (s *maService) filingIngestNIReading(ctx context.Context, filing *maFiling,
 		return err
 	}
 	s.filingIngestTrace(ctx, "ni_done", maFilingSysInternal, maTraceEventSucceeded, map[string]any{"filing_id": filing.ID, "status": status, "proposals": len(proposals)}, "")
+
+	// NI NARRATIVE reading (issue #80, Fase N1): a SEPARATE analysis run AFTER the proposals
+	// reading in the SAME tick. Best-effort by contract — its failure NEVER changes the filing
+	// outcome (ready|degraded already decided by the proposals above), it only logs and leaves a
+	// regenerable 'failed' run.
+	s.runMANINarrativeBestEffort(ctx, filing, requestID)
 	return nil
 }
 
@@ -500,46 +506,56 @@ func validateMANICitation(prop maNIProposalLLM, idx maNIPageIndex) maNICitationV
 		v.Discard = true
 		return v
 	}
+	grounded, correctedPage, note := maNIQuoteGrounding(quoteNorm, prop.PageNo, idx)
+	if !grounded {
+		v.Discard = true
+		return v
+	}
+	v.CorrectedPage = correctedPage
+	v.Note = note
 
-	grounded := false
-	if prop.PageNo != nil {
-		pn := *prop.PageNo
+	if !maNICitationAmountGrounded(prop.Quote, prop) {
+		v.AmountMissing = true
+	}
+	return v
+}
+
+// maNIQuoteGrounding is the shared mechanical anchor of a citation to the REASSEMBLED OCR text
+// (tables inlined via maFilingPageText in buildMANIPageIndex) — used by BOTH the proposals reading
+// (validateMANICitation) and the narrative reading (issue #80). The normalized quote must occur in
+// the normalized markdown of the cited page — or, tolerating an OCR off-by-one, page ±1 — else,
+// when no page is cited, the first page it occurs on in page order. It NEVER fabricates text.
+// Returns: grounded; the corrected page (the neighbor/deduced page the quote was actually found
+// on, nil when the cited page matched); and a human-readable correction note ("" when none).
+func maNIQuoteGrounding(quoteNorm string, pageNo *int, idx maNIPageIndex) (grounded bool, correctedPage *int, note string) {
+	if quoteNorm == "" {
+		return false, nil, ""
+	}
+	if pageNo != nil {
+		pn := *pageNo
 		for _, cand := range []int{pn, pn - 1, pn + 1} {
 			txt, ok := idx.norm[cand]
 			if !ok {
 				continue
 			}
 			if strings.Contains(txt, quoteNorm) {
-				grounded = true
 				if cand != pn {
 					c := cand
-					v.CorrectedPage = &c
-					v.Note = fmt.Sprintf("pagina citazione corretta da %d a %d", pn, cand)
+					return true, &c, fmt.Sprintf("pagina citazione corretta da %d a %d", pn, cand)
 				}
-				break
+				return true, nil, ""
 			}
 		}
-	} else {
-		// No page cited: search in page order (deterministic) and adopt the first match.
-		for _, pageNo := range idx.order {
-			if strings.Contains(idx.norm[pageNo], quoteNorm) {
-				grounded = true
-				c := pageNo
-				v.CorrectedPage = &c
-				v.Note = fmt.Sprintf("pagina citazione dedotta: %d", pageNo)
-				break
-			}
+		return false, nil, ""
+	}
+	// No page cited: search in page order (deterministic) and adopt the first match.
+	for _, p := range idx.order {
+		if strings.Contains(idx.norm[p], quoteNorm) {
+			c := p
+			return true, &c, fmt.Sprintf("pagina citazione dedotta: %d", p)
 		}
 	}
-	if !grounded {
-		v.Discard = true
-		return v
-	}
-
-	if !maNICitationAmountGrounded(prop.Quote, prop) {
-		v.AmountMissing = true
-	}
-	return v
+	return false, nil, ""
 }
 
 // maNICitationAmountGrounded reports whether the proposal's declared amount(s) appear in its

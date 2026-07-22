@@ -175,6 +175,8 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("GET /binocolo/v1/ma/filings/{id}/pdf", h.handleGetMAFilingPDF)
 	handle("GET /binocolo/v1/ma/filings/{id}/proposals", h.handleGetMAFilingProposals)
 	handle("POST /binocolo/v1/ma/proposals/{id}/decision", h.handleDecideMANIProposal)
+	handle("GET /binocolo/v1/ma/filings/{id}/narrative", h.handleGetMAFilingNarrative)
+	handle("POST /binocolo/v1/ma/filings/{id}/narrative/regenerate", h.handleRegenerateMAFilingNarrative)
 	handle("GET /binocolo/v1/ma/sessions", h.handleListMASessions)
 	handle("POST /binocolo/v1/ma/sessions", h.handleCreateMASession)
 	handle("GET /binocolo/v1/ma/sessions/{id}", h.handleGetMASession)
@@ -2102,6 +2104,9 @@ func maHTTPError(err error) (int, string, string) {
 	}
 	if errors.Is(err, errMANIRatifiedAmountRequired) {
 		return http.StatusUnprocessableEntity, "ratified_amount_required", "warn"
+	}
+	if errors.Is(err, errMANINarrativeNotRegenerable) {
+		return http.StatusConflict, "narrative_not_regenerable", "warn"
 	}
 	// Per-company brief regeneration (issue #78, Fase 9).
 	if errors.Is(err, errMADeepBriefDeepAbsent) {
