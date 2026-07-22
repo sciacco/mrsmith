@@ -251,6 +251,25 @@ ORDER BY created_at, id`, runID)
 	return out, nil
 }
 
+// GetMANIProposal returns one proposal by id, or (nil, nil) when absent. The decision endpoint
+// (F8) reads it to validate the requested action against the proposal's direction/candidate
+// treatment before appending a decision.
+func (s *SQLStore) GetMANIProposal(ctx context.Context, id string) (*maNIProposal, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	p, err := scanMANIProposal(s.db.QueryRowContext(ctx, `SELECT `+maNIProposalColumns+`
+FROM binocolo.ma_ni_proposal
+WHERE id = $1::uuid`, id))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get ma ni proposal: %w", err)
+	}
+	return &p, nil
+}
+
 // ---------------------------------------------------------------------------
 // ma_ni_decision — append-only analyst decisions (ratify / reject / revoke).
 // ---------------------------------------------------------------------------

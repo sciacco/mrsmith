@@ -615,6 +615,15 @@ type MACompanyOverview struct {
 	Deep        *MADeepAnalysis               `json:"deep,omitempty"`
 	Appearances []MACompanyOverviewAppearance `json:"appearances"`
 	Cards       []MACompanyOverviewCard       `json:"cards"`
+	// Deposited-filing extension (issue #78, Fase 8). Additive only — the fields above are
+	// unchanged (the production scheda depends on them). Adjusted is the on-read adjusted
+	// valuation (nil when no deep analysis exists for the fiscal identity); BriefStale is true
+	// when the cached brief predates the newest aligned nota-integrativa decision on the
+	// canonical filing; FilingsCount is the number of deposited fascicoli for the identity.
+	Adjusted         *MAAdjustedView `json:"adjusted,omitempty"`
+	BriefStale       bool            `json:"briefStale"`
+	BriefGeneratedAt *time.Time      `json:"briefGeneratedAt,omitempty"`
+	FilingsCount     int             `json:"filingsCount"`
 }
 
 // MACompanySearchResponse is the read-only index of companies already seen by

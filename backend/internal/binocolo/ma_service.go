@@ -921,7 +921,63 @@ func (s *maService) getCompanyOverview(ctx context.Context, companyKey string) (
 			overview.Cards[i].LastEvent = latestEvents[overview.Cards[i].CompanyKey]
 		}
 	}
+	if err := s.hydrateOverviewFilingExtension(ctx, companyKey, &overview); err != nil {
+		return MACompanyOverview{}, err
+	}
 	return overview, nil
+}
+
+// hydrateOverviewFilingExtension adds the deposited-filing fields (adjusted view, brief
+// staleness, filings count) to the company overview — ON READ, no writes (issue #78, Fase 8).
+// It is best-effort about identity: a company with no valid fiscal identity simply leaves the
+// extension empty (no error). Real store errors propagate, so a broken DB is not masked.
+func (s *maService) hydrateOverviewFilingExtension(ctx context.Context, companyKey string, overview *MACompanyOverview) error {
+	identity, _, err := s.resolveCompanyDeepDiveIdentity(ctx, companyKey)
+	if err != nil {
+		if errors.Is(err, errMAStrategyInvalid) {
+			return nil // no fiscal identity: extension stays empty (not an error)
+		}
+		return err
+	}
+	fiscalKey := buildMAFiscalKey(identity.VATCode, identity.TaxCode)
+	if fiscalKey == "" {
+		return nil
+	}
+	if s.filing != nil {
+		filings, ferr := s.filing.ListMAFilingsByFiscalKey(ctx, fiscalKey)
+		if ferr != nil {
+			return ferr
+		}
+		overview.FilingsCount = len(filings)
+	}
+	// The adjusted view + brief staleness need the vendor baseline deep record for the fiscal
+	// identity (ready-preferred). Absent ⇒ adjusted stays nil (nothing to adjust).
+	deep, derr := s.store.GetMADeepByFiscalIdentity(ctx, identity.VATCode, identity.TaxCode)
+	if derr != nil {
+		return derr
+	}
+	if deep == nil {
+		return nil
+	}
+	overview.BriefGeneratedAt = deep.BriefGeneratedAt
+	adjusted, aerr := s.computeMAAdjustedView(ctx, identity, deep)
+	if aerr != nil {
+		return aerr
+	}
+	overview.Adjusted = adjusted
+	// Staleness: only a canonical filing (status active|no_effects) yields decisions to compare;
+	// otherwise there is nothing that could have superseded the brief ⇒ not stale.
+	var maxDecision *time.Time
+	if adjusted != nil && adjusted.FilingID != "" &&
+		(adjusted.Status == maAdjustedStatusActive || adjusted.Status == maAdjustedStatusNoEffects) &&
+		s.filing != nil {
+		maxDecision, err = s.filing.GetMaxMANIDecisionCreatedAt(ctx, adjusted.FilingID)
+		if err != nil {
+			return err
+		}
+	}
+	overview.BriefStale = maDeepBriefStale(deep.BriefGeneratedAt, maxDecision)
+	return nil
 }
 
 // maPricing holds the business pricing/budget levers, sourced from the

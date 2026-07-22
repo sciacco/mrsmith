@@ -493,13 +493,19 @@ WHERE id = $1::uuid
 // filing whose fiscal identity could NOT be READ from page 1. Set-once: it succeeds (rows
 // affected == 1) only while identity_override_at IS NULL.
 //
-// Contract (orchestrator, correcting the earlier F3 decision): the override is allowed
-// ONLY from 'pending_validation' (the identity was unreadable). A 'mismatch' — a readable
-// page-1 identity that DIFFERS from the expected one — is a HARD BLOCK and is NEVER
-// overridable ("Mismatch leggibile = blocco duro; illeggibile = override esplicito
-// auditabile"): accepting a document that self-declares a different company would defeat
-// the identity guarantee. 'validated' needs no override and 'override' is already
-// terminal, so both are excluded too.
+// Contract (orchestrator, correcting the earlier F3 decision): the override resolves ONLY the
+// unreadable soft-block, i.e. a filing that the ingest already parked at status
+// 'identity_blocked' with identity_status 'pending_validation' (page 1 could not be read). Both
+// guards are required:
+//   - identity_status = 'pending_validation' is ALSO the transient pre-gate state of a freshly
+//     created upload; without the status guard an override fired before the first ingest tick
+//     would silently skip the page-1 validation entirely.
+//   - status = 'identity_blocked' proves the gate ran and blocked on an unreadable identity.
+//
+// A 'mismatch' — a readable page-1 identity that DIFFERS from the expected one — is a HARD BLOCK
+// and is NEVER overridable ("Mismatch leggibile = blocco duro; illeggibile = override esplicito
+// auditabile"): accepting a document that self-declares a different company would defeat the
+// identity guarantee. 'validated' needs no override and 'override' is already terminal.
 func (s *SQLStore) ApplyMAFilingIdentityOverride(ctx context.Context, id, subject, email, reason string) (bool, error) {
 	if s == nil || s.db == nil {
 		return false, errors.New("binocolo ma store not configured")
@@ -514,6 +520,7 @@ SET identity_status = 'override',
 WHERE id = $1::uuid
   AND identity_override_at IS NULL
   AND identity_status = 'pending_validation'
+  AND status = 'identity_blocked'
 `, id, subject, email, reason)
 	if err != nil {
 		return false, fmt.Errorf("apply ma filing identity override: %w", err)
@@ -1352,4 +1359,175 @@ WHERE f.status IN ('queued', 'ocr', 'parse')
 		return nil, fmt.Errorf("iterate ma filing ingest orphans: %w", err)
 	}
 	return out, nil
+}
+
+// ---------------------------------------------------------------------------
+// F8 read helpers (HTTP endpoints) — SELECT-only projections for the scheda.
+// ---------------------------------------------------------------------------
+
+// GetMAFilingByBlob resolves the filing for a fiscal identity + canonical blob md5 (the
+// upload dedup key), or (nil, nil) when none. Read-only sibling of the tx-scoped
+// findMAFilingByBlobTx: the upload endpoint uses it to short-circuit a re-ingest on a
+// bit-identical re-upload without opening the create/merge transaction.
+func (s *SQLStore) GetMAFilingByBlob(ctx context.Context, fiscalKey, blobMD5 string) (*maFiling, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	f, err := scanMAFiling(s.db.QueryRowContext(ctx, `SELECT `+maFilingColumns+`
+FROM binocolo.ma_filing
+WHERE fiscal_key = $1 AND blob_md5 = $2
+LIMIT 1`, fiscalKey, blobMD5))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get ma filing by blob: %w", err)
+	}
+	return &f, nil
+}
+
+// ListMAFilingOrigins returns, per filing id, the DISTINCT acquisition origins that produced
+// it (upload | docuengine, ordered), so the scheda can badge how a fascicolo entered. Empty
+// input ⇒ no query; a filing with no acquisition row (should not happen) simply maps to nil.
+func (s *SQLStore) ListMAFilingOrigins(ctx context.Context, filingIDs []string) (map[string][]string, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	out := map[string][]string{}
+	if len(filingIDs) == 0 {
+		return out, nil
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT DISTINCT filing_id::text, origin
+FROM binocolo.ma_filing_acquisition
+WHERE filing_id = ANY(string_to_array($1, ',')::uuid[])
+ORDER BY filing_id::text, origin`, strings.Join(filingIDs, ","))
+	if err != nil {
+		return nil, fmt.Errorf("list ma filing origins: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var filingID, origin string
+		if err := rows.Scan(&filingID, &origin); err != nil {
+			return nil, fmt.Errorf("scan ma filing origin: %w", err)
+		}
+		out[filingID] = append(out[filingID], origin)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma filing origins: %w", err)
+	}
+	return out, nil
+}
+
+// GetLatestMAFilingSearch returns the most recent search for a fiscal identity regardless of
+// status (the fallback when no search sits at 'results'), or (nil, nil) when none.
+func (s *SQLStore) GetLatestMAFilingSearch(ctx context.Context, fiscalKey string) (*maFilingSearch, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	rec, err := scanMAFilingSearch(s.db.QueryRowContext(ctx, `SELECT `+maFilingSearchColumns+`
+FROM binocolo.ma_filing_search
+WHERE fiscal_key = $1
+ORDER BY updated_at DESC, created_at DESC
+LIMIT 1`, fiscalKey))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get latest ma filing search: %w", err)
+	}
+	return &rec, nil
+}
+
+// GetInflightMAFilingSearchID returns the searchId carried by the currently in-flight
+// filing_search job for a fiscal identity (pending|processing), or "" when none is in flight.
+// The search endpoint uses it to report the LIVE search rather than the just-created intent row
+// (which, on an enqueue dedup, is a harmless orphan that no job references — F8 pendenza).
+func (s *SQLStore) GetInflightMAFilingSearchID(ctx context.Context, fiscalKey string) (string, error) {
+	if s == nil || s.db == nil {
+		return "", errors.New("binocolo ma store not configured")
+	}
+	var searchID string
+	err := s.db.QueryRowContext(ctx, `
+SELECT payload->>'searchId'
+FROM binocolo.ma_job
+WHERE job_type = $2
+  AND status IN ('pending', 'processing')
+  AND payload->>'fiscalKey' = $1
+ORDER BY created_at DESC
+LIMIT 1`, fiscalKey, maJobTypeFilingSearch).Scan(&searchID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("get inflight ma filing search id: %w", err)
+	}
+	return strings.TrimSpace(searchID), nil
+}
+
+// maFilingAcquisitionInflight is the compact acquisition status the scheda polls: which
+// balance sheets are still being procured for a fiscal identity.
+type maFilingAcquisitionInflight struct {
+	ID             string
+	Status         string
+	BalanceSheetID string
+}
+
+// ListMAFilingAcquisitionsInflight returns the acquisitions still being worked for a fiscal
+// identity — joined through the in-flight filing_acquire jobs (pending|processing) on
+// payload->>'fiscalKey', since an acquisition row is bound to its filing only on completion and
+// carries no fiscal_key of its own. Ordered oldest-first for a stable UI list.
+func (s *SQLStore) ListMAFilingAcquisitionsInflight(ctx context.Context, fiscalKey string) ([]maFilingAcquisitionInflight, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("binocolo ma store not configured")
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT a.id::text, a.status, COALESCE(a.balance_sheet_id, '')
+FROM binocolo.ma_job j
+JOIN binocolo.ma_filing_acquisition a ON a.id = (j.payload->>'acquisitionId')::uuid
+WHERE j.job_type = $2
+  AND j.status IN ('pending', 'processing')
+  AND j.payload->>'fiscalKey' = $1
+ORDER BY a.created_at`, fiscalKey, maJobTypeFilingAcquire)
+	if err != nil {
+		return nil, fmt.Errorf("list ma filing acquisitions inflight: %w", err)
+	}
+	defer rows.Close()
+	out := []maFilingAcquisitionInflight{}
+	for rows.Next() {
+		var a maFilingAcquisitionInflight
+		if err := rows.Scan(&a.ID, &a.Status, &a.BalanceSheetID); err != nil {
+			return nil, fmt.Errorf("scan ma filing acquisition inflight: %w", err)
+		}
+		out = append(out, a)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ma filing acquisitions inflight: %w", err)
+	}
+	return out, nil
+}
+
+// GetMAFilingLatestAcquisitionContext returns the context_company_key of the most recent
+// acquisition bound to a filing ("" when none / all blank). It backs the identity-override
+// re-enqueue: the resumed ingest needs a context company key to trigger the baseline deep-dive
+// (an empty one is tolerated — the enqueue guard simply skips the baseline, leaving a degraded
+// filing rather than a wrong-identity baseline).
+func (s *SQLStore) GetMAFilingLatestAcquisitionContext(ctx context.Context, filingID string) (string, error) {
+	if s == nil || s.db == nil {
+		return "", errors.New("binocolo ma store not configured")
+	}
+	var ctxKey string
+	err := s.db.QueryRowContext(ctx, `
+SELECT COALESCE(context_company_key, '')
+FROM binocolo.ma_filing_acquisition
+WHERE filing_id = $1::uuid
+ORDER BY updated_at DESC
+LIMIT 1`, filingID).Scan(&ctxKey)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("get ma filing latest acquisition context: %w", err)
+	}
+	return strings.TrimSpace(ctxKey), nil
 }

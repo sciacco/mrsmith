@@ -162,6 +162,17 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/registry/facts", h.handleCreateMACompanyFact)
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/registry/facts/{factId}/revoke", h.handleRevokeMACompanyFact)
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/registry/notes", h.handleCreateMACompanyNote)
+	// Deposited-filing pipeline (issue #78, Fase 8). Company-scoped filing lifecycle + the
+	// filing/proposal-scoped operations. Identity is resolved from {companyKey}; filings are
+	// keyed by fiscal identity, never company_key.
+	handle("GET /binocolo/v1/ma/companies/{companyKey}/filings", h.handleListMAFilings)
+	handle("POST /binocolo/v1/ma/companies/{companyKey}/filings", h.handleUploadMAFiling)
+	handle("POST /binocolo/v1/ma/companies/{companyKey}/filings/search", h.handleSearchMAFilings)
+	handle("POST /binocolo/v1/ma/companies/{companyKey}/filings/acquire", h.handleAcquireMAFilings)
+	handle("POST /binocolo/v1/ma/filings/{id}/identity-override", h.handleOverrideMAFilingIdentity)
+	handle("GET /binocolo/v1/ma/filings/{id}/pdf", h.handleGetMAFilingPDF)
+	handle("GET /binocolo/v1/ma/filings/{id}/proposals", h.handleGetMAFilingProposals)
+	handle("POST /binocolo/v1/ma/proposals/{id}/decision", h.handleDecideMANIProposal)
 	handle("GET /binocolo/v1/ma/sessions", h.handleListMASessions)
 	handle("POST /binocolo/v1/ma/sessions", h.handleCreateMASession)
 	handle("GET /binocolo/v1/ma/sessions/{id}", h.handleGetMASession)
@@ -2004,6 +2015,52 @@ func maHTTPError(err error) (int, string, string) {
 	}
 	if errors.Is(err, errMACardDossierNotFound) {
 		return http.StatusNotFound, "ma_card_dossier_not_found", "warn"
+	}
+	// Deposited-filing endpoints (issue #78, Fase 8).
+	if errors.Is(err, errMAFilingIdentityUnresolved) {
+		return http.StatusUnprocessableEntity, "filing_identity_unresolved", "warn"
+	}
+	if errors.Is(err, errMAFilingInvalidPDF) {
+		return http.StatusUnprocessableEntity, "invalid_pdf", "warn"
+	}
+	if errors.Is(err, errMAFilingEmptyUpload) {
+		return http.StatusUnprocessableEntity, "empty_file", "warn"
+	}
+	if errors.Is(err, errMAFilingTooLarge) {
+		return http.StatusRequestEntityTooLarge, "file_too_large", "warn"
+	}
+	if errors.Is(err, errMAFilingNotFound) {
+		return http.StatusNotFound, "filing_not_found", "warn"
+	}
+	if errors.Is(err, errMAFilingBlobMissing) {
+		return http.StatusNotFound, "filing_blob_missing", "warn"
+	}
+	if errors.Is(err, errMAFilingReasonRequired) {
+		return http.StatusUnprocessableEntity, "reason_required", "warn"
+	}
+	if errors.Is(err, errMAFilingIdentityOverrideNotApplicable) {
+		return http.StatusConflict, "identity_override_not_applicable", "warn"
+	}
+	if errors.Is(err, errMAFilingSearchIDRequired) {
+		return http.StatusUnprocessableEntity, "search_id_required", "warn"
+	}
+	if errors.Is(err, errMAFilingBalanceSheetsRequired) {
+		return http.StatusUnprocessableEntity, "balance_sheet_ids_required", "warn"
+	}
+	if errors.Is(err, errMANIProposalNotFound) {
+		return http.StatusNotFound, "proposal_not_found", "warn"
+	}
+	if errors.Is(err, errMANIActionInvalid) {
+		return http.StatusUnprocessableEntity, "invalid_action", "warn"
+	}
+	if errors.Is(err, errMANIRatifiedTreatmentInvalid) {
+		return http.StatusUnprocessableEntity, "invalid_ratified_treatment", "warn"
+	}
+	if errors.Is(err, errMANIRatifiedTreatmentRequired) {
+		return http.StatusUnprocessableEntity, "ratified_treatment_required", "warn"
+	}
+	if errors.Is(err, errMANIRatifiedAmountRequired) {
+		return http.StatusUnprocessableEntity, "ratified_amount_required", "warn"
 	}
 	if errors.Is(err, sql.ErrNoRows) || strings.Contains(err.Error(), "no rows in result set") {
 		return http.StatusNotFound, "ma_session_not_found", "warn"

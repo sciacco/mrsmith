@@ -72,6 +72,7 @@ type maFilingStore interface {
 	SetMAFilingAcquisitionRequested(ctx context.Context, id, docuRequestID string) error
 	SetMAFilingAcquisitionDownloaded(ctx context.Context, id string) error
 	CompleteMAFilingAcquisition(ctx context.Context, id, filingID string) error
+	LinkMAFilingAcquisitionFiling(ctx context.Context, id, filingID string) error
 	FailMAFilingAcquisition(ctx context.Context, id, errMsg string) error
 	SetMAFilingAcquisitionUnknown(ctx context.Context, id, errMsg string) error
 	AdoptMAFilingAcquisitionRequest(ctx context.Context, id, docuRequestID string) error
@@ -98,6 +99,16 @@ type maFilingStore interface {
 	SweepMAFilingIngestOrphans(ctx context.Context, olderThan time.Duration) ([]maFilingIngestOrphan, error)
 	// on-read adjusted view (F7): the canonical filing is resolved from the fiscal key's filings.
 	ListMAFilingsByFiscalKey(ctx context.Context, fiscalKey string) ([]maFiling, error)
+	// F8 HTTP endpoints (SELECT-only projections + upload dedup + override re-enqueue context).
+	GetMAFilingByBlob(ctx context.Context, fiscalKey, blobMD5 string) (*maFiling, error)
+	ListMAFilingOrigins(ctx context.Context, filingIDs []string) (map[string][]string, error)
+	GetLatestMAFilingSearchWithResults(ctx context.Context, fiscalKey string) (*maFilingSearch, error)
+	GetLatestMAFilingSearch(ctx context.Context, fiscalKey string) (*maFilingSearch, error)
+	GetInflightMAFilingSearchID(ctx context.Context, fiscalKey string) (string, error)
+	ListMAFilingAcquisitionsInflight(ctx context.Context, fiscalKey string) ([]maFilingAcquisitionInflight, error)
+	GetMAFilingLatestAcquisitionContext(ctx context.Context, filingID string) (string, error)
+	ApplyMAFilingIdentityOverride(ctx context.Context, id, subject, email, reason string) (bool, error)
+	GetMANIProposal(ctx context.Context, id string) (*maNIProposal, error)
 	// NI reading (F6): reading run + immutable proposals + append-only decisions.
 	CreateMANIReadingRun(ctx context.Context, filingID, processingRunID, promptID, modelID, requestID string) (string, error)
 	GetActiveMANIReadingRun(ctx context.Context, filingID string) (*maNIReadingRun, error)

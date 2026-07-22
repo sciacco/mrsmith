@@ -323,6 +323,39 @@ func (f *fakeFilingStore) ListMANIAutoReconfirmCandidates(context.Context, strin
 	return nil, nil
 }
 
+// F8 HTTP-endpoint interface additions (unused by the F4–F7 job tests; stubs keep the fake
+// satisfying maFilingStore).
+func (f *fakeFilingStore) GetMAFilingByBlob(context.Context, string, string) (*maFiling, error) {
+	return nil, nil
+}
+func (f *fakeFilingStore) ListMAFilingOrigins(context.Context, []string) (map[string][]string, error) {
+	return map[string][]string{}, nil
+}
+func (f *fakeFilingStore) GetLatestMAFilingSearchWithResults(context.Context, string) (*maFilingSearch, error) {
+	return nil, nil
+}
+func (f *fakeFilingStore) GetLatestMAFilingSearch(context.Context, string) (*maFilingSearch, error) {
+	return nil, nil
+}
+func (f *fakeFilingStore) GetInflightMAFilingSearchID(context.Context, string) (string, error) {
+	return "", nil
+}
+func (f *fakeFilingStore) ListMAFilingAcquisitionsInflight(context.Context, string) ([]maFilingAcquisitionInflight, error) {
+	return nil, nil
+}
+func (f *fakeFilingStore) GetMAFilingLatestAcquisitionContext(context.Context, string) (string, error) {
+	return "", nil
+}
+func (f *fakeFilingStore) LinkMAFilingAcquisitionFiling(context.Context, string, string) error {
+	return nil
+}
+func (f *fakeFilingStore) ApplyMAFilingIdentityOverride(context.Context, string, string, string, string) (bool, error) {
+	return false, nil
+}
+func (f *fakeFilingStore) GetMANIProposal(context.Context, string) (*maNIProposal, error) {
+	return nil, nil
+}
+
 // fakeDocuEngine counts calls per method and lets each test script the paid mutations
 // (create/submit/select). GET/list are pure reads over the in-memory request state.
 type fakeDocuEngine struct {
