@@ -1,6 +1,6 @@
-import { Button, Drawer, Icon, Modal, MoneyInput, Skeleton, StatusBadge, useToast } from '@mrsmith/ui';
+import { Button, Drawer, Icon, Modal, MoneyInput, Skeleton, StatusBadge, Tooltip, useToast } from '@mrsmith/ui';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type KeyboardEvent, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type KeyboardEvent, type RefObject } from 'react';
 import { useApiClient } from '../../api/client';
 import type {
   MACompanyOverview,
@@ -997,38 +997,63 @@ function YearGroupSection({
   );
 }
 
+function useTruncatedText(text: string) {
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [truncated, setTruncated] = useState(false);
+
+  useLayoutEffect(() => {
+    const node = textRef.current;
+    if (!node) return;
+
+    const update = () => setTruncated(node.scrollWidth > node.clientWidth);
+    update();
+
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(update);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [text]);
+
+  return { textRef, truncated };
+}
+
 function ProposalRow({ proposal, selected, dirty, onSelect }: { proposal: MANIProposalView; selected: boolean; dirty: boolean; onSelect: () => void }) {
   const decided = proposalIsDecided(proposal.state);
   const amount = proposalDisplayAmount(proposal);
   const stateText = proposalStateText(proposal.state);
+  const label = proposal.label || proposal.fattoOsservato;
+  const { textRef: labelRef, truncated: labelTruncated } = useTruncatedText(label);
   const chipClass =
     proposal.trattamentoCandidato === 'ebitda' ? styles.chipEbitda : proposal.trattamentoCandidato === 'pfn' ? styles.chipPfn : styles.chipDd;
+
   return (
-    <button
-      type="button"
-      data-prow
-      data-proposal-id={proposal.id}
-      className={`${styles.prow} ${decided ? styles.prowDone : ''} ${proposal.state === 'effective' ? styles.prowRatified : ''}`}
-      aria-current={selected ? 'true' : undefined}
-      onClick={onSelect}
-    >
-      <span className={styles.dot} />
-      <span className={styles.fact}>
-        {proposal.label || proposal.fattoOsservato}
-        {dirty ? (
-          <span className={styles.draftMark} title="Bozza in corso" aria-label="bozza in corso">
-            ▲
-          </span>
-        ) : null}
-      </span>
-      <span className={`${styles.chip} ${chipClass}`}>{treatmentLabel(proposal.trattamentoCandidato)}</span>
-      <span className={styles.amt}>{formatSignedEuro(amount)}</span>
-      <span className={styles.rowState}>
-        {decided ? '✓ ' : ''}
-        {stateText}
-        {proposal.pageNo != null ? ` · p.${proposal.pageNo}` : ''}
-      </span>
-    </button>
+    <Tooltip content={label} placement="top" maxWidth={420} disabled={!labelTruncated}>
+      <button
+        type="button"
+        data-prow
+        data-proposal-id={proposal.id}
+        className={`${styles.prow} ${decided ? styles.prowDone : ''} ${proposal.state === 'effective' ? styles.prowRatified : ''}`}
+        aria-current={selected ? 'true' : undefined}
+        onClick={onSelect}
+      >
+        <span className={styles.dot} />
+        <span ref={labelRef} className={styles.fact}>
+          {label}
+          {dirty ? (
+            <span className={styles.draftMark} title="Bozza in corso" aria-label="bozza in corso">
+              ▲
+            </span>
+          ) : null}
+        </span>
+        <span className={`${styles.chip} ${chipClass}`}>{treatmentLabel(proposal.trattamentoCandidato)}</span>
+        <span className={styles.amt}>{formatSignedEuro(amount)}</span>
+        <span className={styles.rowState}>
+          {decided ? '✓ ' : ''}
+          {stateText}
+          {proposal.pageNo != null ? ` · p.${proposal.pageNo}` : ''}
+        </span>
+      </button>
+    </Tooltip>
   );
 }
 
@@ -1157,20 +1182,25 @@ function ObservationRow({
   selected: boolean;
   onSelect: () => void;
 }) {
+  const claim = observation.claim || '—';
+  const { textRef: claimRef, truncated: claimTruncated } = useTruncatedText(claim);
+
   return (
-    <button
-      type="button"
-      data-prow
-      data-proposal-id={observation.id}
-      className={styles.nrow}
-      aria-current={selected ? 'true' : undefined}
-      onClick={onSelect}
-    >
-      <span aria-hidden="true" />
-      <span className={styles.ntype}>{observation.tipo}</span>
-      <span className={styles.nclaim}>{observation.claim || '—'}</span>
-      <span className={styles.npage}>{observation.pageNo != null ? `p.${observation.pageNo}` : ''}</span>
-    </button>
+    <Tooltip content={claim} placement="top" maxWidth={420} disabled={!claimTruncated}>
+      <button
+        type="button"
+        data-prow
+        data-proposal-id={observation.id}
+        className={styles.nrow}
+        aria-current={selected ? 'true' : undefined}
+        onClick={onSelect}
+      >
+        <span aria-hidden="true" />
+        <span className={styles.ntype}>{observation.tipo}</span>
+        <span ref={claimRef} className={styles.nclaim}>{claim}</span>
+        <span className={styles.npage}>{observation.pageNo != null ? `p.${observation.pageNo}` : ''}</span>
+      </button>
+    </Tooltip>
   );
 }
 
@@ -1249,7 +1279,7 @@ function WorkPanel({
         </span>
       </div>
 
-      <p className={styles.pclaim}>{p.label || p.fattoOsservato}</p>
+      <p className={styles.pclaim}>{p.fattoOsservato || p.label}</p>
 
       {p.quote ? <div className={styles.quote}>«{p.quote}»</div> : null}
       <div className={styles.qmeta}>

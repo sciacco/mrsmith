@@ -1085,23 +1085,27 @@ function CardsSection({ cards, companyKey, activeInitiativeId }: { cards: MAComp
         <div className={styles.cardGrid}>
           {sorted.map((card) => (
             <article key={`${card.initiativeId}-${card.companyKey}`} className={`${styles.linkedCard} ${card.initiativeId === activeInitiativeId ? styles.linkedCardActive : ''}`}>
-              <div>
+              <div className={styles.linkedCardHeading}>
                 <Link
                   to={`/aziende/${encodeURIComponent(companyKey)}?iniziativa=${encodeURIComponent(card.initiativeId)}`}
                   className={styles.rowTitle}
                 >
                   {card.initiativeTitle || card.initiativeId}
                 </Link>
-                {card.initiativeId === activeInitiativeId ? <span className={styles.statusPill}>Lente attiva</span> : null}
-                {card.origin === 'direct' ? <span className={styles.statusPill}>Diretta</span> : null}
+                {card.initiativeId === activeInitiativeId || card.origin === 'direct' ? (
+                  <div className={styles.linkedCardBadges}>
+                    {card.initiativeId === activeInitiativeId ? <span className={styles.statusPill}>Lente attiva</span> : null}
+                    {card.origin === 'direct' ? <span className={styles.statusPill}>Diretta</span> : null}
+                  </div>
+                ) : null}
               </div>
-              <dl>
+              <dl className={styles.linkedCardFacts}>
                 <div><dt>Stato</dt><dd>{stateLabel(card.state)}</dd></div>
                 <div><dt>Esito</dt><dd>{card.esito ? esitoLabel(card.esito) : 'n.d.'}</dd></div>
                 {card.lastEvent ? <div><dt>Ultimo evento</dt><dd>{card.lastEvent}</dd></div> : null}
                 <div><dt>Aggiornata</dt><dd>{dateLabel(card.updatedAt)}</dd></div>
               </dl>
-              <Link to={`/iniziative/${encodeURIComponent(card.initiativeId)}`} className={styles.externalLink}>Apri iniziativa <Icon name="external-link" size={13} /></Link>
+              <Link to={`/iniziative/${encodeURIComponent(card.initiativeId)}`} className={`${styles.externalLink} ${styles.linkedCardAction}`}>Apri <Icon name="external-link" size={13} /></Link>
             </article>
           ))}
         </div>

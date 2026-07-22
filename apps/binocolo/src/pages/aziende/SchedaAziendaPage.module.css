@@ -466,8 +466,7 @@
 
 .cardGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: var(--space-4);
+  gap: var(--space-2);
 }
 
 .initiativePicker {
@@ -499,16 +498,34 @@
 }
 
 .linkedCard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(0, 2fr) auto;
+  align-items: center;
+  gap: var(--space-5);
 }
 
-.linkedCard > div:first-child {
+.linkedCardHeading {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: flex-start;
   gap: var(--space-2);
+  min-width: 0;
+}
+
+.linkedCardBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.linkedCard .linkedCardFacts {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.linkedCardAction {
+  justify-self: end;
+  white-space: nowrap;
 }
 
 .linkedCardActive {
@@ -637,6 +654,15 @@
     grid-template-columns: 1fr;
   }
 
+  .linkedCard {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-3) var(--space-4);
+  }
+
+  .linkedCard .linkedCardFacts {
+    grid-column: 1 / -1;
+  }
+
   .ratingBox {
     align-items: flex-start;
     width: 100%;
@@ -655,5 +681,22 @@
 
   .block {
     padding: var(--space-4);
+  }
+
+  .subSectionHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .linkedCard {
+    grid-template-columns: 1fr;
+  }
+
+  .linkedCard .linkedCardFacts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .linkedCardAction {
+    justify-self: start;
   }
 }
