@@ -6,7 +6,7 @@
 - `apps/` — independent Vite+React frontend apps (portal, future mini-apps)
 - `packages/` — shared frontend libraries (`@mrsmith/ui`, `@mrsmith/auth-client`, `@mrsmith/api-client`)
 - `backend/` — Go monolith with modular `internal/` packages per app
-- `deploy/` — Dockerfile (multi-stage), K8s manifests
+- `deploy/` — Dockerfile (multi-stage), K8s manifests (K8s NOT in use yet: config surface = `backend/.env` + `.env.example`; manifests are inert forward-prep)
 
 ## Important Reference
 - `docs/mistra-dist.yaml` — authoritative Mistra NG Internal API spec; most mini-apps will integrate with these APIs, so use this file as the primary reference for backend contracts, client generation, and shared types.

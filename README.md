@@ -136,7 +136,7 @@ backend/
 deploy/
   Dockerfile               Production multi-stage image
   Dockerfile.dev           Backend hot-reload image
-  k8s/                     Kubernetes manifests
+  k8s/                     Kubernetes manifests (prepared, not in use yet)
 docs/
   *.md, *.yaml, *.json     Product, API, schema, planning, and UX references
 ```
@@ -273,5 +273,8 @@ make docker-build-amd64
 make package-prod-amd64
 ```
 
-Kubernetes manifests live under `deploy/k8s/`. Keep deployment env names aligned
-with `backend/internal/platform/config` and `backend/.env.example`.
+Kubernetes is **not the deploy target yet**: the manifests under `deploy/k8s/`
+are prepared for the future but inert. The operational configuration surface is
+`backend/.env` — when adding an env var, `backend/.env.example` and
+`backend/internal/platform/config` are the required deliverables; updating the
+k8s manifests is optional forward-alignment.
