@@ -57,7 +57,7 @@ func (h *Handler) handleListCustomersWithOrders(w http.ResponseWriter, r *http.R
 FROM loader.v_ordini_ric_spot AS odv
 JOIN loader.erp_anagrafiche_clienti AS cli
   ON cli.numero_azienda = odv.numero_azienda
-  AND (cli.data_dismissione >= NOW() OR cli.data_dismissione = '0001-01-01 00:00:00')
+  AND (cli.data_dismissione >= NOW() OR cli.data_dismissione = '0001-01-01 00:00:00' OR cli.data_dismissione IS NULL)
 ORDER BY ragione_sociale`
 
 	rows, err := h.mistraDB.QueryContext(r.Context(), query)
