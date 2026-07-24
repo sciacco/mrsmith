@@ -6,7 +6,7 @@ A plan can be strong on features and still fail at execution if it is not valida
 
 Use this document when drafting or reviewing implementation plans for new apps, major features, or cross-cutting refactors.
 Before locking assumptions, also review [docs/IMPLEMENTATION-KNOWLEDGE.md](IMPLEMENTATION-KNOWLEDGE.md) for reusable discoveries that may already define identifiers, exclusions, or cross-system rules.
-Any plan that changes database schema or data ownership MUST follow [docs/DATABASE-MIGRATIONS.md](DATABASE-MIGRATIONS.md): pre/post versions must coexist without service interruption, and destructive SQL is always deferred to a separate post-cleanup phase.
+Any plan that changes database schema or data ownership MUST follow [docs/DATABASE-MIGRATIONS.md](DATABASE-MIGRATIONS.md): use the smallest additive change that keeps the current production application operational while the new build is tested against the same database, and defer destructive SQL to a separate post-cleanup migration.
 If the work is an Appsmith migration or another legacy-app port, also follow [docs/APPSMITH-MIGRATION-PLAYBOOK.md](APPSMITH-MIGRATION-PLAYBOOK.md) so risky contracts are verified and pinned before implementation.
 
 ## Core Lessons
@@ -33,7 +33,7 @@ If the work is an Appsmith migration or another legacy-app port, also follow [do
   Env var names, migration strategy, DB bootstrap pattern, and deployment assumptions should be fixed early. "X or Y" placeholders usually become drift later.
 
 - Treat database compatibility as a release invariant.
-  Use expand → coexist/backfill → cutover → post-cleanup. Old and new binaries must remain safe during rolling deployment and application rollback; never place destructive or compatibility-breaking SQL in the migration required to release the new code. Follow [docs/DATABASE-MIGRATIONS.md](DATABASE-MIGRATIONS.md).
+  Keep the current production application operational after additive schema changes so a development build can be tested safely against the same database. Introduce dual reads, dual writes, staged backfills, or other coexistence machinery only when the actual deployment requires it; never place destructive or compatibility-breaking SQL in the migration required to test or release the new code. Follow [docs/DATABASE-MIGRATIONS.md](DATABASE-MIGRATIONS.md).
 
 - Do not leave observability implicit.
   For backend features and refactors, decide the log shape, request-correlation strategy, panic/failure logging, and client-facing 5xx sanitization policy as part of the plan. If internal failures should be diagnosable only from server logs, that must be explicit before implementation.

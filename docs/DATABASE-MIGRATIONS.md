@@ -1,131 +1,123 @@
 # Database Migration Compatibility Rule
 
-## Non-negotiable rule
+## Purpose
 
-Every database change MUST preserve uninterrupted coexistence between the application version running before the migration and the version introduced after it.
+A database change must let the application currently in production continue operating while the new code is tested against the same production database.
 
-Assume rolling deployments, multiple live replicas, delayed workers, retries, and the possible rollback of application code. Applying a migration MUST NOT make the database incompatible with binaries that may still be running.
+For this repository, the normal workflow is simple:
 
-Database changes follow four distinct phases:
+1. apply a backward-compatible schema change;
+2. keep the current production application running;
+3. test the new build in development against the production database;
+4. deploy the new build after validation;
+5. perform destructive cleanup separately, only if it is still useful.
 
-1. **Expand**
-2. **Coexist and migrate data**
-3. **Cut over**
-4. **Post-cleanup**
+Do not design for replicas, rolling deployments, long-lived version coexistence, dual writes, or synchronization unless the actual deployment requires them.
 
-Never combine an incompatible cleanup with the expand or cutover required to release a feature.
+## Primary rule: expand without breaking the current application
 
-## 1. Expand
+The migration needed to test a feature must be additive and compatible with the application already running.
 
-The first production migration is additive and backward-compatible.
-
-Typical safe expand operations include:
+Typical safe changes are:
 
 - adding nullable columns;
-- adding tables without removing old ones;
-- adding indexes that do not block production traffic unacceptably;
-- widening accepted values or constraints;
-- adding new states only when old binaries cannot consume or terminally fail them;
-- introducing new storage alongside the existing contract.
+- adding a table without removing the previous storage;
+- adding a safe index;
+- widening a constraint when the current application tolerates the new values;
+- adding optional data that old queries can ignore.
 
-The expand migration MUST allow the old application to continue reading and writing successfully. New code may depend on the expanded schema only after the migration has been applied.
+Before applying the migration, verify that the current application can continue to read and write normally. In particular, check actual SQL scans, constraints, triggers, and consumers rather than assuming that an additive statement is harmless.
 
-Renames are not additive: add the new object and keep the old contract during coexistence instead of renaming in place.
+Do not rename or remove an object as part of the migration required to test new code. Add the replacement and defer cleanup.
 
-## 2. Coexist and migrate data
+## Testing against the production database
 
-During coexistence, old and new representations may both be present. The application MUST tolerate partially migrated data.
+The current production application and the development build may use the expanded schema at the same time for a short validation window.
 
-Use one or more of these patterns as required:
+The minimum requirements are:
 
-- dual-read with an explicit precedence rule;
-- read-new with fallback-to-old;
-- dual-write;
-- write-new plus compatibility projection for old readers;
-- idempotent synchronization or reconciliation.
+- the production application remains operational;
+- the development build can read existing rows;
+- writes made by the development build do not invalidate the current application's contract;
+- the test can be stopped without reversing the schema migration;
+- test actions that affect real data are limited to agreed records or workflows.
 
-Backfills MUST be:
+Perfect feature parity between the current UI and the development UI is not required during this short test. Temporary visibility differences are acceptable when they do not block users, corrupt data, or hide an operationally relevant change unexpectedly.
 
-- idempotent and safe to repeat;
-- resumable after interruption;
-- bounded or batched when volume can affect production;
-- observable through counts, errors, and progress;
-- safe while normal reads and writes continue;
-- designed so rows already migrated and rows not yet migrated can coexist.
+No feature flag or parallel deployment is required when the developer runs the new build directly in development.
 
-A backfill is not proof of cutover. Verify data parity and writer behavior separately.
+## Data migration and cutover
 
-## 3. Cut over
+Do not add a backfill merely because the schema changed. Use one only when the accepted feature needs existing data in the new representation.
 
-Switch readers and writers only after the expanded schema is available and the compatibility path is active.
+Prefer the simplest sufficient operation:
 
-A cutover plan MUST define:
+- one idempotent `INSERT … SELECT … ON CONFLICT`;
+- one `UPDATE` limited to rows where the new value is missing;
+- a small, explicit conversion performed at cutover.
 
-- which version writes each representation;
-- how old and new replicas coexist during a rolling deployment;
-- the read precedence and fallback behavior;
-- how duplicate or divergent writes are reconciled;
-- how completion and parity are measured;
-- what application rollback does while coexistence is active.
+Batching, progress tracking, reconciliation jobs, dual reads, and dual writes are not defaults. Add them only when justified by concrete data volume, runtime, or concurrency risk.
 
-Producers of new states, job types, or values MUST NOT be enabled while old consumers can claim or reject them incorrectly. Use rollout-safe states, feature gates, or consumer capability boundaries.
+A normal cutover is:
 
-## 4. Post-cleanup
+1. validate the development build;
+2. deploy the accepted code;
+3. run the required idempotent backfill, if any;
+4. stop writing the legacy representation;
+5. retain the old schema until cleanup is demonstrably safe.
 
-Destructive or compatibility-breaking SQL belongs to a separate, explicitly identified post-cleanup migration.
+If the test is rejected, stop the development build. The additive schema may remain unused; removing it immediately is usually unnecessary.
 
-Examples include:
+## Rollback
+
+The previous application version must remain compatible with the expanded schema.
+
+Rolling back application code must not require recreating a table or column removed by the feature migration. This is the main reason destructive SQL is deferred.
+
+Do not require perfect rollback of test data unless the feature has a specific business need for it. Prefer soft deletion or explicit correction of test records over a database-wide reverse migration.
+
+## Post-cleanup
+
+Compatibility-breaking SQL belongs in a later, separate migration. Examples include:
 
 - `DROP TABLE`, `DROP COLUMN`, or `DROP VIEW`;
-- removing legacy values from constraints or enums;
-- tightening nullability or constraints after a backfill;
-- narrowing or incompatibly changing a column type;
-- removing compatibility columns, triggers, projections, or indexes;
-- deleting the old representation after a storage cutover;
-- any SQL that would break an older application binary.
+- making a new column `NOT NULL` after population;
+- removing legacy values or constraints;
+- narrowing a type;
+- deleting the old representation after a storage change.
 
-Post-cleanup may run only after all of the following are true:
+Cleanup is optional. Perform it only after the new code is established, the old path is no longer used, and rollback no longer depends on it. Keeping an unused legacy object temporarily is safer than complicating the feature rollout.
 
-- every live application and worker replica uses the new contract;
-- old writers are disabled and no longer receive traffic;
-- the backfill is complete and verified;
-- parity and reconciliation checks pass;
-- production observability shows no dependency on the legacy path;
-- rollback to a version requiring the old contract is no longer required;
-- the cleanup has its own rollback or recovery procedure.
+## When more elaborate coexistence is justified
 
-Until those conditions are met, retain the old schema even when it appears unused.
+Use patterns such as dual-read, dual-write, synchronization, batched backfills, capability gates, or parity monitoring only when the repository actually has one of these conditions:
 
-## Rollback principle
+- multiple application versions serving traffic concurrently;
+- workers that may run old code for an extended period;
+- a large backfill that cannot complete safely in one operation;
+- independent systems writing both representations;
+- a business requirement for old and new interfaces to show identical data during validation.
 
-Application rollback during expand, coexistence, or cutover MUST NOT require restoring a dropped schema object. If rollback would fail because a table, column, value, or compatibility path has already been removed, cleanup happened too early.
+The implementation plan must name the concrete condition. Do not introduce these mechanisms as generic migration ceremony.
 
-Database rollback is not assumed to be an instantaneous reverse migration. Prefer forward-compatible recovery and retained contracts over destructive reversals.
+## Planning questions
 
-## Planning requirements
+A database-related implementation plan should answer only what is relevant:
 
-Every implementation plan that changes database schema or data ownership MUST state explicitly:
-
-1. the pre-migration readers and writers;
-2. the additive expand migration;
-3. the coexistence strategy;
-4. the backfill and its idempotency boundary;
-5. rolling-deploy behavior with mixed binary versions;
-6. cutover criteria and parity checks;
-7. application rollback behavior;
-8. deferred post-cleanup operations and their prerequisites.
-
-A plan that says only “migrate data and drop the old table/column” is incomplete and MUST NOT be approved.
+1. What schema does the current production application require?
+2. What additive migration allows the new build to be tested safely?
+3. What production data may the development test read or modify?
+4. Is a backfill needed at acceptance, and can it be idempotent?
+5. Which destructive operations, if any, are deferred to post-cleanup?
 
 ## Review checklist
 
-Before approving or applying a migration, verify:
+Before applying a migration, verify:
 
-- Can the old binary run after the migration?
-- Can old and new replicas read and write concurrently?
-- Can the new binary read data that has not been backfilled yet?
-- Can the backfill be stopped, resumed, and rerun safely?
-- Are new states protected from old consumers?
-- Is parity measurable before cutover?
-- Can application code roll back without restoring deleted schema?
-- Are all destructive statements and compatibility removals deferred to post-cleanup?
+- Can the current production application still read and write?
+- Can the new build handle rows created before the migration?
+- Can the development test be stopped without repairing the schema?
+- Are production test writes controlled and understandable to active users?
+- Is any backfill actually necessary and as simple as the data permits?
+- Are destructive statements excluded from the feature migration?
+- Is every coexistence mechanism justified by the real deployment rather than a hypothetical one?
