@@ -52,6 +52,19 @@ passa evita di scoprire il problema a metà cutover. Se non è vuota, un
 identificatore rivendica due aziende e serve arbitraggio umano prima di
 proseguire.
 
+Eseguire anche **Q19**, e **Q4** il cui esito non è mai stato riportato nella
+baseline. C'è una causa nota e concreta per cui Q16 può non essere vuota: lo
+strumento standalone `/azienda` accodava il dossier con la **P.IVA come
+`company_key`**. Se la stessa azienda ha un dossier sotto la P.IVA e un target
+sotto l'ObjectId, quel valore fiscale rivendica due chiavi e la 120 si ferma.
+
+Il codice non lo fa più, ma le righe già scritte restano. **Non è un caso che la
+120 possa risolvere da sola**: è la prima fusione vera di due entità, e la issue
+ha deliberatamente lasciato il merge fuori scope perché cicli, catene, storia
+sulla chiave sorgente e navigazione dell'URL vecchio sono un design proprio. Se
+Q19 mostra `chiavi_fiscali > 0` su `ma_deep_analysis` e Q16 non è vuota, il
+cutover si ferma qui e la fusione va decisa — non aggirata.
+
 ### Dopo la 120
 
 Eseguire **Q15**: verifica che le funzioni SQL `binocolo.ma_normalize_fiscal` e

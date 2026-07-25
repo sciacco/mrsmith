@@ -5086,16 +5086,27 @@ func (s *SQLStore) GetMADeepByVAT(ctx context.Context, vat string) (*maDeepVATRe
 	if s == nil || s.db == nil {
 		return nil, errors.New("binocolo ma store not configured")
 	}
+	// Confronto sull'identità fiscale NORMALIZZATA, non sul valore grezzo.
+	// `WHERE vat_code = $1` mancava la riga per una differenza di forma — prefisso
+	// IT, punti, spazi — e il buco non era cosmetico: questa è la lettura che
+	// impedisce a /azienda di ricomprare un dossier già pagato. Mancarla
+	// significava un secondo IT-full a €0.30 E una seconda riga
+	// ma_deep_analysis per la stessa azienda sotto una chiave diversa.
+	// Cerca anche sul codice fiscale, perché l'input di /azienda può essere un CF.
+	fiscalKey := buildMAFiscalKey(vat, vat)
+	if fiscalKey == "" {
+		return nil, nil
+	}
 	var rec maDeepVATRecord
 	var scorecardRaw, valuationRaw, briefRaw, payloadRaw []byte
 	var briefGeneratedAt sql.NullTime
 	err := s.db.QueryRowContext(ctx, `
 SELECT company_key, status, scorecard, valuation, brief, itfull_payload, COALESCE(error_code, ''), updated_at, brief_generated_at
 FROM binocolo.ma_deep_analysis
-WHERE vat_code = $1
+WHERE `+maDeepFiscalIdentityMatch+`
 ORDER BY (status = 'ready') DESC, updated_at DESC
 LIMIT 1
-`, vat).Scan(&rec.CompanyKey, &rec.Status, &scorecardRaw, &valuationRaw, &briefRaw, &payloadRaw, &rec.ErrorCode, &rec.UpdatedAt, &briefGeneratedAt)
+`, fiscalKey).Scan(&rec.CompanyKey, &rec.Status, &scorecardRaw, &valuationRaw, &briefRaw, &payloadRaw, &rec.ErrorCode, &rec.UpdatedAt, &briefGeneratedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}

@@ -993,3 +993,63 @@ FROM binocolo.ma_company WHERE identity_state = 'fiscal'
 UNION ALL
 SELECT 'aziende assegnate dopo il cutover (UUID)', COUNT(*)
 FROM binocolo.ma_company WHERE origin = 'assigned';
+
+
+-- -----------------------------------------------------------------------------
+-- Q19 — Chiavi che sono valori fiscali: l'impronta del difetto.
+--
+-- Aggiunta 2026-07-25 da una ricognizione sistematica dei writer (issue #86).
+--
+-- Una company_key legittima ha una di due forme: l'ObjectId adottato (24 hex) o
+-- un UUID assegnato. Una chiave a 11 cifre o a 16 caratteri NON è un id interno:
+-- è una P.IVA o un codice fiscale usati come chiave, cioè un'identità coniata da
+-- un payload. È l'impronta esatta della classe di difetto che la issue elimina, e
+-- questa query la riconosce senza sapere quale writer l'abbia prodotta.
+--
+-- CAUSA NOTA: `companyDossier` (lo strumento standalone /azienda) accodava
+-- l'analisi con EnqueueMADeepAnalysis(ctx, vat, vat, ...) — il primo argomento è
+-- la company_key. Corretto nel codice, ma le righe già scritte restano.
+--
+-- PERCHÉ CONTA PRIMA DEL CUTOVER, e non solo come pulizia: se la stessa azienda
+-- ha un dossier sotto la P.IVA E un target sotto l'ObjectId, quel valore fiscale
+-- rivendica DUE company_key, e il preflight della migrazione 120 SOLLEVA. Q16 lo
+-- vede; Q19 dice da dove viene. Q4 misurava già i dossier comprati due volte, ma
+-- il suo esito non è mai stato riportato nella baseline: è la misura che manca.
+--
+-- Se `chiavi_fiscali` > 0 leggere i campioni e incrociare con Q16.
+-- -----------------------------------------------------------------------------
+WITH keyed AS (
+  SELECT 'ma_target' AS tabella, company_key FROM binocolo.ma_target
+  UNION ALL SELECT 'ma_deep_analysis', company_key FROM binocolo.ma_deep_analysis
+  UNION ALL SELECT 'ma_deep_payload_vintage', company_key FROM binocolo.ma_deep_payload_vintage
+  UNION ALL SELECT 'ma_company_bm_family', company_key FROM binocolo.ma_company_bm_family
+  UNION ALL SELECT 'ma_initiative_card', company_key FROM binocolo.ma_initiative_card
+  UNION ALL SELECT 'ma_company_domain', company_key FROM binocolo.ma_company_domain
+  UNION ALL SELECT 'ma_target_rating', company_key FROM binocolo.ma_target_rating
+  UNION ALL SELECT 'ma_target_web_validation', company_key FROM binocolo.ma_target_web_validation
+  UNION ALL SELECT 'ma_sector_eval_label', company_key FROM binocolo.ma_sector_eval_label
+  UNION ALL SELECT 'ma_target_outcome', company_key FROM binocolo.ma_target_outcome
+  UNION ALL SELECT 'ma_company_fact', company_key FROM binocolo.ma_company_fact
+  UNION ALL SELECT 'ma_company_note', company_key FROM binocolo.ma_company_note
+  UNION ALL SELECT 'ma_card_thesis_reading', company_key FROM binocolo.ma_card_thesis_reading
+  UNION ALL SELECT 'ma_session_thesis_reading', company_key FROM binocolo.ma_session_thesis_reading
+  UNION ALL SELECT 'ma_card_irl_item', company_key FROM binocolo.ma_card_irl_item
+  UNION ALL SELECT 'ma_filing_acquisition', context_company_key FROM binocolo.ma_filing_acquisition
+), clean AS (
+  SELECT tabella, upper(btrim(company_key)) AS k
+  FROM keyed WHERE btrim(COALESCE(company_key, '')) <> ''
+)
+SELECT
+  tabella,
+  COUNT(DISTINCT k)                                                          AS chiavi_distinte,
+  COUNT(DISTINCT k) FILTER (WHERE k ~ '^[0-9A-F]{24}$')                       AS objectid,
+  COUNT(DISTINCT k) FILTER (WHERE k ~ '^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$') AS uuid,
+  COUNT(DISTINCT k) FILTER (WHERE k ~ '^(IT)?[0-9]{11}$' OR k ~ '^[0-9A-Z]{16}$') AS chiavi_fiscali,
+  COUNT(DISTINCT k) FILTER (WHERE k !~ '^[0-9A-F]{24}$'
+                              AND k !~ '^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$'
+                              AND k !~ '^(IT)?[0-9]{11}$'
+                              AND k !~ '^[0-9A-Z]{16}$')                      AS altra_forma,
+  (array_agg(DISTINCT k) FILTER (WHERE k ~ '^(IT)?[0-9]{11}$' OR k ~ '^[0-9A-Z]{16}$'))[1:5] AS campioni_fiscali
+FROM clean
+GROUP BY tabella
+ORDER BY chiavi_fiscali DESC, tabella;
