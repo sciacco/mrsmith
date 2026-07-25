@@ -4602,6 +4602,10 @@ func (s *SQLStore) FindMACompanySnapshotByIdentity(ctx context.Context, vatOrTax
 	if vatOrTax == "" {
 		return nil, nil
 	}
+	// Confronto NORMALIZZATO su entrambi i lati, come GetMACompanyDomain: con
+	// `upper(btrim(...))` una P.IVA scritta con il prefisso IT o con i punti non
+	// trovava lo snapshot, e la card diretta ripartiva da una probe Address a
+	// pagamento invece di riusare l'azienda che avevamo già.
 	row := s.db.QueryRowContext(ctx, `
 WITH snapshots AS (
   SELECT COALESCE(company_key, '') AS company_key,
@@ -4609,17 +4613,17 @@ WITH snapshots AS (
          COALESCE(tax_code, '') AS tax_code, COALESCE(province, '') AS province,
          created_at AS seen_at, 1 AS priority
   FROM binocolo.ma_target
-  WHERE upper(btrim(vat_code)) = $1 OR upper(btrim(tax_code)) = $1
+  WHERE binocolo.ma_stable_vat(vat_code) = $1 OR binocolo.ma_normalize_fiscal(tax_code) = $2
   UNION ALL
   SELECT company_key, company_name, vat_code, tax_code, province, updated_at, 2
   FROM binocolo.ma_initiative_card
-  WHERE upper(btrim(vat_code)) = $1 OR upper(btrim(tax_code)) = $1
+  WHERE binocolo.ma_stable_vat(vat_code) = $1 OR binocolo.ma_normalize_fiscal(tax_code) = $2
 )
 SELECT company_key, company_name, vat_code, tax_code, province
 FROM snapshots
 ORDER BY priority, seen_at DESC
 LIMIT 1
-`, vatOrTax)
+`, maStableVAT(vatOrTax), normalizeMAFiscalValue(vatOrTax))
 	var out maCompanySnapshot
 	if err := row.Scan(&out.CompanyKey, &out.CompanyName, &out.VATCode, &out.TaxCode, &out.Province); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

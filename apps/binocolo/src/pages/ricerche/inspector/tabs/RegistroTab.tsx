@@ -38,7 +38,10 @@ export function RegistroTab({
   const rating = target.rating;
   const outcomes = target.outcomes ?? [];
   const dossier = dossierHref({ initiativeId, companyKey: target.companyKey });
-  const companyKey = target.companyKey ?? target.vatCode ?? '';
+  // Mai la P.IVA come chiave: fatti e note finirebbero su un'identità inventata
+  // dal client (issue #86). Senza chiave il pannello non si mostra — la guardia
+  // c'è già più sotto.
+  const companyKey = target.companyKey ?? '';
 
   return (
     <div className={styles.tabBody}>

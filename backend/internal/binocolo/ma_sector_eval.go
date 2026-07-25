@@ -182,7 +182,13 @@ func (s *maService) setSectorEvalLabel(ctx context.Context, sessionID string, bo
 	if s.store == nil {
 		return errMAStoreUnavailable
 	}
-	key := strings.TrimSpace(body.CompanyKey)
+	// normalizeMACompanyKey, non solo TrimSpace: la chiave arriva dal client e
+	// finisce dritta in ma_sector_eval_label.company_key. Senza il maiuscolo, un
+	// client che la rimandasse in altra forma scriverebbe una riga che nessuna
+	// lettura ritrova — l'etichetta sparirebbe in silenzio — e una chiave che non
+	// esiste in ma_company. È l'unico writer del sottosistema che non
+	// normalizzava.
+	key := normalizeMACompanyKey(body.CompanyKey)
 	if key == "" {
 		return fmt.Errorf("%w: companyKey", errMAStrategyInvalid)
 	}
