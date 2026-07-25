@@ -356,7 +356,14 @@ func (s *memoryCompanySearchCache) GetValidCompanySearch(_ context.Context, cach
 	entry.servedCount++
 	entry.lastServedAt = now
 	s.entries[cacheKey] = entry
-	return &companySearchCacheEntry{Response: json.RawMessage(append([]byte(nil), entry.response...))}, nil
+	// FetchedAt fa parte del contratto: su un hit è l'istante della chiamata al
+	// fornitore, non quello della rilettura. Ometterlo qui renderebbe il fake
+	// più permissivo dello store vero proprio sul campo che decide se una
+	// risposta vecchia può avanzare l'osservazione del nome (issue #86).
+	return &companySearchCacheEntry{
+		Response:  json.RawMessage(append([]byte(nil), entry.response...)),
+		FetchedAt: entry.fetchedAt,
+	}, nil
 }
 
 func (s *memoryCompanySearchCache) WithCompanySearchCacheLock(ctx context.Context, _ string, fn func(context.Context) error) error {

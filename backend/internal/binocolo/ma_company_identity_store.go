@@ -258,18 +258,30 @@ WHERE company_key = $1 AND identity_state = 'vendor_only'
 // OR. Il WHERE sul DO UPDATE è la guardia di corsa: se nel frattempo un altro
 // resolver ha rivendicato lo stesso valore per un'altra azienda, la UPDATE non
 // tocca nulla e RETURNING non restituisce righe.
+//
+// first_seen_at/last_seen_at datano l'OSSERVAZIONE DEL FORNITORE, non il
+// passaggio nel resolver: una ri-persistenza (rescore) o un payload servito
+// dalla cache non li fa avanzare, e GREATEST impedisce a un'osservazione vecchia
+// di riportarli indietro. I ruoli, invece, si aggiornano sempre.
 func attachMACompanyIdentifierTx(ctx context.Context, tx *sql.Tx, attachment maCompanyIdentifierAttachment) error {
+	var observedAt any
+	if attachment.ObservedAt != nil && !attachment.ObservedAt.IsZero() {
+		observedAt = attachment.ObservedAt.UTC()
+	}
 	var owner string
 	err := tx.QueryRowContext(ctx, `
-INSERT INTO binocolo.ma_company_identifier (namespace, value, company_key, is_vat, is_tax)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO binocolo.ma_company_identifier (namespace, value, company_key, is_vat, is_tax, first_seen_at, last_seen_at)
+VALUES ($1, $2, $3, $4, $5, COALESCE($6::timestamptz, now()), COALESCE($6::timestamptz, now()))
 ON CONFLICT (namespace, value) DO UPDATE SET
   is_vat       = binocolo.ma_company_identifier.is_vat OR EXCLUDED.is_vat,
   is_tax       = binocolo.ma_company_identifier.is_tax OR EXCLUDED.is_tax,
-  last_seen_at = now()
+  last_seen_at = GREATEST(
+                   binocolo.ma_company_identifier.last_seen_at,
+                   COALESCE($6::timestamptz, binocolo.ma_company_identifier.last_seen_at)
+                 )
 WHERE binocolo.ma_company_identifier.company_key = EXCLUDED.company_key
 RETURNING company_key
-`, attachment.Namespace, attachment.Value, attachment.CompanyKey, attachment.IsVAT, attachment.IsTax).Scan(&owner)
+`, attachment.Namespace, attachment.Value, attachment.CompanyKey, attachment.IsVAT, attachment.IsTax, observedAt).Scan(&owner)
 	if err == nil {
 		return nil
 	}

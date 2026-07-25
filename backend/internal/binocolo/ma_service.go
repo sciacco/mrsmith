@@ -3330,6 +3330,33 @@ func (s *maService) resolveMACompany(ctx context.Context, observation maCompanyO
 	return key, err
 }
 
+// observeVendorIdentity registra nel registro gli identificatori e il nome che
+// una risposta del fornitore ha davvero portato, quando la RIGA che ne nasce
+// conserva l'identità di un'osservazione precedente (l'enrichment advanced, che
+// tiene i valori della riga address per non invalidare il verdetto del gate).
+//
+// Senza, un vendor id nuovo o una P.IVA contesa comparsi solo nella risposta
+// fresca verrebbero scartati insieme al resto: il registro imparerebbe meno di
+// quanto abbiamo pagato per sapere.
+//
+// L'esito NON blocca: l'occorrenza è già chiavata sull'entità della riga
+// address, e questa è un'osservazione in più, non l'assegnazione dell'identità.
+// Un conflitto viene registrato nel ledger da resolveMACompany e loggato; far
+// fallire il run brucerebbe i €0.10 già spesi per una diagnosi che è già stata
+// scritta.
+func (s *maService) observeVendorIdentity(ctx context.Context, companyKey string, observed MATarget) {
+	if s.store == nil || normalizeMACompanyKey(companyKey) == "" || observed.VendorObservedAt == nil {
+		return
+	}
+	observation := maCompanyObservationFromTarget(observed, observed.SessionID, observed.RunID)
+	observation.PriorCompanyKey = companyKey
+	if _, err := s.resolveMACompany(ctx, observation); err != nil {
+		logging.FromContext(ctx).Warn("binocolo vendor identity observation rejected",
+			"component", "binocolo", "operation", "ma_company_observe",
+			"company_key", companyKey, "company", observed.CompanyName, "error", err)
+	}
+}
+
 // noteMACompanyIdentityConflict persiste il conflitto in una transazione
 // separata. Se la scrittura diagnostica fallisce si logga a livello error e
 // basta: il fallimento visibile all'utente non deve dipendere dalla riuscita

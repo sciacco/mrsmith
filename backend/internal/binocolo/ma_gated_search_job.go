@@ -566,13 +566,21 @@ func (s *maService) enrichTargetAdvanced(ctx context.Context, target MATarget) (
 		return MATarget{}, fmt.Errorf("no parsable advanced row for %s", ident)
 	}
 	enriched := parsed[0]
-	// Preserve the ADDRESS-row identity: la company_key risolta dal registro più
-	// i valori identitari che l'hanno prodotta (VendorID/VATCode/TaxCode/
-	// CompanyName) e i row ID. Il gate ha chiavato la sua
-	// ma_target_web_validation sulla chiave della riga address; ripartire dal
-	// payload advanced la farebbe derivare, orfanando il verdetto del gate e
-	// facendo ri-pagare l'azienda al re-run. Financials, ATECO e il payload che
-	// lo scoring legge vengono invece dalla fetch advanced.
+	// La risposta advanced È un'osservazione reale del fornitore, e porta i suoi
+	// identificatori: vendor id, P.IVA, CF e nome possono differire da quelli
+	// della riga address (servita magari dalla cache). Il registro deve
+	// vederli — è così che un id nuovo diventa storico e che una P.IVA
+	// contesa emerge — quindi si osservano PRIMA di essere sostituiti.
+	s.observeVendorIdentity(ctx, target.CompanyKey, enriched)
+
+	// Preserve the ADDRESS-row identity sulla RIGA: la company_key risolta dal
+	// registro più i valori identitari che l'hanno prodotta e i row ID. Il gate
+	// ha chiavato la sua ma_target_web_validation su quella riga, e
+	// maWebValidationTargetFingerprint include companyName/vatCode/taxCode:
+	// persistere i valori advanced cambierebbe l'input hash, invaliderebbe il
+	// verdetto del gate e farebbe ri-pagare l'azienda al re-run. Financials,
+	// ATECO e il payload che lo scoring legge vengono invece dalla fetch
+	// advanced.
 	enriched.ID = target.ID
 	enriched.SessionID = target.SessionID
 	enriched.RunID = target.RunID
@@ -583,6 +591,10 @@ func (s *maService) enrichTargetAdvanced(ctx context.Context, target MATarget) (
 	enriched.CompanyName = target.CompanyName
 	enriched.Origin = target.Origin
 	enriched.EnrichmentLevel = maEnrichmentAdvanced
+	// L'osservazione è già stata registrata sopra con i valori veri. Lasciare il
+	// timestamp su una riga che porta l'identità della address farebbe avanzare
+	// name_observed_at con il nome VECCHIO.
+	enriched.VendorObservedAt = nil
 	// Carry the gate verdict onto the enriched row: scoring reads it for the
 	// sector-mismatch rescue (a gate-confirmed survivor with an off-division
 	// ATECO must not be re-hidden by the cruder 2-digit gate).

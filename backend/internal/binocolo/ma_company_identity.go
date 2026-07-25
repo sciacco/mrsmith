@@ -184,6 +184,11 @@ type maCompanyEntityDraft struct {
 type maCompanyIdentifierAttachment struct {
 	maCompanyIdentifier
 	CompanyKey string
+	// ObservedAt è l'istante in cui il FORNITORE ha mostrato questo
+	// identificatore. nil = ri-persistenza di una riga letta dal nostro DB: i
+	// ruoli si aggiornano comunque in OR, ma last_seen_at non avanza — altrimenti
+	// misurerebbe il passaggio nel resolver invece dell'osservazione.
+	ObservedAt *time.Time
 }
 
 // maCompanyNameObservation è l'aggiornamento del nome, applicato solo quando
@@ -331,6 +336,7 @@ func planMACompanyResolution(
 			plan.Attachments = append(plan.Attachments, maCompanyIdentifierAttachment{
 				maCompanyIdentifier: identifier,
 				CompanyKey:          key,
+				ObservedAt:          observation.ObservedAt,
 			})
 		}
 

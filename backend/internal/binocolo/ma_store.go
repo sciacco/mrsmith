@@ -1312,6 +1312,34 @@ func (s *SQLStore) ReplaceMATargets(ctx context.Context, sessionID, runID string
 	if err != nil {
 		return err
 	}
+	// Deduplica SULLA CHIAVE RISOLTA, che è l'unica che conosce l'identità.
+	// dedupeMATargets, a monte, lavora sulla precedenza del payload: due righe
+	// della stessa azienda con vendor id diversi — risposte cache e fresche
+	// mescolate nello stesso batch, o risultati raccolti a cavallo di una
+	// rinumerazione del fornitore — la superano entrambe. Il resolver le manda
+	// giustamente sulla stessa company_key (è deduplica, non conflitto), ma
+	// senza questo passaggio finirebbero come due target della stessa azienda
+	// nella stessa sessione, decorati dallo stesso rating, dallo stesso verdetto
+	// e dagli stessi esiti. Vince la prima: nelle liste dei chiamanti i target
+	// arricchiti e scorati precedono quelli riportati.
+	keptIndexes := make([]int, 0, len(targets))
+	firstByKey := make(map[string]int, len(targets))
+	droppedByKey := map[string]int{}
+	for index := range targets {
+		key := companyKeys[index]
+		if _, seen := firstByKey[key]; seen {
+			droppedByKey[key]++
+			continue
+		}
+		firstByKey[key] = index
+		keptIndexes = append(keptIndexes, index)
+	}
+	if len(droppedByKey) > 0 {
+		logging.FromContext(ctx).Warn("binocolo duplicate targets collapsed on resolved company key",
+			"component", "binocolo", "operation", "ma_target_replace",
+			"session_id", sessionID, "run_id", runID,
+			"received", len(targets), "persisted", len(keptIndexes), "companies", len(droppedByKey))
+	}
 	if _, err := tx.ExecContext(ctx, `
 DELETE FROM binocolo.ma_evidence
 WHERE target_id IN (SELECT id FROM binocolo.ma_target WHERE session_id = $1::uuid)
@@ -1321,7 +1349,8 @@ WHERE target_id IN (SELECT id FROM binocolo.ma_target WHERE session_id = $1::uui
 	if _, err := tx.ExecContext(ctx, `DELETE FROM binocolo.ma_target WHERE session_id = $1::uuid`, sessionID); err != nil {
 		return fmt.Errorf("delete ma targets: %w", err)
 	}
-	for index, target := range targets {
+	for _, index := range keptIndexes {
+		target := targets[index]
 		companyKey := companyKeys[index]
 		targetID := target.ID
 		if targetID == "" {

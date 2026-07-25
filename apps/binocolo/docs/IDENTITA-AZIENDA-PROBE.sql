@@ -924,10 +924,20 @@ ORDER BY orfane DESC, senza_chiave DESC, tabella;
 -- -----------------------------------------------------------------------------
 -- Q18 — MONITOR del registro (periodico, dopo il cutover).
 --
--- L'invariante canonico dopo l'adozione. Le prime tre righe devono dare 0.
+-- L'invariante canonico dopo l'adozione. Devono dare 0 le prime QUATTRO righe,
+-- compresa «aziende senza alcun identificatore»: il resolver non crea mai
+-- un'entità senza identificatori — erra invece di inventarli da una ragione
+-- sociale — quindi un valore > 0 può venire solo dal backfill, cioè da chiavi
+-- storiche presenti unicamente nelle tabelle di dettaglio e prive della forma
+-- ObjectId. Vanno guardate una per una: sono aziende che nessun identificatore
+-- può più ritrovare.
+--
 -- `aziende_vendor_only` > 0 non è un errore di integrità ma un DIFETTO da
 -- chiudere: un'entità senza identità fiscale è precisamente ciò che non
 -- sopravvive a un cambio fornitore.
+--
+-- Le ultime due righe non sono controlli ma dimensionamento: quante identità
+-- fiscali conosciamo e quante aziende sono nate dopo il cutover.
 -- -----------------------------------------------------------------------------
 SELECT 'valori fiscali su due entità (impossibile: PK)' AS controllo,
        COUNT(*) AS valore

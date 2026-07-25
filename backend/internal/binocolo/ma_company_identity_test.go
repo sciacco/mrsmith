@@ -394,6 +394,34 @@ func TestPlanMACompanyResolutionReusesPriorKeyOnRepersist(t *testing.T) {
 	}
 }
 
+func TestPlanMACompanyResolutionAttachmentsCarryTheObservationInstant(t *testing.T) {
+	// first_seen_at/last_seen_at datano l'osservazione del fornitore, non il
+	// passaggio nel resolver: una ri-persistenza non deve poterli avanzare.
+	existing := map[maCompanyIdentifierRef]string{
+		{maIdentifierNamespaceFiscal, "01234567890"}: "KEY-A",
+	}
+	observedAt := time.Date(2026, 7, 25, 10, 0, 0, 0, time.UTC)
+
+	repersist := planMACompanyResolution(
+		[]maCompanyObservation{{PriorCompanyKey: "KEY-A", VATCode: "01234567890"}},
+		existing, map[string]bool{"KEY-A": true}, fixedKeyMinter("new-"),
+	)
+	if len(repersist.Attachments) != 1 || repersist.Attachments[0].ObservedAt != nil {
+		t.Fatalf("una ri-persistenza non porta un istante di osservazione: %+v", repersist.Attachments)
+	}
+
+	fromVendor := planMACompanyResolution(
+		[]maCompanyObservation{{PriorCompanyKey: "KEY-A", VATCode: "01234567890", ObservedAt: &observedAt}},
+		existing, map[string]bool{"KEY-A": true}, fixedKeyMinter("new-"),
+	)
+	if len(fromVendor.Attachments) != 1 || fromVendor.Attachments[0].ObservedAt == nil {
+		t.Fatalf("un'osservazione vendor deve datare l'attach: %+v", fromVendor.Attachments)
+	}
+	if !fromVendor.Attachments[0].ObservedAt.Equal(observedAt) {
+		t.Fatalf("istante = %s, atteso %s", fromVendor.Attachments[0].ObservedAt, observedAt)
+	}
+}
+
 func TestPlanMACompanyResolutionNameOnlyOnVendorObservation(t *testing.T) {
 	existing := map[maCompanyIdentifierRef]string{
 		{maIdentifierNamespaceFiscal, "01234567890"}: "KEY-A",

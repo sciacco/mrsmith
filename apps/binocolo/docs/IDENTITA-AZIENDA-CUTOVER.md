@@ -92,7 +92,12 @@ Scrivono tutti su un DB condiviso, quindi non li esegue un agent.
 
 ## Dopo il cutover
 
-**Q18** è il monitor periodico. Le prime tre righe devono restare 0.
+**Q18** è il monitor periodico. Devono restare 0 le prime **quattro** righe,
+compresa «aziende senza alcun identificatore»: il resolver non ne crea mai — erra
+invece di inventare un'identità da una ragione sociale — quindi un valore
+maggiore di zero può venire solo dal backfill, da chiavi storiche presenti
+unicamente nelle tabelle di dettaglio.
+
 `aziende_vendor_only > 0` non è un errore di integrità ma un difetto da chiudere:
 un'entità senza identità fiscale è precisamente ciò che non sopravvive a un
 cambio fornitore.
