@@ -18,24 +18,30 @@ type maShareholder struct {
 	PercentShare float64
 }
 
-func parseMATargetsFromVendorData(raw json.RawMessage) ([]MATarget, error) {
+// parseMATargetsFromVendorData converte un dataset del fornitore in target.
+//
+// observedAt è l'istante in cui il FORNITORE ha prodotto quel dataset, che il
+// registro identità usa per la regola sul nome (issue #86): il chiamante deve
+// passare l'istante della chiamata reale, oppure il fetched_at della riga di
+// cache quando serve una risposta già memorizzata. Stamparlo qui con time.Now()
+// registrerebbe un cache hit come una nuova osservazione, e una risposta vecchia
+// potrebbe sovrascrivere un nome letto più tardi. Zero = origine ignota: il nome
+// non viene osservato affatto, che è la scelta prudente.
+func parseMATargetsFromVendorData(raw json.RawMessage, observedAt time.Time) ([]MATarget, error) {
 	items, err := vendorDataItems(raw)
 	if err != nil {
 		return nil, err
 	}
-	// Il parse avviene subito dopo la risposta del fornitore: questo è l'istante
-	// dell'osservazione che il registro identità usa per la regola sul nome
-	// (issue #86). Le righe rilette dal DB non passano di qui e restano senza
-	// timestamp, quindi non avanzano ma_company.name_observed_at.
-	observedAt := time.Now().UTC()
 	targets := make([]MATarget, 0, len(items))
 	for _, item := range items {
 		target, err := normalizeMATarget(item)
 		if err != nil {
 			return nil, err
 		}
-		stamp := observedAt
-		target.VendorObservedAt = &stamp
+		if !observedAt.IsZero() {
+			stamp := observedAt.UTC()
+			target.VendorObservedAt = &stamp
+		}
 		targets = append(targets, target)
 	}
 	return targets, nil

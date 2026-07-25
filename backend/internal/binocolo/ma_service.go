@@ -2252,7 +2252,7 @@ func (s *maService) fetchDirectCardSnapshot(ctx context.Context, vat string) (ma
 	if err != nil {
 		return maCompanySnapshot{}, fmt.Errorf("marshal direct-card address dataset: %w", err)
 	}
-	rows, err := parseMATargetsFromVendorData(raw)
+	rows, err := parseMATargetsFromVendorData(raw, s.now())
 	if err != nil || len(rows) == 0 {
 		if err != nil {
 			return maCompanySnapshot{}, err
@@ -6994,7 +6994,7 @@ func (s *maService) probeMASearchSurface(ctx context.Context, params openapiit.C
 
 func (s *maService) runMASurfaceProbe(ctx context.Context, params openapiit.CompanyITSearchParams, subject, email string) (maSurfaceProbeAudit, error) {
 	params.Limit = nil
-	response, raw, err := s.cachedCompanySearch(ctx, params, subject, email)
+	response, raw, _, err := s.cachedCompanySearch(ctx, params, subject, email)
 	if err != nil {
 		return maSurfaceProbeAudit{}, err
 	}
@@ -7229,23 +7229,27 @@ func allocateExecutionLimit(counts []int, limit int) []int {
 }
 
 func (s *maService) executeCompanySearch(ctx context.Context, params openapiit.CompanyITSearchParams, subject, email string) ([]MATarget, error) {
-	response, _, err := s.cachedCompanySearch(ctx, params, subject, email)
+	response, _, observedAt, err := s.cachedCompanySearch(ctx, params, subject, email)
 	if err != nil {
 		return nil, err
 	}
-	return parseMATargetsFromVendorData(response.Data)
+	return parseMATargetsFromVendorData(response.Data, observedAt)
 }
 
-func (s *maService) cachedCompanySearch(ctx context.Context, params openapiit.CompanyITSearchParams, subject, email string) (openapiit.Envelope[openapiit.CompanyDataset], json.RawMessage, error) {
+// cachedCompanySearch restituisce anche l'ISTANTE in cui la risposta è stata
+// prodotta dal fornitore: now() su una fetch fresca, fetched_at della riga di
+// cache su un hit. Serve al registro identità azienda (issue #86) per non
+// registrare una risposta vecchia come una nuova osservazione del nome.
+func (s *maService) cachedCompanySearch(ctx context.Context, params openapiit.CompanyITSearchParams, subject, email string) (openapiit.Envelope[openapiit.CompanyDataset], json.RawMessage, time.Time, error) {
 	cacheKey, paramsJSON, err := companySearchCacheKey(params)
 	if err != nil {
-		return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, err
+		return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, time.Time{}, err
 	}
 	now := s.now()
 	if s.searchCache != nil {
 		entry, err := s.searchCache.GetValidCompanySearch(ctx, cacheKey, now)
 		if err != nil {
-			return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, err
+			return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, time.Time{}, err
 		}
 		if entry != nil {
 			envelope, err := decodeCompanySearchEnvelope(entry.Response)
@@ -7264,9 +7268,9 @@ func (s *maService) cachedCompanySearch(ctx context.Context, params openapiit.Co
 				Metadata:       maTraceJSON(map[string]any{"cache_key": cacheKey, "count": envelopeCount(envelope), "cost": envelopeCost(envelope)}),
 				Error:          errMessage,
 			}); traceErr != nil {
-				return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, traceErr
+				return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, time.Time{}, traceErr
 			}
-			return envelope, entry.Response, err
+			return envelope, entry.Response, entry.FetchedAt, err
 		}
 		if err := s.traceEvent(ctx, maTraceEventWrite{
 			EventType:      "company_search_cache_miss",
@@ -7275,7 +7279,7 @@ func (s *maService) cachedCompanySearch(ctx context.Context, params openapiit.Co
 			Request:        maTraceJSON(paramsJSON),
 			Metadata:       maTraceJSON(map[string]any{"cache_key": cacheKey}),
 		}); err != nil {
-			return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, err
+			return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, time.Time{}, err
 		}
 	} else if err := s.traceEvent(ctx, maTraceEventWrite{
 		EventType:      "company_search_cache_disabled",
@@ -7284,10 +7288,10 @@ func (s *maService) cachedCompanySearch(ctx context.Context, params openapiit.Co
 		Request:        maTraceJSON(paramsJSON),
 		Metadata:       maTraceJSON(map[string]any{"cache_key": cacheKey}),
 	}); err != nil {
-		return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, err
+		return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, time.Time{}, err
 	}
 	if s.openapiit == nil {
-		return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, errMAOpenAPIITUnavailable
+		return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, time.Time{}, errMAOpenAPIITUnavailable
 	}
 
 	fetch := func(ctx context.Context) (openapiit.Envelope[openapiit.CompanyDataset], json.RawMessage, error) {
@@ -7334,11 +7338,12 @@ func (s *maService) cachedCompanySearch(ctx context.Context, params openapiit.Co
 
 	if s.searchCache == nil {
 		response, raw, err := fetch(ctx)
-		return response, raw, err
+		return response, raw, s.now(), err
 	}
 
 	var response openapiit.Envelope[openapiit.CompanyDataset]
 	var raw json.RawMessage
+	var observedAt time.Time
 	var upstreamErr error
 	err = s.searchCache.WithCompanySearchCacheLock(ctx, cacheKey, func(ctx context.Context) error {
 		entry, err := s.searchCache.GetValidCompanySearch(ctx, cacheKey, s.now())
@@ -7348,6 +7353,7 @@ func (s *maService) cachedCompanySearch(ctx context.Context, params openapiit.Co
 		if entry != nil {
 			response, err = decodeCompanySearchEnvelope(entry.Response)
 			raw = entry.Response
+			observedAt = entry.FetchedAt
 			status := maTraceEventSucceeded
 			errMessage := ""
 			if err != nil {
@@ -7372,6 +7378,7 @@ func (s *maService) cachedCompanySearch(ctx context.Context, params openapiit.Co
 			return nil
 		}
 		fetchedAt := s.now()
+		observedAt = fetchedAt
 		dryRun := params.DryRun != nil && *params.DryRun == 1
 		if err := s.searchCache.UpsertCompanySearch(ctx, companySearchCacheWrite{
 			CacheKey:           cacheKey,
@@ -7398,12 +7405,12 @@ func (s *maService) cachedCompanySearch(ctx context.Context, params openapiit.Co
 		return nil
 	})
 	if err != nil {
-		return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, err
+		return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, time.Time{}, err
 	}
 	if upstreamErr != nil {
-		return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, upstreamErr
+		return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, time.Time{}, upstreamErr
 	}
-	return response, raw, nil
+	return response, raw, observedAt, nil
 }
 
 func decodeCompanySearchEnvelope(raw json.RawMessage) (openapiit.Envelope[openapiit.CompanyDataset], error) {

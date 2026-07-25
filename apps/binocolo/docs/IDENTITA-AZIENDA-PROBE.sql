@@ -877,32 +877,43 @@ LIMIT 50;
 -- TUTTE le tabelle che portano una chiave, non i soli target: comprese quelle
 -- che hanno chiavi presenti nel dettaglio SENZA una riga ma_target.
 --
--- `target_senza_chiave` deve essere 0 e `orfane` deve essere 0 su ogni riga.
--- Se non lo è, rieseguire la migrazione 121 a writer fermi.
+-- `orfane` deve essere 0 su OGNI riga; `senza_chiave` deve essere 0 dove
+-- `chiave_obbligatoria`. Se non lo è, rieseguire la migrazione 121 a writer
+-- fermi.
+--
+-- La distinzione fra chiave obbligatoria e facoltativa non è pedanteria:
+-- `ma_filing_acquisition.context_company_key` è un riferimento CONTESTUALE
+-- nullable (mig 113) — il filing è identificato dalla chiave fiscale, mai da
+-- company_key — quindi un'acquisizione senza contesto è normale e non deve far
+-- fallire il gate. Anche `ma_target.company_key` è nullable, ma lì il NULL è
+-- esattamente ciò che il gate deve intercettare.
 -- -----------------------------------------------------------------------------
 WITH keyed AS (
-  SELECT 'ma_target' AS tabella, company_key FROM binocolo.ma_target
-  UNION ALL SELECT 'ma_target_rating', company_key FROM binocolo.ma_target_rating
-  UNION ALL SELECT 'ma_target_web_validation', company_key FROM binocolo.ma_target_web_validation
-  UNION ALL SELECT 'ma_sector_eval_label', company_key FROM binocolo.ma_sector_eval_label
-  UNION ALL SELECT 'ma_target_outcome', company_key FROM binocolo.ma_target_outcome
-  UNION ALL SELECT 'ma_initiative_card', company_key FROM binocolo.ma_initiative_card
-  UNION ALL SELECT 'ma_company_domain', company_key FROM binocolo.ma_company_domain
-  UNION ALL SELECT 'ma_deep_analysis', company_key FROM binocolo.ma_deep_analysis
-  UNION ALL SELECT 'ma_deep_payload_vintage', company_key FROM binocolo.ma_deep_payload_vintage
-  UNION ALL SELECT 'ma_company_bm_family', company_key FROM binocolo.ma_company_bm_family
-  UNION ALL SELECT 'ma_company_fact', company_key FROM binocolo.ma_company_fact
-  UNION ALL SELECT 'ma_company_note', company_key FROM binocolo.ma_company_note
-  UNION ALL SELECT 'ma_card_thesis_reading', company_key FROM binocolo.ma_card_thesis_reading
-  UNION ALL SELECT 'ma_session_thesis_reading', company_key FROM binocolo.ma_session_thesis_reading
-  UNION ALL SELECT 'ma_card_irl_item', company_key FROM binocolo.ma_card_irl_item
-  UNION ALL SELECT 'ma_filing_acquisition', context_company_key FROM binocolo.ma_filing_acquisition
+  SELECT 'ma_target' AS tabella, true AS chiave_obbligatoria, company_key FROM binocolo.ma_target
+  UNION ALL SELECT 'ma_target_rating', true, company_key FROM binocolo.ma_target_rating
+  UNION ALL SELECT 'ma_target_web_validation', true, company_key FROM binocolo.ma_target_web_validation
+  UNION ALL SELECT 'ma_sector_eval_label', true, company_key FROM binocolo.ma_sector_eval_label
+  UNION ALL SELECT 'ma_target_outcome', true, company_key FROM binocolo.ma_target_outcome
+  UNION ALL SELECT 'ma_initiative_card', true, company_key FROM binocolo.ma_initiative_card
+  UNION ALL SELECT 'ma_company_domain', true, company_key FROM binocolo.ma_company_domain
+  UNION ALL SELECT 'ma_deep_analysis', true, company_key FROM binocolo.ma_deep_analysis
+  UNION ALL SELECT 'ma_deep_payload_vintage', true, company_key FROM binocolo.ma_deep_payload_vintage
+  UNION ALL SELECT 'ma_company_bm_family', true, company_key FROM binocolo.ma_company_bm_family
+  UNION ALL SELECT 'ma_company_fact', true, company_key FROM binocolo.ma_company_fact
+  UNION ALL SELECT 'ma_company_note', true, company_key FROM binocolo.ma_company_note
+  UNION ALL SELECT 'ma_card_thesis_reading', true, company_key FROM binocolo.ma_card_thesis_reading
+  UNION ALL SELECT 'ma_session_thesis_reading', true, company_key FROM binocolo.ma_session_thesis_reading
+  UNION ALL SELECT 'ma_card_irl_item', true, company_key FROM binocolo.ma_card_irl_item
+  -- riferimento contestuale, nullable per contratto
+  UNION ALL SELECT 'ma_filing_acquisition', false, context_company_key FROM binocolo.ma_filing_acquisition
 )
 SELECT
   tabella,
+  bool_or(chiave_obbligatoria)                                                 AS chiave_obbligatoria,
   COUNT(*)                                                                     AS righe,
-  COUNT(*) FILTER (WHERE company_key IS NULL)                                  AS senza_chiave,
-  COUNT(*) FILTER (WHERE company_key IS NOT NULL AND NOT EXISTS (
+  COUNT(*) FILTER (WHERE chiave_obbligatoria AND btrim(COALESCE(company_key, '')) = '')
+                                                                               AS senza_chiave,
+  COUNT(*) FILTER (WHERE btrim(COALESCE(company_key, '')) <> '' AND NOT EXISTS (
                      SELECT 1 FROM binocolo.ma_company c WHERE c.company_key = keyed.company_key))
                                                                                AS orfane
 FROM keyed

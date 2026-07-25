@@ -232,7 +232,7 @@ func TestCachedCompanySearchTraceDistinguishesCacheAndUpstream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("start cache trace: %v", err)
 	}
-	_, _, err = service.cachedCompanySearch(withMATrace(context.Background(), trace), params, "", "")
+	_, _, _, err = service.cachedCompanySearch(withMATrace(context.Background(), trace), params, "", "")
 	if err != nil {
 		t.Fatalf("cached search: %v", err)
 	}
@@ -256,7 +256,7 @@ func TestCachedCompanySearchTraceDistinguishesCacheAndUpstream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("start upstream trace: %v", err)
 	}
-	_, _, err = upstreamService.cachedCompanySearch(withMATrace(context.Background(), upstreamTrace), params, "", "")
+	_, _, _, err = upstreamService.cachedCompanySearch(withMATrace(context.Background(), upstreamTrace), params, "", "")
 	if err != nil {
 		t.Fatalf("upstream search: %v", err)
 	}

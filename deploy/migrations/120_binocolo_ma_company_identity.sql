@@ -270,9 +270,18 @@ CREATE INDEX IF NOT EXISTS ma_target_company_key_idx
 -- ===========================================================================
 
 -- Sorgenti che portano identificatori (chiave + P.IVA/CF/vendor_id + nome).
+--
+-- Per ma_target la COLONNA PERSISTITA VIENE PRIMA, e la derivazione legacy resta
+-- solo per le righe che non l'hanno ancora. È ciò che rende vera la ri-entranza
+-- dichiarata in testa al file: rieseguendo la 120 dopo che esistono aziende con
+-- UUID, derivare dal vendor id reinterpreterebbe quelle righe con la chiave
+-- vecchia e inserirebbe una seconda ma_company 'adopted' — un'entità fantasma
+-- senza identificatori, perché i loro sarebbero già assegnati all'UUID e il DO
+-- NOTHING li lascerebbe dove sono.
 CREATE TEMP TABLE ma_identity_source ON COMMIT DROP AS
 SELECT
   COALESCE(
+    NULLIF(upper(btrim(COALESCE(t.company_key, ''))), ''),
     NULLIF(upper(btrim(COALESCE(t.vendor_id, ''))), ''),
     NULLIF(upper(btrim(COALESCE(t.vat_code, ''))), ''),
     NULLIF(upper(btrim(COALESCE(t.tax_code, ''))), ''),
@@ -353,15 +362,24 @@ FROM ma_identity_key
 WHERE company_key ~ '^[0-9A-F]{24}$';
 
 -- PREFLIGHT. Solleva se un identificatore rivendica due aziende.
+--
+-- Il confronto include il registro GIÀ SCRITTO, non solo la sorgente: a un
+-- rilancio della migrazione la collisione può stare fra ciò che si sta per
+-- inserire e ciò che c'è, e in quel caso l'ON CONFLICT DO NOTHING la
+-- assorbirebbe in silenzio invece di farla vedere.
 DO $$
 DECLARE
   offenders integer;
   sample    text;
 BEGIN
-  WITH bad AS (
+  WITH claimed AS (
+    SELECT namespace, value, company_key FROM ma_identity_identifier_raw
+    UNION
+    SELECT namespace, value, company_key FROM binocolo.ma_company_identifier
+  ), bad AS (
     SELECT format('  %s/%s -> %s', namespace, value,
                   array_to_string(array_agg(DISTINCT company_key ORDER BY company_key), ', ')) AS descr
-    FROM ma_identity_identifier_raw
+    FROM claimed
     GROUP BY namespace, value
     HAVING COUNT(DISTINCT company_key) > 1
   )

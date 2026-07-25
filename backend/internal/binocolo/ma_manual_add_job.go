@@ -270,7 +270,7 @@ func (s *maService) fetchManualAddAdvancedTarget(ctx context.Context, vatCode, s
 	if err != nil {
 		return MATarget{}, fmt.Errorf("marshal manual add advanced dataset: %w", err)
 	}
-	parsed, err := parseMATargetsFromVendorData(rows)
+	parsed, err := parseMATargetsFromVendorData(rows, s.now())
 	if err != nil {
 		return MATarget{}, err
 	}

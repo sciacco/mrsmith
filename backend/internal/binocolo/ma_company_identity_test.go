@@ -238,9 +238,9 @@ func TestPlanMACompanyResolutionDedupeIsNotAConflict(t *testing.T) {
 	}
 }
 
-func TestPlanMACompanyResolutionIntraBatchConflict(t *testing.T) {
-	// Due AZIENDE DIVERSE che rivendicano lo stesso valore: la seconda porta un
-	// vendor id già assegnato altrove insieme a una P.IVA di un'altra entità.
+func TestPlanMACompanyResolutionConflictAgainstRegistry(t *testing.T) {
+	// Una sola occorrenza i cui identificatori appartengono a due aziende già
+	// registrate: il vendor id a KEY-A, la P.IVA a KEY-B.
 	existing := map[maCompanyIdentifierRef]string{
 		{maIdentifierNamespaceVendor, "V1"}:          "KEY-A",
 		{maIdentifierNamespaceFiscal, "01234567890"}: "KEY-B",
@@ -259,6 +259,91 @@ func TestPlanMACompanyResolutionIntraBatchConflict(t *testing.T) {
 	}
 	if plan.Conflicts[0].TargetID != "t-1" {
 		t.Fatalf("diagnostica dell'occorrenza persa: %+v", plan.Conflicts[0])
+	}
+}
+
+func TestPlanMACompanyResolutionIntraBatchConflict(t *testing.T) {
+	// Conflitto che nasce DENTRO il batch, contro un registro vuoto: le prime
+	// due osservazioni coniano due aziende distinte, la terza rivendica un
+	// identificatore di ciascuna.
+	plan := planMACompanyResolution(
+		[]maCompanyObservation{
+			{VATCode: "01234567890", CompanyName: "Alfa"},
+			{VATCode: "09876543210", CompanyName: "Beta"},
+			{VATCode: "01234567890", TaxCode: "09876543210", CompanyName: "Ambigua", TargetID: "t-3"},
+		},
+		map[maCompanyIdentifierRef]string{},
+		map[string]bool{},
+		fixedKeyMinter("new-"),
+	)
+	if len(plan.Conflicts) != 1 {
+		t.Fatalf("un conflitto intra-batch atteso, ottenuti %+v", plan.Conflicts)
+	}
+	if plan.Conflicts[0].TargetID != "t-3" {
+		t.Fatalf("il conflitto va attribuito alla terza osservazione: %+v", plan.Conflicts[0])
+	}
+	if plan.Keys[0] == "" || plan.Keys[1] == "" || plan.Keys[0] == plan.Keys[1] {
+		t.Fatalf("le prime due osservazioni sono aziende distinte e valide: %+v", plan.Keys)
+	}
+	if plan.Keys[2] != "" {
+		t.Fatalf("l'osservazione in conflitto non deve avere chiave: %q", plan.Keys[2])
+	}
+}
+
+func TestPlanMACompanyResolutionPriorKeyIsNeverSilentlyReplaced(t *testing.T) {
+	// Il caso che re-chiaverebbe una riga persistita: il target porta KEY-A, ma
+	// la P.IVA osservata risulta registrata su KEY-B. Sostituire in silenzio
+	// lascerebbe rating e dossier su KEY-A — l'orfanamento che la issue
+	// impedisce. Deve essere un conflitto.
+	existing := map[maCompanyIdentifierRef]string{
+		{maIdentifierNamespaceFiscal, "01234567890"}: "KEY-B",
+	}
+	plan := planMACompanyResolution(
+		[]maCompanyObservation{{PriorCompanyKey: "KEY-A", VATCode: "01234567890", TargetID: "t-1"}},
+		existing,
+		map[string]bool{"KEY-A": true, "KEY-B": true},
+		fixedKeyMinter("new-"),
+	)
+	if len(plan.Conflicts) != 1 {
+		t.Fatalf("un conflitto atteso, ottenuti %+v", plan.Conflicts)
+	}
+	if plan.Conflicts[0].ExistingCompanyKey != "KEY-B" || plan.Conflicts[0].IncomingCompanyKey != "KEY-A" {
+		t.Fatalf("diagnostica invertita: %+v", plan.Conflicts[0])
+	}
+	if plan.Keys[0] != "" {
+		t.Fatalf("nessuna chiave per un'osservazione in conflitto: %q", plan.Keys[0])
+	}
+	if len(plan.Attachments) != 0 {
+		t.Fatalf("nessun attach prima di una decisione umana: %+v", plan.Attachments)
+	}
+}
+
+func TestPlanMACompanyResolutionPriorKeySeedsResolutionWithoutConflict(t *testing.T) {
+	// Il caso normale: la chiave portata e gli identificatori concordano, e un
+	// identificatore nuovo si aggancia alla stessa azienda.
+	existing := map[maCompanyIdentifierRef]string{
+		{maIdentifierNamespaceFiscal, "01234567890"}: "KEY-A",
+	}
+	plan := planMACompanyResolution(
+		[]maCompanyObservation{{PriorCompanyKey: "KEY-A", VATCode: "01234567890", VendorID: "V-NUOVO"}},
+		existing,
+		map[string]bool{"KEY-A": true},
+		fixedKeyMinter("new-"),
+	)
+	if len(plan.Conflicts) != 0 {
+		t.Fatalf("nessun conflitto atteso: %+v", plan.Conflicts)
+	}
+	if plan.Keys[0] != "KEY-A" {
+		t.Fatalf("chiave = %q, attesa KEY-A", plan.Keys[0])
+	}
+	found := false
+	for _, attachment := range plan.Attachments {
+		if attachment.Namespace == maIdentifierNamespaceVendor && attachment.CompanyKey == "KEY-A" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("il vendor id nuovo doveva agganciarsi a KEY-A: %+v", plan.Attachments)
 	}
 }
 

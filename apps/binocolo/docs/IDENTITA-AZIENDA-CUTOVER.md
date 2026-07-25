@@ -41,10 +41,15 @@ espressioni scritte a mano. Tutte le colonne di divergenza devono dare 0.
 
 ### Il gate (passo 4)
 
-Eseguire **Q17**. `senza_chiave` e `orfane` devono essere 0 su ogni riga. La 121
-solleva già da sola se non lo sono, ma il gate va verificato anche a mano:
-è la condizione che rende raggiungibili le guardie applicative, che dopo il
-cutover **errano** invece di riderivare la chiave.
+Eseguire **Q17**. `orfane` deve essere 0 su ogni riga; `senza_chiave` deve
+essere 0 dove `chiave_obbligatoria`. L'unica riga con chiave facoltativa è
+`ma_filing_acquisition`, il cui `context_company_key` è un riferimento
+contestuale nullable per contratto: un'acquisizione senza contesto è normale e
+non deve far fallire il cutover.
+
+La 121 solleva già da sola sui target, ma il gate va verificato anche a mano su
+tutte le tabelle: è la condizione che rende raggiungibili le guardie
+applicative, che dopo il cutover **errano** invece di riderivare la chiave.
 
 ## Tre confini di rollback, distinti
 

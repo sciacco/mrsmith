@@ -59,9 +59,10 @@ type maCompanyIdentifier struct {
 // maCompanyObservation è un'occorrenza di azienda vista da un chiamante.
 type maCompanyObservation struct {
 	// PriorCompanyKey è la chiave che la riga PORTA GIÀ (re-persistenza di un
-	// target riletto dal DB). Non è una derivazione: si usa solo quando nessun
-	// identificatore risolve, ed evita che una riga senza identificatori
-	// utilizzabili cambi identità a ogni salvataggio.
+	// target riletto dal DB). Non è una derivazione: quando l'entità esiste è
+	// l'azienda ATTESA, e un identificatore osservato che appartiene a
+	// un'azienda diversa è un conflitto, non una correzione — re-chiavare la
+	// riga lascerebbe il suo dettaglio sulla chiave vecchia.
 	PriorCompanyKey string
 
 	VendorID    string
@@ -251,8 +252,19 @@ func planMACompanyResolution(
 			continue
 		}
 
-		// Quali aziende rivendicano già uno degli identificatori osservati.
+		// La chiave che la riga PORTA GIÀ, quando l'entità esiste, è l'azienda
+		// ATTESA: inizializza la risoluzione invece di essere un ripiego.
+		//
+		// Preferire gli identificatori l'avrebbe sostituita in silenzio, e una
+		// riga ri-chiavata lascia indietro il proprio dettaglio — rating,
+		// dossier, letture di tesi restano sulla chiave vecchia. È l'orfanamento
+		// che questa issue esiste per impedire, quindi la divergenza fra chiave
+		// portata e identificatori osservati è un CONFLITTO da decidere a mano,
+		// non una riparazione automatica.
 		key := ""
+		if prior != "" && knownKeys[prior] {
+			key = prior
+		}
 		conflicted := false
 		for _, identifier := range identifiers {
 			owner, ok := claimed[identifier.maCompanyIdentifierRef]
@@ -283,15 +295,8 @@ func planMACompanyResolution(
 
 		isNew := false
 		if key == "" {
-			// Nessun identificatore risolve. La chiave pregressa vale come
-			// identità solo se l'entità esiste: è il caso della
-			// re-persistenza, non una derivazione.
-			if prior != "" && knownKeys[prior] {
-				key = prior
-			} else {
-				key = newKey()
-				isNew = true
-			}
+			key = newKey()
+			isNew = true
 		}
 		plan.Keys[index] = key
 

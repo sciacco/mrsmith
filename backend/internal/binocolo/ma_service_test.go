@@ -1446,11 +1446,16 @@ func (f *fakeMAWorkspaceStore) ResolveMACompany(_ context.Context, observation m
 		f.companyIdentities = map[maCompanyIdentifierRef]string{}
 	}
 	identifiers := extractMACompanyIdentifiers(observation.VATCode, observation.TaxCode, observation.VendorID)
+	// La chiave portata dalla riga vince, come nel resolver reale: una
+	// divergenza fra chiave e identificatori è un conflitto, non una
+	// sostituzione silenziosa.
 	key := normalizeMACompanyKey(observation.PriorCompanyKey)
-	for _, identifier := range identifiers {
-		if owner, ok := f.companyIdentities[identifier.maCompanyIdentifierRef]; ok && owner != "" {
-			key = owner
-			break
+	if key == "" {
+		for _, identifier := range identifiers {
+			if owner, ok := f.companyIdentities[identifier.maCompanyIdentifierRef]; ok && owner != "" {
+				key = owner
+				break
+			}
 		}
 	}
 	if key == "" {

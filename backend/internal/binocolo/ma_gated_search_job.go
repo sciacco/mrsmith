@@ -558,7 +558,7 @@ func (s *maService) enrichTargetAdvanced(ctx context.Context, target MATarget) (
 	if err != nil {
 		return MATarget{}, fmt.Errorf("marshal advanced dataset: %w", err)
 	}
-	parsed, err := parseMATargetsFromVendorData(rows)
+	parsed, err := parseMATargetsFromVendorData(rows, s.now())
 	if err != nil {
 		return MATarget{}, err
 	}
