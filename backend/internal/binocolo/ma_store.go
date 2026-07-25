@@ -2290,7 +2290,28 @@ func (s *SQLStore) ListMATargetRows(ctx context.Context, sessionID string) ([]MA
 	}
 	rows, err := s.db.QueryContext(ctx, `
 WITH target_rows AS (
-  SELECT t.*
+  -- Colonne esplicite, non t.*: la CTE espone una company_key, e un t.* che ne
+  -- porti dentro un'altra con lo stesso nome rende ambiguo ogni riferimento
+  -- successivo. È il difetto che la migrazione 120 avrebbe innescato sul binario
+  -- precedente (issue #86), e non deve poter tornare da questo lato.
+  SELECT
+    t.id,
+    t.session_id,
+    t.run_id,
+    t.company_key,
+    t.company_name,
+    t.origin,
+    t.vat_code,
+    t.province,
+    t.town,
+    t.ateco_code,
+    t.score,
+    t.score_version,
+    t.match_state,
+    t.confidence,
+    t.flags,
+    t.enrichment_level,
+    t.turnover
   FROM binocolo.ma_target t
   WHERE t.session_id = $1::uuid
 )

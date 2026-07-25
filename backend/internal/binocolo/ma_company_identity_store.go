@@ -260,9 +260,17 @@ WHERE company_key = $1 AND identity_state = 'vendor_only'
 // tocca nulla e RETURNING non restituisce righe.
 //
 // first_seen_at/last_seen_at datano l'OSSERVAZIONE DEL FORNITORE, non il
-// passaggio nel resolver: una ri-persistenza (rescore) o un payload servito
-// dalla cache non li fa avanzare, e GREATEST impedisce a un'osservazione vecchia
-// di riportarli indietro. I ruoli, invece, si aggiornano sempre.
+// passaggio nel resolver, con la stessa semantica del backfill (MIN/MAX su
+// seen_at): LEAST arretra la prima osservazione quando ne arriva una più antica
+// — una risposta di cache elaborata dopo una fresca — e GREATEST impedisce a
+// quella stessa risposta vecchia di far avanzare l'ultima. Una ri-persistenza
+// (rescore, ObservedAt nil) non muove né l'una né l'altra. I ruoli, invece, si
+// aggiornano sempre: sono conoscenza acquisita, indipendente da quando è
+// arrivata.
+//
+// Un INSERT senza istante di osservazione data la riga a now(): non abbiamo di
+// meglio, ed è il momento in cui l'identificatore è entrato nel registro. LEAST
+// lo arretra alla prima osservazione vera appena ne arriva una.
 func attachMACompanyIdentifierTx(ctx context.Context, tx *sql.Tx, attachment maCompanyIdentifierAttachment) error {
 	var observedAt any
 	if attachment.ObservedAt != nil && !attachment.ObservedAt.IsZero() {
@@ -273,12 +281,16 @@ func attachMACompanyIdentifierTx(ctx context.Context, tx *sql.Tx, attachment maC
 INSERT INTO binocolo.ma_company_identifier (namespace, value, company_key, is_vat, is_tax, first_seen_at, last_seen_at)
 VALUES ($1, $2, $3, $4, $5, COALESCE($6::timestamptz, now()), COALESCE($6::timestamptz, now()))
 ON CONFLICT (namespace, value) DO UPDATE SET
-  is_vat       = binocolo.ma_company_identifier.is_vat OR EXCLUDED.is_vat,
-  is_tax       = binocolo.ma_company_identifier.is_tax OR EXCLUDED.is_tax,
-  last_seen_at = GREATEST(
-                   binocolo.ma_company_identifier.last_seen_at,
-                   COALESCE($6::timestamptz, binocolo.ma_company_identifier.last_seen_at)
-                 )
+  is_vat        = binocolo.ma_company_identifier.is_vat OR EXCLUDED.is_vat,
+  is_tax        = binocolo.ma_company_identifier.is_tax OR EXCLUDED.is_tax,
+  first_seen_at = LEAST(
+                    binocolo.ma_company_identifier.first_seen_at,
+                    COALESCE($6::timestamptz, binocolo.ma_company_identifier.first_seen_at)
+                  ),
+  last_seen_at  = GREATEST(
+                    binocolo.ma_company_identifier.last_seen_at,
+                    COALESCE($6::timestamptz, binocolo.ma_company_identifier.last_seen_at)
+                  )
 WHERE binocolo.ma_company_identifier.company_key = EXCLUDED.company_key
 RETURNING company_key
 `, attachment.Namespace, attachment.Value, attachment.CompanyKey, attachment.IsVAT, attachment.IsTax, observedAt).Scan(&owner)

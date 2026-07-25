@@ -566,6 +566,14 @@ func (s *maService) enrichTargetAdvanced(ctx context.Context, target MATarget) (
 		return MATarget{}, fmt.Errorf("no parsable advanced row for %s", ident)
 	}
 	enriched := parsed[0]
+	// I RIFERIMENTI DI RIGA prima dell'osservazione: se la risposta advanced
+	// porta un identificatore conteso, il conflitto finisce nel ledger e deve
+	// dire QUALE occorrenza l'ha prodotto. Con session/run/target vuoti sarebbe
+	// una riga diagnostica su cui non si può indagare.
+	enriched.ID = target.ID
+	enriched.SessionID = target.SessionID
+	enriched.RunID = target.RunID
+
 	// La risposta advanced È un'osservazione reale del fornitore, e porta i suoi
 	// identificatori: vendor id, P.IVA, CF e nome possono differire da quelli
 	// della riga address (servita magari dalla cache). Il registro deve
@@ -574,16 +582,13 @@ func (s *maService) enrichTargetAdvanced(ctx context.Context, target MATarget) (
 	s.observeVendorIdentity(ctx, target.CompanyKey, enriched)
 
 	// Preserve the ADDRESS-row identity sulla RIGA: la company_key risolta dal
-	// registro più i valori identitari che l'hanno prodotta e i row ID. Il gate
-	// ha chiavato la sua ma_target_web_validation su quella riga, e
+	// registro più i valori identitari che l'hanno prodotta. Il gate ha chiavato
+	// la sua ma_target_web_validation su quella riga, e
 	// maWebValidationTargetFingerprint include companyName/vatCode/taxCode:
 	// persistere i valori advanced cambierebbe l'input hash, invaliderebbe il
 	// verdetto del gate e farebbe ri-pagare l'azienda al re-run. Financials,
 	// ATECO e il payload che lo scoring legge vengono invece dalla fetch
 	// advanced.
-	enriched.ID = target.ID
-	enriched.SessionID = target.SessionID
-	enriched.RunID = target.RunID
 	enriched.CompanyKey = target.CompanyKey
 	enriched.VendorID = target.VendorID
 	enriched.VATCode = target.VATCode

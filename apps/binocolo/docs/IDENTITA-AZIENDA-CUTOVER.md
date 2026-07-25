@@ -13,6 +13,7 @@ L'esecuzione avviene **ad applicazione e worker fermi**. Il runbook è
 ## Sequenza
 
 ```
+0. deploy del commit PREPARATORIO   (branch fix/issue-86-pre-cutover-compat)
 1. stop writer (applicazione + worker)
 2. migrazione 120  — schema, registro, colonna ma_target.company_key nullable
 3. migrazione 121  — backfill di ma_target.company_key (ri-eseguibile)
@@ -21,6 +22,24 @@ L'esecuzione avviene **ad applicazione e worker fermi**. Il runbook è
 6. smoke (sotto)
 7. riapertura scritture
 ```
+
+### Passo 0 — il commit preparatorio non è opzionale
+
+`ListMATargetRows` costruisce una CTE con `SELECT t.*` più una `company_key`
+**derivata con lo stesso nome**. Finché la colonna non esiste il nome è unico;
+nell'istante in cui la 120 la aggiunge, la CTE ne espone due omonime e ogni
+`t.company_key` successivo diventa ambiguo — PostgreSQL risponde `column
+reference "company_key" is ambiguous` e l'elenco dei target smette di
+funzionare.
+
+Non è un problema del binario nuovo, che la colonna la legge: è un problema del
+binario **già in esercizio** nella finestra fra migrazione e deploy. Il commit
+preparatorio (`fix/issue-86-pre-cutover-compat`, ramificato da `main`) sostituisce
+`t.*` con l'elenco esplicito delle colonne e funziona su **entrambi** gli schemi,
+senza cambiare comportamento. Va in produzione **prima** della 120.
+
+Senza il passo 0 la 120 non è additiva nei fatti, e il confine di rollback 1 qui
+sotto è falso.
 
 Le migrazioni le applica l'utente con il proprio processo: nessuna operazione
 diretta sui DB configurati in env.
@@ -53,8 +72,11 @@ applicative, che dopo il cutover **errano** invece di riderivare la chiave.
 
 ## Tre confini di rollback, distinti
 
-1. **Schema** — la 120 è additiva. Un rollback applicativo non richiede mai il
-   ripristino di schema eliminato.
+1. **Schema** — la 120 è additiva e non elimina nulla, quindi un rollback
+   applicativo non richiede mai il ripristino di schema. Vale però **solo a
+   partire dal commit preparatorio del passo 0**: si torna indietro fino a
+   quello, non oltre. Il binario che lo precede non sopravvive alla colonna
+   nuova.
 2. **Semantico** — la prima azienda assegnata con UUID. Prima, il binario vecchio
    è sicuro; dopo, ri-deriva l'ObjectId per quell'azienda e ne crea una seconda
    identità.
@@ -92,11 +114,14 @@ Scrivono tutti su un DB condiviso, quindi non li esegue un agent.
 
 ## Dopo il cutover
 
-**Q18** è il monitor periodico. Devono restare 0 le prime **quattro** righe,
+**Q18** è il monitor periodico. Devono restare 0 le prime **cinque** righe,
 compresa «aziende senza alcun identificatore»: il resolver non ne crea mai — erra
 invece di inventare un'identità da una ragione sociale — quindi un valore
 maggiore di zero può venire solo dal backfill, da chiavi storiche presenti
-unicamente nelle tabelle di dettaglio.
+unicamente nelle tabelle di dettaglio. Il controllo sulle chiavi che non
+risolvono copre tutte le tabelle chiavate, non i soli target: finché F5 non
+introduce le FK verso `ma_company`, nulla impedisce a un writer di coniare una
+chiave fuori dal registro.
 
 `aziende_vendor_only > 0` non è un errore di integrità ma un difetto da chiudere:
 un'entità senza identità fiscale è precisamente ciò che non sopravvive a un

@@ -128,9 +128,10 @@ SELECT namespace, value, company_key, bool_or(is_vat), bool_or(is_tax), MIN(seen
 FROM ma_target_identifier_delta
 GROUP BY namespace, value, company_key
 ON CONFLICT (namespace, value) DO UPDATE SET
-  is_vat       = binocolo.ma_company_identifier.is_vat OR EXCLUDED.is_vat,
-  is_tax       = binocolo.ma_company_identifier.is_tax OR EXCLUDED.is_tax,
-  last_seen_at = GREATEST(binocolo.ma_company_identifier.last_seen_at, EXCLUDED.last_seen_at)
+  is_vat        = binocolo.ma_company_identifier.is_vat OR EXCLUDED.is_vat,
+  is_tax        = binocolo.ma_company_identifier.is_tax OR EXCLUDED.is_tax,
+  first_seen_at = LEAST(binocolo.ma_company_identifier.first_seen_at, EXCLUDED.first_seen_at),
+  last_seen_at  = GREATEST(binocolo.ma_company_identifier.last_seen_at, EXCLUDED.last_seen_at)
 WHERE binocolo.ma_company_identifier.company_key = EXCLUDED.company_key;
 
 -- Promuovi le entità che hanno acquisito un identificatore fiscale.

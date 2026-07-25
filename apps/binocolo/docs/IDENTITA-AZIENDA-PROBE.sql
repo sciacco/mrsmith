@@ -924,13 +924,18 @@ ORDER BY orfane DESC, senza_chiave DESC, tabella;
 -- -----------------------------------------------------------------------------
 -- Q18 — MONITOR del registro (periodico, dopo il cutover).
 --
--- L'invariante canonico dopo l'adozione. Devono dare 0 le prime QUATTRO righe,
+-- L'invariante canonico dopo l'adozione. Devono dare 0 le prime CINQUE righe,
 -- compresa «aziende senza alcun identificatore»: il resolver non crea mai
 -- un'entità senza identificatori — erra invece di inventarli da una ragione
 -- sociale — quindi un valore > 0 può venire solo dal backfill, cioè da chiavi
 -- storiche presenti unicamente nelle tabelle di dettaglio e prive della forma
 -- ObjectId. Vanno guardate una per una: sono aziende che nessun identificatore
 -- può più ritrovare.
+--
+-- Il controllo sulle chiavi che non risolvono copre TUTTE le tabelle chiavate:
+-- finché F5 non introduce le FK verso ma_company, un writer che coni una chiave
+-- fuori dal registro non incontra alcun vincolo, e restringere il monitor a
+-- ma_target lo lascerebbe invisibile.
 --
 -- `aziende_vendor_only` > 0 non è un errore di integrità ma un DIFETTO da
 -- chiudere: un'entità senza identità fiscale è precisamente ciò che non
@@ -944,10 +949,34 @@ SELECT 'valori fiscali su due entità (impossibile: PK)' AS controllo,
 FROM (SELECT value FROM binocolo.ma_company_identifier
       WHERE namespace = 'fiscal' GROUP BY value HAVING COUNT(DISTINCT company_key) > 1) x
 UNION ALL
-SELECT 'occorrenze (ma_target) che non risolvono', COUNT(*)
-FROM binocolo.ma_target t
-WHERE t.company_key IS NULL
-   OR NOT EXISTS (SELECT 1 FROM binocolo.ma_company c WHERE c.company_key = t.company_key)
+-- Copre TUTTE le tabelle chiavate, non i soli target: finché F5 non introduce le
+-- FK verso ma_company, nulla impedisce a un writer di scrivere una chiave che
+-- non esiste, e un monitor ristretto a ma_target non lo vedrebbe. Riusa la
+-- stessa lista di Q17.
+SELECT 'chiavi che non risolvono, in qualunque tabella', COUNT(*)
+FROM (
+  SELECT company_key FROM binocolo.ma_target
+  UNION ALL SELECT company_key FROM binocolo.ma_target_rating
+  UNION ALL SELECT company_key FROM binocolo.ma_target_web_validation
+  UNION ALL SELECT company_key FROM binocolo.ma_sector_eval_label
+  UNION ALL SELECT company_key FROM binocolo.ma_target_outcome
+  UNION ALL SELECT company_key FROM binocolo.ma_initiative_card
+  UNION ALL SELECT company_key FROM binocolo.ma_company_domain
+  UNION ALL SELECT company_key FROM binocolo.ma_deep_analysis
+  UNION ALL SELECT company_key FROM binocolo.ma_deep_payload_vintage
+  UNION ALL SELECT company_key FROM binocolo.ma_company_bm_family
+  UNION ALL SELECT company_key FROM binocolo.ma_company_fact
+  UNION ALL SELECT company_key FROM binocolo.ma_company_note
+  UNION ALL SELECT company_key FROM binocolo.ma_card_thesis_reading
+  UNION ALL SELECT company_key FROM binocolo.ma_session_thesis_reading
+  UNION ALL SELECT company_key FROM binocolo.ma_card_irl_item
+  UNION ALL SELECT context_company_key FROM binocolo.ma_filing_acquisition
+) keyed
+WHERE btrim(COALESCE(company_key, '')) <> ''
+  AND NOT EXISTS (SELECT 1 FROM binocolo.ma_company c WHERE c.company_key = keyed.company_key)
+UNION ALL
+SELECT 'target senza chiave (obbligatoria)', COUNT(*)
+FROM binocolo.ma_target WHERE company_key IS NULL
 UNION ALL
 SELECT 'conflitti identitari aperti', COUNT(*)
 FROM binocolo.ma_company_identity_conflict WHERE state = 'open'

@@ -3885,10 +3885,39 @@ func (s *maService) companyDossier(ctx context.Context, vat string, email string
 	if rec != nil && (rec.Status == maDeepStatusReady || rec.Status == maDeepStatusQueued || rec.Status == maDeepStatusRunning) {
 		return mapMACompanyDossier(vat, rec), nil
 	}
-	if err := s.store.EnqueueMADeepAnalysis(ctx, vat, vat, "", email); err != nil {
+	// La chiave la decide il registro, non la P.IVA digitata (issue #86).
+	// Passare `vat` come company_key — com'era prima — coniava un'identità da un
+	// input fiscale: per un'azienda già nel corpus creava un SECONDO dossier
+	// accanto a quello sotto la chiave canonica, e per una nuova lasciava una
+	// riga ma_deep_analysis senza ma_company. Il record esistente vince, perché
+	// è già la chiave sotto cui il dossier vive.
+	companyKey := ""
+	if rec != nil {
+		companyKey = normalizeMACompanyKey(rec.CompanyKey)
+	}
+	if companyKey == "" {
+		resolved, err := s.resolveMACompany(ctx, maCompanyDossierObservation(vat))
+		if err != nil {
+			return MACompanyDossier{}, err
+		}
+		companyKey = resolved
+	}
+	if err := s.store.EnqueueMADeepAnalysis(ctx, companyKey, vat, "", email); err != nil {
 		return MACompanyDossier{}, err
 	}
 	return MACompanyDossier{VATCode: vat, Status: maDeepStatusQueued}, nil
+}
+
+// maCompanyDossierObservation costruisce l'osservazione per una P.IVA o un
+// codice fiscale digitati a mano. Non c'è vendor id né ragione sociale: la
+// lunghezza discrimina il ruolo, come già fa fetchDirectCardSnapshot. Nessun
+// ObservedAt — non è una chiamata al fornitore, quindi non osserva nomi.
+func maCompanyDossierObservation(vatOrTax string) maCompanyObservation {
+	value := normalizeMAVATOrTax(vatOrTax)
+	if len(value) == 16 {
+		return maCompanyObservation{TaxCode: value}
+	}
+	return maCompanyObservation{VATCode: value}
 }
 
 // getCompanyDossier returns the current cached state for a P.IVA without enqueueing;
