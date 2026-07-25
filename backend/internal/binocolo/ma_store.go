@@ -2236,8 +2236,34 @@ func (s *SQLStore) ListMATargetRows(ctx context.Context, sessionID string) ([]MA
 	}
 	rows, err := s.db.QueryContext(ctx, `
 WITH target_rows AS (
+  -- Colonne esplicite, non t.*: la CTE espone già una company_key derivata, e
+  -- un t.* che ne portasse dentro una OMONIMA renderebbe ambiguo ogni
+  -- t.company_key successivo (PostgreSQL: «column reference "company_key" is
+  -- ambiguous»).
+  --
+  -- Questo è il commit PREPARATORIO della issue #86: va in produzione PRIMA
+  -- della migrazione 120, che aggiunge binocolo.ma_target.company_key. Senza,
+  -- l'applicazione in esercizio smetterebbe di elencare i target nell'istante
+  -- in cui la colonna compare. docs/DATABASE-MIGRATIONS.md chiede esattamente
+  -- questo: verificare le query reali invece di assumere che un ALTER additivo
+  -- sia innocuo.
   SELECT
-    t.*,
+    t.id,
+    t.session_id,
+    t.run_id,
+    t.company_name,
+    t.origin,
+    t.vat_code,
+    t.province,
+    t.town,
+    t.ateco_code,
+    t.score,
+    t.score_version,
+    t.match_state,
+    t.confidence,
+    t.flags,
+    t.enrichment_level,
+    t.turnover,
     COALESCE(
       NULLIF(upper(btrim(t.vendor_id)), ''),
       NULLIF(upper(btrim(t.vat_code)), ''),
