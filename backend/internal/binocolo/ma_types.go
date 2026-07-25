@@ -1430,6 +1430,12 @@ type MATarget struct {
 	VendorPayload    json.RawMessage      `json:"vendorPayload,omitempty"`
 	EnrichmentLevel  string               `json:"enrichmentLevel,omitempty"`
 	CreatedAt        time.Time            `json:"createdAt"`
+	// VendorObservedAt è l'istante della chiamata al fornitore che ha prodotto
+	// questa riga (issue #86). Transiente e non persistito: serve al registro
+	// identità per decidere se il nome è una NUOVA osservazione. Una riga
+	// riletta dal DB lo lascia nil, così una rilettura non avanza mai
+	// ma_company.name_observed_at.
+	VendorObservedAt *time.Time `json:"-"`
 }
 
 // MATargetRow è la proiezione leggera di un target per liste e derivazioni:

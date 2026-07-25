@@ -181,14 +181,16 @@ func (s *maService) manualAddWork(ctx context.Context, job maJob) error {
 		if err != nil {
 			return err
 		}
-		companyKey := normalizeMACompanyKey(maTargetDedupeKey(target))
-		if companyKey == "" {
-			return fmt.Errorf("%w: company key", errMAStrategyInvalid)
+		// Assegnazione canonica (issue #86, categoria B): la chiave la conia il
+		// registro identità, non la precedenza del payload del fornitore.
+		companyKey, err := s.resolveMACompany(ctx, maCompanyObservationFromTarget(target, job.SessionID, runID))
+		if err != nil {
+			return err
 		}
 		target.CompanyKey = companyKey
 		if existing := maFindManualAddTarget(detail.Targets, vatCode, companyKey); existing != nil {
 			target = *existing
-		} else if err := s.store.InsertMATarget(ctx, job.SessionID, runID, target); err != nil {
+		} else if err := s.insertMATarget(ctx, job.SessionID, runID, target); err != nil {
 			if !errors.Is(err, errMATargetAlreadyPresent) {
 				return err
 			}
@@ -203,10 +205,9 @@ func (s *maService) manualAddWork(ctx context.Context, job maJob) error {
 			target = *existing
 		}
 	}
+	// Guardia, non fallback: a questo punto il target è stato risolto dal
+	// registro o riletto dal DB, e in entrambi i casi porta la chiave.
 	companyKey := normalizeMACompanyKey(target.CompanyKey)
-	if companyKey == "" {
-		companyKey = normalizeMACompanyKey(maTargetDedupeKey(target))
-	}
 	if companyKey == "" {
 		return fmt.Errorf("%w: company key", errMAStrategyInvalid)
 	}
@@ -288,7 +289,8 @@ func (s *maService) fetchManualAddAdvancedTarget(ctx context.Context, vatCode, s
 	if strings.TrimSpace(target.TaxCode) == "" && len(vatCode) == 16 {
 		target.TaxCode = vatCode
 	}
-	target.CompanyKey = normalizeMACompanyKey(maTargetDedupeKey(target))
+	// La chiave NON si assegna qui: la conia il resolver in manualAddWork, che
+	// è il punto in cui l'occorrenza entra nel registro (issue #86).
 	return target, nil
 }
 
@@ -310,7 +312,7 @@ func (s *maService) rescoreManualAddTargets(ctx context.Context, targets []MATar
 	merged := make([]MATarget, 0, len(scored)+len(carried))
 	merged = append(merged, scored...)
 	merged = append(merged, carried...)
-	if err := s.store.ReplaceMATargets(ctx, sessionID, runID, merged); err != nil {
+	if err := s.replaceMATargets(ctx, sessionID, runID, merged); err != nil {
 		return err
 	}
 	if err := s.store.CompleteMAExecutionRun(ctx, runID, maRunStatusCompleted, len(scored), ""); err != nil {

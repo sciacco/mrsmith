@@ -957,6 +957,16 @@ func dedupeMATargets(targets []MATarget) []MATarget {
 	return out
 }
 
+// maTargetDedupeKey deduplica le righe DENTRO una risposta del fornitore, ed è
+// l'unico mestiere che le resta dopo la migrazione 120 (issue #86).
+//
+// NON è più l'identità dell'azienda e NON va usata per assegnare, scrivere o
+// ritrovare una company_key: quella la conia e la custodisce il registro
+// (binocolo.ma_company, resolver in ma_company_identity_store.go). La
+// precedenza qui sotto — vendor_id > P.IVA > CF > ragione sociale — è la forma
+// storica misurata sui dati, non una regola da «correggere» invertendola:
+// riportarla in un writer riaggancerebbe l'identità al fornitore, che è
+// esattamente ciò da cui la issue esce.
 func maTargetDedupeKey(target MATarget) string {
 	for _, value := range []string{target.VendorID, target.VATCode, target.TaxCode} {
 		value = strings.ToUpper(strings.TrimSpace(value))

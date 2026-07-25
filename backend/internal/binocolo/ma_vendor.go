@@ -7,6 +7,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type maShareholder struct {
@@ -22,12 +23,19 @@ func parseMATargetsFromVendorData(raw json.RawMessage) ([]MATarget, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Il parse avviene subito dopo la risposta del fornitore: questo è l'istante
+	// dell'osservazione che il registro identità usa per la regola sul nome
+	// (issue #86). Le righe rilette dal DB non passano di qui e restano senza
+	// timestamp, quindi non avanzano ma_company.name_observed_at.
+	observedAt := time.Now().UTC()
 	targets := make([]MATarget, 0, len(items))
 	for _, item := range items {
 		target, err := normalizeMATarget(item)
 		if err != nil {
 			return nil, err
 		}
+		stamp := observedAt
+		target.VendorObservedAt = &stamp
 		targets = append(targets, target)
 	}
 	return targets, nil

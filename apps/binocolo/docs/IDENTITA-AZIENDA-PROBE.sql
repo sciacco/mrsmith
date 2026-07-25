@@ -720,3 +720,226 @@ GROUP BY fiscal_key
 HAVING COUNT(DISTINCT company_name) > 1
 ORDER BY 1
 LIMIT 40;
+
+
+-- -----------------------------------------------------------------------------
+-- Q14 — P.IVA e codice fiscale coincidono?
+--
+-- Aggiunta 2026-07-25 dopo la seconda revisione di #86, per sostituire con una
+-- misura un'assunzione: avevo motivato il namespace fiscale unificato dicendo che
+-- nelle società di capitali il CF è normalmente lo stesso numero a 11 cifre della
+-- P.IVA. È conoscenza di dominio, non un dato nostro.
+--
+-- Dimensiona quante righe fiscali avrà ma_company_identifier: `coincidono` -> UNA
+-- riga con entrambi i ruoli (is_vat + is_tax); `differiscono` -> DUE righe nel
+-- namespace fiscale. `solo_vat` sono le aziende per cui non conosciamo il CF, cioè
+-- quelle su cui DocuEngine non potrebbe cercare i bilanci senza prima risolverlo.
+--
+-- NB: non cambia il modello in nessuno dei due esiti — l'argomento per il namespace
+-- unico è la collisione fra aziende diverse, che non dipende da questa frequenza.
+-- -----------------------------------------------------------------------------
+WITH corpus AS (
+  SELECT COALESCE(vat_code, '') AS vat_code, COALESCE(tax_code, '') AS tax_code FROM binocolo.ma_target
+  UNION ALL
+  SELECT vat_code, tax_code FROM binocolo.ma_initiative_card
+  UNION ALL
+  SELECT vat_code, tax_code FROM binocolo.ma_company_domain
+), clean AS (
+  SELECT
+    CASE WHEN regexp_replace(upper(btrim(vat_code)), '[[:space:].]', '', 'g') ~ '^IT[0-9]{11}$'
+         THEN substr(regexp_replace(upper(btrim(vat_code)), '[[:space:].]', '', 'g'), 3)
+         ELSE regexp_replace(upper(btrim(vat_code)), '[[:space:].]', '', 'g') END AS vat,
+    regexp_replace(upper(btrim(tax_code)), '[[:space:].]', '', 'g')               AS tax
+  FROM corpus
+), per_identita AS (
+  SELECT DISTINCT vat, tax FROM clean WHERE vat <> '' OR tax <> ''
+)
+SELECT
+  COUNT(*)                                                      AS coppie_distinte,
+  COUNT(*) FILTER (WHERE vat <> '' AND tax <> '' AND vat = tax)   AS coincidono,
+  COUNT(*) FILTER (WHERE vat <> '' AND tax <> '' AND vat <> tax)  AS differiscono,
+  COUNT(*) FILTER (WHERE vat <> '' AND tax =  '')                 AS solo_vat,
+  COUNT(*) FILTER (WHERE vat =  '' AND tax <> '')                 AS solo_tax,
+  COUNT(*) FILTER (WHERE vat <> '' AND tax <> '' AND vat <> tax
+                     AND tax ~ '^[0-9A-Z]{16}$')                  AS differiscono_cf_persona_fisica
+FROM per_identita;
+
+
+-- =============================================================================
+-- SEZIONE 2 — CUTOVER DEL REGISTRO IDENTITÀ (issue #86)
+--
+-- Q1..Q14 misurano lo stato PRIMA della decisione. Da qui in poi le query
+-- servono a eseguire e sorvegliare l'adozione:
+--
+--   Q15  parità SQL <-> Go delle primitive ...... PRIMA del cutover (dopo la 120)
+--   Q16  preflight del registro ................. PRIMA di applicare la 120
+--   Q17  gate: chiavi orfane .................... DOPO 120+121, prima del deploy
+--   Q18  monitor del registro ................... periodico, dopo il cutover
+--
+-- Cambio di ruolo di Q3/Q11: dopo il cutover due vendor id per la stessa
+-- identità NON sono più un invariante rotto — sono deriva del fornitore, e la
+-- continuità è integra se entrambi puntano alla stessa ma_company. Restano come
+-- SENSORE DI RINUMERAZIONE OpenAPI.it (alert), non come errore. L'invariante
+-- canonico è Q18.
+-- =============================================================================
+
+
+-- -----------------------------------------------------------------------------
+-- Q15 — Parità fra le funzioni SQL della 120 e la normalizzazione del codice.
+--
+-- binocolo.ma_normalize_fiscal / ma_stable_vat sono lo specchio SQL di
+-- normalizeMAFiscalValue / maStableVAT (ma_filing_store.go). Qui si verifica che
+-- producano esattamente il valore delle espressioni inline usate finora nel
+-- codice e in questa sonda — cioè che promuovere le primitive non abbia
+-- cambiato nulla. Tutte e tre le colonne di divergenza devono dare 0.
+--
+-- Eseguire DOPO la migrazione 120 (le funzioni non esistono prima).
+-- -----------------------------------------------------------------------------
+WITH corpus AS (
+  SELECT COALESCE(vat_code, '') AS vat_code, COALESCE(tax_code, '') AS tax_code FROM binocolo.ma_target
+  UNION ALL SELECT vat_code, tax_code FROM binocolo.ma_initiative_card
+  UNION ALL SELECT vat_code, tax_code FROM binocolo.ma_company_domain
+  UNION ALL SELECT COALESCE(vat_code, ''), COALESCE(tax_code, '') FROM binocolo.ma_deep_analysis
+)
+SELECT
+  COUNT(*)                                                                          AS righe,
+  COUNT(*) FILTER (WHERE binocolo.ma_normalize_fiscal(tax_code)
+                      <> regexp_replace(upper(btrim(tax_code)), '[[:space:].]', '', 'g'))  AS divergenze_normalize,
+  COUNT(*) FILTER (WHERE binocolo.ma_stable_vat(vat_code)
+                      <> CASE WHEN regexp_replace(upper(btrim(vat_code)), '[[:space:].]', '', 'g') ~ '^IT[0-9]{11}$'
+                              THEN substr(regexp_replace(upper(btrim(vat_code)), '[[:space:].]', '', 'g'), 3)
+                              ELSE regexp_replace(upper(btrim(vat_code)), '[[:space:].]', '', 'g') END) AS divergenze_stable_vat,
+  COUNT(*) FILTER (WHERE binocolo.ma_stable_vat(binocolo.ma_stable_vat(vat_code))
+                      <> binocolo.ma_stable_vat(vat_code))                          AS non_idempotenti
+FROM corpus;
+
+
+-- -----------------------------------------------------------------------------
+-- Q16 — Preflight del registro: un identificatore rivendica due aziende?
+--
+-- È l'ASSERZIONE che la migrazione 120 esegue e su cui SOLLEVA. Eseguirla prima
+-- serve a sapere in anticipo se il cutover può partire: deve essere VUOTA.
+--
+-- Differisce da Q7 per direzione e granularità. Q7 chiedeva «una chiave, due
+-- identità fiscali»; qui la domanda è «un VALORE, due chiavi», per ogni singolo
+-- identificatore — la P.IVA e il CF contati separatamente, non collassati nella
+-- fiscal_key composta. È la forma che il namespace fiscale unificato impone, e
+-- l'unica che intercetta la P.IVA dell'azienda A uguale al CF dell'azienda B.
+-- -----------------------------------------------------------------------------
+WITH source AS (
+  SELECT
+    COALESCE(
+      NULLIF(upper(btrim(COALESCE(t.vendor_id, ''))), ''),
+      NULLIF(upper(btrim(COALESCE(t.vat_code, ''))), ''),
+      NULLIF(upper(btrim(COALESCE(t.tax_code, ''))), ''),
+      upper(btrim(COALESCE(t.company_name, '')))
+    ) AS company_key,
+    upper(btrim(COALESCE(t.vendor_id, ''))) AS vendor_id,
+    COALESCE(t.vat_code, '') AS vat_code, COALESCE(t.tax_code, '') AS tax_code
+  FROM binocolo.ma_target t
+  UNION ALL
+  SELECT upper(btrim(company_key)), '', COALESCE(vat_code, ''), COALESCE(tax_code, '') FROM binocolo.ma_initiative_card
+  UNION ALL
+  SELECT upper(btrim(company_key)), '', COALESCE(vat_code, ''), COALESCE(tax_code, '') FROM binocolo.ma_company_domain
+  UNION ALL
+  SELECT upper(btrim(company_key)), '', COALESCE(vat_code, ''), COALESCE(tax_code, '') FROM binocolo.ma_deep_analysis
+  UNION ALL
+  SELECT upper(btrim(company_key)), '', COALESCE(vat_code, ''), COALESCE(tax_code, '') FROM binocolo.ma_company_bm_family
+), identifier AS (
+  SELECT 'fiscal' AS namespace,
+         CASE WHEN regexp_replace(upper(btrim(vat_code)), '[[:space:].]', '', 'g') ~ '^IT[0-9]{11}$'
+              THEN substr(regexp_replace(upper(btrim(vat_code)), '[[:space:].]', '', 'g'), 3)
+              ELSE regexp_replace(upper(btrim(vat_code)), '[[:space:].]', '', 'g') END AS value,
+         company_key
+  FROM source WHERE btrim(COALESCE(company_key, '')) <> ''
+  UNION ALL
+  SELECT 'fiscal', regexp_replace(upper(btrim(tax_code)), '[[:space:].]', '', 'g'), company_key
+  FROM source WHERE btrim(COALESCE(company_key, '')) <> ''
+  UNION ALL
+  SELECT 'vendor_openapiit', vendor_id, company_key
+  FROM source WHERE btrim(COALESCE(company_key, '')) <> ''
+)
+SELECT namespace, value,
+       COUNT(DISTINCT company_key)                             AS n_aziende,
+       array_agg(DISTINCT company_key ORDER BY company_key)    AS aziende
+FROM identifier
+WHERE value <> ''
+GROUP BY namespace, value
+HAVING COUNT(DISTINCT company_key) > 1
+ORDER BY 3 DESC, 1, 2
+LIMIT 50;
+
+
+-- -----------------------------------------------------------------------------
+-- Q17 — GATE del cutover: zero company_key senza una ma_company.
+--
+-- Eseguire DOPO la 120 e la 121, PRIMA del deploy del binario nuovo. Copre
+-- TUTTE le tabelle che portano una chiave, non i soli target: comprese quelle
+-- che hanno chiavi presenti nel dettaglio SENZA una riga ma_target.
+--
+-- `target_senza_chiave` deve essere 0 e `orfane` deve essere 0 su ogni riga.
+-- Se non lo è, rieseguire la migrazione 121 a writer fermi.
+-- -----------------------------------------------------------------------------
+WITH keyed AS (
+  SELECT 'ma_target' AS tabella, company_key FROM binocolo.ma_target
+  UNION ALL SELECT 'ma_target_rating', company_key FROM binocolo.ma_target_rating
+  UNION ALL SELECT 'ma_target_web_validation', company_key FROM binocolo.ma_target_web_validation
+  UNION ALL SELECT 'ma_sector_eval_label', company_key FROM binocolo.ma_sector_eval_label
+  UNION ALL SELECT 'ma_target_outcome', company_key FROM binocolo.ma_target_outcome
+  UNION ALL SELECT 'ma_initiative_card', company_key FROM binocolo.ma_initiative_card
+  UNION ALL SELECT 'ma_company_domain', company_key FROM binocolo.ma_company_domain
+  UNION ALL SELECT 'ma_deep_analysis', company_key FROM binocolo.ma_deep_analysis
+  UNION ALL SELECT 'ma_deep_payload_vintage', company_key FROM binocolo.ma_deep_payload_vintage
+  UNION ALL SELECT 'ma_company_bm_family', company_key FROM binocolo.ma_company_bm_family
+  UNION ALL SELECT 'ma_company_fact', company_key FROM binocolo.ma_company_fact
+  UNION ALL SELECT 'ma_company_note', company_key FROM binocolo.ma_company_note
+  UNION ALL SELECT 'ma_card_thesis_reading', company_key FROM binocolo.ma_card_thesis_reading
+  UNION ALL SELECT 'ma_session_thesis_reading', company_key FROM binocolo.ma_session_thesis_reading
+  UNION ALL SELECT 'ma_card_irl_item', company_key FROM binocolo.ma_card_irl_item
+  UNION ALL SELECT 'ma_filing_acquisition', context_company_key FROM binocolo.ma_filing_acquisition
+)
+SELECT
+  tabella,
+  COUNT(*)                                                                     AS righe,
+  COUNT(*) FILTER (WHERE company_key IS NULL)                                  AS senza_chiave,
+  COUNT(*) FILTER (WHERE company_key IS NOT NULL AND NOT EXISTS (
+                     SELECT 1 FROM binocolo.ma_company c WHERE c.company_key = keyed.company_key))
+                                                                               AS orfane
+FROM keyed
+GROUP BY tabella
+ORDER BY orfane DESC, senza_chiave DESC, tabella;
+
+
+-- -----------------------------------------------------------------------------
+-- Q18 — MONITOR del registro (periodico, dopo il cutover).
+--
+-- L'invariante canonico dopo l'adozione. Le prime tre righe devono dare 0.
+-- `aziende_vendor_only` > 0 non è un errore di integrità ma un DIFETTO da
+-- chiudere: un'entità senza identità fiscale è precisamente ciò che non
+-- sopravvive a un cambio fornitore.
+-- -----------------------------------------------------------------------------
+SELECT 'valori fiscali su due entità (impossibile: PK)' AS controllo,
+       COUNT(*) AS valore
+FROM (SELECT value FROM binocolo.ma_company_identifier
+      WHERE namespace = 'fiscal' GROUP BY value HAVING COUNT(DISTINCT company_key) > 1) x
+UNION ALL
+SELECT 'occorrenze (ma_target) che non risolvono', COUNT(*)
+FROM binocolo.ma_target t
+WHERE t.company_key IS NULL
+   OR NOT EXISTS (SELECT 1 FROM binocolo.ma_company c WHERE c.company_key = t.company_key)
+UNION ALL
+SELECT 'conflitti identitari aperti', COUNT(*)
+FROM binocolo.ma_company_identity_conflict WHERE state = 'open'
+UNION ALL
+SELECT 'aziende senza alcun identificatore', COUNT(*)
+FROM binocolo.ma_company c
+WHERE NOT EXISTS (SELECT 1 FROM binocolo.ma_company_identifier i WHERE i.company_key = c.company_key)
+UNION ALL
+SELECT 'aziende vendor_only (difetto, non stato normale)', COUNT(*)
+FROM binocolo.ma_company WHERE identity_state = 'vendor_only'
+UNION ALL
+SELECT 'aziende con identità fiscale', COUNT(*)
+FROM binocolo.ma_company WHERE identity_state = 'fiscal'
+UNION ALL
+SELECT 'aziende assegnate dopo il cutover (UUID)', COUNT(*)
+FROM binocolo.ma_company WHERE origin = 'assigned';

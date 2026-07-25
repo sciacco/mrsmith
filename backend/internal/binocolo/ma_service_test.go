@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -1398,6 +1399,10 @@ type fakeMAWorkspaceStore struct {
 	links  []maTraceLink
 	done   []maTraceComplete
 	events []maTraceEventWrite
+
+	companyIdentities map[maCompanyIdentifierRef]string
+	companySequence   int
+	companyConflicts  []maCompanyIdentityConflict
 }
 
 func (f *fakeMAWorkspaceStore) ListMASessions(context.Context, string) ([]MASessionSummary, error) {
@@ -1430,6 +1435,40 @@ func (f *fakeMAWorkspaceStore) GetMATargetByID(context.Context, string, string) 
 
 func (f *fakeMAWorkspaceStore) FindMALatestTargetForCard(context.Context, string, string) (string, string, error) {
 	return "", "", errors.New("not implemented")
+}
+
+// ResolveMACompany simula il registro identità con la stessa forma del
+// resolver reale — un identificatore, una azienda — senza DB: chiave pregressa
+// se c'è, altrimenti la prima azienda già vista per uno degli identificatori,
+// altrimenti una chiave nuova.
+func (f *fakeMAWorkspaceStore) ResolveMACompany(_ context.Context, observation maCompanyObservation) (string, error) {
+	if f.companyIdentities == nil {
+		f.companyIdentities = map[maCompanyIdentifierRef]string{}
+	}
+	identifiers := extractMACompanyIdentifiers(observation.VATCode, observation.TaxCode, observation.VendorID)
+	key := normalizeMACompanyKey(observation.PriorCompanyKey)
+	for _, identifier := range identifiers {
+		if owner, ok := f.companyIdentities[identifier.maCompanyIdentifierRef]; ok && owner != "" {
+			key = owner
+			break
+		}
+	}
+	if key == "" {
+		if len(identifiers) == 0 {
+			return "", &maCompanyIdentityMissingError{CompanyName: observation.CompanyName}
+		}
+		f.companySequence++
+		key = fmt.Sprintf("company-%d", f.companySequence)
+	}
+	for _, identifier := range identifiers {
+		f.companyIdentities[identifier.maCompanyIdentifierRef] = key
+	}
+	return key, nil
+}
+
+func (f *fakeMAWorkspaceStore) RecordMACompanyIdentityConflicts(_ context.Context, conflicts []maCompanyIdentityConflict) error {
+	f.companyConflicts = append(f.companyConflicts, conflicts...)
+	return nil
 }
 
 func (f *fakeMAWorkspaceStore) UpdateMASessionLifecycle(context.Context, string, string, string, string) (bool, error) {

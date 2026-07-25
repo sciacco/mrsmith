@@ -1981,7 +1981,7 @@ func (s *maService) executeJobWork(ctx context.Context, job maJob) error {
 		Status:    maTraceEventSucceeded,
 		Metadata:  maTraceJSON(map[string]any{"session_id": job.SessionID, "run_id": run.ID, "result_count": len(targets), "missing_financials": missingFinancials, "thesis": normalizeMAThesis(strategy.Thesis)}),
 	})
-	if err := s.store.ReplaceMATargets(ctx, job.SessionID, run.ID, targets); err != nil {
+	if err := s.replaceMATargets(ctx, job.SessionID, run.ID, targets); err != nil {
 		_ = s.store.CompleteMAExecutionRun(ctx, run.ID, maRunStatusFailed, 0, "store_error")
 		return nil
 	}
@@ -2175,11 +2175,10 @@ func (s *maService) createDirectInitiativeCard(ctx context.Context, initiativeID
 		}
 		snapshot = &fetched
 	}
+	// Nessun fallback che riderivi la chiave dal payload (issue #86): lo
+	// snapshot arriva o dal nostro corpus o dal resolver, e in entrambi i casi
+	// la chiave c'è. Se manca, l'identità è davvero assente e si erra.
 	companyKey = normalizeMACompanyKey(snapshot.CompanyKey)
-	if companyKey == "" {
-		probe := MATarget{CompanyName: snapshot.CompanyName, VATCode: snapshot.VATCode, TaxCode: snapshot.TaxCode}
-		companyKey = normalizeMACompanyKey(maTargetDedupeKey(probe))
-	}
 	if companyKey == "" {
 		return MACreateInitiativeCardResponse{}, fmt.Errorf("%w: company identity", errMAStrategyInvalid)
 	}
@@ -2267,8 +2266,15 @@ func (s *maService) fetchDirectCardSnapshot(ctx context.Context, vat string) (ma
 	if target.TaxCode == "" && len(vat) == 16 {
 		target.TaxCode = vat
 	}
+	// Assegnazione canonica: la chiave la conia il registro, non la precedenza
+	// del payload (issue #86, categoria B). Un'azienda che il corpus non
+	// conosce riceve qui il suo UUID.
+	companyKey, err := s.resolveMACompany(ctx, maCompanyObservationFromTarget(target, "", ""))
+	if err != nil {
+		return maCompanySnapshot{}, err
+	}
 	return maCompanySnapshot{
-		CompanyKey: normalizeMACompanyKey(maTargetDedupeKey(target)), CompanyName: target.CompanyName,
+		CompanyKey: companyKey, CompanyName: target.CompanyName,
 		VATCode: target.VATCode, TaxCode: target.TaxCode, Province: target.Province,
 	}, nil
 }
@@ -2991,7 +2997,7 @@ func (s *maService) rescoreSession(ctx context.Context, sessionID, thesisRaw, su
 	merged := make([]MATarget, 0, len(scored)+len(carried))
 	merged = append(merged, scored...)
 	merged = append(merged, carried...)
-	if err := s.store.ReplaceMATargets(ctx, sessionID, runID, merged); err != nil {
+	if err := s.replaceMATargets(ctx, sessionID, runID, merged); err != nil {
 		return MASessionDetail{}, err
 	}
 	_ = s.traceEvent(ctx, maTraceEventWrite{
@@ -3017,10 +3023,9 @@ func (s *maService) upsertTargetWebValidation(ctx context.Context, sessionID str
 		return MAWebValidation{}, err
 	}
 
+	// Guardia, non fallback (issue #86): il target arriva già chiavato dal
+	// registro. Riderivare qui rimetterebbe l'identità nelle mani del payload.
 	companyKey := normalizeMACompanyKey(body.Target.CompanyKey)
-	if companyKey == "" {
-		companyKey = normalizeMACompanyKey(maTargetDedupeKey(body.Target))
-	}
 	if companyKey == "" {
 		return MAWebValidation{}, fmt.Errorf("%w: company key", errMAStrategyInvalid)
 	}
@@ -3300,6 +3305,46 @@ func validMARating(rating int) bool {
 
 func normalizeMACompanyKey(value string) string {
 	return strings.ToUpper(strings.TrimSpace(value))
+}
+
+// replaceMATargets / insertMATarget / resolveMACompany sono i tre punti in cui
+// il servizio può ricevere il conflitto identitario tipizzato dal registro
+// (issue #86). Passano tutti da noteMACompanyIdentityConflict, che è la SECONDA
+// transazione del contratto: la prima è già stata annullata, quindi il conflitto
+// non può essere registrato dentro di essa.
+func (s *maService) replaceMATargets(ctx context.Context, sessionID, runID string, targets []MATarget) error {
+	err := s.store.ReplaceMATargets(ctx, sessionID, runID, targets)
+	s.noteMACompanyIdentityConflict(ctx, err)
+	return err
+}
+
+func (s *maService) insertMATarget(ctx context.Context, sessionID, runID string, target MATarget) error {
+	err := s.store.InsertMATarget(ctx, sessionID, runID, target)
+	s.noteMACompanyIdentityConflict(ctx, err)
+	return err
+}
+
+func (s *maService) resolveMACompany(ctx context.Context, observation maCompanyObservation) (string, error) {
+	key, err := s.store.ResolveMACompany(ctx, observation)
+	s.noteMACompanyIdentityConflict(ctx, err)
+	return key, err
+}
+
+// noteMACompanyIdentityConflict persiste il conflitto in una transazione
+// separata. Se la scrittura diagnostica fallisce si logga a livello error e
+// basta: il fallimento visibile all'utente non deve dipendere dalla riuscita
+// della diagnostica — l'operazione sbagliata si è già fermata, il ledger è un
+// ausilio.
+func (s *maService) noteMACompanyIdentityConflict(ctx context.Context, err error) {
+	var conflict *maCompanyIdentityConflictError
+	if err == nil || !errors.As(err, &conflict) || s.store == nil {
+		return
+	}
+	if writeErr := s.store.RecordMACompanyIdentityConflicts(ctx, conflict.Conflicts); writeErr != nil {
+		logging.FromContext(ctx).Error("binocolo company identity conflict ledger write failed",
+			"component", "binocolo", "operation", "ma_company_identity_conflict",
+			"conflicts", len(conflict.Conflicts), "error", writeErr)
+	}
 }
 
 func (s *maService) listParameters(ctx context.Context) ([]MAParameter, error) {
