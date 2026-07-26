@@ -3252,14 +3252,17 @@ WITH source_base AS (
     d.updated_at, '', ''
   FROM binocolo.ma_company_domain d
 ), source_clean AS (
+  -- Le primitive della 120, non una loro copia scritta a mano: erano
+  -- bit-identiche, ma tenute in sincronia solo da un commento. F0 esisteva
+  -- proprio per togliere di mezzo le espressioni ricopiate (issue #86).
   SELECT source_base.*,
-         regexp_replace(upper(btrim(vat_code)), '[[:space:].]', '', 'g') AS vat_clean,
-         regexp_replace(upper(btrim(tax_code)), '[[:space:].]', '', 'g') AS tax_clean
+         binocolo.ma_normalize_fiscal(vat_code) AS vat_clean,
+         binocolo.ma_normalize_fiscal(tax_code) AS tax_clean
   FROM source_base
 ), source_rows AS (
   SELECT source_clean.*,
          COALESCE(
-           NULLIF(CASE WHEN vat_clean ~ '^IT[0-9]{11}$' THEN substr(vat_clean, 3) ELSE vat_clean END, ''),
+           NULLIF(binocolo.ma_stable_vat(vat_code), ''),
            NULLIF(tax_clean, ''),
            company_key
          ) AS stable_key
@@ -3319,8 +3322,8 @@ SELECT
     WHERE deep.status = 'ready'
       AND (
         EXISTS (SELECT 1 FROM key_map km WHERE km.stable_key = sk.stable_key AND km.company_key = upper(btrim(deep.company_key)))
-        OR regexp_replace(upper(btrim(COALESCE(deep.vat_code, ''))), '[[:space:].]', '', 'g') = sk.stable_key
-        OR regexp_replace(upper(btrim(COALESCE(deep.tax_code, ''))), '[[:space:].]', '', 'g') = sk.stable_key
+        OR binocolo.ma_normalize_fiscal(deep.vat_code) = sk.stable_key
+        OR binocolo.ma_normalize_fiscal(deep.tax_code) = sk.stable_key
       )
   ) AS has_deep
 FROM selected_keys sk
@@ -5164,17 +5167,16 @@ type maRowQuerier interface {
 const maDeepVATRecordColumns = `company_key, status, scorecard, valuation, brief, itfull_payload, COALESCE(error_code, ''), updated_at, brief_generated_at`
 
 // maDeepFiscalIdentityMatch is the WHERE predicate matching a ma_deep_analysis row to a
-// canonical fiscal_key ($1). It mirrors the finder's normalization (ma_store.go source_clean
-// / source_rows CTEs): vat_code is cleaned then IT-stripped to its stable form, tax_code is
-// cleaned, and a row matches when EITHER equals the key. A company anchored by CF only (no
-// VAT) is reached via the tax_code branch, since buildMAFiscalKey falls back to the cleaned
-// tax code as the key.
+// canonical fiscal_key ($1): vat_code IT-stripped alla forma stabile, tax_code pulito, e la
+// riga corrisponde se UNO dei due eguaglia la chiave. Un'azienda ancorata al solo CF è
+// raggiunta dal ramo tax_code, perché buildMAFiscalKey ripiega sul codice fiscale pulito.
+//
+// Chiama le primitive della migrazione 120 invece di ricopiarne l'espressione: prima erano
+// tre implementazioni parallele della stessa normalizzazione — questa, la CTE del finder e
+// le funzioni SQL — bit-identiche ma tenute in sincronia da un commento (issue #86, F0).
 const maDeepFiscalIdentityMatch = `(
-  CASE WHEN regexp_replace(upper(btrim(COALESCE(vat_code, ''))), '[[:space:].]', '', 'g') ~ '^IT[0-9]{11}$'
-       THEN substr(regexp_replace(upper(btrim(COALESCE(vat_code, ''))), '[[:space:].]', '', 'g'), 3)
-       ELSE regexp_replace(upper(btrim(COALESCE(vat_code, ''))), '[[:space:].]', '', 'g')
-  END = $1
-  OR regexp_replace(upper(btrim(COALESCE(tax_code, ''))), '[[:space:].]', '', 'g') = $1
+  binocolo.ma_stable_vat(vat_code) = $1
+  OR binocolo.ma_normalize_fiscal(tax_code) = $1
 )`
 
 func scanMADeepVATRecord(scanner interface{ Scan(...any) error }) (*maDeepVATRecord, error) {
