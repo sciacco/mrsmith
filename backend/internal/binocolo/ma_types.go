@@ -890,13 +890,6 @@ type MACardRemoveResponse struct {
 	RatingCorrectionSkipped bool             `json:"ratingCorrectionSkipped,omitempty"`
 }
 
-// MACardNoteRequest drives POST .../cards/{companyKey}/note (B4 passo 7): the
-// diario composer note (log event only, never the company registry — PRD
-// §2).
-type MACardNoteRequest struct {
-	Body string `json:"body"`
-}
-
 // MACardDeepDiveResponse drives POST .../cards/{companyKey}/deep-dive (B6,
 // PRD §7): il bottone a 3 stati sulla card legge solo il DossierStatus
 // risultante, mai cifre di costo.

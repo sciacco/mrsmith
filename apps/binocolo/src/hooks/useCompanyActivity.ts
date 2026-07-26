@@ -26,7 +26,6 @@ export function useAnnotationMutations(companyKey: string, initiativeId?: string
   const invalidate = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['ma-company-activity', companyKey] }),
-      queryClient.invalidateQueries({ queryKey: ['ma-card-events'] }),
       queryClient.invalidateQueries({ queryKey: ['ma-board'] }),
       queryClient.invalidateQueries({ queryKey: ['ma-pipeline'] }),
       queryClient.invalidateQueries({ queryKey: ['ma-initiatives', 'active'] }),

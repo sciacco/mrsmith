@@ -762,33 +762,6 @@ func (s *maService) revokeCompanyFact(ctx context.Context, id, note, subject, em
 	return nil
 }
 
-// addCompanyNote appends a free-text note to the company registry (PRD §6):
-// registry content, never a log-of-events entry.
-func (s *maService) addCompanyNote(ctx context.Context, companyKey, body, subject, email string) (MACompanyNote, error) {
-	if s.store == nil {
-		return MACompanyNote{}, errMAStoreUnavailable
-	}
-	companyKey = normalizeMACompanyKey(companyKey)
-	if companyKey == "" {
-		return MACompanyNote{}, fmt.Errorf("%w: companyKey", errMAStrategyInvalid)
-	}
-	if err := s.requireKnownMACompany(ctx, companyKey); err != nil {
-		return MACompanyNote{}, err
-	}
-	body = cleanText(body, 1000)
-	if body == "" {
-		return MACompanyNote{}, fmt.Errorf("%w: body", errMAStrategyInvalid)
-	}
-	note := MACompanyNote{
-		ID:               uuid.NewString(),
-		CompanyKey:       companyKey,
-		Body:             body,
-		CreatedBySubject: subject,
-		CreatedByEmail:   email,
-	}
-	return s.store.InsertMACompanyNote(ctx, note)
-}
-
 func validateMAAnnotationBody(body string) (string, error) {
 	body = cleanText(body, 0)
 	if body == "" {
@@ -2973,13 +2946,6 @@ func (s *maService) reopenCard(ctx context.Context, initiativeID, companyKey, su
 		return MAInitiativeCard{}, err
 	}
 	return card, nil
-}
-
-// addCardNote appende la nota di diario del composer S4 (B4 passo 7): solo
-// il log eventi, mai il registro azienda (PRD §2: generi diversi).
-func (s *maService) addCardNote(ctx context.Context, initiativeID, companyKey, body, subject, email string) error {
-	_, err := s.createAnnotation(ctx, companyKey, MAAnnotationCreateRequest{Body: body, InitiativeID: initiativeID}, subject, email)
-	return err
 }
 
 // addTargetOutcome appende un esito reale (contattato / buon lead / no go) al

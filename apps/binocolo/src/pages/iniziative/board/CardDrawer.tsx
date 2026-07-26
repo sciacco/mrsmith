@@ -1,7 +1,7 @@
 import { useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, Drawer, Icon, Skeleton } from '@mrsmith/ui';
-import type { MAInitiativeCardView, MASessionSummary } from '../../../api/types';
+import type { MAInitiativeCardView } from '../../../api/types';
 import { errorLabel } from '../../ricerche/helpers';
 import { ActivityTimeline } from '../../../components/company/activity/ActivityTimeline';
 import { useAnnotationMutations, useCompanyActivity } from '../../../hooks/useCompanyActivity';
@@ -26,7 +26,6 @@ function schedaHref(companyKey: string, initiativeId: string) {
 export function CardDrawer({
   initiativeId,
   card,
-  sessions,
   cohortKeys,
   onClose,
   onChanged,
@@ -39,7 +38,6 @@ export function CardDrawer({
 }: {
   initiativeId: string;
   card: MAInitiativeCardView;
-  sessions: MASessionSummary[];
   cohortKeys: string[];
   onClose: () => void;
   onChanged: () => void;
@@ -54,14 +52,13 @@ export function CardDrawer({
   const annotations = useAnnotationMutations(card.companyKey, initiativeId);
   const [note, setNote] = useState('');
   const [noteError, setNoteError] = useState('');
+  const [contextExpanded, setContextExpanded] = useState(false);
   const [launching, setLaunching] = useState(false);
 
   const terminal = isTerminalState(card.state);
   const removed = card.state === 'rimossa';
   const ds = dossierState(card.dossierStatus);
   const canLaunch = ds === 'none' || ds === 'failed';
-
-  void sessions;
 
   const submitNote = async () => {
     const body = note.trim();
@@ -91,7 +88,8 @@ export function CardDrawer({
   const activityItems = activity.data?.items ?? [];
   const sessionInitiative = new Map((activity.data?.sessions ?? []).map((session) => [session.id, session.initiativeId]));
   const currentItems = activityItems.filter((item) => item.initiativeId === initiativeId || (item.sessionId && sessionInitiative.get(item.sessionId) === initiativeId));
-  const contextAnnotations = activityItems.filter((item) => item.event === 'nota' && item.initiativeId !== initiativeId).slice(0, 2);
+  const contextAnnotations = activityItems.filter((item) => item.event === 'nota' && item.initiativeId !== initiativeId);
+  const visibleContextAnnotations = contextExpanded ? contextAnnotations : contextAnnotations.slice(0, 2);
 
   return (
     <Drawer
@@ -225,13 +223,19 @@ export function CardDrawer({
 
           <div className={styles.drawerSec}>
             <p className={styles.lab}>Contesto azienda</p>
+            <p className={styles.hint}>{contextAnnotations.length} {contextAnnotations.length === 1 ? 'annotazione' : 'annotazioni'} da altri contesti</p>
             <ActivityTimeline
-              items={contextAnnotations}
+              items={visibleContextAnnotations}
               initiatives={activity.data?.initiatives}
               sessions={activity.data?.sessions}
               companyKey={card.companyKey}
-              emptyLabel="Nessuna annotazione generale o da altre iniziative."
+              emptyLabel="Nessuna annotazione da altri contesti."
             />
+            {contextAnnotations.length > 2 ? (
+              <Button variant="ghost" size="sm" onClick={() => setContextExpanded((value) => !value)}>
+                {contextExpanded ? 'Mostra meno' : 'Mostra tutte'}
+              </Button>
+            ) : null}
           </div>
 
           <div className={styles.drawerSec}>

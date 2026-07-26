@@ -150,7 +150,6 @@ type maWorkspaceStore interface {
 	ListMARatings(ctx context.Context, sessionID string) (map[string]int, error)
 	InsertMACompanyFact(ctx context.Context, fact MACompanyFact) (MACompanyFact, error)
 	RevokeMACompanyFact(ctx context.Context, id, subject, email, note string) (bool, error)
-	InsertMACompanyNote(ctx context.Context, note MACompanyNote) (MACompanyNote, error)
 	GetMACompanyRegistry(ctx context.Context, companyKey string) (MACompanyRegistry, error)
 	SearchMACompanies(ctx context.Context, queryKind, query string, limit int) ([]MACompanySearchRow, error)
 	GetMACompanyOverviewIdentity(ctx context.Context, companyKey string) (*MACompanyOverviewIdentity, error)
@@ -3335,23 +3334,6 @@ RETURNING id::text
 		return false, fmt.Errorf("revoke ma company fact: %w", err)
 	}
 	return true, nil
-}
-
-// InsertMACompanyNote appends a free-text note to the company registry.
-func (s *SQLStore) InsertMACompanyNote(ctx context.Context, note MACompanyNote) (MACompanyNote, error) {
-	if s == nil || s.db == nil {
-		return MACompanyNote{}, errors.New("binocolo ma store not configured")
-	}
-	row := s.db.QueryRowContext(ctx, `
-INSERT INTO binocolo.ma_company_note (id, company_key, body, created_by_subject, created_by_email)
-VALUES ($1::uuid, $2, $3, $4, $5)
-RETURNING id::text, company_key, body, created_by_subject, created_by_email, created_at
-`, note.ID, note.CompanyKey, note.Body, note.CreatedBySubject, note.CreatedByEmail)
-	var out MACompanyNote
-	if err := row.Scan(&out.ID, &out.CompanyKey, &out.Body, &out.CreatedBySubject, &out.CreatedByEmail, &out.CreatedAt); err != nil {
-		return MACompanyNote{}, fmt.Errorf("insert ma company note: %w", err)
-	}
-	return out, nil
 }
 
 // GetMACompanyRegistry loads the full registry (facts active + revoked, notes

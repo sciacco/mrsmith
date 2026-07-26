@@ -8,6 +8,7 @@ export function CompanyActivityPanel({ companyKey, companyName, vatCode }: { com
   const activity = useCompanyActivity(companyKey);
   const mutations = useAnnotationMutations(companyKey);
   const [open, setOpen] = useState(false);
+  const [focusComposer, setFocusComposer] = useState(false);
   const [annotationsOnly, setAnnotationsOnly] = useState(false);
   const [initiativeId, setInitiativeId] = useState('');
   const [body, setBody] = useState('');
@@ -17,8 +18,17 @@ export function CompanyActivityPanel({ companyKey, companyName, vatCode }: { com
   const activeAnnotations = items.filter((item) => item.event === 'nota' && !item.deletedAt);
 
   useEffect(() => {
-    if (open) requestAnimationFrame(() => composerRef.current?.focus());
-  }, [open]);
+    if (open && focusComposer) requestAnimationFrame(() => composerRef.current?.focus());
+  }, [focusComposer, open]);
+
+  const openForAnnotation = () => {
+    setFocusComposer(true);
+    setOpen(true);
+  };
+  const openHistory = () => {
+    setFocusComposer(false);
+    setOpen(true);
+  };
 
   const filtered = useMemo(() => items.filter((item) => {
     if (annotationsOnly && item.event !== 'nota') return false;
@@ -50,20 +60,24 @@ export function CompanyActivityPanel({ companyKey, companyName, vatCode }: { com
             <p>{activeAnnotations.length} annotazioni attive</p>
           </div>
           <div className={styles.headingActions}>
-            <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>Aggiungi annotazione</Button>
-            <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>Apri cronologia</Button>
+            <Button size="sm" variant="secondary" onClick={openForAnnotation}>Aggiungi annotazione</Button>
+            {items.length > 0 ? <Button size="sm" variant="ghost" onClick={openHistory}>Apri cronologia</Button> : null}
           </div>
         </div>
         {activity.isLoading ? <Skeleton rows={3} /> : activity.isError ? (
           <p className={styles.error} role="alert">Cronologia non disponibile. Riprova.</p>
         ) : activeAnnotations.length === 0 ? (
-          <p className={styles.empty}>Nessuna annotazione. Aggiungi il primo contesto operativo sull’azienda.</p>
+          <div className={styles.empty}>
+            <p>Nessuna annotazione registrata.</p>
+            <p>Le annotazioni nate dalla Scheda, dalle iniziative o da processi automatici saranno visibili qui.</p>
+          </div>
         ) : (
           <ActivityTimeline
             items={activeAnnotations.slice(0, 3)}
             initiatives={activity.data?.initiatives}
             sessions={activity.data?.sessions}
             companyKey={companyKey}
+            relativeDates
           />
         )}
       </section>

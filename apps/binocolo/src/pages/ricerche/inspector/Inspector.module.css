@@ -439,6 +439,33 @@
   flex-wrap: wrap;
   align-items: center;
 }
+.activitySegmented {
+  display: inline-flex;
+  padding: var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+}
+.activitySegmented button {
+  min-height: 36px;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-full);
+  color: var(--color-text-secondary);
+  background: transparent;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.activitySegmented button:focus-visible {
+  outline: 2px solid transparent;
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
+}
+.activitySegmented .activitySegmentActive {
+  color: var(--color-accent);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-xs);
+}
 
 /* tesi caveat box */
 .caveat {

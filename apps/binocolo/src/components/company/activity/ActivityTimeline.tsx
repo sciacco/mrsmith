@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Button } from '@mrsmith/ui';
+import { Button, Modal } from '@mrsmith/ui';
 import type { MACompanyActivityLookup, MACompanyActivitySession, MATargetOutcome } from '../../../api/types';
 import { useAnnotationMutations } from '../../../hooks/useCompanyActivity';
 import { eventLabel, TECHNICAL_ACTIVITY_EVENTS } from './eventLabel';
@@ -15,6 +15,21 @@ function dateTime(value?: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
   return new Intl.DateTimeFormat('it-IT', { dateStyle: 'short', timeStyle: 'short' }).format(date);
+}
+
+function relativeDate(value?: string) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const minutes = Math.max(0, Math.floor((Date.now() - date.getTime()) / 60_000));
+  if (minutes < 1) return 'ora';
+  if (minutes < 60) return `${minutes} min fa`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} h fa`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return 'ieri';
+  if (days < 7) return `${days} giorni fa`;
+  return new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: 'short' }).format(date);
 }
 
 function originLabel(
@@ -41,6 +56,7 @@ export function ActivityTimeline({
   editableInitiativeId,
   allowAllAnnotations = false,
   showTechnical = false,
+  relativeDates = false,
   emptyLabel = 'Nessuna attività registrata.',
 }: {
   items: MATargetOutcome[];
@@ -50,11 +66,13 @@ export function ActivityTimeline({
   editableInitiativeId?: string;
   allowAllAnnotations?: boolean;
   showTechnical?: boolean;
+  relativeDates?: boolean;
   emptyLabel?: string;
 }) {
   const mutations = useAnnotationMutations(companyKey, editableInitiativeId);
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<MATargetOutcome | null>(null);
   const [error, setError] = useState('');
   const initiativeMap = useMemo(() => new Map(initiatives.map((item) => [item.id, item.title])), [initiatives]);
   const sessionMap = useMemo(() => new Map(sessions.map((item) => [item.id, item])), [sessions]);
@@ -77,11 +95,12 @@ export function ActivityTimeline({
     }
   };
 
-  const remove = async (item: MATargetOutcome) => {
-    if (!window.confirm('Eliminare questa annotazione? Resterà visibile nella traccia completa dell’Inspector.')) return;
+  const remove = async () => {
+    if (!deleteTarget) return;
     setError('');
     try {
-      await mutations.remove.mutateAsync(item.id);
+      await mutations.remove.mutateAsync(deleteTarget.id);
+      setDeleteTarget(null);
     } catch {
       setError('Annotazione non eliminata. Riprova.');
     }
@@ -90,6 +109,7 @@ export function ActivityTimeline({
   if (visible.length === 0) return <p className={styles.empty}>{emptyLabel}</p>;
 
   return (
+    <>
     <div className={styles.timeline}>
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       {visible.map((item) => {
@@ -112,14 +132,14 @@ export function ActivityTimeline({
                 <p className={styles.text}>{eventLabel(item, sessionTitles)}</p>
               )}
               <p className={styles.meta}>
-                {originLabel(item, initiativeMap, sessionMap)} · {shortAuthor(item.createdByEmail)} · {dateTime(item.createdAt)}
+                {originLabel(item, initiativeMap, sessionMap)} · {shortAuthor(item.createdByEmail)} · {relativeDates ? relativeDate(item.createdAt) : dateTime(item.createdAt)}
                 {item.updatedAt ? ` · modificata ${dateTime(item.updatedAt)} da ${shortAuthor(item.updatedByEmail)}` : ''}
                 {item.deletedAt ? ` · eliminata ${dateTime(item.deletedAt)} da ${shortAuthor(item.deletedByEmail)}` : ''}
               </p>
               {editable && editing !== item.id ? (
                 <div className={styles.actions}>
                   <Button size="sm" variant="ghost" onClick={() => { setEditing(item.id); setDraft(item.note ?? ''); setError(''); }}>Modifica</Button>
-                  <Button size="sm" variant="ghost" onClick={() => void remove(item)}>Elimina</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setDeleteTarget(item)}>Elimina</Button>
                 </div>
               ) : null}
             </div>
@@ -127,5 +147,23 @@ export function ActivityTimeline({
         );
       })}
     </div>
+    <Modal
+      open={deleteTarget !== null}
+      onClose={() => setDeleteTarget(null)}
+      title="Eliminare questa annotazione?"
+      size="sm"
+      dismissible={!mutations.remove.isPending}
+    >
+      <div className={styles.confirmation}>
+        <p>Non sarà più visibile nella Scheda e nelle iniziative.</p>
+        <p>Resterà consultabile nello storico read-only.</p>
+        {error ? <p className={styles.error} role="alert">{error}</p> : null}
+        <div className={styles.confirmationActions}>
+          <Button variant="secondary" onClick={() => setDeleteTarget(null)} disabled={mutations.remove.isPending}>Annulla</Button>
+          <Button variant="danger" onClick={() => void remove()} loading={mutations.remove.isPending}>Elimina</Button>
+        </div>
+      </div>
+    </Modal>
+    </>
   );
 }

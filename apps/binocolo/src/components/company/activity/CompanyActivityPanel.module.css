@@ -15,8 +15,9 @@
 }
 .heading { margin-bottom: var(--space-5); }
 .heading h2 { margin: 0; color: var(--color-text); font-size: 0.875rem; }
-.heading p,
-.empty { margin: var(--space-1) 0 0; color: var(--color-text-muted); font-size: 0.8125rem; }
+.heading p { margin: var(--space-1) 0 0; color: var(--color-text-muted); font-size: 0.8125rem; }
+.empty { color: var(--color-text-muted); font-size: 0.8125rem; line-height: 1.5; }
+.empty p { margin: var(--space-1) 0; }
 .headingActions { flex-wrap: wrap; justify-content: flex-end; }
 
 .drawerBody { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; height: 100%; min-height: 0; }

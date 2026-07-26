@@ -70,10 +70,9 @@ export function RegistroTab({
       <div className={styles.card}>
         <p className={styles.lab}>Attività e annotazioni</p>
         <div className={styles.linkRow}>
-          <div>
-            <button type="button" className={styles.dossierLink} onClick={() => setAnnotationsOnly(false)}>Traccia completa</button>
-            {' · '}
-            <button type="button" className={styles.dossierLink} onClick={() => setAnnotationsOnly(true)}>Annotazioni</button>
+          <div className={styles.activitySegmented} role="group" aria-label="Tipo di attività">
+            <button type="button" className={!annotationsOnly ? styles.activitySegmentActive : ''} aria-pressed={!annotationsOnly} onClick={() => setAnnotationsOnly(false)}>Traccia completa</button>
+            <button type="button" className={annotationsOnly ? styles.activitySegmentActive : ''} aria-pressed={annotationsOnly} onClick={() => setAnnotationsOnly(true)}>Annotazioni</button>
           </div>
           {(activity.data?.initiatives.length ?? 0) > 1 ? (
             <select value={initiativeFilter} onChange={(event) => setInitiativeFilter(event.target.value)} aria-label="Filtra attività per iniziativa">

@@ -431,7 +431,6 @@ export function BoardPage() {
         <CardDrawer
           initiativeId={id}
           card={selected}
-          sessions={board.sessions}
           cohortKeys={cohortKeys}
           onClose={() => setSelectedKey(null)}
           onChanged={() => void data.refetch()}

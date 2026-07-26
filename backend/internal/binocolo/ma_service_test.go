@@ -1843,10 +1843,6 @@ func (f *fakeMAWorkspaceStore) RevokeMACompanyFact(context.Context, string, stri
 	return false, errors.New("not implemented")
 }
 
-func (f *fakeMAWorkspaceStore) InsertMACompanyNote(context.Context, MACompanyNote) (MACompanyNote, error) {
-	return MACompanyNote{}, errors.New("not implemented")
-}
-
 func (f *fakeMAWorkspaceStore) GetMACompanyRegistry(context.Context, string) (MACompanyRegistry, error) {
 	return MACompanyRegistry{}, nil
 }

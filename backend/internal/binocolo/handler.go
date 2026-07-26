@@ -760,28 +760,6 @@ func (h *Handler) handleReopenMACard(w http.ResponseWriter, r *http.Request) {
 	httputil.JSON(w, http.StatusOK, card)
 }
 
-func (h *Handler) handleAddMACardNote(w http.ResponseWriter, r *http.Request) {
-	id, ok := maInitiativeID(w, r)
-	if !ok {
-		return
-	}
-	companyKey, ok := maCompanyKeyPath(w, r)
-	if !ok {
-		return
-	}
-	var body MACardNoteRequest
-	if err := decodeMABody(r, &body); err != nil {
-		httputil.Error(w, http.StatusBadRequest, "invalid_json")
-		return
-	}
-	subject, email := companySearchRefreshActor(r.Context())
-	if err := h.ma.addCardNote(r.Context(), id, companyKey, body.Body, subject, email); err != nil {
-		h.maFailure(w, r, "ma_card_note_add", err, "initiative_id", id, "company_key", companyKey)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
 func (h *Handler) handleDeepDiveMACard(w http.ResponseWriter, r *http.Request) {
 	id, ok := maInitiativeID(w, r)
 	if !ok {
