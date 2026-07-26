@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode, type SyntheticEvent } from 'react';
+import { useFocusRestore } from '../../hooks/useFocusRestore';
 import styles from './Drawer.module.css';
 
 export type DrawerSize = 'sm' | 'md' | 'lg' | 'xl';
@@ -43,6 +44,8 @@ export function Drawer({
   hideCloseButton = false,
 }: DrawerProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+
+  useFocusRestore(open);
 
   useEffect(() => {
     const dialog = dialogRef.current;

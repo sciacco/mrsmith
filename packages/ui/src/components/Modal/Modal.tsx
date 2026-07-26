@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode, type SyntheticEvent } from 'react';
+import { useFocusRestore } from '../../hooks/useFocusRestore';
 import styles from './Modal.module.css';
 
 export type ModalSize = 'sm' | 'md' | 'lg' | 'wide' | 'xwide' | 'fluid';
@@ -29,6 +30,8 @@ export function Modal({
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   const resolvedSize: ModalSize = size ?? (wide ? 'wide' : 'md');
+
+  useFocusRestore(open);
 
   useEffect(() => {
     const dialog = dialogRef.current;
