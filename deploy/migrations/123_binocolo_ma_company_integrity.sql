@@ -21,6 +21,7 @@
 -- ROLLBACK SQL (eseguire deliberatamente in una transazione separata):
 --   BEGIN;
 --   ALTER TABLE binocolo.ma_target DROP CONSTRAINT ma_target_session_company_key_key;
+--   ALTER TABLE binocolo.ma_target DROP CONSTRAINT ma_target_company_key_fkey;
 --   ALTER TABLE binocolo.ma_filing_acquisition DROP CONSTRAINT ma_filing_acquisition_context_company_key_fkey;
 --   ALTER TABLE binocolo.ma_deep_payload_vintage DROP CONSTRAINT ma_deep_payload_vintage_company_key_fkey;
 --   ALTER TABLE binocolo.ma_deep_analysis DROP CONSTRAINT ma_deep_analysis_company_key_fkey;
@@ -36,7 +37,6 @@
 --   ALTER TABLE binocolo.ma_target_outcome DROP CONSTRAINT ma_target_outcome_company_key_fkey;
 --   ALTER TABLE binocolo.ma_target_web_validation DROP CONSTRAINT ma_target_web_validation_company_key_fkey;
 --   ALTER TABLE binocolo.ma_target_rating DROP CONSTRAINT ma_target_rating_company_key_fkey;
---   ALTER TABLE binocolo.ma_target DROP CONSTRAINT ma_target_company_key_fkey;
 --   ALTER TABLE binocolo.ma_target ALTER COLUMN company_key DROP NOT NULL;
 --   COMMIT;
 
