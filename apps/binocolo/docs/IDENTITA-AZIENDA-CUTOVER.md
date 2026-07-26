@@ -112,16 +112,19 @@ applicative, che dopo il cutover **errano** invece di riderivare la chiave.
 2. **Semantico** — la prima azienda assegnata con UUID. Prima, il binario vecchio
    è sicuro; dopo, ri-deriva l'ObjectId per quell'azienda e ne crea una seconda
    identità.
-3. **Scritture** — `ma_target.company_key` è **nullable** proprio per non
-   spostare questo confine: con `NOT NULL` il binario vecchio fallirebbe ogni
-   `INSERT` di target, non avendo la colonna nella propria lista.
+3. **Scritture** — al cutover `ma_target.company_key` era rimasta nullable per
+   non spostare questo confine. La migrazione 123 la rende `NOT NULL`: da quel
+   momento un binario precedente a #86 fallisce ogni `INSERT` di target, non
+   avendo la colonna nella propria lista. Il rollback applicativo oltre questo
+   confine richiede prima il rollback esplicito dei vincoli della 123.
 
 ### Se si torna indietro e si riprova
 
-Il binario vecchio, rimesso in servizio prima del confine semantico, crea target
-con `company_key IS NULL`. Al tentativo successivo: **rieseguire la migrazione
-121 a writer fermi** prima del deploy. È idempotente (`UPDATE … WHERE
-company_key IS NULL`) e registra da sola le identità comparse nel frattempo.
+Prima della migrazione 123, il binario vecchio rimesso in servizio poteva creare
+target con `company_key IS NULL`; al tentativo successivo occorreva rieseguire la
+121 a writer fermi. Dopo la 123 quel binario non può più scrivere target: per
+riattivarlo serve prima il rollback esplicito dei vincoli indicato
+nell'intestazione della migrazione.
 
 ## Smoke (passo 6) — lo esegue l'utente
 
@@ -151,9 +154,9 @@ compresa «aziende senza alcun identificatore»: il resolver non ne crea mai —
 invece di inventare un'identità da una ragione sociale — quindi un valore
 maggiore di zero può venire solo dal backfill, da chiavi storiche presenti
 unicamente nelle tabelle di dettaglio. Il controllo sulle chiavi che non
-risolvono copre tutte le tabelle con quella chiave, non i soli target: finché F5 non
-introduce le FK verso `ma_company`, nulla impedisce a un writer di coniare una
-chiave fuori dal registro.
+risolvono copre tutte le tabelle con quella chiave, non i soli target: dopo la
+migrazione 123 conferma che le FK verso `ma_company` sono presenti e intercetta
+una futura tabella aggiunta senza vincolo.
 
 `aziende_vendor_only > 0` non è un errore di integrità ma un difetto da chiudere:
 un'entità senza identità fiscale è precisamente ciò che non sopravvive a un
@@ -164,10 +167,15 @@ invariante rotto, sono deriva del fornitore. Restano come sensore di
 rinumerazione OpenAPI.it — un alert, non un errore — perché la continuità è
 integra finché entrambi puntano alla stessa `ma_company`.
 
-## Rimasto fuori (F5, lavoro separato)
+## Integrità dichiarata nel database (migrazione 123)
 
-- `NOT NULL` su `ma_target.company_key`.
-- Integrità referenziale dalle tabelle di dettaglio verso `ma_company`.
+La migrazione 123 chiude il lavoro F5: rende `ma_target.company_key` obbligatoria,
+aggiunge le FK dalle sedici tabelle misurate da Q17 verso `ma_company` e impone
+l'unicità `(session_id, company_key)` sui target. Le guardie applicative restano
+per produrre errori di dominio prima che intervenga il vincolo.
+
+## Rimasto fuori
+
 - Fusione di due aziende (`merged_into`): nessun duplicato osservato, e una
   colonna che non gestisce cicli, catene, storia sulla chiave sorgente e
   navigazione dell'URL vecchio sarebbe una promessa che il codice non mantiene.

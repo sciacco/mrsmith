@@ -782,9 +782,10 @@ FROM per_identita;
 --
 --   DOPO la 120            Q15  parità fra le funzioni SQL e le espressioni
 --
---   DOPO 120 + 121         Q17  gate: zero chiavi orfane, prima del deploy
+--   DOPO 120 + 121         Q17  gate: zero chiavi mancanti, vuote o orfane
+--                          Q20  zero aziende duplicate nella stessa sessione
 --
---   dopo il cutover        Q18  monitor del registro, periodico
+--   DOPO la 123            Q18  conferma dei vincoli e monitor periodico
 --
 -- Q1..Q14 girano su qualunque schema.
 --
@@ -889,16 +890,16 @@ LIMIT 50;
 -- TUTTE le tabelle che portano una chiave, non i soli target: comprese quelle
 -- che hanno chiavi presenti nel dettaglio SENZA una riga ma_target.
 --
--- `orfane` deve essere 0 su OGNI riga; `senza_chiave` deve essere 0 dove
--- `chiave_obbligatoria`. Se non lo è, rieseguire la migrazione 121 a writer
--- fermi.
+-- `orfane`, `senza_chiave` e `vuote` devono essere 0 su OGNI riga prima della
+-- migrazione 123. `vuote` è separata perché `''` non entra in `orfane` ma è un
+-- valore non-NULL che la FK rifiuta: ma_company vieta chiavi vuote.
 --
 -- La distinzione fra chiave obbligatoria e facoltativa non è pedanteria:
 -- `ma_filing_acquisition.context_company_key` è un riferimento CONTESTUALE
 -- nullable (mig 113) — il filing è identificato dalla chiave fiscale, mai da
 -- company_key — quindi un'acquisizione senza contesto è normale e non deve far
--- fallire il gate. Anche `ma_target.company_key` è nullable, ma lì il NULL è
--- esattamente ciò che il gate deve intercettare.
+-- fallire il gate. `ma_target.company_key` è invece NOT NULL dalla migrazione
+-- 123; il controllo resta come conferma dell'invariante.
 -- -----------------------------------------------------------------------------
 WITH keyed AS (
   SELECT 'ma_target' AS tabella, true AS chiave_obbligatoria, company_key FROM binocolo.ma_target
@@ -923,14 +924,48 @@ SELECT
   tabella,
   bool_or(chiave_obbligatoria)                                                 AS chiave_obbligatoria,
   COUNT(*)                                                                     AS righe,
-  COUNT(*) FILTER (WHERE chiave_obbligatoria AND btrim(COALESCE(company_key, '')) = '')
-                                                                               AS senza_chiave,
+  COUNT(*) FILTER (WHERE chiave_obbligatoria AND company_key IS NULL)           AS senza_chiave,
+  COUNT(*) FILTER (WHERE company_key IS NOT NULL AND btrim(company_key) = '')    AS vuote,
   COUNT(*) FILTER (WHERE btrim(COALESCE(company_key, '')) <> '' AND NOT EXISTS (
                      SELECT 1 FROM binocolo.ma_company c WHERE c.company_key = keyed.company_key))
                                                                                AS orfane
 FROM keyed
 GROUP BY tabella
-ORDER BY orfane DESC, senza_chiave DESC, tabella;
+ORDER BY orfane DESC, senza_chiave DESC, vuote DESC, tabella;
+
+
+-- -----------------------------------------------------------------------------
+-- Q20 — Duplicati (session_id, company_key) su ma_target.
+--
+-- Eseguire prima della migrazione 123: deve essere VUOTA, perché è il
+-- prerequisito dell'unique ma_target_session_company_key_key. Dopo la 123 resta
+-- un monitor dell'invariante e non può più produrre righe finché il vincolo c'è.
+-- -----------------------------------------------------------------------------
+WITH dup AS (
+  SELECT
+    session_id, company_key,
+    COUNT(*)                                                       AS righe,
+    COUNT(DISTINCT run_id)                                         AS run_distinti,
+    array_agg(DISTINCT origin ORDER BY origin)                     AS origini,
+    array_agg(DISTINCT enrichment_level ORDER BY enrichment_level) AS livelli,
+    (array_agg(DISTINCT company_name ORDER BY company_name))[1:3]  AS nomi,
+    MIN(created_at) AS primo, MAX(created_at) AS ultimo
+  FROM binocolo.ma_target
+  GROUP BY session_id, company_key
+  HAVING COUNT(*) > 1
+)
+SELECT
+  session_id, company_key,
+  CASE
+    WHEN company_key ~ '^[0-9A-F]{24}$' THEN 'objectid'
+    WHEN company_key ~ '^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$' THEN 'uuid'
+    WHEN company_key ~ '^(IT)?[0-9]{11}$' OR company_key ~ '^[0-9A-Z]{16}$' THEN 'fiscale'
+    ELSE 'altra_forma'
+  END AS forma_chiave,
+  righe, run_distinti, origini, livelli, nomi, primo, ultimo
+FROM dup
+ORDER BY righe DESC, session_id, company_key
+LIMIT 50;
 
 
 -- -----------------------------------------------------------------------------
@@ -944,10 +979,10 @@ ORDER BY orfane DESC, senza_chiave DESC, tabella;
 -- ObjectId. Vanno guardate una per una: sono aziende che nessun identificatore
 -- può più ritrovare.
 --
--- Il controllo sulle chiavi che non risolvono copre TUTTE le tabelle con quella chiave:
--- finché F5 non introduce le FK verso ma_company, un writer che coni una chiave
--- fuori dal registro non incontra alcun vincolo, e restringere il monitor a
--- ma_target lo lascerebbe invisibile.
+-- Il controllo sulle chiavi che non risolvono copre TUTTE le tabelle con quella
+-- chiave. Dalla migrazione 123 conferma che le FK verso ma_company sono presenti:
+-- resta utile come sensore di un vincolo caduto o di una nuova tabella aggiunta
+-- senza FK.
 --
 -- `aziende_vendor_only` > 0 non è un errore di integrità ma un DIFETTO da
 -- chiudere: un'entità senza identità fiscale è precisamente ciò che non
@@ -961,10 +996,9 @@ SELECT 'valori fiscali su due entità (impossibile: PK)' AS controllo,
 FROM (SELECT value FROM binocolo.ma_company_identifier
       WHERE namespace = 'fiscal' GROUP BY value HAVING COUNT(DISTINCT company_key) > 1) x
 UNION ALL
--- Copre TUTTE le tabelle con quella chiave, non i soli target: finché F5 non introduce le
--- FK verso ma_company, nulla impedisce a un writer di scrivere una chiave che
--- non esiste, e un monitor ristretto a ma_target non lo vedrebbe. Riusa la
--- stessa lista di Q17.
+-- Copre TUTTE le tabelle con quella chiave, non i soli target: conferma le FK
+-- introdotte dalla 123 e rende visibile una tabella futura aggiunta senza il
+-- vincolo. Riusa la stessa lista di Q17.
 SELECT 'chiavi che non risolvono, in qualunque tabella', COUNT(*)
 FROM (
   SELECT company_key FROM binocolo.ma_target

@@ -107,8 +107,8 @@ func (s *SQLStore) ObserveMACompany(ctx context.Context, companyKey, companyName
 // settore — e non da una risoluzione o da una colonna. Senza, «chiave esistente
 // fornita dal chiamante» è un'assunzione e non un fatto: un client che ne mandi
 // una sbagliata scrive una riga che nessuna lettura ritrova e che il monitor
-// scopre solo dopo. È l'anticipo applicativo della FK verso ma_company, che
-// arriva in F5.
+// scopre solo dopo. La FK verso ma_company è presente dalla migrazione 123; la
+// guardia resta perché produce un errore di dominio leggibile prima del 23503.
 func (s *SQLStore) MACompanyExists(ctx context.Context, companyKey string) (bool, error) {
 	if s == nil || s.db == nil {
 		return false, errors.New("binocolo ma store not configured")
