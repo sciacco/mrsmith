@@ -3393,7 +3393,7 @@ func (s *maService) requireKnownMACompany(ctx context.Context, companyKey string
 		return err
 	}
 	if !known {
-		return fmt.Errorf("%w: company key sconosciuta", errMAStrategyInvalid)
+		return errMACompanyKeyUnknown
 	}
 	return nil
 }

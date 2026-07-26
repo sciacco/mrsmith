@@ -43,13 +43,6 @@
 BEGIN;
 SET LOCAL lock_timeout = '5s';
 
-ALTER TABLE binocolo.ma_target
-  ALTER COLUMN company_key SET NOT NULL;
-
-ALTER TABLE binocolo.ma_target
-  ADD CONSTRAINT ma_target_company_key_fkey
-  FOREIGN KEY (company_key) REFERENCES binocolo.ma_company(company_key) ON DELETE RESTRICT;
-
 ALTER TABLE binocolo.ma_target_rating
   ADD CONSTRAINT ma_target_rating_company_key_fkey
   FOREIGN KEY (company_key) REFERENCES binocolo.ma_company(company_key) ON DELETE RESTRICT;
@@ -109,6 +102,16 @@ ALTER TABLE binocolo.ma_deep_payload_vintage
 ALTER TABLE binocolo.ma_filing_acquisition
   ADD CONSTRAINT ma_filing_acquisition_context_company_key_fkey
   FOREIGN KEY (context_company_key) REFERENCES binocolo.ma_company(company_key) ON DELETE RESTRICT;
+
+-- ma_target per ultima: è il percorso di scrittura più caldo. Se un lock sulle
+-- altre tabelle supera il timeout, la transazione abortisce prima di prenderne
+-- l'ACCESS EXCLUSIVE e fermare le scritture target durante l'attesa.
+ALTER TABLE binocolo.ma_target
+  ALTER COLUMN company_key SET NOT NULL;
+
+ALTER TABLE binocolo.ma_target
+  ADD CONSTRAINT ma_target_company_key_fkey
+  FOREIGN KEY (company_key) REFERENCES binocolo.ma_company(company_key) ON DELETE RESTRICT;
 
 ALTER TABLE binocolo.ma_target
   ADD CONSTRAINT ma_target_session_company_key_key UNIQUE (session_id, company_key);

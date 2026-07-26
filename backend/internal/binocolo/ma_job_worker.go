@@ -261,6 +261,8 @@ func classifyMAJobError(err error, jobType string) string {
 	switch {
 	case errors.Is(err, errMAEstimateSuperseded):
 		return "superseded"
+	case errors.Is(err, errMACompanyKeyUnknown):
+		return "company_key_unknown"
 	case errors.Is(err, errMAStrategyInvalid):
 		return "strategy_invalid"
 	case errors.Is(err, errMABraveUnavailable):

@@ -18,15 +18,15 @@ import (
 // translateMACompanyConstraintError keeps database backstops aligned with the
 // domain errors produced by the application guards. Callers still wrap the
 // result with operation context.
-func translateMACompanyConstraintError(err error) error {
+func translateMACompanyConstraintError(err error, duplicateIsAlreadyPresent bool) error {
 	var pgErr *pgconn.PgError
 	if !errors.As(err, &pgErr) {
 		return err
 	}
 	if pgErr.Code == "23503" && strings.HasSuffix(pgErr.ConstraintName, "_company_key_fkey") {
-		return fmt.Errorf("%w: company key sconosciuta", errMAStrategyInvalid)
+		return fmt.Errorf("%w (%s: %s)", errMACompanyKeyUnknown, pgErr.ConstraintName, pgErr.Detail)
 	}
-	if pgErr.Code == "23505" && pgErr.ConstraintName == "ma_target_session_company_key_key" {
+	if duplicateIsAlreadyPresent && pgErr.Code == "23505" && pgErr.ConstraintName == "ma_target_session_company_key_key" {
 		return errMATargetAlreadyPresent
 	}
 	return err
@@ -1473,7 +1473,7 @@ INSERT INTO binocolo.ma_target (
 			level,
 			scoreVersionVal,
 		); err != nil {
-			return fmt.Errorf("insert ma target: %w", translateMACompanyConstraintError(err))
+			return fmt.Errorf("insert ma target: %w", translateMACompanyConstraintError(err, false))
 		}
 		for _, evidence := range target.Evidence {
 			if _, err := tx.ExecContext(ctx, `
@@ -1648,7 +1648,7 @@ INSERT INTO binocolo.ma_target (
 		level,
 		scoreVersionVal,
 	); err != nil {
-		return fmt.Errorf("insert ma target: %w", translateMACompanyConstraintError(err))
+		return fmt.Errorf("insert ma target: %w", translateMACompanyConstraintError(err, true))
 	}
 	for _, evidence := range target.Evidence {
 		if _, err := tx.ExecContext(ctx, `
@@ -4725,7 +4725,7 @@ SET status = 'queued', attempts = 0, error_code = NULL, vendor_request_id = NULL
 WHERE binocolo.ma_deep_analysis.status = 'failed'
 `, companyKey, nullString(vatCode), nullString(taxCode), nullString(email))
 	if err != nil {
-		return fmt.Errorf("enqueue ma deep analysis: %w", translateMACompanyConstraintError(err))
+		return fmt.Errorf("enqueue ma deep analysis: %w", translateMACompanyConstraintError(err, false))
 	}
 	return nil
 }
@@ -5320,7 +5320,7 @@ VALUES ($1, $2, $3, 'queued', $4)
 ON CONFLICT (company_key) DO NOTHING
 `, companyKey, nullString(vat), nullString(tax), nullString(email))
 	if err != nil {
-		return false, "", fmt.Errorf("insert ma deep analysis if absent: %w", translateMACompanyConstraintError(err))
+		return false, "", fmt.Errorf("insert ma deep analysis if absent: %w", translateMACompanyConstraintError(err, false))
 	}
 	affected, err := res.RowsAffected()
 	if err != nil {
