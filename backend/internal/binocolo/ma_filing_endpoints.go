@@ -370,6 +370,15 @@ func (s *maService) uploadCompanyFiling(ctx context.Context, companyKey, declare
 	if s.store == nil || s.filing == nil {
 		return MAFilingUploadResponse{}, errMAStoreUnavailable
 	}
+	// La chiave del path finisce in ContextCompanyKey e da lì, via
+	// EnqueueMADeepAnalysisIfAbsent (ma_filing_ingest_job.go), in
+	// ma_deep_analysis.company_key. Senza questa verifica un segmento a forma di
+	// P.IVA supererebbe resolveFilingIdentity — che come ultima risorsa tratta la
+	// chiave stessa come identità fiscale — e diventerebbe un'azienda che non
+	// esiste (issue #86).
+	if err := s.requireKnownMACompany(ctx, companyKey); err != nil {
+		return MAFilingUploadResponse{}, err
+	}
 	identity, fiscalKey, err := s.resolveFilingIdentity(ctx, companyKey)
 	if err != nil {
 		return MAFilingUploadResponse{}, err
@@ -463,6 +472,15 @@ func (s *maService) startCompanyFilingSearch(ctx context.Context, companyKey, su
 	if s.store == nil || s.filing == nil {
 		return MAFilingSearchStartResponse{}, errMAStoreUnavailable
 	}
+	// La chiave del path finisce in ContextCompanyKey e da lì, via
+	// EnqueueMADeepAnalysisIfAbsent (ma_filing_ingest_job.go), in
+	// ma_deep_analysis.company_key. Senza questa verifica un segmento a forma di
+	// P.IVA supererebbe resolveFilingIdentity — che come ultima risorsa tratta la
+	// chiave stessa come identità fiscale — e diventerebbe un'azienda che non
+	// esiste (issue #86).
+	if err := s.requireKnownMACompany(ctx, companyKey); err != nil {
+		return MAFilingSearchStartResponse{}, err
+	}
 	identity, fiscalKey, err := s.resolveFilingIdentity(ctx, companyKey)
 	if err != nil {
 		return MAFilingSearchStartResponse{}, err
@@ -490,6 +508,15 @@ func (s *maService) startCompanyFilingSearch(ctx context.Context, companyKey, su
 func (s *maService) acquireCompanyFilings(ctx context.Context, companyKey, searchID string, balanceSheetIDs []string, subject, email string) (MAFilingAcquireResponse, error) {
 	if s.store == nil || s.filing == nil {
 		return MAFilingAcquireResponse{}, errMAStoreUnavailable
+	}
+	// La chiave del path finisce in ContextCompanyKey e da lì, via
+	// EnqueueMADeepAnalysisIfAbsent (ma_filing_ingest_job.go), in
+	// ma_deep_analysis.company_key. Senza questa verifica un segmento a forma di
+	// P.IVA supererebbe resolveFilingIdentity — che come ultima risorsa tratta la
+	// chiave stessa come identità fiscale — e diventerebbe un'azienda che non
+	// esiste (issue #86).
+	if err := s.requireKnownMACompany(ctx, companyKey); err != nil {
+		return MAFilingAcquireResponse{}, err
 	}
 	identity, _, err := s.resolveFilingIdentity(ctx, companyKey)
 	if err != nil {
@@ -539,6 +566,15 @@ func (s *maService) acquireCompanyFilings(ctx context.Context, companyKey, searc
 func (s *maService) retryFilingAcquisition(ctx context.Context, companyKey, acquisitionID, subject, email string) (MAFilingAcquireResponse, error) {
 	if s.store == nil || s.filing == nil {
 		return MAFilingAcquireResponse{}, errMAStoreUnavailable
+	}
+	// La chiave del path finisce in ContextCompanyKey e da lì, via
+	// EnqueueMADeepAnalysisIfAbsent (ma_filing_ingest_job.go), in
+	// ma_deep_analysis.company_key. Senza questa verifica un segmento a forma di
+	// P.IVA supererebbe resolveFilingIdentity — che come ultima risorsa tratta la
+	// chiave stessa come identità fiscale — e diventerebbe un'azienda che non
+	// esiste (issue #86).
+	if err := s.requireKnownMACompany(ctx, companyKey); err != nil {
+		return MAFilingAcquireResponse{}, err
 	}
 	identity, fiscalKey, err := s.resolveFilingIdentity(ctx, companyKey)
 	if err != nil {

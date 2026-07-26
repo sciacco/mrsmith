@@ -2,8 +2,14 @@
 -- Target database: Anisetta PostgreSQL. Apply after 065.
 -- Human ground-truth label per (session, company) for the sector-eval harness.
 -- Kept SEPARATE from the (re-runnable) web-validation prediction so it survives
--- KB changes and session re-validations. Keyed by company_key (vat>tax>vendor>nome,
--- see maTargetDedupeKey) like ma_target_rating, so it survives a session re-execute.
+-- KB changes and session re-validations. Keyed by company_key like ma_target_rating,
+-- so it survives a session re-execute.
+-- CORRECTION 2026-07-25 (issue #81): this comment used to read "company_key
+-- (vat>tax>vendor>nome)". maTargetDedupeKey's real precedence is the reverse —
+-- vendor_id > P.IVA > codice fiscale > company name — and on real data only the
+-- first branch has ever fired (1,583 of 1,584 keys are the OpenAPI.it ObjectId,
+-- zero are the P.IVA). Do NOT "fix" the code to match the old comment: flipping the
+-- precedence would re-key the whole corpus and orphan every row keyed on company_key.
 --   label: keep = nel settore-obiettivo; forse = incerto/da rivedere; scarta = off-target.
 --   L'assenza di riga = non etichettato.
 

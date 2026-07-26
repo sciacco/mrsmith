@@ -115,6 +115,9 @@ type maWorkspaceStore interface {
 	ListMAInitiativeCardEvents(ctx context.Context, initiativeID string, sessionIDs []string, companyKey string) ([]MATargetOutcome, error)
 	ListMALatestCardEvents(ctx context.Context, initiativeID string, companyKeys []string) (map[string]string, error)
 	FindMALatestTargetForCard(ctx context.Context, initiativeID, companyKey string) (sessionID, targetID string, err error)
+	ResolveMACompany(ctx context.Context, observation maCompanyObservation) (string, error)
+	RecordMACompanyIdentityConflicts(ctx context.Context, conflicts []maCompanyIdentityConflict) error
+	MACompanyExists(ctx context.Context, companyKey string) (bool, error)
 }
 
 type maCompanyLegalForm struct {
@@ -1297,6 +1300,47 @@ func (s *SQLStore) ReplaceMATargets(ctx context.Context, sessionID, runID string
 		return fmt.Errorf("begin ma target replace: %w", err)
 	}
 	defer tx.Rollback()
+	// Risolvi-poi-scrivi (issue #86): l'intero batch passa dal registro identità
+	// PRIMA di qualunque INSERT, così un conflitto abortisce prima che sia stato
+	// scritto qualcosa. Un run di ricerca è atomico nella testa dell'analista, e
+	// persisterne una parte mostrerebbe un numero di target che non corrisponde
+	// a ciò che è stato trovato.
+	observations := make([]maCompanyObservation, 0, len(targets))
+	for _, target := range targets {
+		observations = append(observations, maCompanyObservationFromTarget(target, sessionID, runID))
+	}
+	companyKeys, err := resolveMACompanyBatchTx(ctx, tx, observations)
+	if err != nil {
+		return err
+	}
+	// Deduplica SULLA CHIAVE RISOLTA, che è l'unica che conosce l'identità.
+	// dedupeMATargets, a monte, lavora sulla precedenza del payload: due righe
+	// della stessa azienda con vendor id diversi — risposte cache e fresche
+	// mescolate nello stesso batch, o risultati raccolti a cavallo di una
+	// rinumerazione del fornitore — la superano entrambe. Il resolver le manda
+	// giustamente sulla stessa company_key (è deduplica, non conflitto), ma
+	// senza questo passaggio finirebbero come due target della stessa azienda
+	// nella stessa sessione, decorati dallo stesso rating, dallo stesso verdetto
+	// e dagli stessi esiti. Vince la prima: nelle liste dei chiamanti i target
+	// arricchiti e scorati precedono quelli riportati.
+	keptIndexes := make([]int, 0, len(targets))
+	firstByKey := make(map[string]int, len(targets))
+	droppedByKey := map[string]int{}
+	for index := range targets {
+		key := companyKeys[index]
+		if _, seen := firstByKey[key]; seen {
+			droppedByKey[key]++
+			continue
+		}
+		firstByKey[key] = index
+		keptIndexes = append(keptIndexes, index)
+	}
+	if len(droppedByKey) > 0 {
+		logging.FromContext(ctx).Warn("binocolo duplicate targets collapsed on resolved company key",
+			"component", "binocolo", "operation", "ma_target_replace",
+			"session_id", sessionID, "run_id", runID,
+			"received", len(targets), "persisted", len(keptIndexes), "companies", len(droppedByKey))
+	}
 	if _, err := tx.ExecContext(ctx, `
 DELETE FROM binocolo.ma_evidence
 WHERE target_id IN (SELECT id FROM binocolo.ma_target WHERE session_id = $1::uuid)
@@ -1306,7 +1350,9 @@ WHERE target_id IN (SELECT id FROM binocolo.ma_target WHERE session_id = $1::uui
 	if _, err := tx.ExecContext(ctx, `DELETE FROM binocolo.ma_target WHERE session_id = $1::uuid`, sessionID); err != nil {
 		return fmt.Errorf("delete ma targets: %w", err)
 	}
-	for _, target := range targets {
+	for _, index := range keptIndexes {
+		target := targets[index]
+		companyKey := companyKeys[index]
 		targetID := target.ID
 		if targetID == "" {
 			targetID = uuid.NewString()
@@ -1354,6 +1400,7 @@ INSERT INTO binocolo.ma_target (
   id,
   session_id,
   run_id,
+  company_key,
   vendor_id,
   company_name,
   origin,
@@ -1378,12 +1425,13 @@ INSERT INTO binocolo.ma_target (
   score_version
 ) VALUES (
   $1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9, $10,
-  $11, $12, $13, $14, $15, $16, $17, $18, $19, $20::jsonb, $21,
-  $22::jsonb, $23::jsonb, $24, $25
+  $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21::jsonb,
+  $22, $23::jsonb, $24::jsonb, $25, $26
 )
 `, targetID,
 			sessionID,
 			runID,
+			companyKey,
 			nullString(target.VendorID),
 			target.CompanyName,
 			origin,
@@ -1444,9 +1492,13 @@ INSERT INTO binocolo.ma_evidence (
 }
 
 // InsertMATarget appends one target to an existing session/run without replacing the
-// current set. It serializes per session by locking ma_session and re-checks the
-// same VAT/tax/vendor/company-key semantics used by maTargetDedupeKey, so a racing
-// manual insertion cannot create duplicate rows.
+// current set. It serializes per session by locking ma_session and re-checks for a
+// duplicate on the RESOLVED company key.
+//
+// La guardia confrontava i campi grezzi (vendor_id / vat_code / tax_code /
+// company_name) replicando la semantica identitaria in Go: un secondo criterio di
+// identità che poteva dissentire dal registro. Dopo la 120 confronta la chiave
+// risolta, che è l'unico criterio (issue #86, categoria C2).
 func (s *SQLStore) InsertMATarget(ctx context.Context, sessionID, runID string, target MATarget) error {
 	if s == nil || s.db == nil {
 		return errors.New("binocolo ma store not configured")
@@ -1460,31 +1512,24 @@ func (s *SQLStore) InsertMATarget(ctx context.Context, sessionID, runID string, 
 	if err := tx.QueryRowContext(ctx, `SELECT id::text FROM binocolo.ma_session WHERE id = $1::uuid FOR UPDATE`, sessionID).Scan(&locked); err != nil {
 		return fmt.Errorf("lock ma session for target insert: %w", err)
 	}
-	rows, err := tx.QueryContext(ctx, `
-SELECT COALESCE(vendor_id, ''), COALESCE(vat_code, ''), COALESCE(tax_code, ''), company_name
-FROM binocolo.ma_target
-WHERE session_id = $1::uuid
-FOR UPDATE
-`, sessionID)
+	companyKeys, err := resolveMACompanyBatchTx(ctx, tx, []maCompanyObservation{
+		maCompanyObservationFromTarget(target, sessionID, runID),
+	})
 	if err != nil {
+		return err
+	}
+	companyKey := companyKeys[0]
+	var duplicates int
+	if err := tx.QueryRowContext(ctx, `
+SELECT COUNT(*)
+FROM binocolo.ma_target
+WHERE session_id = $1::uuid AND company_key = $2
+`, sessionID, companyKey).Scan(&duplicates); err != nil {
 		return fmt.Errorf("check ma target duplicate: %w", err)
 	}
-	for rows.Next() {
-		var existing MATarget
-		if err := rows.Scan(&existing.VendorID, &existing.VATCode, &existing.TaxCode, &existing.CompanyName); err != nil {
-			rows.Close()
-			return fmt.Errorf("scan ma target duplicate: %w", err)
-		}
-		if maManualAddSameTarget(existing, target) {
-			rows.Close()
-			return errMATargetAlreadyPresent
-		}
+	if duplicates > 0 {
+		return errMATargetAlreadyPresent
 	}
-	if err := rows.Err(); err != nil {
-		rows.Close()
-		return fmt.Errorf("iterate ma target duplicates: %w", err)
-	}
-	rows.Close()
 
 	targetID := target.ID
 	if targetID == "" {
@@ -1530,6 +1575,7 @@ INSERT INTO binocolo.ma_target (
   id,
   session_id,
   run_id,
+  company_key,
   vendor_id,
   company_name,
   origin,
@@ -1554,12 +1600,13 @@ INSERT INTO binocolo.ma_target (
   score_version
 ) VALUES (
   $1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9, $10,
-  $11, $12, $13, $14, $15, $16, $17, $18, $19, $20::jsonb, $21,
-  $22::jsonb, $23::jsonb, $24, $25
+  $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21::jsonb,
+  $22, $23::jsonb, $24::jsonb, $25, $26
 )
 `, targetID,
 		sessionID,
 		runID,
+		companyKey,
 		nullString(target.VendorID),
 		target.CompanyName,
 		origin,
@@ -2099,6 +2146,7 @@ func scanMATargetBase(row maTargetScanner) (MATarget, error) {
 		&item.ID,
 		&item.SessionID,
 		&item.RunID,
+		&item.CompanyKey,
 		&item.VendorID,
 		&item.CompanyName,
 		&item.Origin,
@@ -2151,13 +2199,20 @@ func scanMATargetBase(row maTargetScanner) (MATarget, error) {
 	if len(missingRaw) > 0 {
 		_ = json.Unmarshal(missingRaw, &item.MissingCriteria)
 	}
-	item.CompanyKey = maTargetDedupeKey(item)
+	// La chiave si LEGGE, non si ricalcola dal payload del vendor (issue #86).
+	// La guardia erra invece di derivare: una riga senza chiave è una riga
+	// scritta da un binario pre-cutover, e restituirla con chiave vuota
+	// orfanerebbe in silenzio rating, gate e dossier. Il backfill della
+	// migrazione 121 è lo strumento per ripararla.
+	if strings.TrimSpace(item.CompanyKey) == "" {
+		return MATarget{}, fmt.Errorf("ma target %s: company_key assente (rieseguire il backfill della migrazione 121)", item.ID)
+	}
 	return item, nil
 }
 
 func (s *SQLStore) loadMATargets(ctx context.Context, sessionID string) ([]MATarget, error) {
 	rows, err := s.db.QueryContext(ctx, `
-SELECT id::text, session_id::text, run_id::text, COALESCE(vendor_id, ''), company_name,
+SELECT id::text, session_id::text, run_id::text, COALESCE(company_key, ''), COALESCE(vendor_id, ''), company_name,
        COALESCE(origin, 'search'), COALESCE(vat_code, ''), COALESCE(tax_code, ''), COALESCE(province, ''), COALESCE(town, ''),
        COALESCE(activity_status, ''), turnover, turnover_year, employees, COALESCE(ateco_code, ''),
        COALESCE(ateco_description, ''), score, COALESCE(match_state, ''), COALESCE(confidence, ''), flags,
@@ -2236,14 +2291,28 @@ func (s *SQLStore) ListMATargetRows(ctx context.Context, sessionID string) ([]MA
 	}
 	rows, err := s.db.QueryContext(ctx, `
 WITH target_rows AS (
+  -- Colonne esplicite, non t.*: la CTE espone una company_key, e un t.* che ne
+  -- porti dentro un'altra con lo stesso nome rende ambiguo ogni riferimento
+  -- successivo. È il difetto che la migrazione 120 avrebbe innescato sul binario
+  -- precedente (issue #86), e non deve poter tornare da questo lato.
   SELECT
-    t.*,
-    COALESCE(
-      NULLIF(upper(btrim(t.vendor_id)), ''),
-      NULLIF(upper(btrim(t.vat_code)), ''),
-      NULLIF(upper(btrim(t.tax_code)), ''),
-      upper(btrim(t.company_name))
-    ) AS company_key
+    t.id,
+    t.session_id,
+    t.run_id,
+    t.company_key,
+    t.company_name,
+    t.origin,
+    t.vat_code,
+    t.province,
+    t.town,
+    t.ateco_code,
+    t.score,
+    t.score_version,
+    t.match_state,
+    t.confidence,
+    t.flags,
+    t.enrichment_level,
+    t.turnover
   FROM binocolo.ma_target t
   WHERE t.session_id = $1::uuid
 )
@@ -2303,6 +2372,11 @@ ORDER BY t.score DESC NULLS LAST, t.company_name
 
 	out := []MATargetRow{}
 	for rows.Next() {
+		// La stessa guardia di scanMATargetBase, e per lo stesso motivo: senza,
+		// questa lista serviva la riga con chiave VUOTA mentre GetMASession
+		// errava sulla stessa riga. Due contratti diversi sulla stessa colonna,
+		// ed è lo scarto che rendeva raggiungibili i fallback del client — la UI
+		// riceveva un target senza chiave e se ne inventava una dalla P.IVA.
 		var item MATargetRow
 		var score sql.NullInt64
 		var scoreVersion sql.NullInt64
@@ -2382,6 +2456,9 @@ ORDER BY t.score DESC NULLS LAST, t.company_name
 				CandidateCount:      candidateCount,
 			}
 		}
+		if strings.TrimSpace(item.CompanyKey) == "" {
+			return nil, fmt.Errorf("ma target %s: company_key assente (rieseguire il backfill della migrazione 121)", item.ID)
+		}
 		out = append(out, item)
 	}
 	if err := rows.Err(); err != nil {
@@ -2394,9 +2471,8 @@ ORDER BY t.score DESC NULLS LAST, t.company_name
 // FindMALatestTargetForCard resolves the most recent target row for
 // (initiative, companyKey) among the sessions anchored to the initiative,
 // so the card-dossier page can hydrate the full MATarget (deep/web
-// validation included) via GetMATargetByID. company_key is derived, not
-// stored, so the lookup replicates the same coalesce used everywhere else
-// (vendor_id > vat_code > tax_code > company_name).
+// validation included) via GetMATargetByID. La chiave è persistita
+// (mig 120): la ricerca la confronta, non la ricalcola dal payload.
 func (s *SQLStore) FindMALatestTargetForCard(ctx context.Context, initiativeID, companyKey string) (string, string, error) {
 	if s == nil || s.db == nil {
 		return "", "", errors.New("binocolo ma store not configured")
@@ -2406,12 +2482,7 @@ SELECT t.session_id::text, t.id::text
 FROM binocolo.ma_target t
 JOIN binocolo.ma_session s ON s.id = t.session_id
 WHERE s.initiative_id = $1::uuid
-  AND COALESCE(
-        NULLIF(upper(btrim(t.vendor_id)), ''),
-        NULLIF(upper(btrim(t.vat_code)), ''),
-        NULLIF(upper(btrim(t.tax_code)), ''),
-        upper(btrim(t.company_name))
-      ) = $2
+  AND t.company_key = $2
 ORDER BY t.created_at DESC
 LIMIT 1
 `, initiativeID, companyKey)
@@ -2427,7 +2498,7 @@ func (s *SQLStore) GetMATargetByID(ctx context.Context, sessionID, targetID stri
 		return MATarget{}, errors.New("binocolo ma store not configured")
 	}
 	row := s.db.QueryRowContext(ctx, `
-SELECT id::text, session_id::text, run_id::text, COALESCE(vendor_id, ''), company_name,
+SELECT id::text, session_id::text, run_id::text, COALESCE(company_key, ''), COALESCE(vendor_id, ''), company_name,
        COALESCE(origin, 'search'), COALESCE(vat_code, ''), COALESCE(tax_code, ''), COALESCE(province, ''), COALESCE(town, ''),
        COALESCE(activity_status, ''), turnover, turnover_year, employees, COALESCE(ateco_code, ''),
        COALESCE(ateco_description, ''), score, COALESCE(match_state, ''), COALESCE(confidence, ''), flags,
@@ -2655,10 +2726,18 @@ VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7::jsonb, $8, $9, now())
 // company's stable identities. Manual entries win over auto-verified ones, an
 // exact company_key match wins over an identifier match, freshest last-resort.
 // A miss is (nil, nil) — only real DB failures return an error.
+//
+// Il confronto fiscale è sui valori NORMALIZZATI da entrambi i lati (issue
+// #86, F0): confrontare i valori grezzi era un difetto latente destinato a
+// manifestarsi il giorno in cui un valore fosse arrivato da fonte non-vendor,
+// con una punteggiatura o un prefisso IT diversi.
 func (s *SQLStore) GetMACompanyDomain(ctx context.Context, companyKey, vatCode, taxCode string) (*maCompanyDomain, error) {
 	if s == nil || s.db == nil {
 		return nil, errors.New("binocolo ma store not configured")
 	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	vatCode = maStableVAT(vatCode)
+	taxCode = normalizeMAFiscalValue(taxCode)
 	if companyKey == "" && vatCode == "" && taxCode == "" {
 		return nil, nil
 	}
@@ -2666,8 +2745,8 @@ func (s *SQLStore) GetMACompanyDomain(ctx context.Context, companyKey, vatCode, 
 SELECT company_key, vat_code, tax_code, company_name, domain, method, COALESCE(group_site, false), COALESCE(identity_state, '')
 FROM binocolo.ma_company_domain
 WHERE ($1 <> '' AND company_key = $1)
-   OR ($2 <> '' AND vat_code = $2)
-   OR ($3 <> '' AND tax_code = $3)
+   OR ($2 <> '' AND binocolo.ma_stable_vat(vat_code) = $2)
+   OR ($3 <> '' AND binocolo.ma_normalize_fiscal(tax_code) = $3)
 ORDER BY (method IN ('manual', 'no_website')) DESC, (company_key = $1) DESC, verified_at DESC
 LIMIT 1
 `, companyKey, vatCode, taxCode)
@@ -3140,7 +3219,7 @@ WITH source_base AS (
     t.id::text AS entity_id,
     session.id::text AS context_id,
     COALESCE(session.title, '') AS context_title,
-    COALESCE(NULLIF(upper(btrim(t.vendor_id)), ''), NULLIF(upper(btrim(t.vat_code)), ''), NULLIF(upper(btrim(t.tax_code)), ''), upper(btrim(t.company_name))) AS company_key,
+    COALESCE(t.company_key, '') AS company_key,
     COALESCE(t.company_name, '') AS company_name,
     COALESCE(t.vat_code, '') AS vat_code,
     COALESCE(t.tax_code, '') AS tax_code,
@@ -3173,14 +3252,17 @@ WITH source_base AS (
     d.updated_at, '', ''
   FROM binocolo.ma_company_domain d
 ), source_clean AS (
+  -- Le primitive della 120, non una loro copia scritta a mano: erano
+  -- bit-identiche, ma tenute in sincronia solo da un commento. F0 esisteva
+  -- proprio per togliere di mezzo le espressioni ricopiate (issue #86).
   SELECT source_base.*,
-         regexp_replace(upper(btrim(vat_code)), '[[:space:].]', '', 'g') AS vat_clean,
-         regexp_replace(upper(btrim(tax_code)), '[[:space:].]', '', 'g') AS tax_clean
+         binocolo.ma_normalize_fiscal(vat_code) AS vat_clean,
+         binocolo.ma_normalize_fiscal(tax_code) AS tax_clean
   FROM source_base
 ), source_rows AS (
   SELECT source_clean.*,
          COALESCE(
-           NULLIF(CASE WHEN vat_clean ~ '^IT[0-9]{11}$' THEN substr(vat_clean, 3) ELSE vat_clean END, ''),
+           NULLIF(binocolo.ma_stable_vat(vat_code), ''),
            NULLIF(tax_clean, ''),
            company_key
          ) AS stable_key
@@ -3240,8 +3322,8 @@ SELECT
     WHERE deep.status = 'ready'
       AND (
         EXISTS (SELECT 1 FROM key_map km WHERE km.stable_key = sk.stable_key AND km.company_key = upper(btrim(deep.company_key)))
-        OR regexp_replace(upper(btrim(COALESCE(deep.vat_code, ''))), '[[:space:].]', '', 'g') = sk.stable_key
-        OR regexp_replace(upper(btrim(COALESCE(deep.tax_code, ''))), '[[:space:].]', '', 'g') = sk.stable_key
+        OR binocolo.ma_normalize_fiscal(deep.vat_code) = sk.stable_key
+        OR binocolo.ma_normalize_fiscal(deep.tax_code) = sk.stable_key
       )
   ) AS has_deep
 FROM selected_keys sk
@@ -3475,7 +3557,7 @@ func (s *SQLStore) GetMACompanyOverviewIdentity(ctx context.Context, companyKey 
 	row := s.db.QueryRowContext(ctx, `
 WITH identities AS (
   SELECT
-    COALESCE(NULLIF(upper(btrim(vendor_id)), ''), NULLIF(upper(btrim(vat_code)), ''), NULLIF(upper(btrim(tax_code)), ''), upper(btrim(company_name))) AS company_key,
+    COALESCE(company_key, '') AS company_key,
     COALESCE(company_name, '') AS company_name, COALESCE(vat_code, '') AS vat_code,
     COALESCE(tax_code, '') AS tax_code, COALESCE(province, '') AS province,
     COALESCE(town, '') AS town, COALESCE(ateco_code, '') AS ateco_code,
@@ -3520,9 +3602,7 @@ func (s *SQLStore) ListMACompanyOverviewAppearances(ctx context.Context, company
 	}
 	rows, err := s.db.QueryContext(ctx, `
 WITH target_rows AS (
-  SELECT
-    t.*,
-    COALESCE(NULLIF(upper(btrim(t.vendor_id)), ''), NULLIF(upper(btrim(t.vat_code)), ''), NULLIF(upper(btrim(t.tax_code)), ''), upper(btrim(t.company_name))) AS resolved_company_key
+  SELECT t.*, COALESCE(t.company_key, '') AS resolved_company_key
   FROM binocolo.ma_target t
 ), outcome_rows AS (
   SELECT session_id, company_key, jsonb_agg(jsonb_build_object(
@@ -4511,7 +4591,7 @@ func (s *SQLStore) GetMATargetDeepDiveIdentity(ctx context.Context, companyKey s
 	row := s.db.QueryRowContext(ctx, `
 SELECT COALESCE(NULLIF(btrim(vat_code), ''), ''), COALESCE(NULLIF(btrim(tax_code), ''), '')
 FROM binocolo.ma_target
-WHERE upper(COALESCE(NULLIF(btrim(vendor_id), ''), NULLIF(btrim(vat_code), ''), NULLIF(btrim(tax_code), ''), btrim(company_name))) = $1
+WHERE company_key = $1
   AND (COALESCE(NULLIF(btrim(vat_code), ''), '') <> '' OR COALESCE(NULLIF(btrim(tax_code), ''), '') <> '')
 ORDER BY created_at DESC
 LIMIT 1
@@ -4534,24 +4614,28 @@ func (s *SQLStore) FindMACompanySnapshotByIdentity(ctx context.Context, vatOrTax
 	if vatOrTax == "" {
 		return nil, nil
 	}
+	// Confronto NORMALIZZATO su entrambi i lati, come GetMACompanyDomain: con
+	// `upper(btrim(...))` una P.IVA scritta con il prefisso IT o con i punti non
+	// trovava lo snapshot, e la card diretta ripartiva da una probe Address a
+	// pagamento invece di riusare l'azienda che avevamo già.
 	row := s.db.QueryRowContext(ctx, `
 WITH snapshots AS (
-  SELECT COALESCE(NULLIF(upper(btrim(vendor_id)), ''), NULLIF(upper(btrim(vat_code)), ''), NULLIF(upper(btrim(tax_code)), ''), upper(btrim(company_name))) AS company_key,
+  SELECT COALESCE(company_key, '') AS company_key,
          COALESCE(company_name, '') AS company_name, COALESCE(vat_code, '') AS vat_code,
          COALESCE(tax_code, '') AS tax_code, COALESCE(province, '') AS province,
          created_at AS seen_at, 1 AS priority
   FROM binocolo.ma_target
-  WHERE upper(btrim(vat_code)) = $1 OR upper(btrim(tax_code)) = $1
+  WHERE binocolo.ma_stable_vat(vat_code) = $1 OR binocolo.ma_normalize_fiscal(tax_code) = $2
   UNION ALL
   SELECT company_key, company_name, vat_code, tax_code, province, updated_at, 2
   FROM binocolo.ma_initiative_card
-  WHERE upper(btrim(vat_code)) = $1 OR upper(btrim(tax_code)) = $1
+  WHERE binocolo.ma_stable_vat(vat_code) = $1 OR binocolo.ma_normalize_fiscal(tax_code) = $2
 )
 SELECT company_key, company_name, vat_code, tax_code, province
 FROM snapshots
 ORDER BY priority, seen_at DESC
 LIMIT 1
-`, vatOrTax)
+`, maStableVAT(vatOrTax), normalizeMAFiscalValue(vatOrTax))
 	var out maCompanySnapshot
 	if err := row.Scan(&out.CompanyKey, &out.CompanyName, &out.VATCode, &out.TaxCode, &out.Province); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -5018,16 +5102,27 @@ func (s *SQLStore) GetMADeepByVAT(ctx context.Context, vat string) (*maDeepVATRe
 	if s == nil || s.db == nil {
 		return nil, errors.New("binocolo ma store not configured")
 	}
+	// Confronto sull'identità fiscale NORMALIZZATA, non sul valore grezzo.
+	// `WHERE vat_code = $1` mancava la riga per una differenza di forma — prefisso
+	// IT, punti, spazi — e il buco non era cosmetico: questa è la lettura che
+	// impedisce a /azienda di ricomprare un dossier già pagato. Mancarla
+	// significava un secondo IT-full a €0.30 E una seconda riga
+	// ma_deep_analysis per la stessa azienda sotto una chiave diversa.
+	// Cerca anche sul codice fiscale, perché l'input di /azienda può essere un CF.
+	fiscalKey := buildMAFiscalKey(vat, vat)
+	if fiscalKey == "" {
+		return nil, nil
+	}
 	var rec maDeepVATRecord
 	var scorecardRaw, valuationRaw, briefRaw, payloadRaw []byte
 	var briefGeneratedAt sql.NullTime
 	err := s.db.QueryRowContext(ctx, `
 SELECT company_key, status, scorecard, valuation, brief, itfull_payload, COALESCE(error_code, ''), updated_at, brief_generated_at
 FROM binocolo.ma_deep_analysis
-WHERE vat_code = $1
+WHERE `+maDeepFiscalIdentityMatch+`
 ORDER BY (status = 'ready') DESC, updated_at DESC
 LIMIT 1
-`, vat).Scan(&rec.CompanyKey, &rec.Status, &scorecardRaw, &valuationRaw, &briefRaw, &payloadRaw, &rec.ErrorCode, &rec.UpdatedAt, &briefGeneratedAt)
+`, fiscalKey).Scan(&rec.CompanyKey, &rec.Status, &scorecardRaw, &valuationRaw, &briefRaw, &payloadRaw, &rec.ErrorCode, &rec.UpdatedAt, &briefGeneratedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -5072,17 +5167,16 @@ type maRowQuerier interface {
 const maDeepVATRecordColumns = `company_key, status, scorecard, valuation, brief, itfull_payload, COALESCE(error_code, ''), updated_at, brief_generated_at`
 
 // maDeepFiscalIdentityMatch is the WHERE predicate matching a ma_deep_analysis row to a
-// canonical fiscal_key ($1). It mirrors the finder's normalization (ma_store.go source_clean
-// / source_rows CTEs): vat_code is cleaned then IT-stripped to its stable form, tax_code is
-// cleaned, and a row matches when EITHER equals the key. A company anchored by CF only (no
-// VAT) is reached via the tax_code branch, since buildMAFiscalKey falls back to the cleaned
-// tax code as the key.
+// canonical fiscal_key ($1): vat_code IT-stripped alla forma stabile, tax_code pulito, e la
+// riga corrisponde se UNO dei due eguaglia la chiave. Un'azienda ancorata al solo CF è
+// raggiunta dal ramo tax_code, perché buildMAFiscalKey ripiega sul codice fiscale pulito.
+//
+// Chiama le primitive della migrazione 120 invece di ricopiarne l'espressione: prima erano
+// tre implementazioni parallele della stessa normalizzazione — questa, la CTE del finder e
+// le funzioni SQL — bit-identiche ma tenute in sincronia da un commento (issue #86, F0).
 const maDeepFiscalIdentityMatch = `(
-  CASE WHEN regexp_replace(upper(btrim(COALESCE(vat_code, ''))), '[[:space:].]', '', 'g') ~ '^IT[0-9]{11}$'
-       THEN substr(regexp_replace(upper(btrim(COALESCE(vat_code, ''))), '[[:space:].]', '', 'g'), 3)
-       ELSE regexp_replace(upper(btrim(COALESCE(vat_code, ''))), '[[:space:].]', '', 'g')
-  END = $1
-  OR regexp_replace(upper(btrim(COALESCE(tax_code, ''))), '[[:space:].]', '', 'g') = $1
+  binocolo.ma_stable_vat(vat_code) = $1
+  OR binocolo.ma_normalize_fiscal(tax_code) = $1
 )`
 
 func scanMADeepVATRecord(scanner interface{ Scan(...any) error }) (*maDeepVATRecord, error) {

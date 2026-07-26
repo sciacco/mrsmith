@@ -453,6 +453,13 @@ export function RicercaDetailPage() {
 
   async function submitRating(target: MATargetRow, rating: number, reason: string) {
     if (!detail?.session.id) return;
+    // Senza chiave risolta non si vota: la stella finirebbe su un'identità
+    // inventata, e l'aggiornamento ottimistico qui sotto — che confronta le
+    // chiavi — la applicherebbe a tutte le righe senza chiave (issue #86).
+    if (!targetKey(target)) {
+      toast('Chiave azienda non disponibile: ricarica la ricerca.', 'error');
+      return;
+    }
     const sessionId = detail.session.id;
     const previousRows = rows;
     setRows((current) =>
@@ -537,7 +544,12 @@ export function RicercaDetailPage() {
   }
 
   async function startTargetDeepAnalysis(row: MATargetRow, target: MATarget) {
-    const companyKey = target.companyKey || row.companyKey || target.vatCode || row.vatCode || target.taxCode || target.id;
+    // Solo la chiave che il backend ha risolto: mai ricostruirla da P.IVA, CF o
+    // dall'id della riga. Quella catena di fallback faceva accodare il dossier
+    // — €0.30 — sotto una chiave inventata dal client, e `target.id` è l'id di
+    // un TARGET, non di un'azienda: avrebbe perfino la forma di un UUID
+    // legittimo, quindi nessun controllo lo avrebbe riconosciuto (issue #86).
+    const companyKey = target.companyKey || row.companyKey;
     if (!companyKey) {
       setDeepLaunchError('Chiave azienda non disponibile.');
       return;

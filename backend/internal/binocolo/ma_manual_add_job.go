@@ -181,14 +181,16 @@ func (s *maService) manualAddWork(ctx context.Context, job maJob) error {
 		if err != nil {
 			return err
 		}
-		companyKey := normalizeMACompanyKey(maTargetDedupeKey(target))
-		if companyKey == "" {
-			return fmt.Errorf("%w: company key", errMAStrategyInvalid)
+		// Assegnazione canonica (issue #86, categoria B): la chiave la conia il
+		// registro identità, non la precedenza del payload del fornitore.
+		companyKey, err := s.resolveMACompany(ctx, maCompanyObservationFromTarget(target, job.SessionID, runID))
+		if err != nil {
+			return err
 		}
 		target.CompanyKey = companyKey
 		if existing := maFindManualAddTarget(detail.Targets, vatCode, companyKey); existing != nil {
 			target = *existing
-		} else if err := s.store.InsertMATarget(ctx, job.SessionID, runID, target); err != nil {
+		} else if err := s.insertMATarget(ctx, job.SessionID, runID, target); err != nil {
 			if !errors.Is(err, errMATargetAlreadyPresent) {
 				return err
 			}
@@ -203,10 +205,9 @@ func (s *maService) manualAddWork(ctx context.Context, job maJob) error {
 			target = *existing
 		}
 	}
+	// Guardia, non fallback: a questo punto il target è stato risolto dal
+	// registro o riletto dal DB, e in entrambi i casi porta la chiave.
 	companyKey := normalizeMACompanyKey(target.CompanyKey)
-	if companyKey == "" {
-		companyKey = normalizeMACompanyKey(maTargetDedupeKey(target))
-	}
 	if companyKey == "" {
 		return fmt.Errorf("%w: company key", errMAStrategyInvalid)
 	}
@@ -269,7 +270,7 @@ func (s *maService) fetchManualAddAdvancedTarget(ctx context.Context, vatCode, s
 	if err != nil {
 		return MATarget{}, fmt.Errorf("marshal manual add advanced dataset: %w", err)
 	}
-	parsed, err := parseMATargetsFromVendorData(rows)
+	parsed, err := parseMATargetsFromVendorData(rows, s.now())
 	if err != nil {
 		return MATarget{}, err
 	}
@@ -288,7 +289,8 @@ func (s *maService) fetchManualAddAdvancedTarget(ctx context.Context, vatCode, s
 	if strings.TrimSpace(target.TaxCode) == "" && len(vatCode) == 16 {
 		target.TaxCode = vatCode
 	}
-	target.CompanyKey = normalizeMACompanyKey(maTargetDedupeKey(target))
+	// La chiave NON si assegna qui: la conia il resolver in manualAddWork, che
+	// è il punto in cui l'occorrenza entra nel registro (issue #86).
 	return target, nil
 }
 
@@ -310,7 +312,7 @@ func (s *maService) rescoreManualAddTargets(ctx context.Context, targets []MATar
 	merged := make([]MATarget, 0, len(scored)+len(carried))
 	merged = append(merged, scored...)
 	merged = append(merged, carried...)
-	if err := s.store.ReplaceMATargets(ctx, sessionID, runID, merged); err != nil {
+	if err := s.replaceMATargets(ctx, sessionID, runID, merged); err != nil {
 		return err
 	}
 	if err := s.store.CompleteMAExecutionRun(ctx, runID, maRunStatusCompleted, len(scored), ""); err != nil {
@@ -411,10 +413,32 @@ func maManualAddSameTarget(existing, candidate MATarget) bool {
 	return false
 }
 
+// maManualAddDedupeKeys costruisce l'insieme dei valori con cui riconoscere «è
+// la stessa azienda» fra la P.IVA digitata dall'analista e i target GIÀ
+// PERSISTITI della sessione.
+//
+// Due cose che il codice precedente sbagliava.
+//
+// Passava da maTargetDedupeKey, che è la deduplica di righe dentro UNA risposta
+// del fornitore e nient'altro (issue #86): usarla per confrontare righe
+// persistite ne estendeva lo scope oltre il contratto dichiarato, e ci portava
+// dentro il ramo sulla RAGIONE SOCIALE — cioè due aziende diverse con lo stesso
+// nome sarebbero state la stessa azienda.
+//
+// E normalizzava tutto con upper+trim, mentre i valori fiscali dei target
+// vengono dal fornitore e possono avere il prefisso IT o la punteggiatura. Una
+// P.IVA digitata «01234567890» non riconosceva un target salvato come
+// «IT01234567890»: l'aggiunta manuale pagava una fetch advanced da €0.10 per
+// un'azienda già in sessione, per poi fallire con «target già presente» sulla
+// guardia della chiave risolta.
 func maManualAddDedupeKeys(target MATarget) map[string]struct{} {
 	out := map[string]struct{}{}
-	for _, value := range []string{target.CompanyKey, maTargetDedupeKey(target), target.VendorID, target.VATCode, target.TaxCode} {
-		value = normalizeMACompanyKey(value)
+	for _, value := range []string{
+		normalizeMACompanyKey(target.CompanyKey),
+		normalizeMACompanyKey(target.VendorID),
+		maStableVAT(target.VATCode),
+		normalizeMAFiscalValue(target.TaxCode),
+	} {
 		if value != "" {
 			out[value] = struct{}{}
 		}

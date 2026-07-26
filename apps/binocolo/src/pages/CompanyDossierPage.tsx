@@ -708,7 +708,12 @@ function Dossier({ dossier }: { dossier: MACompanyDossier }) {
         <div className={styles.body}>
           <BriefSection brief={dossier.brief} />
           <ValuationSection valuation={dossier.valuation} brief={dossier.brief} flags={dossier.scorecard?.qualityFlags} />
-          <FamilySection companyKey={dossier.companyKey || dossier.vatCode} bmFamily={dossier.bmFamily} />
+          {/* Solo la chiave risolta dal backend: ratificare la famiglia sulla
+              P.IVA scriverebbe ma_company_bm_family su un'identità inventata dal
+              client, invisibile all'azienda vera (issue #86). */}
+          {dossier.companyKey ? (
+            <FamilySection companyKey={dossier.companyKey} bmFamily={dossier.bmFamily} />
+          ) : null}
           <ScorecardSection scorecard={dossier.scorecard} />
           <BilancioSection itf={itf} />
           <SociSection itf={itf} />

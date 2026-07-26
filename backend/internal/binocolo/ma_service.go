@@ -722,6 +722,12 @@ func (s *maService) addCompanyFact(ctx context.Context, companyKey, kind, note, 
 	if companyKey == "" {
 		return MACompanyFact{}, fmt.Errorf("%w: companyKey", errMAStrategyInvalid)
 	}
+	// Il segmento di path è uno slug opaco che nessuno valida (maCompanyKeyPath,
+	// handler.go): senza questa guardia una riga di registro nasce su
+	// un'azienda che potrebbe non esistere.
+	if err := s.requireKnownMACompany(ctx, companyKey); err != nil {
+		return MACompanyFact{}, err
+	}
 	if !maCompanyFactKinds[kind] {
 		return MACompanyFact{}, errMACompanyFactKindInvalid
 	}
@@ -764,6 +770,9 @@ func (s *maService) addCompanyNote(ctx context.Context, companyKey, body, subjec
 	companyKey = normalizeMACompanyKey(companyKey)
 	if companyKey == "" {
 		return MACompanyNote{}, fmt.Errorf("%w: companyKey", errMAStrategyInvalid)
+	}
+	if err := s.requireKnownMACompany(ctx, companyKey); err != nil {
+		return MACompanyNote{}, err
 	}
 	body = cleanText(body, 1000)
 	if body == "" {
@@ -1981,7 +1990,7 @@ func (s *maService) executeJobWork(ctx context.Context, job maJob) error {
 		Status:    maTraceEventSucceeded,
 		Metadata:  maTraceJSON(map[string]any{"session_id": job.SessionID, "run_id": run.ID, "result_count": len(targets), "missing_financials": missingFinancials, "thesis": normalizeMAThesis(strategy.Thesis)}),
 	})
-	if err := s.store.ReplaceMATargets(ctx, job.SessionID, run.ID, targets); err != nil {
+	if err := s.replaceMATargets(ctx, job.SessionID, run.ID, targets); err != nil {
 		_ = s.store.CompleteMAExecutionRun(ctx, run.ID, maRunStatusFailed, 0, "store_error")
 		return nil
 	}
@@ -2055,6 +2064,12 @@ func (s *maService) setTargetRating(ctx context.Context, sessionID string, input
 	input.CompanyKey = normalizeMACompanyKey(input.CompanyKey)
 	if input.CompanyKey == "" {
 		return fmt.Errorf("%w: company key", errMAStrategyInvalid)
+	}
+	// La chiave arriva dal client: va verificata contro il registro prima di
+	// scrivere il voto e, peggio, prima che ensureInitiativeCard apra una card
+	// su di essa.
+	if err := s.requireKnownMACompany(ctx, input.CompanyKey); err != nil {
+		return err
 	}
 	if !validMARating(input.Rating) {
 		return fmt.Errorf("%w: rating", errMAStrategyInvalid)
@@ -2175,11 +2190,10 @@ func (s *maService) createDirectInitiativeCard(ctx context.Context, initiativeID
 		}
 		snapshot = &fetched
 	}
+	// Nessun fallback che riderivi la chiave dal payload (issue #86): lo
+	// snapshot arriva o dal nostro corpus o dal resolver, e in entrambi i casi
+	// la chiave c'è. Se manca, l'identità è davvero assente e si erra.
 	companyKey = normalizeMACompanyKey(snapshot.CompanyKey)
-	if companyKey == "" {
-		probe := MATarget{CompanyName: snapshot.CompanyName, VATCode: snapshot.VATCode, TaxCode: snapshot.TaxCode}
-		companyKey = normalizeMACompanyKey(maTargetDedupeKey(probe))
-	}
 	if companyKey == "" {
 		return MACreateInitiativeCardResponse{}, fmt.Errorf("%w: company identity", errMAStrategyInvalid)
 	}
@@ -2253,7 +2267,7 @@ func (s *maService) fetchDirectCardSnapshot(ctx context.Context, vat string) (ma
 	if err != nil {
 		return maCompanySnapshot{}, fmt.Errorf("marshal direct-card address dataset: %w", err)
 	}
-	rows, err := parseMATargetsFromVendorData(raw)
+	rows, err := parseMATargetsFromVendorData(raw, s.now())
 	if err != nil || len(rows) == 0 {
 		if err != nil {
 			return maCompanySnapshot{}, err
@@ -2267,8 +2281,15 @@ func (s *maService) fetchDirectCardSnapshot(ctx context.Context, vat string) (ma
 	if target.TaxCode == "" && len(vat) == 16 {
 		target.TaxCode = vat
 	}
+	// Assegnazione canonica: la chiave la conia il registro, non la precedenza
+	// del payload (issue #86, categoria B). Un'azienda che il corpus non
+	// conosce riceve qui il suo UUID.
+	companyKey, err := s.resolveMACompany(ctx, maCompanyObservationFromTarget(target, "", ""))
+	if err != nil {
+		return maCompanySnapshot{}, err
+	}
 	return maCompanySnapshot{
-		CompanyKey: normalizeMACompanyKey(maTargetDedupeKey(target)), CompanyName: target.CompanyName,
+		CompanyKey: companyKey, CompanyName: target.CompanyName,
 		VATCode: target.VATCode, TaxCode: target.TaxCode, Province: target.Province,
 	}, nil
 }
@@ -2901,6 +2922,10 @@ func (s *maService) addTargetOutcome(ctx context.Context, sessionID string, inpu
 	if companyKey == "" {
 		return fmt.Errorf("%w: company key", errMAStrategyInvalid)
 	}
+	// Chiave dal client: verificata contro il registro prima di scrivere l'esito.
+	if err := s.requireKnownMACompany(ctx, companyKey); err != nil {
+		return err
+	}
 	event := strings.ToLower(strings.TrimSpace(input.Event))
 	switch event {
 	case maOutcomeContattato, maOutcomeBuonLead, maOutcomeNoGo:
@@ -2991,7 +3016,7 @@ func (s *maService) rescoreSession(ctx context.Context, sessionID, thesisRaw, su
 	merged := make([]MATarget, 0, len(scored)+len(carried))
 	merged = append(merged, scored...)
 	merged = append(merged, carried...)
-	if err := s.store.ReplaceMATargets(ctx, sessionID, runID, merged); err != nil {
+	if err := s.replaceMATargets(ctx, sessionID, runID, merged); err != nil {
 		return MASessionDetail{}, err
 	}
 	_ = s.traceEvent(ctx, maTraceEventWrite{
@@ -3017,10 +3042,9 @@ func (s *maService) upsertTargetWebValidation(ctx context.Context, sessionID str
 		return MAWebValidation{}, err
 	}
 
+	// Guardia, non fallback (issue #86): il target arriva già risolto dal
+	// registro. Riderivare qui rimetterebbe l'identità nelle mani del payload.
 	companyKey := normalizeMACompanyKey(body.Target.CompanyKey)
-	if companyKey == "" {
-		companyKey = normalizeMACompanyKey(maTargetDedupeKey(body.Target))
-	}
 	if companyKey == "" {
 		return MAWebValidation{}, fmt.Errorf("%w: company key", errMAStrategyInvalid)
 	}
@@ -3302,6 +3326,95 @@ func normalizeMACompanyKey(value string) string {
 	return strings.ToUpper(strings.TrimSpace(value))
 }
 
+// replaceMATargets / insertMATarget / resolveMACompany sono i tre punti in cui
+// il servizio può ricevere il conflitto identitario tipizzato dal registro
+// (issue #86). Passano tutti da noteMACompanyIdentityConflict, che è la SECONDA
+// transazione del contratto: la prima è già stata annullata, quindi il conflitto
+// non può essere registrato dentro di essa.
+func (s *maService) replaceMATargets(ctx context.Context, sessionID, runID string, targets []MATarget) error {
+	err := s.store.ReplaceMATargets(ctx, sessionID, runID, targets)
+	s.noteMACompanyIdentityConflict(ctx, err)
+	return err
+}
+
+func (s *maService) insertMATarget(ctx context.Context, sessionID, runID string, target MATarget) error {
+	err := s.store.InsertMATarget(ctx, sessionID, runID, target)
+	s.noteMACompanyIdentityConflict(ctx, err)
+	return err
+}
+
+func (s *maService) resolveMACompany(ctx context.Context, observation maCompanyObservation) (string, error) {
+	key, err := s.store.ResolveMACompany(ctx, observation)
+	s.noteMACompanyIdentityConflict(ctx, err)
+	return key, err
+}
+
+// observeVendorIdentity registra nel registro gli identificatori e il nome che
+// una risposta del fornitore ha davvero portato, quando la RIGA che ne nasce
+// conserva l'identità di un'osservazione precedente (l'enrichment advanced, che
+// tiene i valori della riga address per non invalidare il verdetto del gate).
+//
+// Senza, un vendor id nuovo o una P.IVA contesa comparsi solo nella risposta
+// fresca verrebbero scartati insieme al resto: il registro imparerebbe meno di
+// quanto abbiamo pagato per sapere.
+//
+// L'esito NON blocca: l'occorrenza è già agganciata all'entità della riga
+// address, e questa è un'osservazione in più, non l'assegnazione dell'identità.
+// Un conflitto viene registrato nel ledger da resolveMACompany e loggato; far
+// fallire il run brucerebbe i €0.10 già spesi per una diagnosi che è già stata
+// scritta.
+func (s *maService) observeVendorIdentity(ctx context.Context, companyKey string, observed MATarget) {
+	if s.store == nil || normalizeMACompanyKey(companyKey) == "" || observed.VendorObservedAt == nil {
+		return
+	}
+	observation := maCompanyObservationFromTarget(observed, observed.SessionID, observed.RunID)
+	observation.PriorCompanyKey = companyKey
+	if _, err := s.resolveMACompany(ctx, observation); err != nil {
+		logging.FromContext(ctx).Warn("binocolo vendor identity observation rejected",
+			"component", "binocolo", "operation", "ma_company_observe",
+			"company_key", companyKey, "company", observed.CompanyName, "error", err)
+	}
+}
+
+// requireKnownMACompany rifiuta una chiave che il registro non conosce.
+//
+// Va chiamata SOLO dai writer che ricevono la chiave dal client (voto, esito,
+// etichetta di settore): lì «chiave esistente fornita dal chiamante» è
+// un'assunzione, non un fatto, e senza controllo una chiave sbagliata produce
+// una riga che nessuna lettura ritrova — la UI mostra il voto sparito e il
+// monitor scopre l'orfano solo dopo. I writer che risolvono o rileggono la
+// chiave non ne hanno bisogno: per costruzione l'azienda esiste già.
+func (s *maService) requireKnownMACompany(ctx context.Context, companyKey string) error {
+	if s.store == nil {
+		return errMAStoreUnavailable
+	}
+	known, err := s.store.MACompanyExists(ctx, companyKey)
+	if err != nil {
+		return err
+	}
+	if !known {
+		return fmt.Errorf("%w: company key sconosciuta", errMAStrategyInvalid)
+	}
+	return nil
+}
+
+// noteMACompanyIdentityConflict persiste il conflitto in una transazione
+// separata. Se la scrittura diagnostica fallisce si logga a livello error e
+// basta: il fallimento visibile all'utente non deve dipendere dalla riuscita
+// della diagnostica — l'operazione sbagliata si è già fermata, il ledger è un
+// ausilio.
+func (s *maService) noteMACompanyIdentityConflict(ctx context.Context, err error) {
+	var conflict *maCompanyIdentityConflictError
+	if err == nil || !errors.As(err, &conflict) || s.store == nil {
+		return
+	}
+	if writeErr := s.store.RecordMACompanyIdentityConflicts(ctx, conflict.Conflicts); writeErr != nil {
+		logging.FromContext(ctx).Error("binocolo company identity conflict ledger write failed",
+			"component", "binocolo", "operation", "ma_company_identity_conflict",
+			"conflicts", len(conflict.Conflicts), "error", writeErr)
+	}
+}
+
 func (s *maService) listParameters(ctx context.Context) ([]MAParameter, error) {
 	if s.store == nil {
 		return nil, errMAStoreUnavailable
@@ -3562,6 +3675,9 @@ func (s *maService) ratifyBMFamily(ctx context.Context, companyKey, family, subj
 	if companyKey == "" {
 		return nil, fmt.Errorf("%w: company key", errMAStrategyInvalid)
 	}
+	if err := s.requireKnownMACompany(ctx, companyKey); err != nil {
+		return nil, err
+	}
 	if family != "" && !maBMFamilies[family] {
 		return nil, fmt.Errorf("%w: famiglia sconosciuta", errMAStrategyInvalid)
 	}
@@ -3813,10 +3929,39 @@ func (s *maService) companyDossier(ctx context.Context, vat string, email string
 	if rec != nil && (rec.Status == maDeepStatusReady || rec.Status == maDeepStatusQueued || rec.Status == maDeepStatusRunning) {
 		return mapMACompanyDossier(vat, rec), nil
 	}
-	if err := s.store.EnqueueMADeepAnalysis(ctx, vat, vat, "", email); err != nil {
+	// La chiave la decide il registro, non la P.IVA digitata (issue #86).
+	// Passare `vat` come company_key — com'era prima — coniava un'identità da un
+	// input fiscale: per un'azienda già nel corpus creava un SECONDO dossier
+	// accanto a quello sotto la chiave canonica, e per una nuova lasciava una
+	// riga ma_deep_analysis senza ma_company. Il record esistente vince, perché
+	// è già la chiave sotto cui il dossier vive.
+	companyKey := ""
+	if rec != nil {
+		companyKey = normalizeMACompanyKey(rec.CompanyKey)
+	}
+	if companyKey == "" {
+		resolved, err := s.resolveMACompany(ctx, maCompanyDossierObservation(vat))
+		if err != nil {
+			return MACompanyDossier{}, err
+		}
+		companyKey = resolved
+	}
+	if err := s.store.EnqueueMADeepAnalysis(ctx, companyKey, vat, "", email); err != nil {
 		return MACompanyDossier{}, err
 	}
 	return MACompanyDossier{VATCode: vat, Status: maDeepStatusQueued}, nil
+}
+
+// maCompanyDossierObservation costruisce l'osservazione per una P.IVA o un
+// codice fiscale digitati a mano. Non c'è vendor id né ragione sociale: la
+// lunghezza discrimina il ruolo, come già fa fetchDirectCardSnapshot. Nessun
+// ObservedAt — non è una chiamata al fornitore, quindi non osserva nomi.
+func maCompanyDossierObservation(vatOrTax string) maCompanyObservation {
+	value := normalizeMAVATOrTax(vatOrTax)
+	if len(value) == 16 {
+		return maCompanyObservation{TaxCode: value}
+	}
+	return maCompanyObservation{VATCode: value}
 }
 
 // getCompanyDossier returns the current cached state for a P.IVA without enqueueing;
@@ -3832,7 +3977,7 @@ func (s *maService) getCompanyDossier(ctx context.Context, vat string) (MACompan
 	dossier := mapMACompanyDossier(vat, rec)
 	// Famiglia di business model (Fase 3): best-effort, il dossier vive anche
 	// senza classificazione. La chiave è quella del record deep (il funnel può
-	// chiavare per vendor id, non per VAT), con fallback sulla VAT normalizzata.
+	// usare il vendor id come chiave, non la VAT), con fallback sulla VAT normalizzata.
 	familyKey := normalizeMACompanyKey(vat)
 	if rec != nil && rec.CompanyKey != "" {
 		familyKey = rec.CompanyKey
@@ -3943,6 +4088,13 @@ func (s *maService) deepDiveCompany(ctx context.Context, companyKey, subject, em
 	if companyKey == "" {
 		return MACompanyDeepDiveResponse{}, fmt.Errorf("%w: company key", errMAStrategyInvalid)
 	}
+	// Guardia PRIMA di risolvere l'identità: senza, l'ultimo ramo di
+	// resolveCompanyDeepDiveIdentity tratta il segmento di path come se fosse
+	// esso stesso una P.IVA, e l'IT-full da €0.30 finisce su una company_key
+	// che nessuna azienda possiede.
+	if err := s.requireKnownMACompany(ctx, companyKey); err != nil {
+		return MACompanyDeepDiveResponse{}, err
+	}
 	existing, err := s.store.ListMADeepAnalysis(ctx, []string{companyKey})
 	if err != nil {
 		return MACompanyDeepDiveResponse{}, err
@@ -3986,6 +4138,15 @@ func (s *maService) resolveCompanyDeepDiveIdentity(ctx context.Context, companyK
 	} else if normalized, ok := normalizeDeepDiveIdentity(identity); ok {
 		return normalized, "ma_initiative_card", nil
 	}
+	// Ultima risorsa: la chiave STESSA come identità fiscale. Regge solo perché
+	// il chiamante ha già verificato che l'azienda esista nel registro
+	// (requireKnownMACompany): serve le chiavi storiche che SONO un valore
+	// fiscale — quelle scritte da /azienda prima della 120 — e per una chiave
+	// legittima (ObjectId o UUID) non scatta mai, perché non ne ha la forma.
+	//
+	// Senza quella verifica a monte questo ramo trasformava un qualunque
+	// segmento di path a forma di P.IVA in un'identità, e l'IT-full da €0.30
+	// finiva su una company_key che nessuna azienda possiede.
 	if vat := normalizeDeepDiveIdentifier(companyKey); vat != "" {
 		return maDeepDiveIdentity{VATCode: vat}, "company_key", nil
 	}
@@ -6949,7 +7110,7 @@ func (s *maService) probeMASearchSurface(ctx context.Context, params openapiit.C
 
 func (s *maService) runMASurfaceProbe(ctx context.Context, params openapiit.CompanyITSearchParams, subject, email string) (maSurfaceProbeAudit, error) {
 	params.Limit = nil
-	response, raw, err := s.cachedCompanySearch(ctx, params, subject, email)
+	response, raw, _, err := s.cachedCompanySearch(ctx, params, subject, email)
 	if err != nil {
 		return maSurfaceProbeAudit{}, err
 	}
@@ -7184,23 +7345,27 @@ func allocateExecutionLimit(counts []int, limit int) []int {
 }
 
 func (s *maService) executeCompanySearch(ctx context.Context, params openapiit.CompanyITSearchParams, subject, email string) ([]MATarget, error) {
-	response, _, err := s.cachedCompanySearch(ctx, params, subject, email)
+	response, _, observedAt, err := s.cachedCompanySearch(ctx, params, subject, email)
 	if err != nil {
 		return nil, err
 	}
-	return parseMATargetsFromVendorData(response.Data)
+	return parseMATargetsFromVendorData(response.Data, observedAt)
 }
 
-func (s *maService) cachedCompanySearch(ctx context.Context, params openapiit.CompanyITSearchParams, subject, email string) (openapiit.Envelope[openapiit.CompanyDataset], json.RawMessage, error) {
+// cachedCompanySearch restituisce anche l'ISTANTE in cui la risposta è stata
+// prodotta dal fornitore: now() su una fetch fresca, fetched_at della riga di
+// cache su un hit. Serve al registro identità azienda (issue #86) per non
+// registrare una risposta vecchia come una nuova osservazione del nome.
+func (s *maService) cachedCompanySearch(ctx context.Context, params openapiit.CompanyITSearchParams, subject, email string) (openapiit.Envelope[openapiit.CompanyDataset], json.RawMessage, time.Time, error) {
 	cacheKey, paramsJSON, err := companySearchCacheKey(params)
 	if err != nil {
-		return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, err
+		return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, time.Time{}, err
 	}
 	now := s.now()
 	if s.searchCache != nil {
 		entry, err := s.searchCache.GetValidCompanySearch(ctx, cacheKey, now)
 		if err != nil {
-			return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, err
+			return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, time.Time{}, err
 		}
 		if entry != nil {
 			envelope, err := decodeCompanySearchEnvelope(entry.Response)
@@ -7219,9 +7384,9 @@ func (s *maService) cachedCompanySearch(ctx context.Context, params openapiit.Co
 				Metadata:       maTraceJSON(map[string]any{"cache_key": cacheKey, "count": envelopeCount(envelope), "cost": envelopeCost(envelope)}),
 				Error:          errMessage,
 			}); traceErr != nil {
-				return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, traceErr
+				return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, time.Time{}, traceErr
 			}
-			return envelope, entry.Response, err
+			return envelope, entry.Response, entry.FetchedAt, err
 		}
 		if err := s.traceEvent(ctx, maTraceEventWrite{
 			EventType:      "company_search_cache_miss",
@@ -7230,7 +7395,7 @@ func (s *maService) cachedCompanySearch(ctx context.Context, params openapiit.Co
 			Request:        maTraceJSON(paramsJSON),
 			Metadata:       maTraceJSON(map[string]any{"cache_key": cacheKey}),
 		}); err != nil {
-			return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, err
+			return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, time.Time{}, err
 		}
 	} else if err := s.traceEvent(ctx, maTraceEventWrite{
 		EventType:      "company_search_cache_disabled",
@@ -7239,10 +7404,10 @@ func (s *maService) cachedCompanySearch(ctx context.Context, params openapiit.Co
 		Request:        maTraceJSON(paramsJSON),
 		Metadata:       maTraceJSON(map[string]any{"cache_key": cacheKey}),
 	}); err != nil {
-		return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, err
+		return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, time.Time{}, err
 	}
 	if s.openapiit == nil {
-		return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, errMAOpenAPIITUnavailable
+		return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, time.Time{}, errMAOpenAPIITUnavailable
 	}
 
 	fetch := func(ctx context.Context) (openapiit.Envelope[openapiit.CompanyDataset], json.RawMessage, error) {
@@ -7289,11 +7454,12 @@ func (s *maService) cachedCompanySearch(ctx context.Context, params openapiit.Co
 
 	if s.searchCache == nil {
 		response, raw, err := fetch(ctx)
-		return response, raw, err
+		return response, raw, s.now(), err
 	}
 
 	var response openapiit.Envelope[openapiit.CompanyDataset]
 	var raw json.RawMessage
+	var observedAt time.Time
 	var upstreamErr error
 	err = s.searchCache.WithCompanySearchCacheLock(ctx, cacheKey, func(ctx context.Context) error {
 		entry, err := s.searchCache.GetValidCompanySearch(ctx, cacheKey, s.now())
@@ -7303,6 +7469,7 @@ func (s *maService) cachedCompanySearch(ctx context.Context, params openapiit.Co
 		if entry != nil {
 			response, err = decodeCompanySearchEnvelope(entry.Response)
 			raw = entry.Response
+			observedAt = entry.FetchedAt
 			status := maTraceEventSucceeded
 			errMessage := ""
 			if err != nil {
@@ -7327,6 +7494,7 @@ func (s *maService) cachedCompanySearch(ctx context.Context, params openapiit.Co
 			return nil
 		}
 		fetchedAt := s.now()
+		observedAt = fetchedAt
 		dryRun := params.DryRun != nil && *params.DryRun == 1
 		if err := s.searchCache.UpsertCompanySearch(ctx, companySearchCacheWrite{
 			CacheKey:           cacheKey,
@@ -7353,12 +7521,12 @@ func (s *maService) cachedCompanySearch(ctx context.Context, params openapiit.Co
 		return nil
 	})
 	if err != nil {
-		return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, err
+		return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, time.Time{}, err
 	}
 	if upstreamErr != nil {
-		return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, upstreamErr
+		return openapiit.Envelope[openapiit.CompanyDataset]{}, nil, time.Time{}, upstreamErr
 	}
-	return response, raw, nil
+	return response, raw, observedAt, nil
 }
 
 func decodeCompanySearchEnvelope(raw json.RawMessage) (openapiit.Envelope[openapiit.CompanyDataset], error) {

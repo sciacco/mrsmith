@@ -78,7 +78,7 @@ Fixture sintetiche preesistenti riportate alla scala reale (frazioni). Suite
   (gated `BinocoloAccessRoles`, trace `ma_deep_regenerate_briefs`) → `regenerateMADeepBriefs`:
   per ogni riga `ready` ricostruisce la scorecard dal payload, legge la valuation in cache,
   e rigenera il brief via LLM con il prompt ricco (045). **Niente IT-full.** Errori LLM
-  per-riga loggati e saltati (best-effort, una riga storta non aborta il batch). Logica LLM
+  per-riga loggati e saltati (best-effort, una riga storta non abortisce il batch). Logica LLM
   condivisa col worker via `buildMADeepBriefLLM`. Store: `ListMADeepReadyForBrief`,
   `UpdateMADeepBrief`. `go vet` + suite verdi. (Endpoint separato dal recompute scorecard:
   quello è gratis e ripetibile, questo costa token.)

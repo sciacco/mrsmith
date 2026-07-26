@@ -342,7 +342,7 @@ func (s *maService) gatedSearchJobWork(ctx context.Context, job maJob) error {
 			addressTargets[index].SessionID = job.SessionID
 			addressTargets[index].RunID = run.ID
 		}
-		if err := s.store.ReplaceMATargets(ctx, job.SessionID, run.ID, addressTargets); err != nil {
+		if err := s.replaceMATargets(ctx, job.SessionID, run.ID, addressTargets); err != nil {
 			_ = s.store.CompleteMAExecutionRun(ctx, run.ID, maRunStatusFailed, 0, "store_error")
 			return nil
 		}
@@ -382,7 +382,7 @@ func (s *maService) gatedSearchJobWork(ctx context.Context, job maJob) error {
 		_ = s.store.CompleteMAExecutionRun(ctx, runID, maRunStatusFailed, 0, maErrorCode(err))
 		return nil
 	}
-	if err := s.store.ReplaceMATargets(ctx, job.SessionID, runID, merged); err != nil {
+	if err := s.replaceMATargets(ctx, job.SessionID, runID, merged); err != nil {
 		_ = s.store.CompleteMAExecutionRun(ctx, runID, maRunStatusFailed, 0, "store_error")
 		return nil
 	}
@@ -558,7 +558,7 @@ func (s *maService) enrichTargetAdvanced(ctx context.Context, target MATarget) (
 	if err != nil {
 		return MATarget{}, fmt.Errorf("marshal advanced dataset: %w", err)
 	}
-	parsed, err := parseMATargetsFromVendorData(rows)
+	parsed, err := parseMATargetsFromVendorData(rows, s.now())
 	if err != nil {
 		return MATarget{}, err
 	}
@@ -566,15 +566,29 @@ func (s *maService) enrichTargetAdvanced(ctx context.Context, target MATarget) (
 		return MATarget{}, fmt.Errorf("no parsable advanced row for %s", ident)
 	}
 	enriched := parsed[0]
-	// Preserve the ADDRESS-row identity keys (the exact fields maTargetDedupeKey derives
-	// company_key from: VendorID→VATCode→TaxCode→CompanyName) plus the row IDs. The gate
-	// keyed its ma_target_web_validation on the address company_key; if the advanced
-	// payload carried a different/absent VendorID the key would drift, orphan the gate
-	// verdict, and make a re-run treat the company as un-gated → re-charge. Financials,
-	// ATECO and the payload that scoring reads come from the advanced fetch.
+	// I RIFERIMENTI DI RIGA prima dell'osservazione: se la risposta advanced
+	// porta un identificatore conteso, il conflitto finisce nel ledger e deve
+	// dire QUALE occorrenza l'ha prodotto. Con session/run/target vuoti sarebbe
+	// una riga diagnostica su cui non si può indagare.
 	enriched.ID = target.ID
 	enriched.SessionID = target.SessionID
 	enriched.RunID = target.RunID
+
+	// La risposta advanced È un'osservazione reale del fornitore, e porta i suoi
+	// identificatori: vendor id, P.IVA, CF e nome possono differire da quelli
+	// della riga address (servita magari dalla cache). Il registro deve
+	// vederli — è così che un id nuovo diventa storico e che una P.IVA
+	// contesa emerge — quindi si osservano PRIMA di essere sostituiti.
+	s.observeVendorIdentity(ctx, target.CompanyKey, enriched)
+
+	// Preserve the ADDRESS-row identity sulla RIGA: la company_key risolta dal
+	// registro più i valori identitari che l'hanno prodotta. Il gate ha agganciato
+	// la sua ma_target_web_validation su quella riga, e
+	// maWebValidationTargetFingerprint include companyName/vatCode/taxCode:
+	// persistere i valori advanced cambierebbe l'input hash, invaliderebbe il
+	// verdetto del gate e farebbe ri-pagare l'azienda al re-run. Financials,
+	// ATECO e il payload che lo scoring legge vengono invece dalla fetch
+	// advanced.
 	enriched.CompanyKey = target.CompanyKey
 	enriched.VendorID = target.VendorID
 	enriched.VATCode = target.VATCode
@@ -582,6 +596,10 @@ func (s *maService) enrichTargetAdvanced(ctx context.Context, target MATarget) (
 	enriched.CompanyName = target.CompanyName
 	enriched.Origin = target.Origin
 	enriched.EnrichmentLevel = maEnrichmentAdvanced
+	// L'osservazione è già stata registrata sopra con i valori veri. Lasciare il
+	// timestamp su una riga che porta l'identità della address farebbe avanzare
+	// name_observed_at con il nome VECCHIO.
+	enriched.VendorObservedAt = nil
 	// Carry the gate verdict onto the enriched row: scoring reads it for the
 	// sector-mismatch rescue (a gate-confirmed survivor with an off-division
 	// ATECO must not be re-hidden by the cruder 2-digit gate).
@@ -986,7 +1004,7 @@ func (s *maService) enrichAssociatedAndRescore(ctx context.Context, targets []MA
 	merged := make([]MATarget, 0, len(scored)+len(carried))
 	merged = append(merged, scored...)
 	merged = append(merged, carried...)
-	if err := s.store.ReplaceMATargets(ctx, sessionID, runID, merged); err != nil {
+	if err := s.replaceMATargets(ctx, sessionID, runID, merged); err != nil {
 		return err
 	}
 	if err := s.store.CompleteMAExecutionRun(ctx, runID, maRunStatusCompleted, len(scored), ""); err != nil {

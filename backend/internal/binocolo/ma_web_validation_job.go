@@ -521,9 +521,14 @@ func (s *maService) lookupCompanyDomain(ctx context.Context, target MATarget) *m
 	if s.store == nil {
 		return nil
 	}
+	// Nessuna riderivazione della chiave (issue #86): un target senza chiave è
+	// un difetto a monte, e la consultazione del registro domini prosegue sui
+	// soli identificatori fiscali invece di inventarne una.
 	companyKey := normalizeMACompanyKey(target.CompanyKey)
 	if companyKey == "" {
-		companyKey = normalizeMACompanyKey(maTargetDedupeKey(target))
+		logging.FromContext(ctx).Warn("binocolo domain registry lookup without company key",
+			"component", "binocolo", "operation", "ma_company_domain_lookup",
+			"company", target.CompanyName)
 	}
 	vat := strings.ToUpper(strings.TrimSpace(target.VATCode))
 	tax := strings.ToUpper(strings.TrimSpace(target.TaxCode))
@@ -557,9 +562,6 @@ func (s *maService) registerCompanyDomainWithIdentityState(ctx context.Context, 
 		return fmt.Errorf("invalid domain identity state %q", identityState)
 	}
 	companyKey := normalizeMACompanyKey(target.CompanyKey)
-	if companyKey == "" {
-		companyKey = normalizeMACompanyKey(maTargetDedupeKey(target))
-	}
 	normalized, ok := normalizeDomain(domain)
 	if companyKey == "" || !ok {
 		return fmt.Errorf("invalid company domain registry record")
@@ -578,9 +580,6 @@ func (s *maService) registerCompanyDomain(ctx context.Context, target MATarget, 
 		return
 	}
 	companyKey := normalizeMACompanyKey(target.CompanyKey)
-	if companyKey == "" {
-		companyKey = normalizeMACompanyKey(maTargetDedupeKey(target))
-	}
 	normalized, ok := normalizeDomain(domain)
 	if companyKey == "" || !ok {
 		return
@@ -604,9 +603,6 @@ func (s *maService) registerCompanyDomainRecord(ctx context.Context, target MATa
 		return
 	}
 	companyKey := normalizeMACompanyKey(target.CompanyKey)
-	if companyKey == "" {
-		companyKey = normalizeMACompanyKey(maTargetDedupeKey(target))
-	}
 	if companyKey == "" {
 		return
 	}

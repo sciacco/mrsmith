@@ -20,6 +20,12 @@ const companySearchCacheTTL = 30 * 24 * time.Hour
 
 type companySearchCacheEntry struct {
 	Response json.RawMessage
+	// FetchedAt è l'istante della CHIAMATA AL FORNITORE che ha prodotto questa
+	// risposta, non quello in cui la si rilegge. Il registro identità azienda lo
+	// usa per la regola sul nome (issue #86): servire una risposta vecchia dalla
+	// cache non è una nuova osservazione, e non deve poter sovrascrivere un nome
+	// osservato più tardi.
+	FetchedAt time.Time
 }
 
 type companySearchCacheWrite struct {
@@ -57,14 +63,15 @@ func (s *SQLStore) GetValidCompanySearch(ctx context.Context, cacheKey string, n
 	}
 
 	var response []byte
+	var fetchedAt time.Time
 	err := s.db.QueryRowContext(ctx, `
 UPDATE binocolo.company_search_cache
 SET last_served_at = $2,
     served_count = served_count + 1
 WHERE cache_key = $1
   AND expires_at > $2
-RETURNING response
-`, cacheKey, now).Scan(&response)
+RETURNING response, fetched_at
+`, cacheKey, now).Scan(&response, &fetchedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -72,7 +79,10 @@ RETURNING response
 		return nil, fmt.Errorf("get valid company search cache: %w", err)
 	}
 
-	return &companySearchCacheEntry{Response: json.RawMessage(append([]byte(nil), response...))}, nil
+	return &companySearchCacheEntry{
+		Response:  json.RawMessage(append([]byte(nil), response...)),
+		FetchedAt: fetchedAt,
+	}, nil
 }
 
 func (s *SQLStore) WithCompanySearchCacheLock(ctx context.Context, cacheKey string, fn func(context.Context) error) (err error) {

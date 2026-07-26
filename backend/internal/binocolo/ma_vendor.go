@@ -7,6 +7,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type maShareholder struct {
@@ -17,7 +18,16 @@ type maShareholder struct {
 	PercentShare float64
 }
 
-func parseMATargetsFromVendorData(raw json.RawMessage) ([]MATarget, error) {
+// parseMATargetsFromVendorData converte un dataset del fornitore in target.
+//
+// observedAt è l'istante in cui il FORNITORE ha prodotto quel dataset, che il
+// registro identità usa per la regola sul nome (issue #86): il chiamante deve
+// passare l'istante della chiamata reale, oppure il fetched_at della riga di
+// cache quando serve una risposta già memorizzata. Stamparlo qui con time.Now()
+// registrerebbe un cache hit come una nuova osservazione, e una risposta vecchia
+// potrebbe sovrascrivere un nome letto più tardi. Zero = origine ignota: il nome
+// non viene osservato affatto, che è la scelta prudente.
+func parseMATargetsFromVendorData(raw json.RawMessage, observedAt time.Time) ([]MATarget, error) {
 	items, err := vendorDataItems(raw)
 	if err != nil {
 		return nil, err
@@ -27,6 +37,10 @@ func parseMATargetsFromVendorData(raw json.RawMessage) ([]MATarget, error) {
 		target, err := normalizeMATarget(item)
 		if err != nil {
 			return nil, err
+		}
+		if !observedAt.IsZero() {
+			stamp := observedAt.UTC()
+			target.VendorObservedAt = &stamp
 		}
 		targets = append(targets, target)
 	}
