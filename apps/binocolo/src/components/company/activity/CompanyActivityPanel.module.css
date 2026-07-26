@@ -71,7 +71,7 @@
   box-shadow: 0 0 0 3px var(--color-accent-glow);
 }
 .composerFooter { margin-top: var(--space-2); }
-.composerFooter span { color: var(--color-text-faint); font-size: 0.75rem; }
+.composerFooter > span { color: var(--color-text-faint); font-size: 0.75rem; }
 .composerActions { display: flex; align-items: center; gap: var(--space-2); }
 .error { margin: var(--space-2) 0 0; color: var(--color-danger-hover); font-size: 0.8125rem; }
 .dismissSlot:empty { display: none; }

@@ -427,8 +427,8 @@ Target: **WCAG 2.1 AA.**
 
 - **Contrast:** follow the text-safety rules in §4.2.
 - **Keyboard:** every interactive element operable via keyboard; Escape closes menus, drawers, modals; Enter/Space activates. Clickable table rows per §13.2.
-- **Focus:** visible focus via `:focus-visible` glow rings. Because glow-only indicators disappear in forced-colors/High-Contrast mode, focus styles SHOULD also set an `outline` (a transparent outline becomes visible under forced colors).
-- **Focus management:** `Modal` (native `<dialog>`) traps focus natively. `Drawer` MUST move focus into the panel on open and restore it to the trigger on close.
+- **Focus:** visible focus via `:focus-visible` glow rings. The glow is decoration, never the indicator — `--color-accent-glow` measures 1,4:1 on `--color-surface`, so always pair it with an opaque `--color-accent` border or ring (4,3:1) to meet SC 1.4.11. Because glow-only indicators disappear in forced-colors/High-Contrast mode, focus styles SHOULD also set an `outline` (a transparent outline becomes visible under forced colors).
+- **Focus management:** `Modal` (native `<dialog>`) traps focus natively. `Drawer` MUST move focus into the panel on open and restore it to the trigger on close. Native `<dialog>` restores focus only on `close()`: a dialog unmounted while still open (`{open ? <Drawer open …/> : null}`) drops focus to `<body>`, so restore in effect cleanup too, guarded on the trigger still being connected.
 - **Overlays:** click-outside closes; `aria-expanded`/`aria-haspopup` on triggers; `role="alert"` on toasts.
 - **Motion:** `prefers-reduced-motion` respected globally (§8.4).
 
