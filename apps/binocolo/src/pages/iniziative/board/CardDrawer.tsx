@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react';
+import { useRef, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, Drawer, Icon, Skeleton } from '@mrsmith/ui';
 import type { MAInitiativeCardView } from '../../../api/types';
@@ -59,11 +59,24 @@ export function CardDrawer({
   const [dismissError, setDismissError] = useState('');
   const [announcement, setAnnouncement] = useState('');
   const [launching, setLaunching] = useState(false);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
 
   const terminal = isTerminalState(card.state);
   const removed = card.state === 'rimossa';
   const ds = dossierState(card.dossierStatus);
   const canLaunch = ds === 'none' || ds === 'failed';
+
+  const announce = (message: string) => {
+    setAnnouncement('');
+    requestAnimationFrame(() => setAnnouncement(message));
+  };
+
+  const discardDraft = () => {
+    setNote('');
+    setNoteError('');
+    setDismissError('');
+    composerRef.current?.focus();
+  };
 
   const submitNote = async () => {
     const body = note.trim();
@@ -72,7 +85,7 @@ export function CardDrawer({
     try {
       await annotations.create.mutateAsync(body);
       setNote('');
-      setAnnouncement('Annotazione aggiunta.');
+      announce('Annotazione aggiunta.');
       onChanged();
     } catch (e) {
       setNoteError(errorLabel(e));
@@ -289,6 +302,7 @@ export function CardDrawer({
         <div className={styles.composer}>
           <div className={styles.composerField}>
             <textarea
+              ref={composerRef}
               className={styles.composerInput}
               placeholder="Aggiungi annotazione…"
               value={note}
@@ -306,9 +320,12 @@ export function CardDrawer({
             {dismissError ? <p className={styles.composerError} role="alert">{dismissError}</p> : null}
             <span className={styles.srStatus} role="status">{announcement}</span>
           </div>
-          <Button variant="primary" size="sm" onClick={() => void submitNote()} loading={annotations.create.isPending} disabled={!note.trim()}>
-            Aggiungi
-          </Button>
+          <div className={styles.composerActions}>
+            {note ? <Button variant="ghost" size="sm" onClick={discardDraft}>Annulla</Button> : null}
+            <Button variant="primary" size="sm" onClick={() => void submitNote()} loading={annotations.create.isPending} disabled={!note.trim()}>
+              Aggiungi
+            </Button>
+          </div>
         </div>
       </div>
     </Drawer>

@@ -48,17 +48,21 @@ export function SingleSelect<V extends string | number = string | number>({
 
   useEffect(() => {
     if (!open) return;
+    function isOutside(target: Node) {
+      return !triggerRef.current?.contains(target) && !dropdownRef.current?.contains(target);
+    }
     function handleClickOutside(e: MouseEvent) {
-      const target = e.target as Node;
-      if (
-        !triggerRef.current?.contains(target) &&
-        !dropdownRef.current?.contains(target)
-      ) {
-        setOpen(false);
-      }
+      if (isOutside(e.target as Node)) setOpen(false);
+    }
+    function handleFocusOutside(e: FocusEvent) {
+      if (isOutside(e.target as Node)) setOpen(false);
     }
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('focusin', handleFocusOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('focusin', handleFocusOutside);
+    };
   }, [open]);
 
   useLayoutEffect(() => {
@@ -140,7 +144,11 @@ export function SingleSelect<V extends string | number = string | number>({
   }
 
   function handleOptionKeyDown(event: React.KeyboardEvent<HTMLElement>) {
-    if (event.key === 'ArrowDown') {
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      setOpen(false);
+      setTimeout(() => triggerRef.current?.focus(), 0);
+    } else if (event.key === 'ArrowDown') {
       event.preventDefault();
       focusOption('next', event.currentTarget);
     } else if (event.key === 'ArrowUp') {

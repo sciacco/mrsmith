@@ -108,6 +108,10 @@ export function ActivityTimeline({
   const sessionMap = useMemo(() => new Map(sessions.map((item) => [item.id, item])), [sessions]);
   const sessionTitles = useMemo(() => new Map(sessions.map((item) => [item.id, item.title])), [sessions]);
   const visible = showTechnical ? items : items.filter((item) => !TECHNICAL_ACTIVITY_EVENTS.has(item.event));
+  const announce = (message: string) => {
+    setAnnouncement('');
+    requestAnimationFrame(() => setAnnouncement(message));
+  };
 
   useEffect(() => {
     onEditingChange?.(editing !== null);
@@ -132,7 +136,7 @@ export function ActivityTimeline({
       await mutations.update.mutateAsync({ id: item.id, body });
       setEditing(null);
       setDraft('');
-      setAnnouncement('Annotazione aggiornata.');
+      announce('Annotazione aggiornata.');
       requestAnimationFrame(() => editButtonRefs.current.get(item.id)?.focus());
     } catch {
       setError('Modifica non salvata. Riprova.');
@@ -145,7 +149,7 @@ export function ActivityTimeline({
     try {
       await mutations.remove.mutateAsync(deleteTarget.id);
       setDeleteTarget(null);
-      setAnnouncement('Annotazione eliminata.');
+      announce('Annotazione eliminata.');
       requestAnimationFrame(() => timelineRef.current?.focus());
     } catch {
       setDeleteError('Annotazione non eliminata. Riprova.');

@@ -42,6 +42,18 @@ export function CompanyActivityPanel({ companyKey, companyName, vatCode }: { com
     return session?.initiativeId === initiativeId;
   }), [activity.data?.sessions, annotationsOnly, initiativeId, items]);
 
+  const announce = (message: string) => {
+    setAnnouncement('');
+    requestAnimationFrame(() => setAnnouncement(message));
+  };
+
+  const discardDraft = () => {
+    setBody('');
+    setError('');
+    setDismissError('');
+    composerRef.current?.focus();
+  };
+
   const submit = async () => {
     const value = body.trim();
     if (!value) return;
@@ -49,7 +61,7 @@ export function CompanyActivityPanel({ companyKey, companyName, vatCode }: { com
     try {
       await mutations.create.mutateAsync(value);
       setBody('');
-      setAnnouncement('Annotazione aggiunta.');
+      announce('Annotazione aggiunta.');
       composerRef.current?.focus();
     } catch {
       setError('Annotazione non salvata. Riprova.');
@@ -159,7 +171,10 @@ export function CompanyActivityPanel({ companyKey, companyName, vatCode }: { com
               />
               <div className={styles.composerFooter}>
                 <span>{body.length}/1.000</span>
-                <Button variant="primary" size="sm" disabled={!body.trim()} loading={mutations.create.isPending} onClick={() => void submit()}>Aggiungi</Button>
+                <div className={styles.composerActions}>
+                  {body ? <Button variant="ghost" size="sm" onClick={discardDraft}>Annulla</Button> : null}
+                  <Button variant="primary" size="sm" disabled={!body.trim()} loading={mutations.create.isPending} onClick={() => void submit()}>Aggiungi</Button>
+                </div>
               </div>
               {error ? <p id="company-annotation-error" className={styles.error} role="alert">{error}</p> : null}
               <span className={styles.srStatus} role="status">{announcement}</span>
