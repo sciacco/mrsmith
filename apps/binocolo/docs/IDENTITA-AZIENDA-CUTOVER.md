@@ -13,8 +13,7 @@ L'esecuzione avviene **ad applicazione e worker fermi**. Il runbook è
 ## Sequenza
 
 ```
-0.  deploy del commit PREPARATORIO  (branch fix/issue-86-pre-cutover-compat)
-0.5 migrazione 122                  (solo se Q16 non è vuota — vedi sotto)
+0.5 migrazione 122                  (fatta il 2026-07-26, Q16 ora vuota)
 1.  stop writer (applicazione + worker)
 2. migrazione 120  — schema, registro, colonna ma_target.company_key nullable
 3. migrazione 121  — backfill di ma_target.company_key (ri-eseguibile)
@@ -24,23 +23,28 @@ L'esecuzione avviene **ad applicazione e worker fermi**. Il runbook è
 7. riapertura scritture
 ```
 
-### Passo 0 — il commit preparatorio non è opzionale
+### Il commit di compatibilità, e quando serve davvero
 
-`ListMATargetRows` costruisce una CTE con `SELECT t.*` più una `company_key`
+`ListMATargetRows` costruiva una CTE con `SELECT t.*` più una `company_key`
 **derivata con lo stesso nome**. Finché la colonna non esiste il nome è unico;
 nell'istante in cui la 120 la aggiunge, la CTE ne espone due omonime e ogni
 `t.company_key` successivo diventa ambiguo — PostgreSQL risponde `column
 reference "company_key" is ambiguous` e l'elenco dei target smette di
-funzionare.
+funzionare. Non è un problema del binario nuovo, che la colonna la legge: è un
+problema del binario **già in esercizio** con lo schema nuovo.
 
-Non è un problema del binario nuovo, che la colonna la legge: è un problema del
-binario **già in esercizio** nella finestra fra migrazione e deploy. Il commit
-preparatorio (`fix/issue-86-pre-cutover-compat`, ramificato da `main`) sostituisce
-`t.*` con l'elenco esplicito delle colonne e funziona su **entrambi** gli schemi,
-senza cambiare comportamento. Va in produzione **prima** della 120.
+`17f1005` — il **primo commit** del ramo — sostituisce `t.*` con l'elenco
+esplicito e funziona su **entrambi** gli schemi, senza cambiare comportamento.
 
-Senza il passo 0 la 120 non è additiva nei fatti, e il confine di rollback 1 qui
-sotto è falso.
+**Con l'applicazione ferma per tutto il cutover quel problema non si presenta**:
+nessuno serve richieste fra la migrazione e il deploy. Il commit resta comunque
+il primo del ramo, isolato e cherry-pickabile, perché serve in due casi:
+
+- vuoi **validare la build nuova contro il DB di produzione mentre l'app gira**,
+  che è il flusso descritto in `docs/DATABASE-MIGRATIONS.md`;
+- **abortisci** dopo la 120 e riaccendi il binario vecchio (vedi rollback 1).
+
+In entrambi i casi: `git cherry-pick 17f1005` su main, deploy, e poi si procede.
 
 Le migrazioni le applica l'utente con il proprio processo: nessuna operazione
 diretta sui DB configurati in env.
@@ -115,10 +119,11 @@ applicative, che dopo il cutover **errano** invece di riderivare la chiave.
 ## Tre confini di rollback, distinti
 
 1. **Schema** — la 120 è additiva e non elimina nulla, quindi un rollback
-   applicativo non richiede mai il ripristino di schema. Vale però **solo a
-   partire dal commit preparatorio del passo 0**: si torna indietro fino a
-   quello, non oltre. Il binario che lo precede non sopravvive alla colonna
-   nuova.
+   applicativo non richiede mai il ripristino di schema. Con una riserva: il
+   binario **precedente a `17f1005`** non sopravvive alla colonna nuova, perché
+   la sua CTE diventa ambigua. Se abortisci dopo la 120 e devi riaccendere il
+   vecchio, o gli porti sopra `17f1005` (cherry-pick + deploy) o elimini la
+   colonna.
 2. **Semantico** — la prima azienda assegnata con UUID. Prima, il binario vecchio
    è sicuro; dopo, ri-deriva l'ObjectId per quell'azienda e ne crea una seconda
    identità.
