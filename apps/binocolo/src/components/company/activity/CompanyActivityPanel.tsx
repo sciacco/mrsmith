@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Drawer, Skeleton } from '@mrsmith/ui';
+import { Button, Drawer, SingleSelect, Skeleton } from '@mrsmith/ui';
 import { useAnnotationMutations, useCompanyActivity } from '../../../hooks/useCompanyActivity';
 import { ActivityTimeline } from './ActivityTimeline';
 import styles from './CompanyActivityPanel.module.css';
@@ -16,6 +16,7 @@ export function CompanyActivityPanel({ companyKey, companyName, vatCode }: { com
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const items = activity.data?.items ?? [];
   const activeAnnotations = items.filter((item) => item.event === 'nota' && !item.deletedAt);
+  const initiativeOptions = (activity.data?.initiatives ?? []).map((initiative) => ({ value: initiative.id, label: initiative.title }));
 
   useEffect(() => {
     if (open && focusComposer) requestAnimationFrame(() => composerRef.current?.focus());
@@ -56,16 +57,19 @@ export function CompanyActivityPanel({ companyKey, companyName, vatCode }: { com
       <section className={styles.summary}>
         <div className={styles.heading}>
           <div>
-            <h2>Attività e annotazioni</h2>
-            <p>{activeAnnotations.length} annotazioni attive</p>
+            <h3>Attività e annotazioni</h3>
+            {!activity.isLoading && !activity.isError ? <p>{activeAnnotations.length} annotazioni attive</p> : null}
           </div>
           <div className={styles.headingActions}>
             <Button size="sm" variant="secondary" onClick={openForAnnotation}>Aggiungi annotazione</Button>
-            {items.length > 0 ? <Button size="sm" variant="ghost" onClick={openHistory}>Apri cronologia</Button> : null}
+            {items.length > 0 || activity.isError ? <Button size="sm" variant="ghost" onClick={openHistory}>Apri cronologia</Button> : null}
           </div>
         </div>
         {activity.isLoading ? <Skeleton rows={3} /> : activity.isError ? (
-          <p className={styles.error} role="alert">Cronologia non disponibile. Riprova.</p>
+          <div className={styles.errorState} role="alert">
+            <span>Cronologia non disponibile.</span>
+            <Button size="sm" variant="secondary" onClick={() => void activity.refetch()}>Riprova</Button>
+          </div>
         ) : activeAnnotations.length === 0 ? (
           <div className={styles.empty}>
             <p>Nessuna annotazione registrata.</p>
@@ -78,6 +82,7 @@ export function CompanyActivityPanel({ companyKey, companyName, vatCode }: { com
             sessions={activity.data?.sessions}
             companyKey={companyKey}
             relativeDates
+            compact
           />
         )}
       </section>
@@ -93,18 +98,29 @@ export function CompanyActivityPanel({ companyKey, companyName, vatCode }: { com
           <div className={styles.drawerBody}>
             <div className={styles.toolbar}>
               <div className={styles.segmented} role="group" aria-label="Tipo di attività">
-                <button type="button" className={!annotationsOnly ? styles.active : ''} onClick={() => setAnnotationsOnly(false)}>Tutto</button>
-                <button type="button" className={annotationsOnly ? styles.active : ''} onClick={() => setAnnotationsOnly(true)}>Annotazioni</button>
+                <button type="button" className={!annotationsOnly ? styles.active : ''} aria-pressed={!annotationsOnly} onClick={() => setAnnotationsOnly(false)}>Tutto</button>
+                <button type="button" className={annotationsOnly ? styles.active : ''} aria-pressed={annotationsOnly} onClick={() => setAnnotationsOnly(true)}>Annotazioni</button>
               </div>
-              {(activity.data?.initiatives.length ?? 0) > 1 ? (
-                <select aria-label="Filtra per iniziativa" value={initiativeId} onChange={(event) => setInitiativeId(event.target.value)}>
-                  <option value="">Tutte le iniziative</option>
-                  {activity.data?.initiatives.map((initiative) => <option key={initiative.id} value={initiative.id}>{initiative.title}</option>)}
-                </select>
+              {initiativeOptions.length > 1 ? (
+                <div className={styles.initiativeFilter} role="group" aria-label="Filtra per iniziativa">
+                  <SingleSelect
+                    options={initiativeOptions}
+                    selected={initiativeId || null}
+                    onChange={(value) => setInitiativeId(value ?? '')}
+                    placeholder="Tutte le iniziative"
+                    allowClear
+                    clearLabel="Tutte le iniziative"
+                  />
+                </div>
               ) : null}
             </div>
             <div className={styles.scroll}>
-              {activity.isLoading ? <Skeleton rows={5} /> : (
+              {activity.isLoading ? <Skeleton rows={5} /> : activity.isError ? (
+                <div className={styles.errorState} role="alert">
+                  <span>Cronologia non disponibile.</span>
+                  <Button size="sm" variant="secondary" onClick={() => void activity.refetch()}>Riprova</Button>
+                </div>
+              ) : (
                 <ActivityTimeline
                   items={filtered}
                   initiatives={activity.data?.initiatives}

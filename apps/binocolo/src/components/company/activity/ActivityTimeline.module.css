@@ -50,6 +50,14 @@
   background: transparent;
 }
 
+.eyebrow {
+  margin: 0 0 var(--space-1);
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
 .text {
   margin: 0;
   color: var(--color-text);
@@ -93,8 +101,16 @@
   box-shadow: 0 0 0 3px var(--color-accent-glow);
 }
 
-.deleted { opacity: 0.72; }
-.deleted .text { text-decoration: line-through; }
+.deleted .content {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+}
+.deleted .text {
+  color: var(--color-text-secondary);
+  text-decoration: line-through;
+}
+.deleted .meta,
+.deleted .eyebrow { color: var(--color-text-secondary); }
 .deletedLabel {
   display: inline-block;
   margin-bottom: var(--space-1);
@@ -108,6 +124,14 @@
   color: var(--color-danger-hover);
   font-size: 0.8125rem;
 }
+
+.compact { gap: var(--space-2); }
+.compact .content {
+  padding: var(--space-1) 0 var(--space-2);
+  border-color: transparent;
+  background: transparent;
+}
+.compact .item { gap: var(--space-2); }
 
 .confirmation { display: grid; gap: var(--space-3); }
 .confirmation p { margin: 0; color: var(--color-text-secondary); line-height: 1.5; }

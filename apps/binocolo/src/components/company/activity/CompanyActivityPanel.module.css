@@ -1,8 +1,9 @@
 .summary {
-  padding: var(--space-6);
-  border: 1px solid var(--color-border-subtle);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-sm);
 }
 .heading,
 .headingActions,
@@ -13,8 +14,8 @@
   justify-content: space-between;
   gap: var(--space-3);
 }
-.heading { margin-bottom: var(--space-5); }
-.heading h2 { margin: 0; color: var(--color-text); font-size: 0.875rem; }
+.heading { margin-bottom: var(--space-3); }
+.heading h3 { margin: 0; color: var(--color-text); font-size: 1rem; font-weight: 700; }
 .heading p { margin: var(--space-1) 0 0; color: var(--color-text-muted); font-size: 0.8125rem; }
 .empty { color: var(--color-text-muted); font-size: 0.8125rem; line-height: 1.5; }
 .empty p { margin: var(--space-1) 0; }
@@ -26,14 +27,7 @@
   border-bottom: 1px solid var(--color-border-subtle);
   background: var(--color-bg-elevated);
 }
-.toolbar select {
-  min-height: 44px;
-  padding: 0 var(--space-3);
-  border: 1.5px solid var(--color-border);
-  border-radius: var(--radius-md);
-  color: var(--color-text);
-  background: var(--color-bg-elevated);
-}
+.initiativeFilter { min-width: 220px; }
 .segmented { display: inline-flex; padding: var(--space-1); border-radius: var(--radius-full); background: var(--color-surface); }
 .segmented button {
   min-height: 36px;
@@ -45,6 +39,11 @@
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+}
+.segmented button:hover { color: var(--color-text); }
+.segmented button:focus-visible {
+  outline: 2px solid transparent;
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
 }
 .segmented .active { color: var(--color-accent); background: var(--color-bg-elevated); box-shadow: var(--shadow-xs); }
 .scroll { min-height: 0; overflow-y: auto; padding: var(--space-5) var(--space-6); }
@@ -66,8 +65,7 @@
   font: inherit;
   line-height: 1.5;
 }
-.composer textarea:focus-visible,
-.toolbar select:focus-visible {
+.composer textarea:focus-visible {
   outline: 2px solid transparent;
   border-color: var(--color-accent);
   box-shadow: 0 0 0 3px var(--color-accent-glow);
@@ -75,6 +73,14 @@
 .composerFooter { margin-top: var(--space-2); }
 .composerFooter span { color: var(--color-text-faint); font-size: 0.75rem; }
 .error { margin: var(--space-2) 0 0; color: var(--color-danger-hover); font-size: 0.8125rem; }
+.errorState {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: var(--color-danger-hover);
+  font-size: 0.8125rem;
+}
 @media (max-width: 640px) {
   .summary,
   .scroll,

@@ -37,6 +37,8 @@ function contextLabel(
   initiativeMap: Map<string, string>,
   sessionMap: Map<string, MACompanyActivitySession>,
 ) {
+  const payload = item.payload as Record<string, unknown> | undefined;
+  if (payload?.annotationOrigin === 'legacy_registry') return 'Registro azienda';
   if (item.initiativeId) return initiativeMap.get(item.initiativeId) ?? 'Iniziativa';
   if (item.sessionId) {
     const session = sessionMap.get(item.sessionId);
@@ -47,10 +49,10 @@ function contextLabel(
 }
 
 function authorLabel(item: MATargetOutcome) {
-  if (item.updatedAt) return shortAuthor(item.updatedByEmail);
   const payload = item.payload as Record<string, unknown> | undefined;
-  if (payload?.annotationOrigin === 'legacy_registry') return 'Registro azienda';
-  if (payload?.annotationOrigin === 'system_domain') return 'Verifica automatica del dominio';
+  if (payload?.annotationOrigin === 'system_domain') {
+    return item.updatedAt ? shortAuthor(item.updatedByEmail) : 'Verifica automatica del dominio';
+  }
   return shortAuthor(item.createdByEmail);
 }
 
@@ -63,6 +65,7 @@ export function ActivityTimeline({
   allowAllAnnotations = false,
   showTechnical = false,
   relativeDates = false,
+  compact = false,
   emptyLabel = 'Nessuna attività registrata.',
 }: {
   items: MATargetOutcome[];
@@ -73,6 +76,7 @@ export function ActivityTimeline({
   allowAllAnnotations?: boolean;
   showTechnical?: boolean;
   relativeDates?: boolean;
+  compact?: boolean;
   emptyLabel?: string;
 }) {
   const mutations = useAnnotationMutations(companyKey, editableInitiativeId);
@@ -117,15 +121,22 @@ export function ActivityTimeline({
 
   return (
     <>
-    <div className={styles.timeline}>
+    <div className={`${styles.timeline} ${compact ? styles.compact : ''}`} aria-live="polite">
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       {visible.map((item) => {
         const annotation = item.event === 'nota';
         const editable = annotation && !item.deletedAt && (allowAllAnnotations || (Boolean(editableInitiativeId) && item.initiativeId === editableInitiativeId));
+        const context = contextLabel(item, initiativeMap, sessionMap);
+        const kind = annotation ? 'Annotazione' : 'Stato';
         return (
-          <article key={item.id} className={`${styles.item} ${annotation ? styles.annotation : styles.event} ${item.deletedAt ? styles.deleted : ''}`}>
+          <article
+            key={item.id}
+            className={`${styles.item} ${annotation ? styles.annotation : styles.event} ${item.deletedAt ? styles.deleted : ''}`}
+            aria-label={`${kind}: ${eventLabel(item, sessionTitles)}`}
+          >
             <span className={styles.dot} aria-hidden="true" />
             <div className={styles.content}>
+              <p className={styles.eyebrow}>{kind.toUpperCase()} · {context}</p>
               {item.deletedAt ? <span className={styles.deletedLabel}>Annotazione eliminata</span> : null}
               {editing === item.id ? (
                 <div className={styles.editor}>
@@ -139,7 +150,7 @@ export function ActivityTimeline({
                 <p className={styles.text}>{eventLabel(item, sessionTitles)}</p>
               )}
               <p className={styles.meta}>
-                {contextLabel(item, initiativeMap, sessionMap)} · {authorLabel(item)} · {relativeDates ? relativeDate(item.createdAt) : dateTime(item.createdAt)}
+                {authorLabel(item)} · {relativeDates ? relativeDate(item.createdAt) : dateTime(item.createdAt)}
                 {item.updatedAt ? ` · modificata ${dateTime(item.updatedAt)} da ${shortAuthor(item.updatedByEmail)}` : ''}
                 {item.deletedAt ? ` · eliminata ${dateTime(item.deletedAt)} da ${shortAuthor(item.deletedByEmail)}` : ''}
               </p>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Icon } from '@mrsmith/ui';
+import { Button, Icon, SingleSelect, Skeleton } from '@mrsmith/ui';
 import { Link } from 'react-router-dom';
 import type { MATarget } from '../../../../api/types';
 import { ActivityTimeline } from '../../../../components/company/activity/ActivityTimeline';
@@ -45,6 +45,7 @@ export function RegistroTab({
     if (item.initiativeId === initiativeFilter) return true;
     return activity.data?.sessions.find((session) => session.id === item.sessionId)?.initiativeId === initiativeFilter;
   });
+  const initiativeOptions = (activity.data?.initiatives ?? []).map((initiative) => ({ value: initiative.id, label: initiative.title }));
 
   return (
     <div className={styles.tabBody}>
@@ -61,9 +62,13 @@ export function RegistroTab({
 
         <div className={`${styles.card} ${styles.cardCompact}`}>
           <p className={styles.lab}>Traccia attività</p>
-          <p className={styles.rlMain} style={{ margin: 0 }}>
-            {activity.data?.items.length ?? 0} elementi, incluse le annotazioni eliminate.
-          </p>
+          {activity.isLoading ? <Skeleton rows={1} /> : activity.isError ? (
+            <p className={styles.activityErrorText}>Conteggio non disponibile.</p>
+          ) : (
+            <p className={styles.rlMain} style={{ margin: 0 }}>
+              {items.length} {items.length === 1 ? 'elemento' : 'elementi'} con i filtri attivi.
+            </p>
+          )}
         </div>
       </div>
 
@@ -74,14 +79,25 @@ export function RegistroTab({
             <button type="button" className={!annotationsOnly ? styles.activitySegmentActive : ''} aria-pressed={!annotationsOnly} onClick={() => setAnnotationsOnly(false)}>Traccia completa</button>
             <button type="button" className={annotationsOnly ? styles.activitySegmentActive : ''} aria-pressed={annotationsOnly} onClick={() => setAnnotationsOnly(true)}>Annotazioni</button>
           </div>
-          {(activity.data?.initiatives.length ?? 0) > 1 ? (
-            <select value={initiativeFilter} onChange={(event) => setInitiativeFilter(event.target.value)} aria-label="Filtra attività per iniziativa">
-              <option value="">Tutte le iniziative</option>
-              {activity.data?.initiatives.map((initiative) => <option key={initiative.id} value={initiative.id}>{initiative.title}</option>)}
-            </select>
+          {initiativeOptions.length > 1 ? (
+            <div className={styles.activityInitiativeFilter} role="group" aria-label="Filtra attività per iniziativa">
+              <SingleSelect
+                options={initiativeOptions}
+                selected={initiativeFilter || null}
+                onChange={(value) => setInitiativeFilter(value ?? '')}
+                placeholder="Tutte le iniziative"
+                allowClear
+                clearLabel="Tutte le iniziative"
+              />
+            </div>
           ) : null}
         </div>
-        {activity.isError ? <p className={styles.muted} role="alert">Cronologia non disponibile.</p> : (
+        {activity.isLoading ? <Skeleton rows={4} /> : activity.isError ? (
+          <div className={styles.activityErrorState} role="alert">
+            <span>Cronologia non disponibile.</span>
+            <Button size="sm" variant="secondary" onClick={() => void activity.refetch()}>Riprova</Button>
+          </div>
+        ) : (
           <ActivityTimeline
             items={items}
             initiatives={activity.data?.initiatives}
@@ -105,7 +121,7 @@ export function RegistroTab({
       )}
 
       <div className={styles.linkRow}>
-        <span className={styles.muted}>Diario completo e IRL nel dossier di lavorazione.</span>
+        <span className={styles.muted}>Attività completa e IRL nel dossier di lavorazione.</span>
         {dossier ? (
           <Link className={styles.dossierLink} to={dossier}>
             Apri dossier <Icon name="external-link" size={14} />
