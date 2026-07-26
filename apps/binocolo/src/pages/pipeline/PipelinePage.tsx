@@ -296,6 +296,14 @@ function PipelineDrawer({
             <p className={styles.lab}>Attività · {card.initiativeTitle}</p>
             {activity.isLoading ? (
               <Skeleton rows={3} />
+            ) : activity.isError ? (
+              <div className={styles.activityError} role="alert">
+                <Icon name="triangle-alert" size={16} />
+                <div>
+                  <p>Attività non disponibile.</p>
+                  <Button variant="secondary" size="sm" onClick={() => void activity.refetch()}>Riprova</Button>
+                </div>
+              </div>
             ) : (
               <ActivityTimeline
                 items={events}

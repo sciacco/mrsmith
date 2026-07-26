@@ -430,6 +430,7 @@ export function BoardPage() {
       {selected ? (
         <CardDrawer
           initiativeId={id}
+          initiativeTitle={board.initiative.title}
           card={selected}
           cohortKeys={cohortKeys}
           onClose={() => setSelectedKey(null)}

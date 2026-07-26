@@ -25,6 +25,7 @@ function schedaHref(companyKey: string, initiativeId: string) {
 
 export function CardDrawer({
   initiativeId,
+  initiativeTitle,
   card,
   cohortKeys,
   onClose,
@@ -37,6 +38,7 @@ export function CardDrawer({
   onOpenDossier,
 }: {
   initiativeId: string;
+  initiativeTitle: string;
   card: MAInitiativeCardView;
   cohortKeys: string[];
   onClose: () => void;
@@ -87,8 +89,10 @@ export function CardDrawer({
   const facts = card.registryFacts ?? [];
   const activityItems = activity.data?.items ?? [];
   const sessionInitiative = new Map((activity.data?.sessions ?? []).map((session) => [session.id, session.initiativeId]));
-  const currentItems = activityItems.filter((item) => item.initiativeId === initiativeId || (item.sessionId && sessionInitiative.get(item.sessionId) === initiativeId));
-  const contextAnnotations = activityItems.filter((item) => item.event === 'nota' && item.initiativeId !== initiativeId);
+  const belongsToCurrentInitiative = (item: (typeof activityItems)[number]) =>
+    item.initiativeId === initiativeId || Boolean(item.sessionId && sessionInitiative.get(item.sessionId) === initiativeId);
+  const currentItems = activityItems.filter(belongsToCurrentInitiative);
+  const contextAnnotations = activityItems.filter((item) => item.event === 'nota' && !belongsToCurrentInitiative(item));
   const visibleContextAnnotations = contextExpanded ? contextAnnotations : contextAnnotations.slice(0, 2);
 
   return (
@@ -221,53 +225,74 @@ export function CardDrawer({
             )}
           </div>
 
-          <div className={styles.drawerSec}>
-            <p className={styles.lab}>Contesto azienda</p>
-            <p className={styles.hint}>{contextAnnotations.length} {contextAnnotations.length === 1 ? 'annotazione' : 'annotazioni'} da altri contesti</p>
-            <ActivityTimeline
-              items={visibleContextAnnotations}
-              initiatives={activity.data?.initiatives}
-              sessions={activity.data?.sessions}
-              companyKey={card.companyKey}
-              emptyLabel="Nessuna annotazione da altri contesti."
-            />
-            {contextAnnotations.length > 2 ? (
-              <Button variant="ghost" size="sm" onClick={() => setContextExpanded((value) => !value)}>
-                {contextExpanded ? 'Mostra meno' : 'Mostra tutte'}
-              </Button>
-            ) : null}
-          </div>
-
-          <div className={styles.drawerSec}>
-            <p className={styles.lab}>Attività · {activity.data?.initiatives.find((item) => item.id === initiativeId)?.title ?? 'iniziativa'}</p>
-            {activity.isLoading ? (
+          {activity.isLoading ? (
+            <div className={styles.drawerSec}>
+              <p className={styles.lab}>Attività · {initiativeTitle}</p>
               <Skeleton rows={3} />
-            ) : (
-              <ActivityTimeline
-                items={currentItems}
-                initiatives={activity.data?.initiatives}
-                sessions={activity.data?.sessions}
-                companyKey={card.companyKey}
-                editableInitiativeId={initiativeId}
-              />
-            )}
-          </div>
+            </div>
+          ) : activity.isError ? (
+            <div className={styles.drawerSec}>
+              <p className={styles.lab}>Attività</p>
+              <div className={styles.activityError} role="alert">
+                <Icon name="triangle-alert" size={16} />
+                <div>
+                  <p>Attività non disponibile.</p>
+                  <Button variant="secondary" size="sm" onClick={() => void activity.refetch()}>Riprova</Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className={styles.drawerSec}>
+                <p className={styles.lab}>Attività · {initiativeTitle}</p>
+                <ActivityTimeline
+                  items={currentItems}
+                  initiatives={activity.data?.initiatives}
+                  sessions={activity.data?.sessions}
+                  companyKey={card.companyKey}
+                  editableInitiativeId={initiativeId}
+                />
+              </div>
+
+              <div className={styles.drawerSec}>
+                <p className={styles.lab}>Contesto azienda</p>
+                {contextAnnotations.length > 0 ? (
+                  <p className={styles.hint}>{contextAnnotations.length} {contextAnnotations.length === 1 ? 'annotazione' : 'annotazioni'} da altri contesti</p>
+                ) : null}
+                <ActivityTimeline
+                  items={visibleContextAnnotations}
+                  initiatives={activity.data?.initiatives}
+                  sessions={activity.data?.sessions}
+                  companyKey={card.companyKey}
+                  emptyLabel="Nessuna annotazione da altri contesti."
+                />
+                {contextAnnotations.length > 2 ? (
+                  <Button variant="ghost" size="sm" onClick={() => setContextExpanded((value) => !value)}>
+                    {contextExpanded ? 'Mostra meno' : 'Mostra tutte'}
+                  </Button>
+                ) : null}
+              </div>
+            </>
+          )}
         </div>
 
         <div className={styles.composer}>
-          <textarea
-            className={styles.composerInput}
-            placeholder="Aggiungi annotazione…"
-            value={note}
-            aria-invalid={Boolean(noteError)}
-            aria-describedby={noteError ? 'card-annotation-error' : undefined}
-            onChange={(e) => { setNote(e.target.value); setNoteError(''); }}
-            maxLength={1000}
-            rows={1}
-          />
-          <div>
-            <p className={styles.hint}>Contesto: {activity.data?.initiatives.find((item) => item.id === initiativeId)?.title ?? 'iniziativa corrente'}</p>
-            {noteError ? <p id="card-annotation-error" role="alert" style={{ color: 'var(--color-danger-hover)' }}>{noteError}</p> : null}
+          <div className={styles.composerField}>
+            <textarea
+              className={styles.composerInput}
+              placeholder="Aggiungi annotazione…"
+              value={note}
+              aria-invalid={Boolean(noteError)}
+              aria-describedby={noteError ? 'card-annotation-error' : undefined}
+              onChange={(e) => { setNote(e.target.value); setNoteError(''); }}
+              maxLength={1000}
+              rows={2}
+            />
+            <div className={styles.composerMeta}>
+              <span>Contesto: {initiativeTitle}</span>
+              <span>{note.length}/1.000</span>
+            </div>
+            {noteError ? <p id="card-annotation-error" className={styles.composerError} role="alert">{noteError}</p> : null}
           </div>
           <Button variant="primary" size="sm" onClick={() => void submitNote()} loading={annotations.create.isPending} disabled={!note.trim()}>
             Aggiungi

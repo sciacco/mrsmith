@@ -929,6 +929,17 @@
   color: var(--color-text-faint);
   white-space: nowrap;
 }
+.activityError {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-md);
+  color: var(--color-danger-hover);
+  background: var(--color-danger-subtle);
+}
+.activityError p { margin: 0 0 var(--space-2); font-size: 0.8125rem; font-weight: 600; }
 .composer {
   display: flex;
   gap: var(--space-2);
@@ -936,17 +947,28 @@
   padding: var(--space-3) 0 var(--space-4);
   border-top: 1px solid var(--color-border-subtle);
 }
+.composerField { flex: 1; min-width: 0; }
 .composerInput {
-  flex: 1;
+  width: 100%;
   border: 1.5px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: 10px 12px;
   font-size: 0.875rem;
   font-family: inherit;
   color: var(--color-text);
+  background: var(--color-bg-elevated);
   resize: vertical;
-  min-height: 44px;
+  min-height: 64px;
 }
+.composerMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-1);
+  color: var(--color-text-faint);
+  font-size: 0.75rem;
+}
+.composerError { margin: var(--space-1) 0 0; color: var(--color-danger-hover); font-size: 0.8125rem; }
 
 /* ── vista tabella ── */
 .tableWrap {

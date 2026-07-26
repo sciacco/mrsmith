@@ -71,6 +71,7 @@ const OUTCOME_LABELS: Record<string, string> = {
   sfumata: 'Sfumata',
   rimandata: 'Rimandata',
 };
+const HIDDEN_HISTORY_EVENTS = new Set(['nota', 'card_creata', 'dominio_verificato']);
 
 function resolveLens(searchParams: URLSearchParams): Lens {
   const ricerca = searchParams.get('ricerca')?.trim();
@@ -1036,7 +1037,7 @@ function HistorySection({ appearances, companyKey }: { appearances: MACompanyOve
                 {appearance.scoreAtRating != null ? <span>Score al giudizio {formatScore(appearance.scoreAtRating)}</span> : null}
                 {appearance.ratedAt ? <span>Giudizio il {dateLabel(appearance.ratedAt)}</span> : null}
                 {appearance.exclusionReason ? <span>Motivo: {appearance.exclusionReason}</span> : null}
-                {(appearance.outcomes ?? []).map((outcome) => (
+                {(appearance.outcomes ?? []).filter((outcome) => !HIDDEN_HISTORY_EVENTS.has(outcome.event)).map((outcome) => (
                   <span key={outcome.id}>{OUTCOME_LABELS[outcome.event] ?? outcome.event}{outcome.note ? ` · ${outcome.note}` : ''}</span>
                 ))}
               </div>
