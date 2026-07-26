@@ -6,6 +6,9 @@
 
 .trigger {
   display: flex;
+  width: 100%;
+  text-align: left;
+  font: inherit;
   align-items: center;
   justify-content: space-between;
   min-height: 44px;
@@ -20,6 +23,12 @@
 
 .trigger:hover {
   border-color: var(--color-text-muted);
+}
+
+.trigger:focus-visible {
+  outline: 2px solid transparent;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
 }
 
 .triggerDisabled,
@@ -150,6 +159,11 @@
 
 .option {
   display: flex;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font-family: inherit;
   align-items: center;
   gap: var(--space-3, 12px);
   padding: 9px 12px;
@@ -160,7 +174,9 @@
   color: var(--color-text-secondary);
 }
 
-.option:hover {
+.option:hover,
+.option:focus-visible {
+  outline: none;
   background: var(--color-surface);
 }
 

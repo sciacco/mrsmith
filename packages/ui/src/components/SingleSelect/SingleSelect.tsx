@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { useState, useRef, useEffect, useId, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import styles from './SingleSelect.module.css';
 
@@ -17,6 +17,7 @@ interface SingleSelectProps<V extends string | number = string | number> {
   clearLabel?: string;
   disabled?: boolean;
   searchable?: boolean;
+  ariaLabel?: string;
 }
 
 const DROPDOWN_GAP = 6;
@@ -32,12 +33,14 @@ export function SingleSelect<V extends string | number = string | number>({
   clearLabel = 'Tutti',
   disabled = false,
   searchable,
+  ariaLabel,
 }: SingleSelectProps<V>) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [coords, setCoords] = useState({ top: 0, left: 0, width: 0, placeTop: false });
-  const triggerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const listboxId = useId();
 
   useEffect(() => {
     if (disabled) setOpen(false);
@@ -91,7 +94,10 @@ export function SingleSelect<V extends string | number = string | number>({
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') {
+        setOpen(false);
+        requestAnimationFrame(() => triggerRef.current?.focus());
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -111,6 +117,7 @@ export function SingleSelect<V extends string | number = string | number>({
     onChange(value);
     setOpen(false);
     setSearch('');
+    requestAnimationFrame(() => triggerRef.current?.focus());
   }
 
   function handleClear() {
@@ -118,6 +125,38 @@ export function SingleSelect<V extends string | number = string | number>({
     onChange(null);
     setOpen(false);
     setSearch('');
+    requestAnimationFrame(() => triggerRef.current?.focus());
+  }
+
+  function focusOption(position: 'first' | 'last' | 'next' | 'previous', current?: HTMLElement) {
+    const optionElements = Array.from(dropdownRef.current?.querySelectorAll<HTMLElement>('[role="option"]') ?? []);
+    if (optionElements.length === 0) return;
+    const currentIndex = current ? optionElements.indexOf(current) : -1;
+    const targetIndex = position === 'first' ? 0
+      : position === 'last' ? optionElements.length - 1
+      : position === 'next' ? Math.min(currentIndex + 1, optionElements.length - 1)
+      : Math.max(currentIndex - 1, 0);
+    optionElements[targetIndex]?.focus();
+  }
+
+  function handleOptionKeyDown(event: React.KeyboardEvent<HTMLElement>) {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      focusOption('next', event.currentTarget);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      focusOption('previous', event.currentTarget);
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      focusOption('first');
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      focusOption('last');
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      setOpen(false);
+      triggerRef.current?.focus();
+    }
   }
 
   const dropdown = (
@@ -142,31 +181,44 @@ export function SingleSelect<V extends string | number = string | number>({
           className={styles.search}
           type="text"
           placeholder="Cerca..."
+          aria-label="Cerca opzioni"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowDown') { event.preventDefault(); focusOption('first'); }
+            if (event.key === 'ArrowUp') { event.preventDefault(); focusOption('last'); }
+          }}
           autoFocus
         />
       ) : null}
-      <div className={styles.options}>
+      <div id={listboxId} className={styles.options} role="listbox">
         {allowClear && !activeSearch && (
-          <div
+          <button
+            type="button"
+            role="option"
+            aria-selected={selected === null}
             className={`${styles.option} ${selected === null ? styles.optionSelected : ''}`}
             onClick={handleClear}
+            onKeyDown={handleOptionKeyDown}
           >
             <span className={styles.radio}>
               {selected === null && <span className={styles.radioDot} />}
             </span>
             <span className={styles.clearLabel}>{clearLabel}</span>
-          </div>
+          </button>
         )}
         {filtered.length === 0 ? (
           <div className={styles.empty}>Nessun risultato</div>
         ) : (
           filtered.map((o) => (
-            <div
+            <button
+              type="button"
+              role="option"
+              aria-selected={o.value === selected}
               key={o.value}
               className={`${styles.option} ${o.value === selected ? styles.optionSelected : ''}`}
               onClick={() => handleSelect(o.value)}
+              onKeyDown={handleOptionKeyDown}
             >
               <span className={styles.radio}>
                 {o.value === selected && <span className={styles.radioDot} />}
@@ -179,7 +231,7 @@ export function SingleSelect<V extends string | number = string | number>({
               ) : (
                 <span>{o.label}</span>
               )}
-            </div>
+            </button>
           ))
         )}
       </div>
@@ -188,12 +240,25 @@ export function SingleSelect<V extends string | number = string | number>({
 
   return (
     <div className={styles.container}>
-      <div
+      <button
+        type="button"
         ref={triggerRef}
         className={`${styles.trigger} ${open && !disabled ? styles.triggerOpen : ''} ${disabled ? styles.triggerDisabled : ''}`}
-        aria-disabled={disabled}
+        role="combobox"
+        aria-expanded={open && !disabled}
+        aria-haspopup="listbox"
+        aria-controls={listboxId}
+        aria-label={ariaLabel}
+        disabled={disabled}
         onClick={() => {
           if (!disabled) setOpen(!open);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            if (!open) setOpen(true);
+            requestAnimationFrame(() => focusOption(event.key === 'ArrowDown' ? 'first' : 'last'));
+          }
         }}
       >
         {selectedOption ? (
@@ -211,7 +276,7 @@ export function SingleSelect<V extends string | number = string | number>({
         <span className={`${styles.arrow} ${open ? styles.arrowOpen : ''}`}>
           &#9660;
         </span>
-      </div>
+      </button>
       {open && !disabled && (renderInline ? dropdown : createPortal(dropdown, document.body))}
     </div>
   );

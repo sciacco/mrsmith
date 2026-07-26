@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Modal } from '@mrsmith/ui';
 import type { MACompanyActivityLookup, MACompanyActivitySession, MATargetOutcome } from '../../../api/types';
 import { useAnnotationMutations } from '../../../hooks/useCompanyActivity';
@@ -50,10 +50,24 @@ function contextLabel(
 
 function authorLabel(item: MATargetOutcome) {
   const payload = item.payload as Record<string, unknown> | undefined;
-  if (payload?.annotationOrigin === 'system_domain') {
-    return item.updatedAt ? shortAuthor(item.updatedByEmail) : 'Verifica automatica del dominio';
-  }
+  if (payload?.annotationOrigin === 'system_domain') return 'Verifica automatica del dominio';
   return shortAuthor(item.createdByEmail);
+}
+
+function eventKindLabel(item: MATargetOutcome) {
+  switch (item.event) {
+    case 'nota': return 'Annotazione';
+    case 'stato': return 'Stato';
+    case 'chiusura':
+    case 'contattato':
+    case 'buon_lead':
+    case 'no_go': return 'Esito';
+    case 'card_creata': return 'Inserimento';
+    case 'card_riaperta': return 'Riapertura';
+    case 'card_rimossa': return 'Rimozione';
+    case 'dominio_verificato': return 'Verifica';
+    default: return 'Attività';
+  }
 }
 
 export function ActivityTimeline({
@@ -66,6 +80,7 @@ export function ActivityTimeline({
   showTechnical = false,
   relativeDates = false,
   compact = false,
+  onEditingChange,
   emptyLabel = 'Nessuna attività registrata.',
 }: {
   items: MATargetOutcome[];
@@ -77,6 +92,7 @@ export function ActivityTimeline({
   showTechnical?: boolean;
   relativeDates?: boolean;
   compact?: boolean;
+  onEditingChange?: (editing: boolean) => void;
   emptyLabel?: string;
 }) {
   const mutations = useAnnotationMutations(companyKey, editableInitiativeId);
@@ -85,10 +101,25 @@ export function ActivityTimeline({
   const [deleteTarget, setDeleteTarget] = useState<MATargetOutcome | null>(null);
   const [deleteError, setDeleteError] = useState('');
   const [error, setError] = useState('');
+  const [announcement, setAnnouncement] = useState('');
+  const timelineRef = useRef<HTMLElement | null>(null);
+  const editButtonRefs = useRef(new Map<string, HTMLButtonElement>());
   const initiativeMap = useMemo(() => new Map(initiatives.map((item) => [item.id, item.title])), [initiatives]);
   const sessionMap = useMemo(() => new Map(sessions.map((item) => [item.id, item])), [sessions]);
   const sessionTitles = useMemo(() => new Map(sessions.map((item) => [item.id, item.title])), [sessions]);
   const visible = showTechnical ? items : items.filter((item) => !TECHNICAL_ACTIVITY_EVENTS.has(item.event));
+
+  useEffect(() => {
+    onEditingChange?.(editing !== null);
+    return () => onEditingChange?.(false);
+  }, [editing, onEditingChange]);
+
+  const cancelEdit = (itemId: string) => {
+    setEditing(null);
+    setDraft('');
+    setError('');
+    requestAnimationFrame(() => editButtonRefs.current.get(itemId)?.focus());
+  };
 
   const save = async (item: MATargetOutcome) => {
     const body = draft.trim();
@@ -101,6 +132,8 @@ export function ActivityTimeline({
       await mutations.update.mutateAsync({ id: item.id, body });
       setEditing(null);
       setDraft('');
+      setAnnouncement('Annotazione aggiornata.');
+      requestAnimationFrame(() => editButtonRefs.current.get(item.id)?.focus());
     } catch {
       setError('Modifica non salvata. Riprova.');
     }
@@ -112,22 +145,30 @@ export function ActivityTimeline({
     try {
       await mutations.remove.mutateAsync(deleteTarget.id);
       setDeleteTarget(null);
+      setAnnouncement('Annotazione eliminata.');
+      requestAnimationFrame(() => timelineRef.current?.focus());
     } catch {
       setDeleteError('Annotazione non eliminata. Riprova.');
     }
   };
 
-  if (visible.length === 0) return <p className={styles.empty}>{emptyLabel}</p>;
+  if (visible.length === 0) return (
+    <p ref={(element) => { timelineRef.current = element; }} className={styles.empty} tabIndex={-1}>
+      <span className={styles.srStatus} role="status">{announcement}</span>
+      {emptyLabel}
+    </p>
+  );
 
   return (
     <>
-    <div className={`${styles.timeline} ${compact ? styles.compact : ''}`} aria-live="polite">
+    <div ref={(element) => { timelineRef.current = element; }} className={`${styles.timeline} ${compact ? styles.compact : ''}`} tabIndex={-1}>
+      <span className={styles.srStatus} role="status">{announcement}</span>
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       {visible.map((item) => {
         const annotation = item.event === 'nota';
         const editable = annotation && !item.deletedAt && (allowAllAnnotations || (Boolean(editableInitiativeId) && item.initiativeId === editableInitiativeId));
         const context = contextLabel(item, initiativeMap, sessionMap);
-        const kind = annotation ? 'Annotazione' : 'Stato';
+        const kind = eventKindLabel(item);
         return (
           <article
             key={item.id}
@@ -140,10 +181,23 @@ export function ActivityTimeline({
               {item.deletedAt ? <span className={styles.deletedLabel}>Annotazione eliminata</span> : null}
               {editing === item.id ? (
                 <div className={styles.editor}>
-                  <textarea value={draft} maxLength={1000} rows={4} onChange={(event) => setDraft(event.target.value)} autoFocus />
+                  <textarea
+                    value={draft}
+                    maxLength={1000}
+                    rows={4}
+                    onChange={(event) => setDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape') {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        cancelEdit(item.id);
+                      }
+                    }}
+                    autoFocus
+                  />
                   <div className={styles.actions}>
                     <Button size="sm" variant="primary" loading={mutations.update.isPending} onClick={() => void save(item)}>Salva</Button>
-                    <Button size="sm" variant="ghost" onClick={() => { setEditing(null); setDraft(''); setError(''); }}>Annulla</Button>
+                    <Button size="sm" variant="ghost" onClick={() => cancelEdit(item.id)}>Annulla</Button>
                   </div>
                 </div>
               ) : (
@@ -156,7 +210,14 @@ export function ActivityTimeline({
               </p>
               {editable && editing !== item.id ? (
                 <div className={styles.actions}>
-                  <Button size="sm" variant="ghost" onClick={() => { setEditing(item.id); setDraft(item.note ?? ''); setError(''); }}>Modifica</Button>
+                  <Button
+                    ref={(element) => { if (element) editButtonRefs.current.set(item.id, element); else editButtonRefs.current.delete(item.id); }}
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => { setEditing(item.id); setDraft(item.note ?? ''); setError(''); }}
+                  >
+                    Modifica
+                  </Button>
                   <Button size="sm" variant="ghost" onClick={() => { setDeleteError(''); setDeleteTarget(item); }}>Elimina</Button>
                 </div>
               ) : null}

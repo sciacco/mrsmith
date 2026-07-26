@@ -13,6 +13,9 @@ export function CompanyActivityPanel({ companyKey, companyName, vatCode }: { com
   const [initiativeId, setInitiativeId] = useState('');
   const [body, setBody] = useState('');
   const [error, setError] = useState('');
+  const [dismissError, setDismissError] = useState('');
+  const [timelineEditing, setTimelineEditing] = useState(false);
+  const [announcement, setAnnouncement] = useState('');
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const items = activity.data?.items ?? [];
   const activeAnnotations = items.filter((item) => item.event === 'nota' && !item.deletedAt);
@@ -46,6 +49,7 @@ export function CompanyActivityPanel({ companyKey, companyName, vatCode }: { com
     try {
       await mutations.create.mutateAsync(value);
       setBody('');
+      setAnnouncement('Annotazione aggiunta.');
       composerRef.current?.focus();
     } catch {
       setError('Annotazione non salvata. Riprova.');
@@ -58,7 +62,9 @@ export function CompanyActivityPanel({ companyKey, companyName, vatCode }: { com
         <div className={styles.heading}>
           <div>
             <h3>Attività e annotazioni</h3>
-            {!activity.isLoading && !activity.isError ? <p>{activeAnnotations.length} annotazioni attive</p> : null}
+            {!activity.isLoading && !activity.isError ? (
+              <p>{activeAnnotations.length} {activeAnnotations.length === 1 ? 'annotazione attiva' : 'annotazioni attive'}</p>
+            ) : null}
           </div>
           <div className={styles.headingActions}>
             <Button size="sm" variant="secondary" onClick={openForAnnotation}>Aggiungi annotazione</Button>
@@ -90,7 +96,12 @@ export function CompanyActivityPanel({ companyKey, companyName, vatCode }: { com
       {open ? (
         <Drawer
           open
-          onClose={() => setOpen(false)}
+          onClose={() => { setOpen(false); setDismissError(''); }}
+          onDismissAttempt={() => {
+            if (!body.trim() && !timelineEditing) return true;
+            setDismissError('Salva o annulla le modifiche prima di chiudere.');
+            return false;
+          }}
           title="Attività e annotazioni"
           subtitle={`${companyName}${vatCode ? ` · P.IVA ${vatCode}` : ''}`}
           size="lg"
@@ -110,9 +121,13 @@ export function CompanyActivityPanel({ companyKey, companyName, vatCode }: { com
                     placeholder="Tutte le iniziative"
                     allowClear
                     clearLabel="Tutte le iniziative"
+                    ariaLabel="Filtra per iniziativa"
                   />
                 </div>
               ) : null}
+            </div>
+            <div className={styles.dismissSlot}>
+              {dismissError ? <p className={styles.dismissError} role="alert">{dismissError}</p> : null}
             </div>
             <div className={styles.scroll}>
               {activity.isLoading ? <Skeleton rows={5} /> : activity.isError ? (
@@ -127,6 +142,7 @@ export function CompanyActivityPanel({ companyKey, companyName, vatCode }: { com
                   sessions={activity.data?.sessions}
                   companyKey={companyKey}
                   allowAllAnnotations
+                  onEditingChange={setTimelineEditing}
                 />
               )}
             </div>
@@ -139,13 +155,14 @@ export function CompanyActivityPanel({ companyKey, companyName, vatCode }: { com
                 placeholder="Aggiungi annotazione…"
                 aria-invalid={Boolean(error)}
                 aria-describedby={error ? 'company-annotation-error' : undefined}
-                onChange={(event) => { setBody(event.target.value); setError(''); }}
+                onChange={(event) => { setBody(event.target.value); setError(''); setDismissError(''); }}
               />
               <div className={styles.composerFooter}>
-                <span>{body.length}/1000</span>
+                <span>{body.length}/1.000</span>
                 <Button variant="primary" size="sm" disabled={!body.trim()} loading={mutations.create.isPending} onClick={() => void submit()}>Aggiungi</Button>
               </div>
               {error ? <p id="company-annotation-error" className={styles.error} role="alert">{error}</p> : null}
+              <span className={styles.srStatus} role="status">{announcement}</span>
             </div>
           </div>
         </Drawer>

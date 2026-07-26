@@ -55,6 +55,9 @@ export function CardDrawer({
   const [note, setNote] = useState('');
   const [noteError, setNoteError] = useState('');
   const [contextExpanded, setContextExpanded] = useState(false);
+  const [timelineEditing, setTimelineEditing] = useState(false);
+  const [dismissError, setDismissError] = useState('');
+  const [announcement, setAnnouncement] = useState('');
   const [launching, setLaunching] = useState(false);
 
   const terminal = isTerminalState(card.state);
@@ -69,6 +72,7 @@ export function CardDrawer({
     try {
       await annotations.create.mutateAsync(body);
       setNote('');
+      setAnnouncement('Annotazione aggiunta.');
       onChanged();
     } catch (e) {
       setNoteError(errorLabel(e));
@@ -98,7 +102,12 @@ export function CardDrawer({
   return (
     <Drawer
       open
-      onClose={onClose}
+      onClose={() => { setDismissError(''); onClose(); }}
+      onDismissAttempt={() => {
+        if (!note.trim() && !timelineEditing) return true;
+        setDismissError('Salva o annulla le modifiche prima di chiudere.');
+        return false;
+      }}
       title={card.companyName}
       subtitle={
         <div className={styles.drawerMeta}>
@@ -251,6 +260,7 @@ export function CardDrawer({
                   sessions={activity.data?.sessions}
                   companyKey={card.companyKey}
                   editableInitiativeId={initiativeId}
+                  onEditingChange={setTimelineEditing}
                 />
               </div>
 
@@ -284,7 +294,7 @@ export function CardDrawer({
               value={note}
               aria-invalid={Boolean(noteError)}
               aria-describedby={noteError ? 'card-annotation-error' : undefined}
-              onChange={(e) => { setNote(e.target.value); setNoteError(''); }}
+              onChange={(e) => { setNote(e.target.value); setNoteError(''); setDismissError(''); }}
               maxLength={1000}
               rows={2}
             />
@@ -293,6 +303,8 @@ export function CardDrawer({
               <span>{note.length}/1.000</span>
             </div>
             {noteError ? <p id="card-annotation-error" className={styles.composerError} role="alert">{noteError}</p> : null}
+            {dismissError ? <p className={styles.composerError} role="alert">{dismissError}</p> : null}
+            <span className={styles.srStatus} role="status">{announcement}</span>
           </div>
           <Button variant="primary" size="sm" onClick={() => void submitNote()} loading={annotations.create.isPending} disabled={!note.trim()}>
             Aggiungi

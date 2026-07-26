@@ -88,6 +88,7 @@ export function RegistroTab({
                 placeholder="Tutte le iniziative"
                 allowClear
                 clearLabel="Tutte le iniziative"
+                ariaLabel="Filtra attività per iniziativa"
               />
             </div>
           ) : null}
