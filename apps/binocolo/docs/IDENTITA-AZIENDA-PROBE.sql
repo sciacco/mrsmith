@@ -769,12 +769,24 @@ FROM per_identita;
 -- SEZIONE 2 — CUTOVER DEL REGISTRO IDENTITÀ (issue #86)
 --
 -- Q1..Q14 misurano lo stato PRIMA della decisione. Da qui in poi le query
--- servono a eseguire e sorvegliare l'adozione:
+-- servono a eseguire e sorvegliare l'adozione.
 --
---   Q15  parità SQL <-> Go delle primitive ...... PRIMA del cutover (dopo la 120)
---   Q16  preflight del registro ................. PRIMA di applicare la 120
---   Q17  gate: chiavi orfane .................... DOPO 120+121, prima del deploy
---   Q18  monitor del registro ................... periodico, dopo il cutover
+-- IL FILE NON SI ESEGUE IN BLOCCO. Metà di queste query legge oggetti che
+-- CREA la migrazione 120 — la colonna ma_target.company_key, le tabelle del
+-- registro, le funzioni di normalizzazione — e prima di applicarla fallisce con
+-- «column/relation does not exist». Non è un guasto: è l'ordine del cutover.
+--
+--   PRIMA della 120        Q16  preflight del registro (deve essere VUOTA)
+--                          Q19  chiavi a forma di P.IVA/CF (la causa nota)
+--                          Q4   dossier comprati due volte (esito mai riportato)
+--
+--   DOPO la 120            Q15  parità fra le funzioni SQL e le espressioni
+--
+--   DOPO 120 + 121         Q17  gate: zero chiavi orfane, prima del deploy
+--
+--   dopo il cutover        Q18  monitor del registro, periodico
+--
+-- Q1..Q14 girano su qualunque schema.
 --
 -- Cambio di ruolo di Q3/Q11: dopo il cutover due vendor id per la stessa
 -- identità NON sono più un invariante rotto — sono deriva del fornitore, e la
@@ -1017,9 +1029,25 @@ FROM binocolo.ma_company WHERE origin = 'assigned';
 -- il suo esito non è mai stato riportato nella baseline: è la misura che manca.
 --
 -- Se `chiavi_fiscali` > 0 leggere i campioni e incrociare con Q16.
+--
+-- ESEGUIBILE PRIMA DELLA 120. Per ma_target la chiave è quella DERIVATA, perché
+-- la colonna company_key non esiste ancora: è comunque il valore che il backfill
+-- adotterà, quindi la misura vale. DOPO la 120, per misurare la colonna vera,
+-- sostituire la prima riga della UNION con:
+--
+--   SELECT 'ma_target' AS tabella, company_key FROM binocolo.ma_target
+--
+-- Tutte le altre tabelle hanno già la loro colonna e non cambiano.
 -- -----------------------------------------------------------------------------
 WITH keyed AS (
-  SELECT 'ma_target' AS tabella, company_key FROM binocolo.ma_target
+  SELECT 'ma_target (chiave derivata)' AS tabella,
+         COALESCE(
+           NULLIF(upper(btrim(COALESCE(vendor_id, ''))), ''),
+           NULLIF(upper(btrim(COALESCE(vat_code, ''))), ''),
+           NULLIF(upper(btrim(COALESCE(tax_code, ''))), ''),
+           upper(btrim(COALESCE(company_name, '')))
+         ) AS company_key
+  FROM binocolo.ma_target
   UNION ALL SELECT 'ma_deep_analysis', company_key FROM binocolo.ma_deep_analysis
   UNION ALL SELECT 'ma_deep_payload_vintage', company_key FROM binocolo.ma_deep_payload_vintage
   UNION ALL SELECT 'ma_company_bm_family', company_key FROM binocolo.ma_company_bm_family

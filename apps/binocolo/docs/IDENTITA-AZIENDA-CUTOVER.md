@@ -52,8 +52,13 @@ passa evita di scoprire il problema a metà cutover. Se non è vuota, un
 identificatore rivendica due aziende e serve arbitraggio umano prima di
 proseguire.
 
-Eseguire anche **Q19**, e **Q4** il cui esito non è mai stato riportato nella
-baseline. C'è una causa nota e concreta per cui Q16 può non essere vuota: lo
+La sonda **non si esegue in blocco**: Q15, Q17 e Q18 leggono oggetti che la 120
+deve ancora creare e prima falliscono con «does not exist». Prima del cutover si
+eseguono solo **Q16**, **Q19** e **Q4** (più le Q1–Q14, che girano su qualunque
+schema).
+
+Eseguire quindi anche **Q19**, e **Q4** il cui esito non è mai stato riportato
+nella baseline. C'è una causa nota e concreta per cui Q16 può non essere vuota: lo
 strumento standalone `/azienda` accodava il dossier con la **P.IVA come
 `company_key`**. Se la stessa azienda ha un dossier sotto la P.IVA e un target
 sotto l'ObjectId, quel valore fiscale rivendica due chiavi e la 120 si ferma.
