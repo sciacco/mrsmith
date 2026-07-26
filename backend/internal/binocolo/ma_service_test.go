@@ -1400,10 +1400,13 @@ type fakeMAWorkspaceStore struct {
 	done   []maTraceComplete
 	events []maTraceEventWrite
 
-	companyIdentities map[maCompanyIdentifierRef]string
-	companySequence   int
-	companyConflicts  []maCompanyIdentityConflict
-	companyKnown      map[string]bool
+	companyIdentities   map[maCompanyIdentifierRef]string
+	companySequence     int
+	companyConflicts    []maCompanyIdentityConflict
+	companyKnown        map[string]bool
+	outcomes            []MATargetOutcome
+	updateAnnotationErr error
+	deleteAnnotationErr error
 }
 
 func (f *fakeMAWorkspaceStore) ListMASessions(context.Context, string) ([]MASessionSummary, error) {
@@ -1560,8 +1563,25 @@ func (f *fakeMAWorkspaceStore) MarkMATargetAdvancedEnriched(context.Context, str
 	return nil
 }
 
-func (f *fakeMAWorkspaceStore) InsertMATargetOutcome(context.Context, MATargetOutcome) error {
+func (f *fakeMAWorkspaceStore) InsertMATargetOutcome(_ context.Context, outcome MATargetOutcome) error {
+	f.outcomes = append(f.outcomes, outcome)
 	return nil
+}
+
+func (f *fakeMAWorkspaceStore) UpdateMAAnnotation(context.Context, string, string, string, string) error {
+	return f.updateAnnotationErr
+}
+
+func (f *fakeMAWorkspaceStore) SoftDeleteMAAnnotation(context.Context, string, string, string) error {
+	return f.deleteAnnotationErr
+}
+
+func (f *fakeMAWorkspaceStore) ListMACompanyActivity(context.Context, string, bool) (MACompanyActivity, error) {
+	return MACompanyActivity{Items: []MATargetOutcome{}, Initiatives: []MACompanyActivityLookup{}, Sessions: []MACompanyActivitySession{}}, nil
+}
+
+func (f *fakeMAWorkspaceStore) LatestMASystemDomainAnnotation(context.Context, string) (string, error) {
+	return "", nil
 }
 
 func (f *fakeMAWorkspaceStore) GetMACompanyDomain(context.Context, string, string, string) (*maCompanyDomain, error) {

@@ -1,0 +1,110 @@
+.timeline {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.item {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--space-3) minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.item::before {
+  content: '';
+  position: absolute;
+  top: var(--space-4);
+  bottom: calc(-1 * var(--space-4));
+  left: 5px;
+  width: 1px;
+  background: var(--color-border-subtle);
+}
+
+.item:last-child::before { display: none; }
+
+.dot {
+  width: var(--space-3);
+  height: var(--space-3);
+  margin-top: var(--space-2);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-elevated);
+}
+
+.annotation .dot {
+  border-color: var(--color-accent);
+  background: var(--color-accent-muted);
+}
+
+.content {
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+}
+
+.event .content {
+  padding-block: var(--space-2);
+  border-color: transparent;
+  background: transparent;
+}
+
+.text {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.meta,
+.empty {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.editor { display: grid; gap: var(--space-2); }
+.editor textarea {
+  min-height: 96px;
+  width: 100%;
+  resize: vertical;
+  padding: var(--space-3);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  background: var(--color-bg-elevated);
+  font: inherit;
+  line-height: 1.5;
+}
+.editor textarea:focus-visible {
+  outline: 2px solid transparent;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
+}
+
+.deleted { opacity: 0.72; }
+.deleted .text { text-decoration: line-through; }
+.deletedLabel {
+  display: inline-block;
+  margin-bottom: var(--space-1);
+  color: var(--color-danger-hover);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.error {
+  margin: 0;
+  color: var(--color-danger-hover);
+  font-size: 0.8125rem;
+}

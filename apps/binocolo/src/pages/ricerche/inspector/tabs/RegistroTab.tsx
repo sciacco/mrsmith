@@ -1,10 +1,13 @@
+import { useState } from 'react';
 import { Icon } from '@mrsmith/ui';
 import { Link } from 'react-router-dom';
-import type { MATarget, MATargetOutcome } from '../../../../api/types';
+import type { MATarget } from '../../../../api/types';
+import { ActivityTimeline } from '../../../../components/company/activity/ActivityTimeline';
+import { useCompanyActivity } from '../../../../hooks/useCompanyActivity';
 import { CompanyRegistrySection } from '../../../iniziative/CompanyRegistrySection';
 import { HiddenField } from '../HiddenField';
 import styles from '../Inspector.module.css';
-import { dossierHref, formatDateTime } from './format';
+import { dossierHref } from './format';
 
 function RatingStars({ rating }: { rating: number }) {
   const excluded = rating === -1;
@@ -20,14 +23,6 @@ function RatingStars({ rating }: { rating: number }) {
   );
 }
 
-function outcomeBadgeClass(event: MATargetOutcome['event']): string {
-  switch (event) {
-    case 'buon_lead': return styles.outcomeBadgeGood ?? '';
-    case 'no_go': return styles.outcomeBadgeNoGo ?? '';
-    default: return styles.outcomeBadge ?? '';
-  }
-}
-
 export function RegistroTab({
   target,
   initiativeId,
@@ -36,12 +31,20 @@ export function RegistroTab({
   initiativeId?: string;
 }) {
   const rating = target.rating;
-  const outcomes = target.outcomes ?? [];
   const dossier = dossierHref({ initiativeId, companyKey: target.companyKey });
   // Mai la P.IVA come chiave: fatti e note finirebbero su un'identità inventata
   // dal client (issue #86). Senza chiave il pannello non si mostra — la guardia
   // c'è già più sotto.
   const companyKey = target.companyKey ?? '';
+  const activity = useCompanyActivity(companyKey, { includeDeleted: true });
+  const [annotationsOnly, setAnnotationsOnly] = useState(false);
+  const [initiativeFilter, setInitiativeFilter] = useState('');
+  const items = (activity.data?.items ?? []).filter((item) => {
+    if (annotationsOnly && item.event !== 'nota') return false;
+    if (!initiativeFilter) return true;
+    if (item.initiativeId === initiativeFilter) return true;
+    return activity.data?.sessions.find((session) => session.id === item.sessionId)?.initiativeId === initiativeFilter;
+  });
 
   return (
     <div className={styles.tabBody}>
@@ -56,38 +59,39 @@ export function RegistroTab({
           )}
         </div>
 
-        {/* specchietto outcomes count (read-only mirror) */}
         <div className={`${styles.card} ${styles.cardCompact}`}>
-          <p className={styles.lab}>Outcomes <HiddenField label="outcomes[]" /></p>
-          {outcomes.length === 0 ? (
-            <p className={styles.muted} style={{ margin: 0 }}>Nessun evento di lavorazione.</p>
-          ) : (
-            <p className={styles.rlMain} style={{ margin: 0 }}>
-              {outcomes.length} evento{outcomes.length > 1 ? 'i' : ''} ·{' '}
-              <span className={styles.muted}>ultimo {formatDateTime(outcomes.at(-1)?.createdAt)}</span>
-            </p>
-          )}
+          <p className={styles.lab}>Traccia attività</p>
+          <p className={styles.rlMain} style={{ margin: 0 }}>
+            {activity.data?.items.length ?? 0} elementi, incluse le annotazioni eliminate.
+          </p>
         </div>
       </div>
 
-      {/* outcomes timeline (read-only) */}
-      {outcomes.length > 0 ? (
-        <div className={styles.card}>
-          <p className={styles.lab}>Outcomes / eventi di lavorazione</p>
-          <div className={styles.outcomes}>
-            {outcomes.map((o) => (
-              <div key={o.id} className={styles.outcome}>
-                <span className={styles.outcomeDate}>{formatDateTime(o.createdAt)}</span>
-                <span className={styles.outcomeText}>
-                  {o.note || o.event}
-                  {o.createdByEmail ? <small className={styles.muted}> · {o.createdByEmail}</small> : null}
-                </span>
-                <span className={`${styles.outcomeBadge} ${outcomeBadgeClass(o.event)}`}>{o.event}</span>
-              </div>
-            ))}
+      <div className={styles.card}>
+        <p className={styles.lab}>Attività e annotazioni</p>
+        <div className={styles.linkRow}>
+          <div>
+            <button type="button" className={styles.dossierLink} onClick={() => setAnnotationsOnly(false)}>Traccia completa</button>
+            {' · '}
+            <button type="button" className={styles.dossierLink} onClick={() => setAnnotationsOnly(true)}>Annotazioni</button>
           </div>
+          {(activity.data?.initiatives.length ?? 0) > 1 ? (
+            <select value={initiativeFilter} onChange={(event) => setInitiativeFilter(event.target.value)} aria-label="Filtra attività per iniziativa">
+              <option value="">Tutte le iniziative</option>
+              {activity.data?.initiatives.map((initiative) => <option key={initiative.id} value={initiative.id}>{initiative.title}</option>)}
+            </select>
+          ) : null}
         </div>
-      ) : null}
+        {activity.isError ? <p className={styles.muted} role="alert">Cronologia non disponibile.</p> : (
+          <ActivityTimeline
+            items={items}
+            initiatives={activity.data?.initiatives}
+            sessions={activity.data?.sessions}
+            companyKey={companyKey}
+            showTechnical
+          />
+        )}
+      </div>
 
       {/* registro azienda (read-only mirror del card-dossier) */}
       {companyKey ? (

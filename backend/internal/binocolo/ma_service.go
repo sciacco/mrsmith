@@ -45,6 +45,7 @@ var (
 	errMAVATNotFound           = errors.New("P.IVA non trovata nel registro")
 	errMAInvalidVAT            = errors.New("P.IVA o codice fiscale non valido")
 	errMACardAlreadyPresent    = errors.New("Azienda già presente in questa iniziativa")
+	errMAAnnotationNotFound    = errors.New("ma annotation not found")
 	// errMAEstimateSuperseded is returned by ReplaceMAEstimates when the active
 	// strategy version changed mid-estimate (the user re-submitted). The estimate
 	// worker loops on it to re-run against the now-active version, so the latest
@@ -786,6 +787,90 @@ func (s *maService) addCompanyNote(ctx context.Context, companyKey, body, subjec
 		CreatedByEmail:   email,
 	}
 	return s.store.InsertMACompanyNote(ctx, note)
+}
+
+func validateMAAnnotationBody(body string) (string, error) {
+	body = cleanText(body, 0)
+	if body == "" {
+		return "", fmt.Errorf("%w: body", errMAStrategyInvalid)
+	}
+	if len([]rune(body)) > 1000 {
+		return "", fmt.Errorf("%w: body exceeds 1000 characters", errMAStrategyInvalid)
+	}
+	return body, nil
+}
+
+func (s *maService) createAnnotation(ctx context.Context, companyKey string, input MAAnnotationCreateRequest, subject, email string) (MATargetOutcome, error) {
+	if s.store == nil {
+		return MATargetOutcome{}, errMAStoreUnavailable
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey == "" {
+		return MATargetOutcome{}, fmt.Errorf("%w: companyKey", errMAStrategyInvalid)
+	}
+	body, err := validateMAAnnotationBody(input.Body)
+	if err != nil {
+		return MATargetOutcome{}, err
+	}
+	if err := s.requireKnownMACompany(ctx, companyKey); err != nil {
+		return MATargetOutcome{}, err
+	}
+	initiativeID := strings.TrimSpace(input.InitiativeID)
+	if initiativeID != "" {
+		if _, err := uuid.Parse(initiativeID); err != nil {
+			return MATargetOutcome{}, fmt.Errorf("%w: initiativeId", errMAStrategyInvalid)
+		}
+		if _, err := s.requireOperationalInitiativeCard(ctx, initiativeID, companyKey); err != nil {
+			return MATargetOutcome{}, err
+		}
+	}
+	annotation := MATargetOutcome{
+		ID: uuid.NewString(), InitiativeID: initiativeID, CompanyKey: companyKey,
+		Event: maEventNota, Note: body, Payload: maTraceJSON(map[string]any{}),
+		CreatedBySubject: subject, CreatedByEmail: email, CreatedAt: s.now(),
+	}
+	if err := s.store.InsertMATargetOutcome(ctx, annotation); err != nil {
+		return MATargetOutcome{}, err
+	}
+	return annotation, nil
+}
+
+func (s *maService) updateAnnotation(ctx context.Context, id, body, subject, email string) error {
+	if s.store == nil {
+		return errMAStoreUnavailable
+	}
+	if _, err := uuid.Parse(strings.TrimSpace(id)); err != nil {
+		return errMAAnnotationNotFound
+	}
+	body, err := validateMAAnnotationBody(body)
+	if err != nil {
+		return err
+	}
+	return s.store.UpdateMAAnnotation(ctx, id, body, subject, email)
+}
+
+func (s *maService) deleteAnnotation(ctx context.Context, id, subject, email string) error {
+	if s.store == nil {
+		return errMAStoreUnavailable
+	}
+	if _, err := uuid.Parse(strings.TrimSpace(id)); err != nil {
+		return errMAAnnotationNotFound
+	}
+	return s.store.SoftDeleteMAAnnotation(ctx, id, subject, email)
+}
+
+func (s *maService) listCompanyActivity(ctx context.Context, companyKey string, includeDeleted bool) (MACompanyActivity, error) {
+	if s.store == nil {
+		return MACompanyActivity{}, errMAStoreUnavailable
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey == "" {
+		return MACompanyActivity{}, fmt.Errorf("%w: companyKey", errMAStrategyInvalid)
+	}
+	if err := s.requireKnownMACompany(ctx, companyKey); err != nil {
+		return MACompanyActivity{}, err
+	}
+	return s.store.ListMACompanyActivity(ctx, companyKey, includeDeleted)
 }
 
 // getCompanyRegistry loads the full registry (facts + notes) for the dossier
@@ -2893,22 +2978,8 @@ func (s *maService) reopenCard(ctx context.Context, initiativeID, companyKey, su
 // addCardNote appende la nota di diario del composer S4 (B4 passo 7): solo
 // il log eventi, mai il registro azienda (PRD §2: generi diversi).
 func (s *maService) addCardNote(ctx context.Context, initiativeID, companyKey, body, subject, email string) error {
-	companyKey = normalizeMACompanyKey(companyKey)
-	body = cleanText(body, 1000)
-	if body == "" {
-		return fmt.Errorf("%w: body", errMAStrategyInvalid)
-	}
-	if _, err := s.requireOperationalInitiativeCard(ctx, initiativeID, companyKey); err != nil {
-		return err
-	}
-	return s.store.InsertMATargetOutcome(ctx, MATargetOutcome{
-		InitiativeID:     initiativeID,
-		CompanyKey:       companyKey,
-		Event:            maEventNota,
-		Note:             body,
-		CreatedBySubject: subject,
-		CreatedByEmail:   email,
-	})
+	_, err := s.createAnnotation(ctx, companyKey, MAAnnotationCreateRequest{Body: body, InitiativeID: initiativeID}, subject, email)
+	return err
 }
 
 // addTargetOutcome appende un esito reale (contattato / buon lead / no go) al

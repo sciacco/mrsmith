@@ -568,6 +568,29 @@ type MATargetOutcome struct {
 	CreatedBySubject string          `json:"-"`
 	CreatedByEmail   string          `json:"createdByEmail,omitempty"`
 	CreatedAt        time.Time       `json:"createdAt"`
+	UpdatedAt        *time.Time      `json:"updatedAt,omitempty"`
+	UpdatedBySubject string          `json:"-"`
+	UpdatedByEmail   string          `json:"updatedByEmail,omitempty"`
+	DeletedAt        *time.Time      `json:"deletedAt,omitempty"`
+	DeletedBySubject string          `json:"-"`
+	DeletedByEmail   string          `json:"deletedByEmail,omitempty"`
+}
+
+type MACompanyActivityLookup struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
+}
+
+type MACompanyActivitySession struct {
+	ID           string `json:"id"`
+	Title        string `json:"title"`
+	InitiativeID string `json:"initiativeId,omitempty"`
+}
+
+type MACompanyActivity struct {
+	Items       []MATargetOutcome          `json:"items"`
+	Initiatives []MACompanyActivityLookup  `json:"initiatives"`
+	Sessions    []MACompanyActivitySession `json:"sessions"`
 }
 
 // MAInitiativeCard è la card di lavorazione (iniziativa, azienda) —
@@ -739,6 +762,15 @@ type MATargetOutcomeRequest struct {
 	CompanyKey string `json:"companyKey"`
 	Event      string `json:"event"`
 	Note       string `json:"note,omitempty"`
+}
+
+type MAAnnotationCreateRequest struct {
+	Body         string `json:"body"`
+	InitiativeID string `json:"initiativeId,omitempty"`
+}
+
+type MAAnnotationUpdateRequest struct {
+	Body string `json:"body"`
 }
 
 // MACardMarker names one Iniziativa where the company has an ACTIVE card

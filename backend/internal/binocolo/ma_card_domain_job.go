@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 type maCardDomainVerifyPayload struct {
@@ -84,12 +86,18 @@ func (s *maService) cardDomainVerifyWork(ctx context.Context, job maJob) error {
 		evidence, _ := s.gatherNeutralEvidence(ctx, domain, maWebValidationEvidenceCount, job.CreatedBySubject, job.CreatedByEmail, pages)
 		if description := cleanText(s.representCompany(ctx, evidence, job.CreatedBySubject, job.CreatedByEmail), 850); description != "" {
 			body := fmt.Sprintf("Descrizione dal sito (%s): %s", s.now().Format("2006-01-02"), description)
-			registry, err := s.store.GetMACompanyRegistry(ctx, payload.CompanyKey)
+			latest, err := s.store.LatestMASystemDomainAnnotation(ctx, payload.CompanyKey)
 			if err != nil {
 				return err
 			}
-			if len(registry.Notes) == 0 || registry.Notes[0].Body != body {
-				if _, err := s.addCompanyNote(ctx, payload.CompanyKey, body, job.CreatedBySubject, job.CreatedByEmail); err != nil {
+			if latest != body {
+				if err := s.store.InsertMATargetOutcome(ctx, MATargetOutcome{
+					ID: uuid.NewString(), InitiativeID: payload.InitiativeID,
+					CompanyKey: payload.CompanyKey, Event: maEventNota, Note: body,
+					Payload:          maTraceJSON(map[string]any{"annotationOrigin": "system_domain"}),
+					CreatedBySubject: job.CreatedBySubject, CreatedByEmail: job.CreatedByEmail,
+					CreatedAt: s.now(),
+				}); err != nil {
 					return err
 				}
 			}

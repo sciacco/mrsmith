@@ -18,6 +18,26 @@ import (
 const (
 	maCompanyConstraintFKOnly       = false
 	maCompanyConstraintManualInsert = true
+
+	updateMAAnnotationQuery = `
+UPDATE binocolo.ma_target_outcome
+SET note = $2,
+    updated_at = now(),
+    updated_by_subject = $3,
+    updated_by_email = $4
+WHERE id = $1::uuid
+  AND event = 'nota'
+  AND deleted_at IS NULL
+RETURNING id::text`
+	softDeleteMAAnnotationQuery = `
+UPDATE binocolo.ma_target_outcome
+SET deleted_at = now(),
+    deleted_by_subject = $2,
+    deleted_by_email = $3
+WHERE id = $1::uuid
+  AND event = 'nota'
+  AND deleted_at IS NULL
+RETURNING id::text`
 )
 
 // translateMACompanyConstraintError keeps database backstops aligned with the
@@ -66,6 +86,10 @@ type maWorkspaceStore interface {
 	MarkMATargetAdvancedEnriched(ctx context.Context, targetID string, vendorPayload json.RawMessage) error
 	UpsertMATargetRating(ctx context.Context, sessionID string, input MATargetRatingRequest, subject, email string) error
 	InsertMATargetOutcome(ctx context.Context, outcome MATargetOutcome) error
+	UpdateMAAnnotation(ctx context.Context, id, note, subject, email string) error
+	SoftDeleteMAAnnotation(ctx context.Context, id, subject, email string) error
+	ListMACompanyActivity(ctx context.Context, companyKey string, includeDeleted bool) (MACompanyActivity, error)
+	LatestMASystemDomainAnnotation(ctx context.Context, companyKey string) (string, error)
 	GetMACompanyDomain(ctx context.Context, companyKey, vatCode, taxCode string) (*maCompanyDomain, error)
 	UpsertMACompanyDomain(ctx context.Context, record maCompanyDomain) error
 	UpsertMAWebValidation(ctx context.Context, input maWebValidationUpsert) (MAWebValidation, error)
@@ -469,8 +493,8 @@ SELECT
   (SELECT MAX(session.updated_at) FROM binocolo.ma_session session WHERE session.initiative_id = initiative.id) AS last_activity_at,
   (SELECT
     CASE
-      WHEN o.event = 'nota' AND COALESCE(o.note, '') != '' THEN 'nota: ' || o.note
-      WHEN o.event = 'nota' THEN 'nota'
+      WHEN o.event = 'nota' AND COALESCE(o.note, '') != '' THEN 'Annotazione: ' || o.note
+      WHEN o.event = 'nota' THEN 'Annotazione'
       WHEN o.event = 'stato' AND COALESCE(o.note, '') != '' THEN 'Stato aggiornato: ' || o.note
       WHEN o.event = 'stato' THEN 'Stato aggiornato'
       WHEN o.event = 'card_creata' AND COALESCE(o.note, '') != '' THEN 'Card creata: ' || o.note
@@ -492,6 +516,7 @@ SELECT
     END
     FROM binocolo.ma_target_outcome o
     WHERE o.initiative_id = initiative.id
+      AND o.deleted_at IS NULL
     ORDER BY o.created_at DESC
     LIMIT 1
   ) AS last_activity_event,
@@ -2717,9 +2742,9 @@ SET rating = EXCLUDED.rating,
 	return nil
 }
 
-// InsertMATargetOutcome appende un evento al log esiti (append-only): la
-// ground truth reale — contattato / buon lead / no go — che renderà validabile
-// lo score. Mai aggiornato né cancellato da codice.
+// InsertMATargetOutcome appends an event. Ordinary events remain append-only;
+// annotations (`nota`) are the sole event kind mutable through the guarded
+// methods below.
 func (s *SQLStore) InsertMATargetOutcome(ctx context.Context, outcome MATargetOutcome) error {
 	if s == nil || s.db == nil {
 		return errors.New("binocolo ma store not configured")
@@ -2736,13 +2761,169 @@ func (s *SQLStore) InsertMATargetOutcome(ctx context.Context, outcome MATargetOu
 	if len(payload) == 0 {
 		payload = json.RawMessage(`{}`)
 	}
+	id := outcome.ID
+	if id == "" {
+		id = uuid.NewString()
+	}
+	var createdAt any
+	if !outcome.CreatedAt.IsZero() {
+		createdAt = outcome.CreatedAt
+	}
 	if _, err := s.db.ExecContext(ctx, `
 INSERT INTO binocolo.ma_target_outcome (id, session_id, initiative_id, company_key, event, note, payload, created_by_subject, created_by_email, created_at)
-VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7::jsonb, $8, $9, now())
-`, uuid.NewString(), sessionID, initiativeID, outcome.CompanyKey, outcome.Event, nullString(outcome.Note), string(payload), nullString(outcome.CreatedBySubject), nullString(outcome.CreatedByEmail)); err != nil {
+VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7::jsonb, $8, $9, COALESCE($10::timestamptz, now()))
+`, id, sessionID, initiativeID, outcome.CompanyKey, outcome.Event, nullString(outcome.Note), string(payload), nullString(outcome.CreatedBySubject), nullString(outcome.CreatedByEmail), createdAt); err != nil {
 		return fmt.Errorf("insert ma target outcome: %w", err)
 	}
 	return nil
+}
+
+func (s *SQLStore) UpdateMAAnnotation(ctx context.Context, id, note, subject, email string) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	var returnedID string
+	if err := s.db.QueryRowContext(ctx, updateMAAnnotationQuery, id, note, nullString(subject), nullString(email)).Scan(&returnedID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return errMAAnnotationNotFound
+		}
+		return fmt.Errorf("update ma annotation: %w", err)
+	}
+	return nil
+}
+
+func (s *SQLStore) SoftDeleteMAAnnotation(ctx context.Context, id, subject, email string) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	var returnedID string
+	if err := s.db.QueryRowContext(ctx, softDeleteMAAnnotationQuery, id, nullString(subject), nullString(email)).Scan(&returnedID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return errMAAnnotationNotFound
+		}
+		return fmt.Errorf("soft delete ma annotation: %w", err)
+	}
+	return nil
+}
+
+func maCompanyActivityQuery(includeDeleted bool) string {
+	deletedClause := "\n  AND o.deleted_at IS NULL"
+	if includeDeleted {
+		deletedClause = " /* includes-deleted */"
+	}
+	return `
+SELECT o.id::text, COALESCE(o.session_id::text, ''), COALESCE(o.initiative_id::text, ''), o.company_key,
+       o.event, COALESCE(o.note, ''), COALESCE(o.payload::text, '{}'),
+       COALESCE(o.created_by_email, ''), o.created_at,
+       o.updated_at, COALESCE(o.updated_by_email, ''),
+       o.deleted_at, COALESCE(o.deleted_by_email, '')
+FROM binocolo.ma_target_outcome o /* activity-includes-deleted */
+WHERE o.company_key = $1` + deletedClause + `
+ORDER BY o.created_at DESC`
+}
+
+func (s *SQLStore) ListMACompanyActivity(ctx context.Context, companyKey string, includeDeleted bool) (MACompanyActivity, error) {
+	if s == nil || s.db == nil {
+		return MACompanyActivity{}, errors.New("binocolo ma store not configured")
+	}
+	out := MACompanyActivity{Items: []MATargetOutcome{}, Initiatives: []MACompanyActivityLookup{}, Sessions: []MACompanyActivitySession{}}
+	rows, err := s.db.QueryContext(ctx, maCompanyActivityQuery(includeDeleted), companyKey)
+	if err != nil {
+		return out, fmt.Errorf("list ma company activity: %w", err)
+	}
+	for rows.Next() {
+		var item MATargetOutcome
+		var payload string
+		var updatedAt, deletedAt sql.NullTime
+		if err := rows.Scan(&item.ID, &item.SessionID, &item.InitiativeID, &item.CompanyKey, &item.Event, &item.Note, &payload,
+			&item.CreatedByEmail, &item.CreatedAt, &updatedAt, &item.UpdatedByEmail, &deletedAt, &item.DeletedByEmail); err != nil {
+			rows.Close()
+			return out, fmt.Errorf("scan ma company activity: %w", err)
+		}
+		item.Payload = json.RawMessage(payload)
+		if updatedAt.Valid {
+			item.UpdatedAt = &updatedAt.Time
+		}
+		if deletedAt.Valid {
+			item.DeletedAt = &deletedAt.Time
+		}
+		out.Items = append(out.Items, item)
+	}
+	if err := rows.Close(); err != nil {
+		return out, fmt.Errorf("close ma company activity: %w", err)
+	}
+	if err := rows.Err(); err != nil {
+		return out, fmt.Errorf("iterate ma company activity: %w", err)
+	}
+
+	initiativeRows, err := s.db.QueryContext(ctx, `
+SELECT DISTINCT initiative.id::text, initiative.title
+FROM binocolo.ma_target_outcome outcome /* activity-includes-deleted */
+LEFT JOIN binocolo.ma_session session ON session.id = outcome.session_id
+JOIN binocolo.ma_initiative initiative ON initiative.id = COALESCE(outcome.initiative_id, session.initiative_id)
+WHERE outcome.company_key = $1
+ORDER BY initiative.title, initiative.id::text`, companyKey)
+	if err != nil {
+		return out, fmt.Errorf("list ma company activity initiatives: %w", err)
+	}
+	for initiativeRows.Next() {
+		var item MACompanyActivityLookup
+		if err := initiativeRows.Scan(&item.ID, &item.Title); err != nil {
+			initiativeRows.Close()
+			return out, fmt.Errorf("scan ma company activity initiative: %w", err)
+		}
+		out.Initiatives = append(out.Initiatives, item)
+	}
+	if err := initiativeRows.Err(); err != nil {
+		initiativeRows.Close()
+		return out, fmt.Errorf("iterate ma company activity initiatives: %w", err)
+	}
+	if err := initiativeRows.Close(); err != nil {
+		return out, fmt.Errorf("close ma company activity initiatives: %w", err)
+	}
+
+	sessionRows, err := s.db.QueryContext(ctx, `
+SELECT DISTINCT session.id::text, COALESCE(session.title, ''), COALESCE(session.initiative_id::text, '')
+FROM binocolo.ma_session session
+JOIN binocolo.ma_target_outcome outcome ON outcome.session_id = session.id
+WHERE outcome.company_key = $1
+ORDER BY COALESCE(session.title, ''), session.id::text`, companyKey)
+	if err != nil {
+		return out, fmt.Errorf("list ma company activity sessions: %w", err)
+	}
+	defer sessionRows.Close()
+	for sessionRows.Next() {
+		var item MACompanyActivitySession
+		if err := sessionRows.Scan(&item.ID, &item.Title, &item.InitiativeID); err != nil {
+			return out, fmt.Errorf("scan ma company activity session: %w", err)
+		}
+		out.Sessions = append(out.Sessions, item)
+	}
+	if err := sessionRows.Err(); err != nil {
+		return out, fmt.Errorf("iterate ma company activity sessions: %w", err)
+	}
+	return out, nil
+}
+
+func (s *SQLStore) LatestMASystemDomainAnnotation(ctx context.Context, companyKey string) (string, error) {
+	if s == nil || s.db == nil {
+		return "", errors.New("binocolo ma store not configured")
+	}
+	var note string
+	err := s.db.QueryRowContext(ctx, `
+SELECT COALESCE(note, '')
+FROM binocolo.ma_target_outcome
+WHERE company_key = $1 AND event = 'nota' AND deleted_at IS NULL
+  AND payload->>'annotationOrigin' = 'system_domain'
+ORDER BY created_at DESC
+LIMIT 1`, companyKey).Scan(&note)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("latest ma system domain annotation: %w", err)
+	}
+	return note, nil
 }
 
 // GetMACompanyDomain looks up the verified-domain registry by any of the
@@ -2821,6 +3002,7 @@ func (s *SQLStore) loadMAOutcomes(ctx context.Context, sessionID string) (map[st
 SELECT id, company_key, event, COALESCE(note, ''), COALESCE(created_by_email, ''), created_at
 FROM binocolo.ma_target_outcome
 WHERE session_id = $1::uuid
+  AND deleted_at IS NULL
 ORDER BY created_at
 `, sessionID)
 	if err != nil {
@@ -2849,6 +3031,7 @@ func (s *SQLStore) loadMAOutcomesForCompany(ctx context.Context, sessionID, comp
 SELECT id, company_key, event, COALESCE(note, ''), COALESCE(created_by_email, ''), created_at
 FROM binocolo.ma_target_outcome
 WHERE session_id = $1::uuid AND company_key = $2
+  AND deleted_at IS NULL
 ORDER BY created_at
 `, sessionID, companyKey)
 	if err != nil {
@@ -2997,8 +3180,8 @@ func (s *SQLStore) ListMALatestCardEvents(ctx context.Context, initiativeID stri
 	query := fmt.Sprintf(`
 SELECT DISTINCT ON (o.company_key) o.company_key,
   CASE
-    WHEN o.event = 'nota' AND COALESCE(o.note, '') != '' THEN 'nota: ' || o.note
-    WHEN o.event = 'nota' THEN 'nota'
+    WHEN o.event = 'nota' AND COALESCE(o.note, '') != '' THEN 'Annotazione: ' || o.note
+    WHEN o.event = 'nota' THEN 'Annotazione'
     WHEN o.event = 'stato' AND COALESCE(o.note, '') != '' THEN 'Stato aggiornato: ' || o.note
     WHEN o.event = 'stato' THEN 'Stato aggiornato'
     WHEN o.event = 'card_creata' AND COALESCE(o.note, '') != '' THEN 'Card creata: ' || o.note
@@ -3021,6 +3204,8 @@ SELECT DISTINCT ON (o.company_key) o.company_key,
 FROM binocolo.ma_target_outcome o
 WHERE o.initiative_id = $1::uuid
   AND o.company_key IN (%s)
+  AND o.deleted_at IS NULL
+  AND o.event NOT IN ('card_creata', 'dominio_verificato')
 ORDER BY o.company_key, o.created_at DESC
 `, strings.Join(placeholders, ", "))
 	rows, err := s.db.QueryContext(ctx, query, args...)
@@ -3637,10 +3822,15 @@ WITH target_rows AS (
     'note', COALESCE(note, ''),
     'payload', COALESCE(payload, '{}'::jsonb),
     'createdByEmail', COALESCE(created_by_email, ''),
-    'createdAt', created_at
+    'createdAt', created_at,
+    'updatedAt', updated_at,
+    'updatedByEmail', COALESCE(updated_by_email, ''),
+    'deletedAt', deleted_at,
+    'deletedByEmail', COALESCE(deleted_by_email, '')
   ) ORDER BY created_at DESC) AS outcomes
   FROM binocolo.ma_target_outcome
   WHERE company_key = $1 AND session_id IS NOT NULL
+    AND deleted_at IS NULL
   GROUP BY session_id, company_key
 )
 SELECT
@@ -4008,10 +4198,13 @@ func (s *SQLStore) ListMAInitiativeCardEvents(ctx context.Context, initiativeID 
 	query := fmt.Sprintf(`
 SELECT o.id::text, COALESCE(o.session_id::text, ''), COALESCE(o.initiative_id::text, ''), o.company_key,
        o.event, COALESCE(o.note, ''), COALESCE(o.payload::text, '{}'),
-       COALESCE(o.created_by_email, ''), o.created_at
+       COALESCE(o.created_by_email, ''), o.created_at,
+       o.updated_at, COALESCE(o.updated_by_email, ''),
+       o.deleted_at, COALESCE(o.deleted_by_email, '')
 FROM binocolo.ma_target_outcome o
 WHERE o.company_key = $2
   AND (o.initiative_id = $1::uuid OR %s)
+  AND o.deleted_at IS NULL
 ORDER BY o.created_at DESC
 `, sessionClause)
 	rows, err := s.db.QueryContext(ctx, query, args...)
@@ -4022,11 +4215,19 @@ ORDER BY o.created_at DESC
 	for rows.Next() {
 		var item MATargetOutcome
 		var payload string
+		var updatedAt, deletedAt sql.NullTime
 		if err := rows.Scan(&item.ID, &item.SessionID, &item.InitiativeID, &item.CompanyKey,
-			&item.Event, &item.Note, &payload, &item.CreatedByEmail, &item.CreatedAt); err != nil {
+			&item.Event, &item.Note, &payload, &item.CreatedByEmail, &item.CreatedAt,
+			&updatedAt, &item.UpdatedByEmail, &deletedAt, &item.DeletedByEmail); err != nil {
 			return nil, fmt.Errorf("scan ma initiative card event: %w", err)
 		}
 		item.Payload = json.RawMessage(payload)
+		if updatedAt.Valid {
+			item.UpdatedAt = &updatedAt.Time
+		}
+		if deletedAt.Valid {
+			item.DeletedAt = &deletedAt.Time
+		}
 		out = append(out, item)
 	}
 	if err := rows.Err(); err != nil {

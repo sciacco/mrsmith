@@ -428,17 +428,7 @@ export interface MACreateInitiativeCardResponse {
   domainVerification?: 'queued';
 }
 
-export interface MACardEvent {
-  id: string;
-  sessionId?: string;
-  initiativeId?: string;
-  companyKey: string;
-  event: string;
-  note?: string;
-  payload?: unknown;
-  createdByEmail?: string;
-  createdAt: string;
-}
+export interface MACardEvent extends MATargetOutcome {}
 
 export interface MACardEventListResponse {
   items: MACardEvent[];
@@ -515,6 +505,25 @@ export interface MATargetOutcome {
   payload?: unknown;
   createdByEmail?: string;
   createdAt: string;
+  updatedAt?: string;
+  updatedByEmail?: string;
+  deletedAt?: string;
+  deletedByEmail?: string;
+}
+
+export interface MACompanyActivityLookup {
+  id: string;
+  title: string;
+}
+
+export interface MACompanyActivitySession extends MACompanyActivityLookup {
+  initiativeId?: string;
+}
+
+export interface MACompanyActivityResponse {
+  items: MATargetOutcome[];
+  initiatives: MACompanyActivityLookup[];
+  sessions: MACompanyActivitySession[];
 }
 
 export interface MADeepAnalysis {

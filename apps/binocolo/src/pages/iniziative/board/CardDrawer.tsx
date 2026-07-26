@@ -1,15 +1,10 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
-import { Button, Drawer, Icon, Skeleton, useToast } from '@mrsmith/ui';
-import { useApiClient } from '../../../api/client';
-import type {
-  MACardEvent,
-  MACardEventListResponse,
-  MACompanyRegistry,
-  MAInitiativeCardView,
-  MASessionSummary,
-} from '../../../api/types';
-import { errorLabel, relativeDate, shortAuthor } from '../../ricerche/helpers';
+import { Button, Drawer, Icon, Skeleton } from '@mrsmith/ui';
+import type { MAInitiativeCardView, MASessionSummary } from '../../../api/types';
+import { errorLabel } from '../../ricerche/helpers';
+import { ActivityTimeline } from '../../../components/company/activity/ActivityTimeline';
+import { useAnnotationMutations, useCompanyActivity } from '../../../hooks/useCompanyActivity';
 import { writeCohort } from '../../../components/scheda/cohort';
 import { ACTIVE_STATES, isTerminalState, stateLabel, esitoLabel, stateVars } from '../../../lib/cardStates';
 import { dossierState } from './useBoardData';
@@ -26,47 +21,6 @@ const REGISTRY_LABELS: Record<string, { label: string; kind: 'info' | 'warn' }> 
 
 function schedaHref(companyKey: string, initiativeId: string) {
   return `/aziende/${encodeURIComponent(companyKey)}?iniziativa=${encodeURIComponent(initiativeId)}`;
-}
-
-/** Etichetta di un evento del diario. I payload append-only NON si riscrivono: le
- *  chiavi stato/esito storiche risolvono via stateLabel/esitoLabel (legacy-map). */
-export function eventLabel(event: MACardEvent, sessionMap: Map<string, string>): string {
-  const p = event.payload as Record<string, unknown> | undefined;
-  switch (event.event) {
-    case 'stato': {
-      const from = p && typeof p.from === 'string' ? stateLabel(p.from) : null;
-      const to = p && typeof p.to === 'string' ? stateLabel(p.to) : null;
-      return from && to ? `${from} → ${to}` : `Stato aggiornato${event.note ? ` — ${event.note}` : ''}`;
-    }
-    case 'chiusura': {
-      // v2: payload {stato, esito}. Storico: {esito} soltanto.
-      const stato = p && typeof p.stato === 'string' ? stateLabel(p.stato) : 'Chiusura';
-      const esito = p && typeof p.esito === 'string' && p.esito ? ` — ${esitoLabel(p.esito)}` : '';
-      const base = `${stato}${esito}`;
-      return event.note ? `${base}: ${event.note}` : base;
-    }
-    case 'card_creata': {
-      const rating = p && typeof p.rating === 'number' ? p.rating : 0;
-      const stars = rating > 0 ? ` ${'★'.repeat(Math.min(rating, 3))}` : '';
-      const sessionId = p && typeof p.sessionId === 'string' ? p.sessionId : null;
-      const title = sessionId ? sessionMap.get(sessionId) ?? null : null;
-      return `Aggiunta${title ? ` da ${title}` : ''}${stars}${event.note ? ` — ${event.note}` : ''}`;
-    }
-    case 'card_riaperta':
-      return 'Rimessa in lavorazione';
-    case 'card_rimossa':
-      return 'Rimossa dalla lavorazione';
-    case 'dominio_verificato': {
-      const esito = p && typeof p.esito === 'string' ? p.esito : 'non_verificabile';
-      if (esito === 'confermato') return 'Verifica automatica dominio: confermata';
-      if (esito === 'non_confermato') return 'Verifica automatica dominio: non confermata';
-      return 'Verifica automatica dominio: non disponibile';
-    }
-    case 'nota':
-      return event.note ?? 'Nota';
-    default:
-      return event.note ? `${event.event} — ${event.note}` : event.event;
-  }
 }
 
 export function CardDrawer({
@@ -96,13 +50,10 @@ export function CardDrawer({
   onDeepDive: (companyKey: string) => Promise<void>;
   onOpenDossier: (card: MAInitiativeCardView) => void;
 }) {
-  const api = useApiClient();
-  const { toast } = useToast();
-  const [events, setEvents] = useState<MACardEvent[]>([]);
-  const [loadingEvents, setLoadingEvents] = useState(true);
-  const [registry, setRegistry] = useState<MACompanyRegistry | null>(null);
+  const activity = useCompanyActivity(card.companyKey);
+  const annotations = useAnnotationMutations(card.companyKey, initiativeId);
   const [note, setNote] = useState('');
-  const [savingNote, setSavingNote] = useState(false);
+  const [noteError, setNoteError] = useState('');
   const [launching, setLaunching] = useState(false);
 
   const terminal = isTerminalState(card.state);
@@ -110,50 +61,18 @@ export function CardDrawer({
   const ds = dossierState(card.dossierStatus);
   const canLaunch = ds === 'none' || ds === 'failed';
 
-  const loadEvents = useCallback(async () => {
-    setLoadingEvents(true);
-    try {
-      const res = await api.get<MACardEventListResponse>(
-        `/binocolo/v1/ma/initiatives/${initiativeId}/cards/${encodeURIComponent(card.companyKey)}/events`,
-      );
-      setEvents(res.items);
-    } catch (e) {
-      toast(errorLabel(e), 'error');
-    } finally {
-      setLoadingEvents(false);
-    }
-  }, [api, initiativeId, card.companyKey, toast]);
-
-  useEffect(() => {
-    void loadEvents();
-  }, [loadEvents]);
-
-  useEffect(() => {
-    api
-      .get<MACompanyRegistry>(`/binocolo/v1/ma/companies/${encodeURIComponent(card.companyKey)}/registry`)
-      .then(setRegistry)
-      .catch(() => setRegistry(null));
-  }, [api, card.companyKey]);
-
-  const sessionMap = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const s of sessions) m.set(s.id, s.title);
-    return m;
-  }, [sessions]);
+  void sessions;
 
   const submitNote = async () => {
     const body = note.trim();
     if (!body) return;
-    setSavingNote(true);
+    setNoteError('');
     try {
-      await api.post(`/binocolo/v1/ma/initiatives/${initiativeId}/cards/${encodeURIComponent(card.companyKey)}/note`, { body });
+      await annotations.create.mutateAsync(body);
       setNote('');
-      await loadEvents();
       onChanged();
     } catch (e) {
-      toast(errorLabel(e), 'error');
-    } finally {
-      setSavingNote(false);
+      setNoteError(errorLabel(e));
     }
   };
 
@@ -169,7 +88,10 @@ export function CardDrawer({
   };
 
   const facts = card.registryFacts ?? [];
-  const lastNote = registry?.notes?.[0];
+  const activityItems = activity.data?.items ?? [];
+  const sessionInitiative = new Map((activity.data?.sessions ?? []).map((session) => [session.id, session.initiativeId]));
+  const currentItems = activityItems.filter((item) => item.initiativeId === initiativeId || (item.sessionId && sessionInitiative.get(item.sessionId) === initiativeId));
+  const contextAnnotations = activityItems.filter((item) => item.event === 'nota' && item.initiativeId !== initiativeId).slice(0, 2);
 
   return (
     <Drawer
@@ -299,32 +221,31 @@ export function CardDrawer({
             ) : (
               <p className={styles.hint}>Nessun fatto registrato.</p>
             )}
-            {lastNote ? (
-              <p className={styles.hint} style={{ marginTop: 8 }}>
-                Ultima nota: &ldquo;{lastNote.body}&rdquo; · {shortAuthor(lastNote.createdByEmail)} · {relativeDate(lastNote.createdAt)}
-              </p>
-            ) : null}
           </div>
 
           <div className={styles.drawerSec}>
-            <p className={styles.lab}>Diario attività</p>
-            {loadingEvents ? (
+            <p className={styles.lab}>Contesto azienda</p>
+            <ActivityTimeline
+              items={contextAnnotations}
+              initiatives={activity.data?.initiatives}
+              sessions={activity.data?.sessions}
+              companyKey={card.companyKey}
+              emptyLabel="Nessuna annotazione generale o da altre iniziative."
+            />
+          </div>
+
+          <div className={styles.drawerSec}>
+            <p className={styles.lab}>Attività · {activity.data?.initiatives.find((item) => item.id === initiativeId)?.title ?? 'iniziativa'}</p>
+            {activity.isLoading ? (
               <Skeleton rows={3} />
             ) : (
-              <ul className={styles.timeline}>
-                {events.map((event) => (
-                  <li key={event.id} className={styles.timelineItem}>
-                    <div className={styles.timelineDot} />
-                    <div className={event.event === 'nota' ? styles.timelineNote : styles.timelineEvent}>
-                      {eventLabel(event, sessionMap)}
-                    </div>
-                    <span className={styles.timelineWho}>
-                      {shortAuthor(event.createdByEmail)} · {relativeDate(event.createdAt)}
-                    </span>
-                  </li>
-                ))}
-                {events.length === 0 ? <li className={styles.hint}>Nessun evento ancora nel diario.</li> : null}
-              </ul>
+              <ActivityTimeline
+                items={currentItems}
+                initiatives={activity.data?.initiatives}
+                sessions={activity.data?.sessions}
+                companyKey={card.companyKey}
+                editableInitiativeId={initiativeId}
+              />
             )}
           </div>
         </div>
@@ -332,14 +253,20 @@ export function CardDrawer({
         <div className={styles.composer}>
           <textarea
             className={styles.composerInput}
-            placeholder="Aggiungi una nota al diario…"
+            placeholder="Aggiungi annotazione…"
             value={note}
-            onChange={(e) => setNote(e.target.value)}
+            aria-invalid={Boolean(noteError)}
+            aria-describedby={noteError ? 'card-annotation-error' : undefined}
+            onChange={(e) => { setNote(e.target.value); setNoteError(''); }}
             maxLength={1000}
             rows={1}
           />
-          <Button variant="primary" size="sm" onClick={() => void submitNote()} loading={savingNote} disabled={!note.trim()}>
-            Invia
+          <div>
+            <p className={styles.hint}>Contesto: {activity.data?.initiatives.find((item) => item.id === initiativeId)?.title ?? 'iniziativa corrente'}</p>
+            {noteError ? <p id="card-annotation-error" role="alert" style={{ color: 'var(--color-danger-hover)' }}>{noteError}</p> : null}
+          </div>
+          <Button variant="primary" size="sm" onClick={() => void submitNote()} loading={annotations.create.isPending} disabled={!note.trim()}>
+            Aggiungi
           </Button>
         </div>
       </div>

@@ -144,7 +144,6 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/close", h.handleCloseMACard)
 	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/remove", h.handleRemoveMACard)
 	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/reopen", h.handleReopenMACard)
-	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/note", h.handleAddMACardNote)
 	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/deep-dive", h.handleDeepDiveMACard)
 	handle("GET /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/thesis-reading", h.handleGetCardThesisReading)
 	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/thesis-reading", h.handleGenerateCardThesisReading)
@@ -159,10 +158,13 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/deep-dive", h.handleDeepDiveMACompany)
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/brief/regenerate", h.handleRegenerateMACompanyBrief)
 	handle("GET /binocolo/v1/ma/companies/{companyKey}/overview", h.handleGetMACompanyOverview)
+	handle("GET /binocolo/v1/ma/companies/{companyKey}/activity", h.handleGetMACompanyActivity)
+	handle("POST /binocolo/v1/ma/companies/{companyKey}/annotations", h.handleCreateMAAnnotation)
+	handle("PATCH /binocolo/v1/ma/annotations/{id}", h.handleUpdateMAAnnotation)
+	handle("DELETE /binocolo/v1/ma/annotations/{id}", h.handleDeleteMAAnnotation)
 	handle("GET /binocolo/v1/ma/companies/{companyKey}/registry", h.handleGetMACompanyRegistry)
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/registry/facts", h.handleCreateMACompanyFact)
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/registry/facts/{factId}/revoke", h.handleRevokeMACompanyFact)
-	handle("POST /binocolo/v1/ma/companies/{companyKey}/registry/notes", h.handleCreateMACompanyNote)
 	// Deposited-filing pipeline (issue #78, Fase 8). Company-scoped filing lifecycle + the
 	// filing/proposal-scoped operations. Identity is resolved from {companyKey}; filings are
 	// keyed by fiscal identity, never company_key.
@@ -1182,27 +1184,61 @@ func (h *Handler) handleRevokeMACompanyFact(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusNoContent)
 }
 
-type maCompanyNoteCreateRequest struct {
-	Body string `json:"body"`
-}
-
-func (h *Handler) handleCreateMACompanyNote(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleGetMACompanyActivity(w http.ResponseWriter, r *http.Request) {
 	companyKey, ok := maCompanyKeyPath(w, r)
 	if !ok {
 		return
 	}
-	var body maCompanyNoteCreateRequest
+	activity, err := h.ma.listCompanyActivity(r.Context(), companyKey, r.URL.Query().Get("includeDeleted") == "true")
+	if err != nil {
+		h.maFailure(w, r, "ma_company_activity_list", err, "company_key", companyKey)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, activity)
+}
+
+func (h *Handler) handleCreateMAAnnotation(w http.ResponseWriter, r *http.Request) {
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	var body MAAnnotationCreateRequest
 	if err := decodeMABody(r, &body); err != nil {
 		httputil.Error(w, http.StatusBadRequest, "invalid_json")
 		return
 	}
 	subject, email := companySearchRefreshActor(r.Context())
-	note, err := h.ma.addCompanyNote(r.Context(), companyKey, body.Body, subject, email)
+	annotation, err := h.ma.createAnnotation(r.Context(), companyKey, body, subject, email)
 	if err != nil {
-		h.maFailure(w, r, "ma_company_note_create", err, "company_key", companyKey)
+		h.maFailure(w, r, "ma_annotation_create", err, "company_key", companyKey)
 		return
 	}
-	httputil.JSON(w, http.StatusOK, note)
+	httputil.JSON(w, http.StatusCreated, annotation)
+}
+
+func (h *Handler) handleUpdateMAAnnotation(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(r.PathValue("id"))
+	var body MAAnnotationUpdateRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	if err := h.ma.updateAnnotation(r.Context(), id, body.Body, subject, email); err != nil {
+		h.maFailure(w, r, "ma_annotation_update", err, "annotation_id", id)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) handleDeleteMAAnnotation(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(r.PathValue("id"))
+	subject, email := companySearchRefreshActor(r.Context())
+	if err := h.ma.deleteAnnotation(r.Context(), id, subject, email); err != nil {
+		h.maFailure(w, r, "ma_annotation_delete", err, "annotation_id", id)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) handleArchiveMASession(w http.ResponseWriter, r *http.Request) {
@@ -2052,6 +2088,9 @@ func maHTTPError(err error) (int, string, string) {
 	}
 	if errors.Is(err, errMACardDossierNotFound) {
 		return http.StatusNotFound, "ma_card_dossier_not_found", "warn"
+	}
+	if errors.Is(err, errMAAnnotationNotFound) {
+		return http.StatusNotFound, "ma_annotation_not_found", "warn"
 	}
 	// Deposited-filing endpoints (issue #78, Fase 8).
 	if errors.Is(err, errMAFilingIdentityUnresolved) {

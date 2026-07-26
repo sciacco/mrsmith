@@ -67,7 +67,6 @@ export function CompanyRegistrySection({
   const [factNote, setFactNote] = useState('');
   const [revokeTarget, setRevokeTarget] = useState<MACompanyFact | null>(null);
   const [revokeNote, setRevokeNote] = useState('');
-  const [noteBody, setNoteBody] = useState('');
 
   const registryKey = ['ma-company-registry', companyKey];
 
@@ -110,22 +109,9 @@ export function CompanyRegistrySection({
     },
   });
 
-  const createNote = useMutation({
-    mutationFn: () =>
-      api.post(`/binocolo/v1/ma/companies/${encodeURIComponent(companyKey)}/registry/notes`, { body: noteBody.trim() }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: registryKey });
-      setNoteBody('');
-    },
-    onError: (err: unknown) => {
-      toast(errorLabel(err), 'error');
-    },
-  });
-
   const facts = registry.data?.facts ?? [];
   const activeFacts = facts.filter((f) => !f.revokedAt);
   const revokedFacts = facts.filter((f) => f.revokedAt);
-  const notes = registry.data?.notes ?? [];
 
   return (
     <>
@@ -183,45 +169,6 @@ export function CompanyRegistrySection({
           <div className={styles.factActions}>
             <Button variant="secondary" size="sm" onClick={() => setFactModalOpen(true)}>
               + Registra fatto
-            </Button>
-          </div>
-        )}
-      </section>
-
-      <section className={styles.section}>
-        <div className={styles.sectionHead}>
-          <h2 className={styles.sectionTitle}>Note d&apos;azienda</h2>
-        </div>
-        {notes.length === 0 && !registry.isLoading ? (
-          <p className={styles.hint}>Nessuna nota.</p>
-        ) : (
-          <ul className={styles.noteList}>
-            {notes.map((n) => (
-              <li key={n.id} className={styles.noteRow}>
-                <b>Nota</b> — {n.body}
-                <span className={styles.factWho}>{whoWhen(n.createdByEmail, n.createdAt)}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-        {readOnly ? null : (
-          <div className={styles.noteComposer}>
-            <input
-              type="text"
-              className={styles.noteInput}
-              value={noteBody}
-              onChange={(e) => setNoteBody(e.target.value)}
-              placeholder="Aggiungi nota d'azienda…"
-              maxLength={1000}
-            />
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={!noteBody.trim()}
-              loading={createNote.isPending}
-              onClick={() => createNote.mutate()}
-            >
-              Aggiungi
             </Button>
           </div>
         )}

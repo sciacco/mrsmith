@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Drawer, Icon, MultiSelect, Skeleton, useToast } from '@mrsmith/ui';
+import { Button, Drawer, Icon, MultiSelect, Skeleton } from '@mrsmith/ui';
 import { useApiClient } from '../../api/client';
-import type { MACardEvent, MACardEventListResponse, MAInitiativeCardView, MAPipelineCardView, MAPipelineResponse } from '../../api/types';
+import type { MAInitiativeCardView, MAPipelineCardView, MAPipelineResponse } from '../../api/types';
 import { ACTIVE_STATES, CARD_STATES, MACROFASI, TERMINAL_STATES, stateLabel, esitoLabel, stateVars } from '../../lib/cardStates';
-import { errorLabel, relativeDate, shortAuthor } from '../ricerche/helpers';
+import { errorLabel } from '../ricerche/helpers';
 import { writeCohort } from '../../components/scheda/cohort';
-import { eventLabel } from '../iniziative/board/CardDrawer';
+import { ActivityTimeline } from '../../components/company/activity/ActivityTimeline';
+import { useCompanyActivity } from '../../hooks/useCompanyActivity';
 import { FunnelStrip } from '../iniziative/board/FunnelStrip';
 import { StatesView } from '../iniziative/board/StatesView';
 import { MacroView } from '../iniziative/board/MacroView';
@@ -16,10 +17,6 @@ import styles from '../iniziative/board/board.module.css';
 
 type Layout = 'macro' | 'states' | 'table';
 type Scope = 'active' | 'complete';
-
-// L'aggregato non porta le sessioni per-card: i titoli di provenienza nel diario
-// restano non risolti (il dettaglio pieno è nella board di iniziativa / scheda).
-const NO_SESSIONS = new Map<string, string>();
 
 function readLS(k: string, fb: string) {
   try {
@@ -39,7 +36,6 @@ function writeLS(k: string, v: string) {
 export function PipelinePage() {
   const api = useApiClient();
   const navigate = useNavigate();
-  const { toast } = useToast();
 
   const query = useQuery({
     queryKey: ['ma-pipeline'],
@@ -218,7 +214,6 @@ export function PipelinePage() {
             writeCohort({ lensType: 'iniziativa', lensId: selected.initiativeId, companyKeys: cohortKeys });
             navigate(`/aziende/${encodeURIComponent(selected.companyKey)}?iniziativa=${encodeURIComponent(selected.initiativeId)}`);
           }}
-          onError={(m) => toast(m, 'error')}
         />
       ) : null}
     </main>
@@ -233,34 +228,15 @@ function PipelineDrawer({
   onClose,
   onOpenBoard,
   onOpenScheda,
-  onError,
 }: {
   card: MAPipelineCardView;
   onClose: () => void;
   onOpenBoard: () => void;
   onOpenScheda: () => void;
-  onError: (m: string) => void;
 }) {
-  const api = useApiClient();
-  const [events, setEvents] = useState<MACardEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let live = true;
-    setLoading(true);
-    api
-      .get<MACardEventListResponse>(`/binocolo/v1/ma/initiatives/${card.initiativeId}/cards/${encodeURIComponent(card.companyKey)}/events`)
-      .then((res) => {
-        if (live) setEvents(res.items);
-      })
-      .catch((e) => onError(errorLabel(e)))
-      .finally(() => {
-        if (live) setLoading(false);
-      });
-    return () => {
-      live = false;
-    };
-  }, [api, card.initiativeId, card.companyKey, onError]);
+  const activity = useCompanyActivity(card.companyKey);
+  const sessionInitiative = new Map((activity.data?.sessions ?? []).map((session) => [session.id, session.initiativeId]));
+  const events = (activity.data?.items ?? []).filter((item) => item.initiativeId === card.initiativeId || (item.sessionId && sessionInitiative.get(item.sessionId) === card.initiativeId));
 
   const prov = card.provenances?.[0];
   const facts = card.registryFacts ?? [];
@@ -317,22 +293,16 @@ function PipelineDrawer({
           </div>
 
           <div className={styles.drawerSec}>
-            <p className={styles.lab}>Diario attività</p>
-            {loading ? (
+            <p className={styles.lab}>Attività · {card.initiativeTitle}</p>
+            {activity.isLoading ? (
               <Skeleton rows={3} />
             ) : (
-              <ul className={styles.timeline}>
-                {events.map((e) => (
-                  <li key={e.id} className={styles.timelineItem}>
-                    <div className={styles.timelineDot} />
-                    <div className={e.event === 'nota' ? styles.timelineNote : styles.timelineEvent}>{eventLabel(e, NO_SESSIONS)}</div>
-                    <span className={styles.timelineWho}>
-                      {shortAuthor(e.createdByEmail)} · {relativeDate(e.createdAt)}
-                    </span>
-                  </li>
-                ))}
-                {events.length === 0 ? <li className={styles.hint}>Nessun evento nel diario.</li> : null}
-              </ul>
+              <ActivityTimeline
+                items={events}
+                initiatives={activity.data?.initiatives}
+                sessions={activity.data?.sessions}
+                companyKey={card.companyKey}
+              />
             )}
           </div>
         </div>

@@ -30,6 +30,7 @@ import { SpineNav, type SpineItem } from '../../components/scheda/SpineNav';
 import { useSectionSpy } from '../../components/scheda/useSectionSpy';
 import { ThesisReadingPanel } from '../../components/ThesisReadingPanel/ThesisReadingPanel';
 import { CompanyRegistrySection } from '../iniziative/CompanyRegistrySection';
+import { CompanyActivityPanel } from '../../components/company/activity/CompanyActivityPanel';
 import { bucketLabelWithSuppressionHistory, dateLabel, errorLabel, sessionStatusLabel } from '../ricerche/helpers';
 import styles from './SchedaAziendaPage.module.css';
 
@@ -933,6 +934,7 @@ export function SchedaAziendaPage() {
         <div className={styles.registryWrap}>
           <CompanyRegistrySection companyKey={identity.companyKey} vatCode={identity.vatCode} companyName={identity.companyName} readOnly={false} />
         </div>
+        <CompanyActivityPanel companyKey={identity.companyKey} companyName={identity.companyName || identity.companyKey} vatCode={identity.vatCode} />
         {showIRL ? (
           <div className={styles.subSection}>
             <h3>IRL</h3>
