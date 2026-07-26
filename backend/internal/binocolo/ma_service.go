@@ -722,6 +722,12 @@ func (s *maService) addCompanyFact(ctx context.Context, companyKey, kind, note, 
 	if companyKey == "" {
 		return MACompanyFact{}, fmt.Errorf("%w: companyKey", errMAStrategyInvalid)
 	}
+	// Il segmento di path è uno slug opaco che nessuno valida (maCompanyKeyPath,
+	// handler.go): senza questa guardia una riga di registro nasce su
+	// un'azienda che potrebbe non esistere.
+	if err := s.requireKnownMACompany(ctx, companyKey); err != nil {
+		return MACompanyFact{}, err
+	}
 	if !maCompanyFactKinds[kind] {
 		return MACompanyFact{}, errMACompanyFactKindInvalid
 	}
@@ -764,6 +770,9 @@ func (s *maService) addCompanyNote(ctx context.Context, companyKey, body, subjec
 	companyKey = normalizeMACompanyKey(companyKey)
 	if companyKey == "" {
 		return MACompanyNote{}, fmt.Errorf("%w: companyKey", errMAStrategyInvalid)
+	}
+	if err := s.requireKnownMACompany(ctx, companyKey); err != nil {
+		return MACompanyNote{}, err
 	}
 	body = cleanText(body, 1000)
 	if body == "" {
@@ -3666,6 +3675,9 @@ func (s *maService) ratifyBMFamily(ctx context.Context, companyKey, family, subj
 	if companyKey == "" {
 		return nil, fmt.Errorf("%w: company key", errMAStrategyInvalid)
 	}
+	if err := s.requireKnownMACompany(ctx, companyKey); err != nil {
+		return nil, err
+	}
 	if family != "" && !maBMFamilies[family] {
 		return nil, fmt.Errorf("%w: famiglia sconosciuta", errMAStrategyInvalid)
 	}
@@ -4076,6 +4088,13 @@ func (s *maService) deepDiveCompany(ctx context.Context, companyKey, subject, em
 	if companyKey == "" {
 		return MACompanyDeepDiveResponse{}, fmt.Errorf("%w: company key", errMAStrategyInvalid)
 	}
+	// Guardia PRIMA di risolvere l'identità: senza, l'ultimo ramo di
+	// resolveCompanyDeepDiveIdentity tratta il segmento di path come se fosse
+	// esso stesso una P.IVA, e l'IT-full da €0.30 finisce su una company_key
+	// che nessuna azienda possiede.
+	if err := s.requireKnownMACompany(ctx, companyKey); err != nil {
+		return MACompanyDeepDiveResponse{}, err
+	}
 	existing, err := s.store.ListMADeepAnalysis(ctx, []string{companyKey})
 	if err != nil {
 		return MACompanyDeepDiveResponse{}, err
@@ -4119,6 +4138,15 @@ func (s *maService) resolveCompanyDeepDiveIdentity(ctx context.Context, companyK
 	} else if normalized, ok := normalizeDeepDiveIdentity(identity); ok {
 		return normalized, "ma_initiative_card", nil
 	}
+	// Ultima risorsa: la chiave STESSA come identità fiscale. Regge solo perché
+	// il chiamante ha già verificato che l'azienda esista nel registro
+	// (requireKnownMACompany): serve le chiavi storiche che SONO un valore
+	// fiscale — quelle scritte da /azienda prima della 120 — e per una chiave
+	// legittima (ObjectId o UUID) non scatta mai, perché non ne ha la forma.
+	//
+	// Senza quella verifica a monte questo ramo trasformava un qualunque
+	// segmento di path a forma di P.IVA in un'identità, e l'IT-full da €0.30
+	// finiva su una company_key che nessuna azienda possiede.
 	if vat := normalizeDeepDiveIdentifier(companyKey); vat != "" {
 		return maDeepDiveIdentity{VATCode: vat}, "company_key", nil
 	}

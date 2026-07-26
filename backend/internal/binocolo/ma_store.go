@@ -2372,6 +2372,11 @@ ORDER BY t.score DESC NULLS LAST, t.company_name
 
 	out := []MATargetRow{}
 	for rows.Next() {
+		// La stessa guardia di scanMATargetBase, e per lo stesso motivo: senza,
+		// questa lista serviva la riga con chiave VUOTA mentre GetMASession
+		// errava sulla stessa riga. Due contratti diversi sulla stessa colonna,
+		// ed è lo scarto che rendeva raggiungibili i fallback del client — la UI
+		// riceveva un target senza chiave e se ne inventava una dalla P.IVA.
 		var item MATargetRow
 		var score sql.NullInt64
 		var scoreVersion sql.NullInt64
@@ -2450,6 +2455,9 @@ ORDER BY t.score DESC NULLS LAST, t.company_name
 				GroupSiteIdentifier: groupIdentifier,
 				CandidateCount:      candidateCount,
 			}
+		}
+		if strings.TrimSpace(item.CompanyKey) == "" {
+			return nil, fmt.Errorf("ma target %s: company_key assente (rieseguire il backfill della migrazione 121)", item.ID)
 		}
 		out = append(out, item)
 	}

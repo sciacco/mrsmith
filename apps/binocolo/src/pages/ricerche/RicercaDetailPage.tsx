@@ -453,6 +453,13 @@ export function RicercaDetailPage() {
 
   async function submitRating(target: MATargetRow, rating: number, reason: string) {
     if (!detail?.session.id) return;
+    // Senza chiave risolta non si vota: la stella finirebbe su un'identità
+    // inventata, e l'aggiornamento ottimistico qui sotto — che confronta le
+    // chiavi — la applicherebbe a tutte le righe senza chiave (issue #86).
+    if (!targetKey(target)) {
+      toast('Chiave azienda non disponibile: ricarica la ricerca.', 'error');
+      return;
+    }
     const sessionId = detail.session.id;
     const previousRows = rows;
     setRows((current) =>

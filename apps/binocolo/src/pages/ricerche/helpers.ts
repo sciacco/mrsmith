@@ -247,9 +247,20 @@ export function gatedBucketCounts(progress: MAGatedProgressResponse | null): { k
 
 export type MATargetListItem = MATarget | MATargetRow;
 
+// targetKey è l'identità azienda di una riga, e l'unica provenienza legittima è
+// la chiave che il backend ha risolto (issue #86).
+//
+// Ricadeva su `vatCode || taxCode || id`, e questa funzione alimenta anche la
+// SCRITTURA del voto (POST /sessions/{id}/rating): un target servito senza
+// chiave faceva salvare la stella su una P.IVA — o sull'id della RIGA, che ha
+// forma di UUID legittimo e sarebbe indistinguibile da una chiave vera. Al
+// refresh la stella tornava vuota, perché la lettura idrata dalla chiave
+// canonica.
+//
+// Stringa vuota quando la chiave manca: chi scrive deve astenersi, chi naviga
+// deve disabilitare il link. Inventarla è sempre peggio.
 export function targetKey(target: MATargetListItem): string {
-  const taxCode = 'taxCode' in target ? target.taxCode : undefined;
-  return target.companyKey || target.vatCode || taxCode || target.id;
+  return target.companyKey || '';
 }
 
 export function isGateReject(target: MATargetListItem): boolean {
