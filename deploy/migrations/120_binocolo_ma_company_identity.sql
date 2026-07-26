@@ -165,7 +165,7 @@ CREATE INDEX IF NOT EXISTS ma_company_identifier_company_idx
 -- quindi a due transazioni — rollback + errore tipizzato, poi scrittura del
 -- conflitto in una SECONDA transazione, di proprietà del livello service.
 --
--- NESSUNA FK, nemmeno verso sessione o run. Due ragioni: un conflitto aborta il
+-- NESSUNA FK, nemmeno verso sessione o run. Due ragioni: un conflitto abortisce il
 -- batch SENZA scrivere, quindi il target non esiste e una FK obbligatoria
 -- farebbe fallire l'inserimento; e un ledger che perde righe quando una sessione
 -- viene purgata perderebbe proprio la storia che deve conservare.

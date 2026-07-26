@@ -168,7 +168,7 @@ ON CONFLICT (namespace, value) WHERE state = 'open' DO UPDATE SET
 // resolveMACompanyBatchTx risolve un intero batch dentro la transazione del
 // chiamante e restituisce una chiave per osservazione, nello stesso ordine.
 //
-// Un conflitto aborta PRIMA di qualunque scrittura: un run di ricerca è atomico
+// Un conflitto abortisce PRIMA di qualunque scrittura: un run di ricerca è atomico
 // nella testa dell'analista, e persisterne una parte mostrerebbe un numero di
 // target che non corrisponde a ciò che è stato trovato.
 func resolveMACompanyBatchTx(ctx context.Context, tx *sql.Tx, observations []maCompanyObservation) ([]string, error) {

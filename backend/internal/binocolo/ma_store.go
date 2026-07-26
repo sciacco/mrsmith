@@ -1301,7 +1301,7 @@ func (s *SQLStore) ReplaceMATargets(ctx context.Context, sessionID, runID string
 	}
 	defer tx.Rollback()
 	// Risolvi-poi-scrivi (issue #86): l'intero batch passa dal registro identità
-	// PRIMA di qualunque INSERT, così un conflitto aborta prima che sia stato
+	// PRIMA di qualunque INSERT, così un conflitto abortisce prima che sia stato
 	// scritto qualcosa. Un run di ricerca è atomico nella testa dell'analista, e
 	// persisterne una parte mostrerebbe un numero di target che non corrisponde
 	// a ciò che è stato trovato.

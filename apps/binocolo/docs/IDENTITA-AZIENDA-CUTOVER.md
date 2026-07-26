@@ -107,7 +107,7 @@ applicative, che dopo il cutover **errano** invece di riderivare la chiave.
 1. **Schema** — la 120 è additiva e non elimina nulla, quindi un rollback
    applicativo non richiede mai il ripristino di schema. Con una riserva: il
    binario **oggi in produzione** non sopravvive alla colonna nuova (CTE
-   ambigua, sopra). Se si aborta dopo la 120 e si riaccende quello, prima va
+   ambigua, sopra). Se si abortisce dopo la 120 e si riaccende quello, prima va
    eliminata la colonna.
 2. **Semantico** — la prima azienda assegnata con UUID. Prima, il binario vecchio
    è sicuro; dopo, ri-deriva l'ObjectId per quell'azienda e ne crea una seconda
