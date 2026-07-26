@@ -582,7 +582,7 @@ func (s *maService) enrichTargetAdvanced(ctx context.Context, target MATarget) (
 	s.observeVendorIdentity(ctx, target.CompanyKey, enriched)
 
 	// Preserve the ADDRESS-row identity sulla RIGA: la company_key risolta dal
-	// registro più i valori identitari che l'hanno prodotta. Il gate ha chiavato
+	// registro più i valori identitari che l'hanno prodotta. Il gate ha agganciato
 	// la sua ma_target_web_validation su quella riga, e
 	// maWebValidationTargetFingerprint include companyName/vatCode/taxCode:
 	// persistere i valori advanced cambierebbe l'input hash, invaliderebbe il

@@ -3042,7 +3042,7 @@ func (s *maService) upsertTargetWebValidation(ctx context.Context, sessionID str
 		return MAWebValidation{}, err
 	}
 
-	// Guardia, non fallback (issue #86): il target arriva già chiavato dal
+	// Guardia, non fallback (issue #86): il target arriva già risolto dal
 	// registro. Riderivare qui rimetterebbe l'identità nelle mani del payload.
 	companyKey := normalizeMACompanyKey(body.Target.CompanyKey)
 	if companyKey == "" {
@@ -3358,7 +3358,7 @@ func (s *maService) resolveMACompany(ctx context.Context, observation maCompanyO
 // fresca verrebbero scartati insieme al resto: il registro imparerebbe meno di
 // quanto abbiamo pagato per sapere.
 //
-// L'esito NON blocca: l'occorrenza è già chiavata sull'entità della riga
+// L'esito NON blocca: l'occorrenza è già agganciata all'entità della riga
 // address, e questa è un'osservazione in più, non l'assegnazione dell'identità.
 // Un conflitto viene registrato nel ledger da resolveMACompany e loggato; far
 // fallire il run brucerebbe i €0.10 già spesi per una diagnosi che è già stata
@@ -3977,7 +3977,7 @@ func (s *maService) getCompanyDossier(ctx context.Context, vat string) (MACompan
 	dossier := mapMACompanyDossier(vat, rec)
 	// Famiglia di business model (Fase 3): best-effort, il dossier vive anche
 	// senza classificazione. La chiave è quella del record deep (il funnel può
-	// chiavare per vendor id, non per VAT), con fallback sulla VAT normalizzata.
+	// usare il vendor id come chiave, non la VAT), con fallback sulla VAT normalizzata.
 	familyKey := normalizeMACompanyKey(vat)
 	if rec != nil && rec.CompanyKey != "" {
 		familyKey = rec.CompanyKey

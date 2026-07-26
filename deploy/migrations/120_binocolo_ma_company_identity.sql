@@ -7,7 +7,8 @@
 -- Le aziende nuove ricevono un UUID. Un registro identificatori per identità
 -- fiscale fa da deduplica e da ponte verso i fornitori, presenti e futuri.
 --
--- NON si aggiunge company_key alle ~15 tabelle già chiavate: le chiavi non
+-- NON si aggiunge company_key alle ~15 tabelle che già la usano come chiave:
+-- le chiavi non
 -- cambiano, quindi non c'è nulla da rimappare. Si aggiunge UNA colonna, su
 -- ma_target, perché quella è la radice dell'occorrenza e oggi NON persiste la
 -- chiave (la riderivava a ogni lettura: senza la colonna l'UUID di un'azienda

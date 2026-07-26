@@ -5,7 +5,7 @@ Issue [#86](https://github.com/sciacco/mrsmith/issues/86), sub-issue di #81.
 Il lavoro è **adottare, non migrare**: le `company_key` esistenti diventano
 identificatori nostri, opachi e mai più ricalcolati; le aziende nuove ricevono un
 UUID. Nessuna chiave cambia, quindi nessun URL si rompe e nessuna delle ~15
-tabelle chiavate su `company_key` va rimappata.
+tabelle che usano `company_key` come chiave va rimappata.
 
 L'esecuzione avviene **ad applicazione e worker fermi**. Il runbook è
 **ri-entrante**: ogni passo si può rieseguire.
@@ -166,7 +166,7 @@ compresa «aziende senza alcun identificatore»: il resolver non ne crea mai —
 invece di inventare un'identità da una ragione sociale — quindi un valore
 maggiore di zero può venire solo dal backfill, da chiavi storiche presenti
 unicamente nelle tabelle di dettaglio. Il controllo sulle chiavi che non
-risolvono copre tutte le tabelle chiavate, non i soli target: finché F5 non
+risolvono copre tutte le tabelle con quella chiave, non i soli target: finché F5 non
 introduce le FK verso `ma_company`, nulla impedisce a un writer di coniare una
 chiave fuori dal registro.
 

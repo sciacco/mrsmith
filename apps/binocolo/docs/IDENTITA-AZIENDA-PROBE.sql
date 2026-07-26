@@ -944,7 +944,7 @@ ORDER BY orfane DESC, senza_chiave DESC, tabella;
 -- ObjectId. Vanno guardate una per una: sono aziende che nessun identificatore
 -- può più ritrovare.
 --
--- Il controllo sulle chiavi che non risolvono copre TUTTE le tabelle chiavate:
+-- Il controllo sulle chiavi che non risolvono copre TUTTE le tabelle con quella chiave:
 -- finché F5 non introduce le FK verso ma_company, un writer che coni una chiave
 -- fuori dal registro non incontra alcun vincolo, e restringere il monitor a
 -- ma_target lo lascerebbe invisibile.
@@ -961,7 +961,7 @@ SELECT 'valori fiscali su due entità (impossibile: PK)' AS controllo,
 FROM (SELECT value FROM binocolo.ma_company_identifier
       WHERE namespace = 'fiscal' GROUP BY value HAVING COUNT(DISTINCT company_key) > 1) x
 UNION ALL
--- Copre TUTTE le tabelle chiavate, non i soli target: finché F5 non introduce le
+-- Copre TUTTE le tabelle con quella chiave, non i soli target: finché F5 non introduce le
 -- FK verso ma_company, nulla impedisce a un writer di scrivere una chiave che
 -- non esiste, e un monitor ristretto a ma_target non lo vedrebbe. Riusa la
 -- stessa lista di Q17.

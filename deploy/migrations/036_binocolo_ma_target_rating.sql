@@ -10,7 +10,7 @@
 -- primo ramo si è mai attivato (1.583 chiavi su 1.584 sono l'ObjectId OpenAPI.it,
 -- zero sono la P.IVA). NON allineare il codice a questo commento: invertire la
 -- precedenza ricodificherebbe l'identità di tutto il corpus e orfanerebbe ogni
--- riga qui e nelle altre tabelle chiavate su company_key.
+-- riga qui e nelle altre tabelle che usano company_key come chiave.
 
 BEGIN;
 

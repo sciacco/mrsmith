@@ -1,4 +1,4 @@
--- 122: Binocolo M&A — riporta i dossier chiavati sulla P.IVA sulla chiave
+-- 122: Binocolo M&A — riporta i dossier con la P.IVA come chiave sulla chiave
 -- canonica dell'azienda (issue #86).
 --
 -- ============================================================================
@@ -47,7 +47,7 @@ BEGIN;
 
 -- ---------------------------------------------------------------------------
 -- 1. Le identità da riportare: un valore fiscale che è ANCHE una company_key
---    in una tabella di cache, mentre la stessa identità è chiavata altrimenti
+--    in una tabella di cache, mentre la stessa identità ha un'altra chiave
 --    nel corpus autoritativo (target, card, registro domini).
 --
 --    La normalizzazione è scritta a mano perché le funzioni della 120 non

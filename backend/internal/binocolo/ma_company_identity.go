@@ -61,7 +61,7 @@ type maCompanyObservation struct {
 	// PriorCompanyKey è la chiave che la riga PORTA GIÀ (re-persistenza di un
 	// target riletto dal DB). Non è una derivazione: quando l'entità esiste è
 	// l'azienda ATTESA, e un identificatore osservato che appartiene a
-	// un'azienda diversa è un conflitto, non una correzione — re-chiavare la
+	// un'azienda diversa è un conflitto, non una correzione — cambiare la chiave della
 	// riga lascerebbe il suo dettaglio sulla chiave vecchia.
 	PriorCompanyKey string
 
@@ -116,7 +116,7 @@ func (e *maCompanyIdentityConflictError) Error() string {
 
 // maCompanyIdentityMissingError è l'occorrenza priva di qualunque
 // identificatore E di una chiave pregressa: non c'è nulla su cui fondare
-// un'identità. Prima della 120 una riga così veniva chiavata sulla ragione
+// un'identità. Prima della 120 una riga così veniva identificata dalla ragione
 // sociale — cioè un'identità inventata da un nome. Qui erra invece di derivare.
 type maCompanyIdentityMissingError struct {
 	CompanyName string
@@ -261,7 +261,7 @@ func planMACompanyResolution(
 		// ATTESA: inizializza la risoluzione invece di essere un ripiego.
 		//
 		// Preferire gli identificatori l'avrebbe sostituita in silenzio, e una
-		// riga ri-chiavata lascia indietro il proprio dettaglio — rating,
+		// riga a cui si cambia chiave lascia indietro il proprio dettaglio — rating,
 		// dossier, letture di tesi restano sulla chiave vecchia. È l'orfanamento
 		// che questa issue esiste per impedire, quindi la divergenza fra chiave
 		// portata e identificatori osservati è un CONFLITTO da decidere a mano,
