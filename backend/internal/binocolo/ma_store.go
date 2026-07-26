@@ -15,14 +15,14 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/logging"
 )
 
-// translateMACompanyConstraintError keeps database backstops aligned with the
-// domain errors produced by the application guards. The mode enables the 23505
-// translation only for manual target insertion; callers add operation context.
 const (
 	maCompanyConstraintFKOnly       = false
 	maCompanyConstraintManualInsert = true
 )
 
+// translateMACompanyConstraintError keeps database backstops aligned with the
+// domain errors produced by the application guards. The mode enables the 23505
+// translation only for manual target insertion; callers add operation context.
 func translateMACompanyConstraintError(err error, duplicateIsAlreadyPresent bool) error {
 	var pgErr *pgconn.PgError
 	if !errors.As(err, &pgErr) {
