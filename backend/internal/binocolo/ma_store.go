@@ -117,6 +117,7 @@ type maWorkspaceStore interface {
 	FindMALatestTargetForCard(ctx context.Context, initiativeID, companyKey string) (sessionID, targetID string, err error)
 	ResolveMACompany(ctx context.Context, observation maCompanyObservation) (string, error)
 	RecordMACompanyIdentityConflicts(ctx context.Context, conflicts []maCompanyIdentityConflict) error
+	MACompanyExists(ctx context.Context, companyKey string) (bool, error)
 }
 
 type maCompanyLegalForm struct {

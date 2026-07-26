@@ -1403,6 +1403,7 @@ type fakeMAWorkspaceStore struct {
 	companyIdentities map[maCompanyIdentifierRef]string
 	companySequence   int
 	companyConflicts  []maCompanyIdentityConflict
+	companyKnown      map[string]bool
 }
 
 func (f *fakeMAWorkspaceStore) ListMASessions(context.Context, string) ([]MASessionSummary, error) {
@@ -1474,6 +1475,21 @@ func (f *fakeMAWorkspaceStore) ResolveMACompany(_ context.Context, observation m
 func (f *fakeMAWorkspaceStore) RecordMACompanyIdentityConflicts(_ context.Context, conflicts []maCompanyIdentityConflict) error {
 	f.companyConflicts = append(f.companyConflicts, conflicts...)
 	return nil
+}
+
+// MACompanyExists riconosce le chiavi che il fake ha coniato risolvendo, così i
+// writer con chiave dal client si comportano come in produzione.
+func (f *fakeMAWorkspaceStore) MACompanyExists(_ context.Context, companyKey string) (bool, error) {
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey == "" {
+		return false, nil
+	}
+	for _, owner := range f.companyIdentities {
+		if owner == companyKey {
+			return true, nil
+		}
+	}
+	return f.companyKnown[companyKey], nil
 }
 
 func (f *fakeMAWorkspaceStore) UpdateMASessionLifecycle(context.Context, string, string, string, string) (bool, error) {

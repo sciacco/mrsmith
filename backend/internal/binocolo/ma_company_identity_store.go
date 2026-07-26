@@ -101,6 +101,31 @@ func (s *SQLStore) ObserveMACompany(ctx context.Context, companyKey, companyName
 	return tx.Commit()
 }
 
+// MACompanyExists dice se una chiave è un'azienda conosciuta dal registro.
+//
+// Serve ai writer che ricevono la chiave dal CLIENT — voto, esito, etichetta di
+// settore — e non da una risoluzione o da una colonna. Senza, «chiave esistente
+// fornita dal chiamante» è un'assunzione e non un fatto: un client che ne mandi
+// una sbagliata scrive una riga che nessuna lettura ritrova e che il monitor
+// scopre solo dopo. È l'anticipo applicativo della FK verso ma_company, che
+// arriva in F5.
+func (s *SQLStore) MACompanyExists(ctx context.Context, companyKey string) (bool, error) {
+	if s == nil || s.db == nil {
+		return false, errors.New("binocolo ma store not configured")
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey == "" {
+		return false, nil
+	}
+	var exists bool
+	if err := s.db.QueryRowContext(ctx, `
+SELECT EXISTS (SELECT 1 FROM binocolo.ma_company WHERE company_key = $1)
+`, companyKey).Scan(&exists); err != nil {
+		return false, fmt.Errorf("check ma company exists: %w", err)
+	}
+	return exists, nil
+}
+
 // RecordMACompanyIdentityConflicts è la SECONDA transazione del contratto sul
 // conflitto. Idempotente: la stessa rilevazione ripetuta aggiorna
 // last_detected_at e incrementa il contatore invece di fallire — una scrittura

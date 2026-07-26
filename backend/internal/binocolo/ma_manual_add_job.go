@@ -413,10 +413,32 @@ func maManualAddSameTarget(existing, candidate MATarget) bool {
 	return false
 }
 
+// maManualAddDedupeKeys costruisce l'insieme dei valori con cui riconoscere «è
+// la stessa azienda» fra la P.IVA digitata dall'analista e i target GIÀ
+// PERSISTITI della sessione.
+//
+// Due cose che il codice precedente sbagliava.
+//
+// Passava da maTargetDedupeKey, che è la deduplica di righe dentro UNA risposta
+// del fornitore e nient'altro (issue #86): usarla per confrontare righe
+// persistite ne estendeva lo scope oltre il contratto dichiarato, e ci portava
+// dentro il ramo sulla RAGIONE SOCIALE — cioè due aziende diverse con lo stesso
+// nome sarebbero state la stessa azienda.
+//
+// E normalizzava tutto con upper+trim, mentre i valori fiscali dei target
+// vengono dal fornitore e possono avere il prefisso IT o la punteggiatura. Una
+// P.IVA digitata «01234567890» non riconosceva un target salvato come
+// «IT01234567890»: l'aggiunta manuale pagava una fetch advanced da €0.10 per
+// un'azienda già in sessione, per poi fallire con «target già presente» sulla
+// guardia della chiave risolta.
 func maManualAddDedupeKeys(target MATarget) map[string]struct{} {
 	out := map[string]struct{}{}
-	for _, value := range []string{target.CompanyKey, maTargetDedupeKey(target), target.VendorID, target.VATCode, target.TaxCode} {
-		value = normalizeMACompanyKey(value)
+	for _, value := range []string{
+		normalizeMACompanyKey(target.CompanyKey),
+		normalizeMACompanyKey(target.VendorID),
+		maStableVAT(target.VATCode),
+		normalizeMAFiscalValue(target.TaxCode),
+	} {
 		if value != "" {
 			out[value] = struct{}{}
 		}

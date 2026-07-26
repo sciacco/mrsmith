@@ -192,6 +192,9 @@ func (s *maService) setSectorEvalLabel(ctx context.Context, sessionID string, bo
 	if key == "" {
 		return fmt.Errorf("%w: companyKey", errMAStrategyInvalid)
 	}
+	if err := s.requireKnownMACompany(ctx, key); err != nil {
+		return err
+	}
 	label := strings.TrimSpace(body.Label)
 	switch label {
 	case "", "keep", "forse", "scarta":

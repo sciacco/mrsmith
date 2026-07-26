@@ -2056,6 +2056,12 @@ func (s *maService) setTargetRating(ctx context.Context, sessionID string, input
 	if input.CompanyKey == "" {
 		return fmt.Errorf("%w: company key", errMAStrategyInvalid)
 	}
+	// La chiave arriva dal client: va verificata contro il registro prima di
+	// scrivere il voto e, peggio, prima che ensureInitiativeCard apra una card
+	// su di essa.
+	if err := s.requireKnownMACompany(ctx, input.CompanyKey); err != nil {
+		return err
+	}
 	if !validMARating(input.Rating) {
 		return fmt.Errorf("%w: rating", errMAStrategyInvalid)
 	}
@@ -2907,6 +2913,10 @@ func (s *maService) addTargetOutcome(ctx context.Context, sessionID string, inpu
 	if companyKey == "" {
 		return fmt.Errorf("%w: company key", errMAStrategyInvalid)
 	}
+	// Chiave dal client: verificata contro il registro prima di scrivere l'esito.
+	if err := s.requireKnownMACompany(ctx, companyKey); err != nil {
+		return err
+	}
 	event := strings.ToLower(strings.TrimSpace(input.Event))
 	switch event {
 	case maOutcomeContattato, maOutcomeBuonLead, maOutcomeNoGo:
@@ -3355,6 +3365,28 @@ func (s *maService) observeVendorIdentity(ctx context.Context, companyKey string
 			"component", "binocolo", "operation", "ma_company_observe",
 			"company_key", companyKey, "company", observed.CompanyName, "error", err)
 	}
+}
+
+// requireKnownMACompany rifiuta una chiave che il registro non conosce.
+//
+// Va chiamata SOLO dai writer che ricevono la chiave dal client (voto, esito,
+// etichetta di settore): lì «chiave esistente fornita dal chiamante» è
+// un'assunzione, non un fatto, e senza controllo una chiave sbagliata produce
+// una riga che nessuna lettura ritrova — la UI mostra il voto sparito e il
+// monitor scopre l'orfano solo dopo. I writer che risolvono o rileggono la
+// chiave non ne hanno bisogno: per costruzione l'azienda esiste già.
+func (s *maService) requireKnownMACompany(ctx context.Context, companyKey string) error {
+	if s.store == nil {
+		return errMAStoreUnavailable
+	}
+	known, err := s.store.MACompanyExists(ctx, companyKey)
+	if err != nil {
+		return err
+	}
+	if !known {
+		return fmt.Errorf("%w: company key sconosciuta", errMAStrategyInvalid)
+	}
+	return nil
 }
 
 // noteMACompanyIdentityConflict persiste il conflitto in una transazione
