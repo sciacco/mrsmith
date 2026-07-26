@@ -13,8 +13,9 @@ L'esecuzione avviene **ad applicazione e worker fermi**. Il runbook è
 ## Sequenza
 
 ```
-0. deploy del commit PREPARATORIO   (branch fix/issue-86-pre-cutover-compat)
-1. stop writer (applicazione + worker)
+0.  deploy del commit PREPARATORIO  (branch fix/issue-86-pre-cutover-compat)
+0.5 migrazione 122                  (solo se Q16 non è vuota — vedi sotto)
+1.  stop writer (applicazione + worker)
 2. migrazione 120  — schema, registro, colonna ma_target.company_key nullable
 3. migrazione 121  — backfill di ma_target.company_key (ri-eseguibile)
 4. GATE            — sonda Q17: zero righe senza chiave, zero chiavi orfane
@@ -63,12 +64,35 @@ strumento standalone `/azienda` accodava il dossier con la **P.IVA come
 `company_key`**. Se la stessa azienda ha un dossier sotto la P.IVA e un target
 sotto l'ObjectId, quel valore fiscale rivendica due chiavi e la 120 si ferma.
 
-Il codice non lo fa più, ma le righe già scritte restano. **Non è un caso che la
-120 possa risolvere da sola**: è la prima fusione vera di due entità, e la issue
-ha deliberatamente lasciato il merge fuori scope perché cicli, catene, storia
-sulla chiave sorgente e navigazione dell'URL vecchio sono un design proprio. Se
-Q19 mostra `chiavi_fiscali > 0` su `ma_deep_analysis` e Q16 non è vuota, il
-cutover si ferma qui e la fusione va decisa — non aggirata.
+### Esito misurato il 2026-07-26 — serve il passo 0.5
+
+Le tre query sono state eseguite sull'Anisetta e il caso **esiste**:
+
+- **Q16**: 4 identità fiscali con due chiavi ciascuna (la P.IVA e un ObjectId).
+  Così com'è, la 120 **si ferma**.
+- **Q19**: 6 chiavi a forma di P.IVA in `ma_deep_analysis` e
+  `ma_deep_payload_vintage`, 3 in `ma_company_bm_family`. **Zero** in target,
+  card, rating, esiti, note, IRL, domini, web validation.
+- **Q4**: `identita_duplicate = 0`, `euro_sprecati = 0`.
+
+Le tre insieme dicono che **non è la fusione rimandata dalla issue**. Quella
+presuppone storia su entrambi i lati — card, voti, esiti, URL navigati — e va
+progettata. Qui la chiave sbagliata è usata solo da righe di cache, la chiave
+giusta non ha un dossier concorrente, e non c'è nulla dell'analista da
+riconciliare. **Si sposta, non si fonde**: è la migrazione 122.
+
+La 122 si applica **prima** della 120 (il numero è più alto solo perché 120 e
+121 sono già citate ovunque per numero). Non decide nulla alla cieca: solleva se
+la destinazione ha già un dossier, se una chiave avrebbe due destinazioni, o se
+la chiave sorgente porta storia fuori dalle tre tabelle di cache — ognuno di
+quei casi È una fusione vera, e allora il cutover si ferma davvero.
+
+Dopo la 122, **rieseguire Q16**: deve essere vuota. Solo allora si applica la 120.
+
+Le due chiavi fiscali che non collidono con nulla (aziende viste solo da
+`/azienda`, mai in una ricerca) restano come sono: la chiave è opaca, e se un
+domani compariranno in una ricerca il resolver le ritroverà dal loro
+identificatore fiscale. Q19 continuerà a contarle, correttamente.
 
 ### Dopo la 120
 
