@@ -1576,6 +1576,22 @@ func (f *fakeMAWorkspaceStore) SoftDeleteMAAnnotation(context.Context, string, s
 	return f.deleteAnnotationErr
 }
 
+func (f *fakeMAWorkspaceStore) ListMACompanyContacts(context.Context, string) ([]MACompanyContact, error) {
+	return []MACompanyContact{}, nil
+}
+
+func (f *fakeMAWorkspaceStore) CreateMACompanyContact(context.Context, string, MACompanyContactWrite, string, string) (MACompanyContact, error) {
+	return MACompanyContact{}, nil
+}
+
+func (f *fakeMAWorkspaceStore) UpdateMACompanyContact(context.Context, string, string, MACompanyContactWrite, string, string) (MACompanyContact, error) {
+	return MACompanyContact{}, nil
+}
+
+func (f *fakeMAWorkspaceStore) SoftDeleteMACompanyContact(context.Context, string, string, string, string) error {
+	return nil
+}
+
 func (f *fakeMAWorkspaceStore) ListMACompanyActivity(context.Context, string, bool) (MACompanyActivity, error) {
 	return MACompanyActivity{Items: []MATargetOutcome{}, Initiatives: []MACompanyActivityLookup{}, Sessions: []MACompanyActivitySession{}}, nil
 }

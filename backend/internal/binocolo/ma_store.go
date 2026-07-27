@@ -88,6 +88,10 @@ type maWorkspaceStore interface {
 	InsertMATargetOutcome(ctx context.Context, outcome MATargetOutcome) error
 	UpdateMAAnnotation(ctx context.Context, id, note, subject, email string) error
 	SoftDeleteMAAnnotation(ctx context.Context, id, subject, email string) error
+	ListMACompanyContacts(ctx context.Context, companyKey string) ([]MACompanyContact, error)
+	CreateMACompanyContact(ctx context.Context, companyKey string, input MACompanyContactWrite, subject, email string) (MACompanyContact, error)
+	UpdateMACompanyContact(ctx context.Context, companyKey, contactID string, input MACompanyContactWrite, subject, email string) (MACompanyContact, error)
+	SoftDeleteMACompanyContact(ctx context.Context, companyKey, contactID, subject, email string) error
 	ListMACompanyActivity(ctx context.Context, companyKey string, includeDeleted bool) (MACompanyActivity, error)
 	LatestMASystemDomainAnnotation(ctx context.Context, companyKey string) (string, error)
 	GetMACompanyDomain(ctx context.Context, companyKey, vatCode, taxCode string) (*maCompanyDomain, error)

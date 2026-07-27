@@ -26,26 +26,27 @@ import (
 )
 
 var (
-	errMAStoreUnavailable      = errors.New("ma store unavailable")
-	errMAOpenAPIITUnavailable  = errors.New("openapiit unavailable")
-	errMAOpenRouterUnavailable = errors.New("openrouter unavailable")
-	errMABraveUnavailable      = errors.New("brave unavailable")
-	errMALLMConfigUnavailable  = errors.New("ma llm config unavailable")
-	errMAEstimateTooLarge      = errors.New("estimate too large")
-	errMAEstimateOverBudget    = errors.New("estimate over budget")
-	errMAVisibilityInvalid     = errors.New("ma session visibility invalid")
-	errMASessionArchived       = errors.New("ma session archived")
-	errMASessionDeleted        = errors.New("ma session deleted")
-	errMAInitiativeArchived    = errors.New("ma initiative archived")
-	errMAInitiativeDeleted     = errors.New("ma initiative deleted")
-	errMAInitiativePurged      = errors.New("ma initiative purged")
-	errMAInitiativeNotFound    = errors.New("ma initiative not found")
-	errMATargetAlreadyPresent  = errors.New("Azienda già presente nella ricerca")
-	errMAManualAddInFlight     = errors.New("Inserimento manuale già in corso per questa ricerca")
-	errMAVATNotFound           = errors.New("P.IVA non trovata nel registro")
-	errMAInvalidVAT            = errors.New("P.IVA o codice fiscale non valido")
-	errMACardAlreadyPresent    = errors.New("Azienda già presente in questa iniziativa")
-	errMAAnnotationNotFound    = errors.New("ma annotation not found")
+	errMAStoreUnavailable       = errors.New("ma store unavailable")
+	errMAOpenAPIITUnavailable   = errors.New("openapiit unavailable")
+	errMAOpenRouterUnavailable  = errors.New("openrouter unavailable")
+	errMABraveUnavailable       = errors.New("brave unavailable")
+	errMALLMConfigUnavailable   = errors.New("ma llm config unavailable")
+	errMAEstimateTooLarge       = errors.New("estimate too large")
+	errMAEstimateOverBudget     = errors.New("estimate over budget")
+	errMAVisibilityInvalid      = errors.New("ma session visibility invalid")
+	errMASessionArchived        = errors.New("ma session archived")
+	errMASessionDeleted         = errors.New("ma session deleted")
+	errMAInitiativeArchived     = errors.New("ma initiative archived")
+	errMAInitiativeDeleted      = errors.New("ma initiative deleted")
+	errMAInitiativePurged       = errors.New("ma initiative purged")
+	errMAInitiativeNotFound     = errors.New("ma initiative not found")
+	errMATargetAlreadyPresent   = errors.New("Azienda già presente nella ricerca")
+	errMAManualAddInFlight      = errors.New("Inserimento manuale già in corso per questa ricerca")
+	errMAVATNotFound            = errors.New("P.IVA non trovata nel registro")
+	errMAInvalidVAT             = errors.New("P.IVA o codice fiscale non valido")
+	errMACardAlreadyPresent     = errors.New("Azienda già presente in questa iniziativa")
+	errMAAnnotationNotFound     = errors.New("ma annotation not found")
+	errMACompanyContactNotFound = errors.New("ma company contact not found")
 	// errMAEstimateSuperseded is returned by ReplaceMAEstimates when the active
 	// strategy version changed mid-estimate (the user re-submitted). The estimate
 	// worker loops on it to re-run against the now-active version, so the latest
@@ -830,6 +831,102 @@ func (s *maService) deleteAnnotation(ctx context.Context, id, subject, email str
 		return errMAAnnotationNotFound
 	}
 	return s.store.SoftDeleteMAAnnotation(ctx, id, subject, email)
+}
+
+func validateMACompanyContact(input MACompanyContactWrite) (MACompanyContactWrite, error) {
+	input.Name = strings.TrimSpace(input.Name)
+	input.Relationship = strings.TrimSpace(input.Relationship)
+	input.ContactDetails = strings.TrimSpace(input.ContactDetails)
+	input.Note = strings.TrimSpace(input.Note)
+	limits := []struct {
+		name, value string
+		max         int
+	}{
+		{"name", input.Name, 200}, {"relationship", input.Relationship, 100},
+		{"contactDetails", input.ContactDetails, 2000}, {"note", input.Note, 2000},
+	}
+	for _, field := range limits {
+		if field.name == "name" && field.value == "" {
+			return input, fmt.Errorf("%w: name", errMAStrategyInvalid)
+		}
+		if len([]rune(field.value)) > field.max {
+			return input, fmt.Errorf("%w: %s exceeds %d characters", errMAStrategyInvalid, field.name, field.max)
+		}
+	}
+	return input, nil
+}
+
+func (s *maService) listCompanyContacts(ctx context.Context, companyKey string) ([]MACompanyContact, error) {
+	if s.store == nil {
+		return nil, errMAStoreUnavailable
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey == "" {
+		return nil, fmt.Errorf("%w: companyKey", errMAStrategyInvalid)
+	}
+	if err := s.requireKnownMACompany(ctx, companyKey); err != nil {
+		return nil, err
+	}
+	return s.store.ListMACompanyContacts(ctx, companyKey)
+}
+
+func (s *maService) createCompanyContact(ctx context.Context, companyKey string, input MACompanyContactWrite, subject, email string) (MACompanyContact, error) {
+	if s.store == nil {
+		return MACompanyContact{}, errMAStoreUnavailable
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey == "" {
+		return MACompanyContact{}, fmt.Errorf("%w: companyKey", errMAStrategyInvalid)
+	}
+	clean, err := validateMACompanyContact(input)
+	if err != nil {
+		return MACompanyContact{}, err
+	}
+	if err := s.requireKnownMACompany(ctx, companyKey); err != nil {
+		return MACompanyContact{}, err
+	}
+	return s.store.CreateMACompanyContact(ctx, companyKey, clean, subject, email)
+}
+
+func (s *maService) updateCompanyContact(ctx context.Context, companyKey, contactID string, input MACompanyContactReplaceRequest, subject, email string) (MACompanyContact, error) {
+	if s.store == nil {
+		return MACompanyContact{}, errMAStoreUnavailable
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey == "" {
+		return MACompanyContact{}, fmt.Errorf("%w: companyKey", errMAStrategyInvalid)
+	}
+	if _, err := uuid.Parse(strings.TrimSpace(contactID)); err != nil {
+		return MACompanyContact{}, errMACompanyContactNotFound
+	}
+	if input.Name == nil || input.Relationship == nil || input.ContactDetails == nil || input.Note == nil || input.IsPrimary == nil {
+		return MACompanyContact{}, fmt.Errorf("%w: PUT requires all contact fields", errMAStrategyInvalid)
+	}
+	clean, err := validateMACompanyContact(MACompanyContactWrite{Name: *input.Name, Relationship: *input.Relationship, ContactDetails: *input.ContactDetails, Note: *input.Note, IsPrimary: *input.IsPrimary})
+	if err != nil {
+		return MACompanyContact{}, err
+	}
+	if err := s.requireKnownMACompany(ctx, companyKey); err != nil {
+		return MACompanyContact{}, err
+	}
+	return s.store.UpdateMACompanyContact(ctx, companyKey, contactID, clean, subject, email)
+}
+
+func (s *maService) deleteCompanyContact(ctx context.Context, companyKey, contactID, subject, email string) error {
+	if s.store == nil {
+		return errMAStoreUnavailable
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey == "" {
+		return fmt.Errorf("%w: companyKey", errMAStrategyInvalid)
+	}
+	if _, err := uuid.Parse(strings.TrimSpace(contactID)); err != nil {
+		return errMACompanyContactNotFound
+	}
+	if err := s.requireKnownMACompany(ctx, companyKey); err != nil {
+		return err
+	}
+	return s.store.SoftDeleteMACompanyContact(ctx, companyKey, contactID, subject, email)
 }
 
 func (s *maService) listCompanyActivity(ctx context.Context, companyKey string, includeDeleted bool) (MACompanyActivity, error) {

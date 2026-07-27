@@ -162,6 +162,10 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/annotations", h.handleCreateMAAnnotation)
 	handle("PATCH /binocolo/v1/ma/annotations/{id}", h.handleUpdateMAAnnotation)
 	handle("DELETE /binocolo/v1/ma/annotations/{id}", h.handleDeleteMAAnnotation)
+	handle("GET /binocolo/v1/ma/companies/{companyKey}/contacts", h.handleListMACompanyContacts)
+	handle("POST /binocolo/v1/ma/companies/{companyKey}/contacts", h.handleCreateMACompanyContact)
+	handle("PUT /binocolo/v1/ma/companies/{companyKey}/contacts/{contactId}", h.handleUpdateMACompanyContact)
+	handle("DELETE /binocolo/v1/ma/companies/{companyKey}/contacts/{contactId}", h.handleDeleteMACompanyContact)
 	handle("GET /binocolo/v1/ma/companies/{companyKey}/registry", h.handleGetMACompanyRegistry)
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/registry/facts", h.handleCreateMACompanyFact)
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/registry/facts/{factId}/revoke", h.handleRevokeMACompanyFact)
@@ -1219,6 +1223,72 @@ func (h *Handler) handleDeleteMAAnnotation(w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *Handler) handleListMACompanyContacts(w http.ResponseWriter, r *http.Request) {
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	contacts, err := h.ma.listCompanyContacts(r.Context(), companyKey)
+	if err != nil {
+		h.maFailure(w, r, "ma_company_contacts_list", err, "company_key", companyKey)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, contacts)
+}
+
+func (h *Handler) handleCreateMACompanyContact(w http.ResponseWriter, r *http.Request) {
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	var body MACompanyContactWrite
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	contact, err := h.ma.createCompanyContact(r.Context(), companyKey, body, subject, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_company_contact_create", err, "company_key", companyKey)
+		return
+	}
+	httputil.JSON(w, http.StatusCreated, contact)
+}
+
+func (h *Handler) handleUpdateMACompanyContact(w http.ResponseWriter, r *http.Request) {
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	contactID := strings.TrimSpace(r.PathValue("contactId"))
+	var body MACompanyContactReplaceRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	contact, err := h.ma.updateCompanyContact(r.Context(), companyKey, contactID, body, subject, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_company_contact_update", err, "company_key", companyKey, "contact_id", contactID)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, contact)
+}
+
+func (h *Handler) handleDeleteMACompanyContact(w http.ResponseWriter, r *http.Request) {
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	contactID := strings.TrimSpace(r.PathValue("contactId"))
+	subject, email := companySearchRefreshActor(r.Context())
+	if err := h.ma.deleteCompanyContact(r.Context(), companyKey, contactID, subject, email); err != nil {
+		h.maFailure(w, r, "ma_company_contact_delete", err, "company_key", companyKey, "contact_id", contactID)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *Handler) handleArchiveMASession(w http.ResponseWriter, r *http.Request) {
 	id, ok := maSessionID(w, r)
 	if !ok {
@@ -2069,6 +2139,9 @@ func maHTTPError(err error) (int, string, string) {
 	}
 	if errors.Is(err, errMAAnnotationNotFound) {
 		return http.StatusNotFound, "ma_annotation_not_found", "warn"
+	}
+	if errors.Is(err, errMACompanyContactNotFound) {
+		return http.StatusNotFound, "ma_company_contact_not_found", "warn"
 	}
 	// Deposited-filing endpoints (issue #78, Fase 8).
 	if errors.Is(err, errMAFilingIdentityUnresolved) {

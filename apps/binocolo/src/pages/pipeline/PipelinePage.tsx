@@ -8,6 +8,7 @@ import { ACTIVE_STATES, CARD_STATES, MACROFASI, TERMINAL_STATES, stateLabel, esi
 import { errorLabel } from '../ricerche/helpers';
 import { writeCohort } from '../../components/scheda/cohort';
 import { ActivityTimeline } from '../../components/company/activity/ActivityTimeline';
+import { CompanyContactsPanel } from '../../components/company/contacts/CompanyContactsPanel';
 import { useCompanyActivity } from '../../hooks/useCompanyActivity';
 import { FunnelStrip } from '../iniziative/board/FunnelStrip';
 import { StatesView } from '../iniziative/board/StatesView';
@@ -220,9 +221,8 @@ export function PipelinePage() {
   );
 }
 
-/** Drawer di sola lettura (v1): dati della card + diario, e i due passaggi «Apri
- *  nella board» / «Apri scheda». Nessuna mutazione (si lavora nella board di
- *  iniziativa). */
+/** Drawer read-only per stato e lavorazione della card; la rubrica aziendale
+ * resta modificabile perché non muta la card. */
 function PipelineDrawer({
   card,
   onClose,
@@ -275,6 +275,10 @@ function PipelineDrawer({
               {card.esito ? ` · ${esitoLabel(card.esito)}` : ''}
             </span>
             {prov ? <p className={styles.hint} style={{ marginTop: 8 }}>Giudizio: {'★'.repeat(Math.max(0, Math.min(3, prov.rating)))} · {prov.sessionTitle}</p> : null}
+          </div>
+
+          <div className={styles.drawerSec}>
+            <CompanyContactsPanel companyKey={card.companyKey} compact />
           </div>
 
           <div className={styles.drawerSec}>

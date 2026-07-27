@@ -31,6 +31,7 @@ import { useSectionSpy } from '../../components/scheda/useSectionSpy';
 import { ThesisReadingPanel } from '../../components/ThesisReadingPanel/ThesisReadingPanel';
 import { CompanyRegistrySection } from '../iniziative/CompanyRegistrySection';
 import { CompanyActivityPanel } from '../../components/company/activity/CompanyActivityPanel';
+import { CompanyContactsPanel } from '../../components/company/contacts/CompanyContactsPanel';
 import { bucketLabelWithSuppressionHistory, dateLabel, errorLabel, sessionStatusLabel } from '../ricerche/helpers';
 import styles from './SchedaAziendaPage.module.css';
 
@@ -919,9 +920,12 @@ export function SchedaAziendaPage() {
 
         {target && showShareholdersDetail ? (
           <LabeledDisclosure title="Tutti i soci" density={String(shareholders.length)}>
-            <ShareholdersDetail target={target} />
+            <ShareholdersDetail target={target} companyKey={identity.companyKey} />
           </LabeledDisclosure>
         ) : null}
+        <div className={styles.subSection}>
+          <CompanyContactsPanel companyKey={identity.companyKey} />
+        </div>
       </section>
 
       <section className={styles.block} aria-labelledby="scheda-storia-title">

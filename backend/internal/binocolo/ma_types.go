@@ -773,6 +773,34 @@ type MAAnnotationUpdateRequest struct {
 	Body string `json:"body"`
 }
 
+type MACompanyContact struct {
+	ID             string     `json:"id"`
+	CompanyKey     string     `json:"companyKey"`
+	Name           string     `json:"name"`
+	Relationship   string     `json:"relationship"`
+	ContactDetails string     `json:"contactDetails"`
+	Note           string     `json:"note"`
+	IsPrimary      bool       `json:"isPrimary"`
+	CreatedAt      time.Time  `json:"createdAt"`
+	UpdatedAt      *time.Time `json:"updatedAt,omitempty"`
+}
+
+type MACompanyContactWrite struct {
+	Name           string `json:"name"`
+	Relationship   string `json:"relationship"`
+	ContactDetails string `json:"contactDetails"`
+	Note           string `json:"note"`
+	IsPrimary      bool   `json:"isPrimary"`
+}
+
+type MACompanyContactReplaceRequest struct {
+	Name           *string `json:"name"`
+	Relationship   *string `json:"relationship"`
+	ContactDetails *string `json:"contactDetails"`
+	Note           *string `json:"note"`
+	IsPrimary      *bool   `json:"isPrimary"`
+}
+
 // MACardMarker names one Iniziativa where the company has an ACTIVE card
 // (PRD §6.1: collision marker, derived from the cards, no new data).
 type MACardMarker struct {

@@ -495,6 +495,26 @@ export interface MAScoringPlanSignal {
 export type MATargetBucket = 'principale' | 'da_verificare' | 'azionabile' | 'soppresso';
 
 // Evento del log esiti (ground truth reale, append-only).
+export interface MACompanyContact {
+  id: string;
+  companyKey: string;
+  name: string;
+  relationship: string;
+  contactDetails: string;
+  note: string;
+  isPrimary: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface MACompanyContactWrite {
+  name: string;
+  relationship: string;
+  contactDetails: string;
+  note: string;
+  isPrimary: boolean;
+}
+
 export interface MATargetOutcome {
   id: string;
   sessionId?: string;

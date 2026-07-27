@@ -4,6 +4,7 @@ import { Button, Drawer, Icon, Skeleton } from '@mrsmith/ui';
 import type { MAInitiativeCardView } from '../../../api/types';
 import { errorLabel } from '../../ricerche/helpers';
 import { ActivityTimeline } from '../../../components/company/activity/ActivityTimeline';
+import { CompanyContactsPanel } from '../../../components/company/contacts/CompanyContactsPanel';
 import { useAnnotationMutations, useCompanyActivity } from '../../../hooks/useCompanyActivity';
 import { writeCohort } from '../../../components/scheda/cohort';
 import { ACTIVE_STATES, isTerminalState, stateLabel, esitoLabel, stateVars } from '../../../lib/cardStates';
@@ -227,6 +228,10 @@ export function CardDrawer({
             ) : (
               <p className={styles.hint}>Stato analisi non disponibile.</p>
             )}
+          </div>
+
+          <div className={styles.drawerSec}>
+            <CompanyContactsPanel companyKey={card.companyKey} compact />
           </div>
 
           <div className={styles.drawerSec}>

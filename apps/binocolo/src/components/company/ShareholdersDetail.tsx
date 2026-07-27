@@ -1,5 +1,7 @@
-import { Icon } from '@mrsmith/ui';
+import { useState } from 'react';
+import { Button, Icon } from '@mrsmith/ui';
 import type { MATarget } from '../../api/types';
+import { ContactEditorModal } from './contacts/ContactEditorModal';
 import styles from './CompanyPanels.module.css';
 
 type ShareholderDetail = {
@@ -60,8 +62,9 @@ export function hasShareholdersDetail(target?: MATarget): boolean {
   return extractShareholdersDetail(target).length > 0;
 }
 
-export function ShareholdersDetail({ target }: { target: MATarget }) {
+export function ShareholdersDetail({ target, companyKey }: { target: MATarget; companyKey: string }) {
   const shareholders = extractShareholdersDetail(target);
+  const [contactName, setContactName] = useState<string | null>(null);
 
   if (shareholders.length === 0) {
     return <EmptyState title="Soci non disponibili" text="Nessun dato relativo ai soci presente per questo target." />;
@@ -80,9 +83,11 @@ export function ShareholdersDetail({ target }: { target: MATarget }) {
               <span>Quota societaria:</span>
               <strong>{percent > 0 ? `${percent.toLocaleString('it-IT')}%` : 'n.d.'}</strong>
             </div>
+            <Button size="sm" variant="ghost" onClick={() => setContactName(displayName)}>Aggiungi ai contatti</Button>
           </div>
         );
       })}
+      {contactName ? <ContactEditorModal companyKey={companyKey} open onClose={() => setContactName(null)} initial={{ name: contactName, relationship: 'Socio' }} /> : null}
     </div>
   );
 }
