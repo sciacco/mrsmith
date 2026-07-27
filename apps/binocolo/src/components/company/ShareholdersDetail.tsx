@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Icon } from '@mrsmith/ui';
+import { Button, Icon, Tooltip } from '@mrsmith/ui';
 import type { MATarget } from '../../api/types';
 import { ContactEditorModal } from './contacts/ContactEditorModal';
 import styles from './CompanyPanels.module.css';
@@ -83,7 +83,11 @@ export function ShareholdersDetail({ target, companyKey }: { target: MATarget; c
               <span>Quota societaria:</span>
               <strong>{percent > 0 ? `${percent.toLocaleString('it-IT')}%` : 'n.d.'}</strong>
             </div>
-            <Button size="sm" variant="ghost" onClick={() => setContactName(displayName)}>Aggiungi ai contatti</Button>
+            <Tooltip content="Aggiungi ai contatti">
+              <Button className={styles.shContactButton} size="sm" variant="ghost" aria-label={`Aggiungi ${displayName} ai contatti`} onClick={() => setContactName(displayName)}>
+                <span aria-hidden="true">+</span><Icon name="user" size={16} />
+              </Button>
+            </Tooltip>
           </div>
         );
       })}

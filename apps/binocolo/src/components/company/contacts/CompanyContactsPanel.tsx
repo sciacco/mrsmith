@@ -26,11 +26,11 @@ export function CompanyContactsPanel({ companyKey, compact = false }: { companyK
       {query.isLoading ? <Skeleton rows={2} /> : query.isError ? (
         <div className={styles.errorState} role="alert"><p>Rubrica non disponibile.</p><Button size="sm" variant="secondary" onClick={() => void query.refetch()}>Riprova</Button></div>
       ) : contacts.length === 0 ? (
-        <div className={styles.empty}><span aria-hidden="true"><Icon name="user" size={28} /></span><strong>Nessun interlocutore</strong><p>Aggiungi la prima persona di riferimento per questa azienda.</p><Button size="sm" variant="primary" onClick={() => setEditor('new')}>Aggiungi interlocutore</Button></div>
+        <p className={styles.empty}>Nessun interlocutore</p>
       ) : (
         <div className={styles.list}>{contacts.map((contact, index) => (
           <details className={styles.contact} key={contact.id} open={contact.isPrimary || (!contacts.some((item) => item.isPrimary) && index === 0 && !compact)}>
-            <summary><span><strong>{contact.name}</strong>{contact.relationship ? <small>{contact.relationship}</small> : null}</span>{contact.isPrimary ? <em>Principale</em> : null}<Icon name="chevron-down" size={16} /></summary>
+            <summary><span><strong>{contact.name}</strong>{contact.relationship ? <small>{contact.relationship}</small> : null}</span>{contact.contactDetails ? <span className={styles.contactPreview}>{contact.contactDetails.split('\n').filter((line) => line.trim()).join(' · ')}</span> : null}{contact.isPrimary ? <em>Principale</em> : null}<Icon name="chevron-down" size={16} /></summary>
             <div className={styles.contactBody}>
               {contact.contactDetails ? <div className={styles.details}><div className={styles.detailsHeading}><span>Recapiti</span><button type="button" onClick={() => void copy(contact.contactDetails)}>Copia tutti i recapiti</button></div>{contact.contactDetails.split('\n').filter((line) => line.trim().length > 0).map((line, lineIndex) => <div className={styles.detailLine} key={`${contact.id}-${lineIndex}`}><span>{line}</span><button type="button" aria-label={`Copia recapito: ${line}`} onClick={() => void copy(line)}><Icon name="copy" size={15} /></button></div>)}</div> : <p className={styles.muted}>Nessun recapito registrato.</p>}
               {contact.note ? <p className={styles.note}>{contact.note}</p> : null}

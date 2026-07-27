@@ -10,6 +10,7 @@
 .contact summary > span { display: grid; flex: 1; gap: var(--space-1); }
 .contact summary strong { font-size: .9375rem; }
 .contact summary small { color: var(--color-text-muted); font-size: .75rem; }
+.contactPreview { flex: 1; min-width: 0; overflow: hidden; color: var(--color-text-secondary); font-size: .8125rem; line-height: 1.4; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
 .contact summary em { padding: var(--space-1) var(--space-2); border-radius: var(--radius-full); background: var(--color-accent-subtle); color: var(--color-accent); font-size: .6875rem; font-style: normal; font-weight: 600; text-transform: uppercase; }
 .contact[open] summary > svg { transform: rotate(180deg); }
 .contactBody { display: grid; gap: var(--space-3); padding: 0 var(--space-4) var(--space-4); border-top: 1px solid var(--color-border-subtle); }
@@ -20,10 +21,8 @@
 .detailLine button { display: grid; place-items: center; min-width: 36px; min-height: 36px; border-radius: var(--radius-full); }
 .note { margin: 0; padding: var(--space-3); border-left: 3px solid var(--color-border); color: var(--color-text-secondary); font-size: .8125rem; line-height: 1.5; white-space: pre-wrap; }
 .contactActions { display: flex; justify-content: flex-end; gap: var(--space-2); }
-.empty { display: grid; justify-items: center; padding: var(--space-8); text-align: center; }
-.empty > span { display: grid; place-items: center; width: 72px; height: 72px; margin-bottom: var(--space-5); border-radius: var(--radius-xl); background: var(--color-surface); color: var(--color-text-faint); }
-.empty strong { color: var(--color-text-secondary); }
-.empty p, .muted { margin: var(--space-1) 0 var(--space-4); color: var(--color-text-muted); font-size: .8125rem; }
+.empty { margin: 0; color: var(--color-text-muted); font-size: .8125rem; line-height: 1.5; }
+.muted { margin: var(--space-1) 0 var(--space-4); color: var(--color-text-muted); font-size: .8125rem; }
 .errorState { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-4); border-radius: var(--radius-md); background: var(--color-danger-subtle); color: var(--color-danger-hover); }
 .errorState p { margin: 0; }
 .copyError, .formError, .warning { margin: 0; color: var(--color-danger-hover); font-size: .8125rem; }
@@ -41,4 +40,4 @@
 .removeBody > p { margin: 0; line-height: 1.5; }
 .compact .heading h3 { font-size: .875rem; }
 .compact .heading p { display: none; }
-@media (max-width: 640px) { .heading { align-items: stretch; flex-direction: column; } .modalActions { flex-direction: column-reverse; } .modalActions button { width: 100%; } }
+@media (max-width: 640px) { .heading { align-items: stretch; flex-direction: column; } .contactPreview { display: none; } .modalActions { flex-direction: column-reverse; } .modalActions button { width: 100%; } }
