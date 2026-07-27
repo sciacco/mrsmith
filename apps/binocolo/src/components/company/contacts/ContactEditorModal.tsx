@@ -15,9 +15,16 @@ export function ContactEditorModal({ companyKey, open, onClose, contact, initial
 
   useEffect(() => {
     if (!open) return;
-    setForm(contact ? { name: contact.name, relationship: contact.relationship, contactDetails: contact.contactDetails, note: contact.note, isPrimary: contact.isPrimary } : { ...empty, ...initial });
+    setForm(contact ? { name: contact.name, relationship: contact.relationship, contactDetails: contact.contactDetails, note: contact.note, isPrimary: contact.isPrimary } : {
+      ...empty,
+      name: initial?.name ?? '',
+      relationship: initial?.relationship ?? '',
+      contactDetails: initial?.contactDetails ?? '',
+      note: initial?.note ?? '',
+      isPrimary: initial?.isPrimary ?? false,
+    });
     setError('');
-  }, [contact, initial, open]);
+  }, [contact, initial?.contactDetails, initial?.isPrimary, initial?.name, initial?.note, initial?.relationship, open]);
 
   const set = (key: keyof MACompanyContactWrite, value: string | boolean) => { setForm((current) => ({ ...current, [key]: value })); setError(''); };
   const save = async () => {
