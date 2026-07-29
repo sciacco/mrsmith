@@ -942,7 +942,7 @@ export function SchedaAziendaPage() {
         <CompanyActivityPanel companyKey={identity.companyKey} companyName={identity.companyName || identity.companyKey} vatCode={identity.vatCode} />
         {showIRL ? (
           <div className={styles.subSection}>
-            <h3>IRL</h3>
+            <h3>IRL (Information Request List)</h3>
             <IRLPanel initiativeId={lens.type === 'iniziativa' ? lens.id : ''} companyKey={identity.companyKey} companyName={identity.companyName || identity.companyKey} />
           </div>
         ) : null}
