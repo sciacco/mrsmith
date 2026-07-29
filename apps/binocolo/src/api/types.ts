@@ -515,6 +515,32 @@ export interface MACompanyContactWrite {
   isPrimary: boolean;
 }
 
+// Google Drive documents (issue #98). Drive is the source of truth; the
+// backend lists the company folder's direct children, already sorted
+// (folders first, then by name) and with trashed children filtered out.
+// modifiedAt is an ISO string (may be empty).
+export interface MACompanyDocument {
+  id: string;
+  name: string;
+  mimeType: string;
+  modifiedAt: string;
+  webViewLink: string;
+}
+
+export interface MACompanyDocuments {
+  folderWebViewLink: string;
+  // Bound subfolder id of the lens initiative's card (absent without a lens or
+  // binding). The active-lens highlight matches on this id, never on names.
+  cardFolderId?: string;
+  items: MACompanyDocument[];
+}
+
+// Response of the idempotent card subfolder ensure (POST drive-folder).
+export interface MACardDriveFolder {
+  folderId: string;
+  webViewLink: string;
+}
+
 export interface MATargetOutcome {
   id: string;
   sessionId?: string;

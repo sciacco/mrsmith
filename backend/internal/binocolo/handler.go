@@ -15,6 +15,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/acl"
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/brave"
+	"github.com/sciacco/mrsmith/internal/platform/googledrive"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 	"github.com/sciacco/mrsmith/internal/platform/llm"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
@@ -23,11 +24,12 @@ import (
 )
 
 type Deps struct {
-	OpenAPIIT  *openapiit.Client
-	Brave      *brave.Client
-	Scrape     *scrape.Client
-	LLM        *llm.Service
-	AnisettaDB *sql.DB
+	OpenAPIIT   *openapiit.Client
+	Brave       *brave.Client
+	Scrape      *scrape.Client
+	LLM         *llm.Service
+	GoogleDrive *googledrive.Service
+	AnisettaDB  *sql.DB
 	// InstanceOwner stamps enqueued ma_job rows with this instance's stable identity
 	// (config InstanceOwner) so they are pre-leased to it and foreign workers on the
 	// shared Anisetta DB can't steal them. Empty tolerated (see EnqueueMAJob).
@@ -79,6 +81,11 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	// be a non-nil interface (typed-nil), defeating the s.scrape == nil fallback.
 	if deps.Scrape != nil {
 		h.ma.scrape = deps.Scrape
+	}
+	// Google Drive documents (issue #98). Soft dependency: nil degrades the
+	// documents surface to a not_configured (503) state, the Scheda is unaffected.
+	if deps.GoogleDrive != nil {
+		h.ma.drive = deps.GoogleDrive
 	}
 	if sqlStore != nil {
 		h.ma.kb = sqlStore
@@ -166,6 +173,10 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/contacts", h.handleCreateMACompanyContact)
 	handle("PUT /binocolo/v1/ma/companies/{companyKey}/contacts/{contactId}", h.handleUpdateMACompanyContact)
 	handle("DELETE /binocolo/v1/ma/companies/{companyKey}/contacts/{contactId}", h.handleDeleteMACompanyContact)
+	// Google Drive documents (issue #98, executing PRD #85). Company-scoped
+	// listing (lazy-ensures the folder) and the idempotent card subfolder ensure.
+	handle("GET /binocolo/v1/ma/companies/{companyKey}/documents", h.handleListMACompanyDocuments)
+	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/drive-folder", h.handleEnsureMACardDriveFolder)
 	handle("GET /binocolo/v1/ma/companies/{companyKey}/registry", h.handleGetMACompanyRegistry)
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/registry/facts", h.handleCreateMACompanyFact)
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/registry/facts/{factId}/revoke", h.handleRevokeMACompanyFact)
@@ -1289,6 +1300,57 @@ func (h *Handler) handleDeleteMACompanyContact(w http.ResponseWriter, r *http.Re
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// handleListMACompanyDocuments lists the company's Drive folder children (lazy-
+// ensuring the folder on first access). Drive is the source of truth; Binocolo
+// owns only the binding. Folders sort first, then by name. The optional
+// initiativeId query param is the Scheda's lens: it resolves the card's bound
+// subfolder id so the frontend highlights by id, never by name.
+func (h *Handler) handleListMACompanyDocuments(w http.ResponseWriter, r *http.Request) {
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	initiativeID := strings.TrimSpace(r.URL.Query().Get("initiativeId"))
+	if initiativeID != "" {
+		if _, err := uuid.Parse(initiativeID); err != nil {
+			httputil.Error(w, http.StatusBadRequest, "invalid_ma_initiative_id")
+			return
+		}
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	docs, err := h.ma.listCompanyDocuments(r.Context(), companyKey, initiativeID, subject, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_company_documents_list", err, "company_key", companyKey)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, docs)
+}
+
+// handleEnsureMACardDriveFolder idempotently ensures the card's Drive subfolder
+// (under the company folder) and returns its id + browse link. 200 OK on every
+// call — idempotent ensure semantics.
+func (h *Handler) handleEnsureMACardDriveFolder(w http.ResponseWriter, r *http.Request) {
+	initiativeID, ok := maInitiativeID(w, r)
+	if !ok {
+		return
+	}
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	if _, err := h.ma.requireOperationalInitiativeCard(r.Context(), initiativeID, companyKey); err != nil {
+		h.maFailure(w, r, "ma_card_drive_folder_ensure", err, "initiative_id", initiativeID, "company_key", companyKey)
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	folderID, webViewLink, err := h.ma.ensureCardFolder(r.Context(), initiativeID, companyKey, subject, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_card_drive_folder_ensure", err, "initiative_id", initiativeID, "company_key", companyKey)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, map[string]string{"folderId": folderID, "webViewLink": webViewLink})
+}
+
 func (h *Handler) handleArchiveMASession(w http.ResponseWriter, r *http.Request) {
 	id, ok := maSessionID(w, r)
 	if !ok {
@@ -2224,6 +2286,32 @@ func maHTTPError(err error) (int, string, string) {
 	var openRouterErr *llm.APIError
 	if errors.As(err, &openRouterErr) {
 		return http.StatusBadGateway, "openrouter_upstream_error", "warn"
+	}
+	// Google Drive documents (issue #98). The code strings are part of the
+	// contract — the frontend branches on them; not_configured → 503 so the
+	// Scheda renders a graceful "Documenti non disponibili" state.
+	var driveErr *googledrive.Error
+	if errors.As(err, &driveErr) {
+		switch driveErr.Code {
+		case googledrive.CodeNotConfigured:
+			return http.StatusServiceUnavailable, "googledrive_not_configured", "warn"
+		case googledrive.CodeNotFound:
+			return http.StatusNotFound, "googledrive_not_found", "warn"
+		case googledrive.CodeTrashed:
+			return http.StatusGone, "googledrive_trashed", "warn"
+		case googledrive.CodeOutsideContextRoot:
+			return http.StatusGone, "googledrive_outside_context_root", "warn"
+		case googledrive.CodePermissionDenied:
+			return http.StatusBadGateway, "googledrive_permission_denied", "warn"
+		case googledrive.CodeInvalidCredentials:
+			return http.StatusBadGateway, "googledrive_invalid_credentials", "warn"
+		case googledrive.CodeRateLimited:
+			return http.StatusTooManyRequests, "googledrive_rate_limited", "warn"
+		case googledrive.CodeUnavailable:
+			return http.StatusBadGateway, "googledrive_unavailable", "warn"
+		default:
+			return http.StatusBadGateway, "googledrive_invalid_response", "warn"
+		}
 	}
 	return http.StatusInternalServerError, "binocolo_ma_error", "error"
 }

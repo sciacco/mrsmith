@@ -1,11 +1,12 @@
 import { useRef, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
-import { Button, Drawer, Icon, Skeleton } from '@mrsmith/ui';
+import { Button, Drawer, Icon, Skeleton, useToast } from '@mrsmith/ui';
 import type { MAInitiativeCardView } from '../../../api/types';
 import { errorLabel } from '../../ricerche/helpers';
 import { ActivityTimeline } from '../../../components/company/activity/ActivityTimeline';
 import { CompanyContactsPanel } from '../../../components/company/contacts/CompanyContactsPanel';
 import { useAnnotationMutations, useCompanyActivity } from '../../../hooks/useCompanyActivity';
+import { useEnsureMACardDriveFolder } from '../../../hooks/useCompanyDocumenti';
 import { writeCohort } from '../../../components/scheda/cohort';
 import { ACTIVE_STATES, isTerminalState, stateLabel, esitoLabel, stateVars } from '../../../lib/cardStates';
 import { dossierState } from './useBoardData';
@@ -22,6 +23,45 @@ const REGISTRY_LABELS: Record<string, { label: string; kind: 'info' | 'warn' }> 
 
 function schedaHref(companyKey: string, initiativeId: string) {
   return `/aziende/${encodeURIComponent(companyKey)}?iniziativa=${encodeURIComponent(initiativeId)}`;
+}
+
+// Documenti row for the card drawer (issue #98). No embedded listing — the
+// drawer is beyond the fold even empty at 1366×768, so the full listing lives
+// in the Scheda. This single action lazy-ensures the card subfolder and opens
+// it in Drive. The Drive link comes from an async POST, so a placeholder tab is
+// opened synchronously on click to survive the round-trip (first creation can
+// be slow) and avoid the popup blocker; it is redirected on success or closed
+// on error.
+function DocumentiDrawerRow({ initiativeId, companyKey }: { initiativeId: string; companyKey: string }) {
+  const ensure = useEnsureMACardDriveFolder();
+  const { toast } = useToast();
+  const open = () => {
+    const placeholder = window.open('', '_blank');
+    ensure.mutate(
+      { initiativeId, companyKey },
+      {
+        onSuccess: (data) => {
+          if (placeholder) placeholder.location.href = data.webViewLink;
+          else window.open(data.webViewLink, '_blank', 'noopener');
+        },
+        onError: () => {
+          if (placeholder) placeholder.close();
+          toast('Cartella non disponibile.', 'error');
+        },
+      },
+    );
+  };
+  return (
+    <Button
+      variant="secondary"
+      size="sm"
+      loading={ensure.isPending}
+      leftIcon={<Icon name="external-link" size={16} />}
+      onClick={open}
+    >
+      Apri cartella in Drive
+    </Button>
+  );
 }
 
 export function CardDrawer({
@@ -232,6 +272,11 @@ export function CardDrawer({
 
           <div className={styles.drawerSec}>
             <CompanyContactsPanel companyKey={card.companyKey} compact />
+          </div>
+
+          <div className={styles.drawerSec}>
+            <p className={styles.lab}>Documenti</p>
+            <DocumentiDrawerRow initiativeId={initiativeId} companyKey={card.companyKey} />
           </div>
 
           <div className={styles.drawerSec}>

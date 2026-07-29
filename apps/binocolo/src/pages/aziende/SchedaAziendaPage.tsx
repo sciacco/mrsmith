@@ -32,6 +32,7 @@ import { ThesisReadingPanel } from '../../components/ThesisReadingPanel/ThesisRe
 import { CompanyRegistrySection } from '../iniziative/CompanyRegistrySection';
 import { CompanyActivityPanel } from '../../components/company/activity/CompanyActivityPanel';
 import { CompanyContactsPanel } from '../../components/company/contacts/CompanyContactsPanel';
+import { DocumentiPanel } from '../../components/company/documenti/DocumentiPanel';
 import { bucketLabelWithSuppressionHistory, dateLabel, errorLabel, sessionStatusLabel } from '../ricerche/helpers';
 import styles from './SchedaAziendaPage.module.css';
 
@@ -58,6 +59,7 @@ const SPINE_IDS = [
   'scheda-controllo-title',
   'scheda-storia-title',
   'scheda-bilanci-title',
+  'scheda-documenti-title',
 ] as const;
 
 // Etichette degli EVENTI del diario (storico append-only, mai riscritto). Lo
@@ -676,6 +678,7 @@ export function SchedaAziendaPage() {
           '—'
         ) : undefined,
     },
+    { id: SPINE_IDS[5], index: 6, title: 'Documenti' },
   ];
 
   return (
@@ -954,6 +957,21 @@ export function SchedaAziendaPage() {
           depositi camerali» can sit on the title row; the h2 keeps id="scheda-bilanci-title". */}
       <section className={styles.block} aria-labelledby="scheda-bilanci-title">
         <FilingsBlock companyKey={companyKey ?? ''} overview={overview} baselineValuation={valuation} />
+      </section>
+
+      <section className={styles.block} aria-labelledby="scheda-documenti-title">
+        <div className={styles.blockHeader}>
+          <span className={styles.blockIndex}>6</span>
+          <div>
+            <h2 id="scheda-documenti-title">Documenti</h2>
+            <p>Cartella dell’azienda su Google Drive: documenti trasversali e sottocartelle delle lavorazioni.</p>
+          </div>
+        </div>
+        <DocumentiPanel
+          companyKey={identity.companyKey}
+          hideHeading
+          activeInitiativeId={lens.type === 'iniziativa' ? lens.id : undefined}
+        />
       </section>
         </div>
       </div>

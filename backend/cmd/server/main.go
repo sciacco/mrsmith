@@ -40,6 +40,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/database"
 	"github.com/sciacco/mrsmith/internal/platform/email"
 	"github.com/sciacco/mrsmith/internal/platform/emailledger"
+	"github.com/sciacco/mrsmith/internal/platform/googledrive"
 	"github.com/sciacco/mrsmith/internal/platform/health"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 	"github.com/sciacco/mrsmith/internal/platform/hubspot"
@@ -267,6 +268,12 @@ func main() {
 	if anisettaDB != nil {
 		logger.Info("shared llm service configured", "component", "llm")
 	}
+
+	// Shared Google Drive client (#97): configured entirely from the DB
+	// (mrsmith.googledrive_credential + mrsmith.googledrive_context). Injected as
+	// a soft dependency into the consumer domains; nil degrades the documents
+	// surface to a clean not_configured state.
+	googledriveSvc := googledrive.New(anisettaDB, logger)
 
 	var openapiitCli *openapiit.Client
 	if cfg.OpenAPIITAPIToken != "" {
@@ -581,7 +588,7 @@ func main() {
 		appCatalog = filtered
 	}
 	portal.RegisterRoutes(api, appCatalog)
-	binocoloDeepWorker := binocolo.RegisterRoutes(api, binocolo.Deps{OpenAPIIT: openapiitCli, Brave: braveCli, Scrape: scrapeCli, LLM: llmSvc, AnisettaDB: anisettaDB, InstanceOwner: cfg.InstanceOwner, FilingDocAICompare: cfg.BinocoloFilingDocAICompare, FilingDocumentID: cfg.BinocoloFilingDocumentID})
+	binocoloDeepWorker := binocolo.RegisterRoutes(api, binocolo.Deps{OpenAPIIT: openapiitCli, Brave: braveCli, Scrape: scrapeCli, LLM: llmSvc, GoogleDrive: googledriveSvc, AnisettaDB: anisettaDB, InstanceOwner: cfg.InstanceOwner, FilingDocAICompare: cfg.BinocoloFilingDocAICompare, FilingDocumentID: cfg.BinocoloFilingDocumentID})
 	budget.RegisterRoutes(api, arakCli)
 	fornitori.RegisterRoutes(api, arakCli, arakDB, alyanteDB)
 	statsrda.RegisterRoutes(api, arakDB)

@@ -1,0 +1,78 @@
+.panel { display: grid; gap: var(--space-4); }
+.heading { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
+.heading h3 { margin: 0; font-size: 1.125rem; line-height: 1.2; }
+.heading p { margin: var(--space-1) 0 0; color: var(--color-text-muted); font-size: 0.8125rem; }
+
+.list { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  text-decoration: none;
+  transition: border-color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
+}
+.item:hover { border-color: var(--color-border); background: var(--color-surface); }
+.item:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; box-shadow: 0 0 0 3px var(--color-accent-glow); }
+.itemIcon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+}
+.itemBody { display: grid; flex: 1; min-width: 0; gap: var(--space-1); }
+.itemName { font-size: 0.9375rem; font-weight: 500; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.itemMeta { color: var(--color-text-muted); font-size: 0.75rem; line-height: 1.3; }
+.itemOpen { display: grid; place-items: center; flex: none; color: var(--color-text-faint); }
+
+.itemActive { border-color: var(--color-accent-muted); background: var(--color-accent-subtle); }
+.itemActive:hover { background: var(--color-accent-muted); }
+.itemActive .itemIcon { background: var(--color-accent-muted); color: var(--color-accent); }
+.itemActive .itemOpen { color: var(--color-accent); }
+.lensPill {
+  flex: none;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  color: var(--color-text-on-accent);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.empty { margin: 0; color: var(--color-text-muted); font-size: 0.8125rem; line-height: 1.5; }
+
+/* Local-only notice states: a Drive failure never breaks the Scheda, it just
+   explains itself inside this section. Info = not configured, warn = the folder
+   is trashed or moved (operator action needed elsewhere), error = transient. */
+.infoState, .warnState, .errorState {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+}
+.infoState { background: var(--color-info-subtle); color: var(--color-info-strong); }
+.warnState { background: var(--color-warning-subtle); color: var(--color-warning-strong); }
+.errorState { background: var(--color-danger-subtle); color: var(--color-danger-hover); }
+.stateIcon { display: grid; place-items: center; flex: none; }
+.stateIcon svg { stroke-width: 2; }
+.infoState p, .warnState p, .errorState p { margin: 0; font-size: 0.875rem; font-weight: 600; line-height: 1.3; }
+.stateHint { display: block; margin-top: var(--space-1); color: inherit; font-size: 0.8125rem; opacity: 0.9; }
+.errorBody { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3); }
+.errorBody p { color: var(--color-danger-hover); }
+
+@media (max-width: 640px) {
+  .heading { align-items: stretch; flex-direction: column; }
+}

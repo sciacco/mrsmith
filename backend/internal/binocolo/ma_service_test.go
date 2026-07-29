@@ -1592,6 +1592,25 @@ func (f *fakeMAWorkspaceStore) SoftDeleteMACompanyContact(context.Context, strin
 	return nil
 }
 
+// Google Drive folder bindings (issue #98). Unreachable in these tests — the
+// drive client is nil, so the orchestration returns not_configured before the
+// store is touched. Stubs satisfy the interface so the package compiles.
+func (f *fakeMAWorkspaceStore) GetMACompanyDriveFolder(context.Context, string) (string, error) {
+	return "", nil
+}
+
+func (f *fakeMAWorkspaceStore) InsertMACompanyDriveFolder(context.Context, string, string, string, string) error {
+	return nil
+}
+
+func (f *fakeMAWorkspaceStore) GetMACardDriveFolder(context.Context, string, string) (string, error) {
+	return "", nil
+}
+
+func (f *fakeMAWorkspaceStore) InsertMACardDriveFolder(context.Context, string, string, string, string, string) error {
+	return nil
+}
+
 func (f *fakeMAWorkspaceStore) ListMACompanyActivity(context.Context, string, bool) (MACompanyActivity, error) {
 	return MACompanyActivity{Items: []MATargetOutcome{}, Initiatives: []MACompanyActivityLookup{}, Sessions: []MACompanyActivitySession{}}, nil
 }

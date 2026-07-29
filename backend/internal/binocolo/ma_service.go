@@ -18,6 +18,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/sciacco/mrsmith/internal/platform/brave"
+	"github.com/sciacco/mrsmith/internal/platform/googledrive"
 	"github.com/sciacco/mrsmith/internal/platform/llm"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
 	"github.com/sciacco/mrsmith/internal/platform/openapiit"
@@ -206,8 +207,12 @@ type maService struct {
 		Crawl(context.Context, string, int, int) ([]scrape.CrawlPage, error)
 		Map(context.Context, string, int) ([]string, error)
 	}
-	llmp maLLMProvider
-	now  func() time.Time
+	// drive is the shared Google Drive client (#97). Soft dependency, set
+	// post-construction like scrape; nil degrades the documents surface to a
+	// clean not_configured (503) state without blocking the rest of the Scheda.
+	drive *googledrive.Service
+	llmp  maLLMProvider
+	now   func() time.Time
 	// owner is this instance's stable identity (config InstanceOwner), stamped on
 	// every enqueued ma_job so the job is pre-leased to this instance and foreign
 	// workers on the shared DB can't steal it. Set post-construction like brave.
