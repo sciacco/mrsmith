@@ -140,3 +140,8 @@ The Appsmith source uses raw lowercase labels in the biometric table (`nome`, `c
 
 ### Accessi Biometrico — Defensive Ceiling / Filters
 The biometric-request list is ported 1:1 with `ORDER BY data_richiesta DESC` and no pagination or filters (`GET /api/cp-backoffice/v1/biometric-requests`). That matches the source and avoided splitting the parity diff between "expected behavior" and "perceived regression" at cutover, but it leaves the endpoint unbounded as volumes grow. Follow-up after operators have validated v1 parity: decide the smallest safe mitigation — server-side limit with truncation signal (e.g. `LIMIT 500` paired with a "show older" affordance), minimal filters (date range, customer, status), or true pagination — and validate the chosen contract against operator workflow before shipping. Track biometric-request volume post-launch to size the ceiling correctly rather than guessing. Pointer: `apps/customer-portal/FINAL.md` §Slice S4, §Slice S5c, §Risk Register R3.
+
+## Binocolo App
+
+### Company Identity Registry — Q18 Periodic Monitor
+The company identity registry (issues #81/#86, migrations 120–123) is in production. Keep running probe **Q18** in `apps/binocolo/docs/IDENTITA-AZIENDA-PROBE.sql` periodically (user runs it on Anisetta) to watch the invariants: one key per fiscal identity, no `vendor_only` companies accumulating, no rows in `ma_company_identity_conflict` left unhandled. A sustained violation means either a vendor id change or a writer bypassing the resolver — see `docs/IMPLEMENTATION-KNOWLEDGE.md` §"Binocolo `company_key` Is An Owned Identifier".

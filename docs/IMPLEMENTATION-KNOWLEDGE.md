@@ -273,6 +273,51 @@ Alyante ERP ID
 - Used by: `apps/binocolo` `/target`.
 - Open questions: none.
 
+### OpenAPI.it DocuEngine Payloads Need Defensive Decoding And Vendor-Paced Polling
+
+- Context: Binocolo filing acquisition (`backend/internal/platform/openapiit` DocuEngine client, `ma_filing` jobs) and any future OpenAPI.it document-service integration.
+- Discovery: DocuEngine serves an empty `GET /requests` collection as HTTP `404` with error code `221` ("no requests related to your account"), so on a fresh account a pre-POST reconciliation loop fails forever and the POST never fires. The free tier allows **1440 GET/day per endpoint**, which a 2s worker tick burns in hours. Production scalars diverge from the spec: `GET /requests/{id}` returns `documents` as an array of filename strings (Download objects only come from `/requests/{id}/documents`), and `fileSize` is a number in production but a string in the spec examples — a rigid struct field makes the whole decode fail and the job spins in a silent "transient" poll loop (`attempts=0`, business row frozen, logs show `cannot unmarshal`). `GET /requests` has no server-side filters, so reconciliation works by name + time window + per-id GET. Separately, a manual upload and a camerale purchase of the *same* deposited filing always produce different md5s, because DocuEngine prepends a cover page containing a unique request header — two validated, aligned filings for one deposit is the systemic case, not a re-deposit.
+- Practical rule: map empty-collection HTTP errors inside the client, never at call sites. Decouple vendor poll cadence from the worker tick (per-job interval, e.g. 30s). Decode OpenAPI.it scalars with flexible types (`DocuFlexString`/`DocuFlexInt64`-style). Resolve duplicate filings by extract identity (identical key figures → canonical is the one with `balance_sheet_id`; any divergence or missing extract → conservative ambiguous), never by md5.
+- Evidence: production incident 2026-07-22 (fix `b9aed1d`) and smoke findings the same day; `backend/internal/binocolo/ma_filing_*.go`.
+- Used by: Binocolo bilanci/NI acquisition (`filing_search`/`filing_acquire`/`filing_ingest` jobs).
+- Open questions: none.
+
+### Mistral OCR Page Markdown Excludes Tables When `include_blocks` Is On
+
+- Context: Binocolo filing ingest OCR (`mistral-ocr-4-0` through the platform LLM client) and any future OCR consumer.
+- Discovery: with `include_blocks=true` the per-page markdown does **not** contain the tables — only links like `[tbl-N.md](tbl-N.md)`; the actual content lives in `extras.tables[{id, format:"markdown", content}]` (duplicated in `blocks` of type `table`, with typed header/footer, bbox, per-page confidence). Italian filings come in two layouts: CCIAA fascicles with a cover page (CF in clear on p.1, repeated headers, page offsets, verbale at the end) versus "naked" XBRL-derived PDFs where the CF appears **only inside tbl-0** — so identity validation must look across multiple pages and inside tables. Batch mode can take hours and must never be used for interactive flows.
+- Practical rule: reassemble page text **at read time** with a single shared helper for all consumers; persist the vendor markdown untouched. Never rely on page-1 markdown alone for identity checks.
+- Evidence: live smoke 2026-07-22 on real fascicles (real 2023 figures: attivo=passivo 920.586; negatives rendered as `(6.709)`; header row `|   | 31-12-2023 | 31-12-2022  |`).
+- Used by: Binocolo filing ingest and NI reading.
+- Open questions: none.
+
+### OpenAPI.it IT-full Closing Dates Are Local Midnight Serialized In UTC
+
+- Context: any consumer of IT-full balance-sheet payloads that derives a date key.
+- Discovery: the vendor serializes a closing date as local midnight expressed in UTC evening — FY2025 arrives as `2025-12-30T23:00:00` — so `raw[:10]` lands on the wrong day.
+- Practical rule: when deriving a calendar date, round hour ≥ 12 up to the next day (`maBaselineExerciseDate`). Apply the correction only in new read paths: persisted vintage keys (`deepVintageKey`) were written from the raw prefix and must not be re-derived.
+- Evidence: fix `318f271` in Binocolo bilanci.
+- Used by: Binocolo adjusted-valuation path; any new IT-full consumer.
+- Open questions: none.
+
+### Company Domain Search Queries Must Never Contain Fiscal Identifiers
+
+- Context: resolving a company's official website from anagraphic data (Binocolo domain resolver; any future company-web lookup).
+- Discovery: putting the P.IVA/CF in a web-search query (Brave or fastcrw) returns **only registries and aggregators** (paginegialle, registroimprese, cerved…) and never the official site — company sites do not expose fiscal ids in indexable titles/snippets, registries do. Registries also never mention the official domain, so the two-phase "query VAT → registry page → extract domain" idea is a dead end. The strong identity signal is instead the **on-page** P.IVA (a legal obligation, art. 35 DPR 633/72) — which lives in the footer, exactly what Firecrawl-style `onlyMainContent` scraping strips; a foreign 11-digit id on a legal page is an equally strong wrong-entity/group-site signal. Name matching must use whole-word sets, never substrings ("safe" must not match "creditsafe"), and "sito ufficiale" in the primary query biases results toward directories. In practice the dominant residual bottleneck is scraper fetchability (renderer failures, SSRF guards, anti-bot), not acceptance logic.
+- Practical rule: keep fiscal identifiers out of search queries but match them on-page with full-page scrapes (`ScrapeFull`, www-first fallback); treat a reject without verified identity as recall-unsafe (route to review, never to discard).
+- Evidence: eval splits and live probes 2026-06-30 → 2026-07-02 on real sessions (Liguria, Nord-Est); `backend/internal/binocolo/ma_web_validation_job.go`, `backend/internal/platform/scrape`.
+- Used by: Binocolo UC2 gate, associate-domain remedies, direct-card verification.
+- Open questions: none.
+
+### CSS Module Keyframes Are Scoped; Global Animation Names Wake Dormant Rules
+
+- Context: frontend styling in any `apps/*` CSS module.
+- Discovery: `@keyframes` declared in a CSS module are scoped to that module. An `animation: someName` without a local keyframe of that name is a reference to a **global** keyframe — it silently does nothing until someone later defines `someName` in `global.css`, at which point dormant animations wake up in pages nobody touched (observed with `rowEnter` in Binocolo Iniziative).
+- Practical rule: before adding a keyframe name to `global.css`, grep the workspace for existing `animation:` references to that name; keep module animations fully local (keyframe + usage in the same module) unless a global animation is intended.
+- Evidence: Binocolo `/aziende` implementation review, 2026-07-18 (issue #76 remediation).
+- Used by: all frontend apps.
+- Open questions: none.
+
 ### Training Directory Chips Are Action-First
 
 - Context: `apps/training` People directory (`/persone`) and backend `GET /api/training/v1/people/directory`.
@@ -666,6 +711,7 @@ Alyante ERP ID
 - Context: slow report-style endpoints behind the shared Go HTTP server, including `GET /api/panoramica/v1/iaas/monthly-charges`.
 - Discovery: a handler can finish its SQL work and still surface as a client-side transport failure if response delivery exceeds the server write budget or the downstream connection closes first. In that case, naive access logs can still misleadingly report a clean `200` unless the response writer captures downstream write errors.
 - Practical rule: when a read endpoint is expected to run for tens of seconds, align `http.Server.WriteTimeout` with that runtime budget and make access logs record downstream write failures and request-context cancellation separately from normal completions.
+- Practical rule: any synchronous endpoint that fans out batches of LLM or vendor calls will overrun the shared 60s write budget and lose the entire result (observed: a 138-call model-comparison run died at 175s with HTTP 000; a 10-call brief regeneration was truncated). Either move the work to an async job (`ma_job` pattern), or explicitly clear the deadlines via `http.NewResponseController` — which requires the wrapping response recorder in `backend/pkg/middleware` to implement `Unwrap()` — and bound each inner call with its own timeout so one slow call becomes a counted failure instead of sinking the request.
 - Evidence: Panoramica local-dev failure on 2026-04-09 where `monthly-charges` took ~44s, Vite logged `socket hang up`, and backend access logging needed downstream write-error tracking to distinguish true delivery from handler completion.
 - Used by: `apps/panoramica-cliente` IaaS PPU monthly charges view; shared backend middleware in `backend/pkg/middleware`.
 - Open questions: whether future report endpoints should adopt per-handler query deadlines or asynchronous export flows instead of relying on a larger shared write timeout.
