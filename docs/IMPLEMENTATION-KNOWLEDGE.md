@@ -156,6 +156,15 @@ Alyante ERP ID
 
 ## API and Backend Contract Quirks
 
+### Google Shared Drive Service Accounts Need Explicit Trash and Access Handling
+
+- Context: shared Google Drive integration used by MrSmith mini-app document contexts.
+- Discovery: a Service Account added directly to a Shared Drive with the Google **Contributor** role can read metadata, list children, create folders, and read files uploaded manually by an analyst. Drive API calls for Shared Drives require the Shared Drive flags (`supportsAllDrives`, plus `includeItemsFromAllDrives`/`corpora=drive`/`driveId` when listing). Renaming preserves the folder ID and web link. Moving a folder elsewhere in the same Shared Drive also preserves its ID, so the backend must enforce the configured context root by walking parent ancestry. A trashed folder is still returned successfully with `trashed=true`; its descendants are also returned with `trashed=true`, so trash must be detected explicitly. Removing the Service Account from the Shared Drive makes an existing folder lookup return Google `404 notFound`, indistinguishable from a missing or invalid ID rather than a `403 permissionDenied`.
+- Practical rule: use one DB-configured Service Account directly, bind each `(app, context)` to a Shared Drive and hard root, and validate both `driveId` and ancestry on every operation. Treat `trashed=true` as a dedicated domain error. Treat Google 404 as “not found or not accessible”; do not claim that revoked membership can be distinguished from deletion. Contributor is the verified minimum role for the initial `GetItem`/`ListChildren`/`CreateFolder` surface.
+- Evidence: live spike against `MrSmith — Spike Google Drive` on 2026-07-29, recorded in GitHub issue #85.
+- Used by: `backend/internal/platform/googledrive` (migration 126 for its `mrsmith.googledrive_credential` + `mrsmith.googledrive_context` tables); first consumer `apps/binocolo`.
+- Open questions: none for the verified initial surface.
+
 ### Direct User-Triggered Emails Go Through the Email Ledger
 
 - Context: any mini-app that sends an email as a user action tied to a domain object (e.g. RDA sending a PO email to a supplier) and needs "sent N times, last on … by … to …" before offering a resend.
