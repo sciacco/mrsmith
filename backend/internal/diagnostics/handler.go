@@ -68,28 +68,23 @@ func eventFromRecord(record slog.Record, handlerAttrs []slog.Attr, groups []stri
 	attrs = sanitizeAttrs(attrs)
 
 	sourceFile, sourceLine, sourceFunction := sourceFromPC(record.PC)
-	stack := stringField(attrs, "stack")
-	if stack != "" {
-		stack = truncateString(stack, maxStackBytes)
-	}
-
 	return Event{
 		ObservedAt:     record.Time,
 		Level:          record.Level.String(),
-		Message:        truncateString(record.Message, maxMessageBytes),
-		Component:      truncateString(stringField(attrs, "component"), maxStringBytes),
-		Operation:      truncateString(stringField(attrs, "operation"), maxStringBytes),
-		RequestID:      truncateString(stringField(attrs, "request_id"), maxStringBytes),
-		Method:         truncateString(stringField(attrs, "method"), maxStringBytes),
-		Path:           truncateString(stringField(attrs, "path"), maxStringBytes),
+		Message:        record.Message,
+		Component:      stringField(attrs, "component"),
+		Operation:      stringField(attrs, "operation"),
+		RequestID:      stringField(attrs, "request_id"),
+		Method:         stringField(attrs, "method"),
+		Path:           stringField(attrs, "path"),
 		Status:         intField(attrs, "status"),
-		AuthSubject:    truncateString(stringField(attrs, "auth_subject"), maxStringBytes),
-		Error:          truncateString(stringField(attrs, "error"), maxErrorBytes),
+		AuthSubject:    stringField(attrs, "auth_subject"),
+		Error:          stringField(attrs, "error"),
 		SourceFile:     sourceFile,
 		SourceLine:     sourceLine,
 		SourceFunction: sourceFunction,
 		Attrs:          attrs,
-		Stack:          stack,
+		Stack:          stringField(attrs, "stack"),
 	}
 }
 
