@@ -50,25 +50,61 @@ func billingPeriodLabel(months int) string {
 	}
 }
 
+type billingRow struct{ label, value string }
+
+func billingRows(templateType string, isColo, en bool, nrc, bill string) []billingRow {
+	switch {
+	case isColo && en:
+		return []billingRow{
+			{"Setup", nrc},
+			{"Colocation", "Three months in advance"},
+			{"Used Electric Current and Excess Amperes", "Monthly deferred"},
+		}
+	case isColo:
+		return []billingRow{
+			{"Attivazione", nrc},
+			{"Colocation", "Trimestrale anticipata"},
+			{"Corrente Utilizzata e Ampere Eccedenti", "Mensile posticipata"},
+		}
+	case en:
+		return []billingRow{{"Setup", nrc}, {"Fee", bill}}
+	case templateType == "iaas":
+		return []billingRow{{"Corrispettivi Una Tantum", nrc}, {"Canone", bill}}
+	default:
+		return []billingRow{{"Corrispettivi Una Tantum", nrc}, {"Canone", bill + " anticipata"}}
+	}
+}
+
+func renderBillingBlock(title string, rows []billingRow) string {
+	var b strings.Builder
+	b.WriteString("<ul>\n<li><b>" + title + "</b>\n<ul>\n")
+	for _, r := range rows {
+		b.WriteString("<li>" + r.label + ": " + r.value + "</li>\n")
+	}
+	b.WriteString("</ul>\n</li>\n</ul>\n")
+	return b.String()
+}
+
 func GenerateTermsAndConditions(
 	templateType string, isColo bool, lang string,
 	paymentMethodLabel string,
 	initialTermMonths, nextTermMonths, deliveredInDays, nrcChargeTime, billMonths int,
 	legalNotes string,
 ) string {
+	en := lang == "en"
+
 	nrcLabel := nrcChargeTimeLabel(nrcChargeTime)
 	billingLabel := billingPeriodLabel(billMonths)
-
-	nrcLabelEN := billingTranslations[nrcLabel]
-	if nrcLabelEN == "" {
-		nrcLabelEN = nrcLabel
+	if en {
+		if t := billingTranslations[nrcLabel]; t != "" {
+			nrcLabel = t
+		}
+		if t := billingTranslations[billingLabel]; t != "" {
+			billingLabel = t
+		}
 	}
-	billingLabelEN := billingTranslations[billingLabel]
-	if billingLabelEN == "" {
-		billingLabelEN = billingLabel
-	}
 
-	commonIT := fmt.Sprintf(`<ul>
+	title, common := "Modalit&agrave; di fatturazione", fmt.Sprintf(`<ul>
 <li><b>Condizioni di pagamento</b>: %s</li>
 <li><b>Durata Soluzione (mesi)</b>: %d</li>
 <li><b>Durata Rinnovo (mesi)</b>: %d</li>
@@ -76,8 +112,8 @@ func GenerateTermsAndConditions(
 <li><b>Esclusioni</b>: IVA e quant&rsquo;altro non indicato</li>
 <li><b>Valuta</b>: Euro (se non diversamente specificato)</li>
 </ul>`, paymentMethodLabel, initialTermMonths, nextTermMonths, deliveredInDays)
-
-	commonEN := fmt.Sprintf(`<ul>
+	if en {
+		title, common = "Billing Methods", fmt.Sprintf(`<ul>
 <li><b>Payment Conditions</b>: %s</li>
 <li><b>Period of Service (months)</b>: %d</li>
 <li><b>Renewal Period (months)</b>: %d</li>
@@ -85,73 +121,9 @@ func GenerateTermsAndConditions(
 <li><b>Not included</b>: VAT and what is not specified</li>
 <li><b>Currency</b>: Euro (unless otherwise specified)</li>
 </ul>`, paymentMethodLabel, initialTermMonths, nextTermMonths, deliveredInDays)
-
-	var tec string
-
-	if isColo && lang == "it" {
-		tec = fmt.Sprintf(`<ul>
-<li><b>Modalit&agrave; di fatturazione</b>
-<ul>
-<li>Attivazione: %s</li>
-<li>Colocation: Trimestrale anticipata</li>
-<li>Corrente Utilizzata e Ampere Eccedenti: Mensile posticipata</li>
-</ul>
-</li>
-</ul>
-`, nrcLabel) + commonIT
-	} else if isColo && lang == "en" {
-		tec = fmt.Sprintf(`<ul>
-<li><b>Billing Methods</b>
-<ul>
-<li>Setup: %s</li>
-<li>Colocation: Three months in advance</li>
-<li>Used Electric Current and Excess Amperes: Monthly deferred</li>
-</ul>
-</li>
-</ul>
-`, nrcLabelEN) + commonEN
-	} else if !isColo && templateType != "iaas" && lang == "en" {
-		tec = fmt.Sprintf(`<ul>
-<li><b>Billing Methods</b>
-<ul>
-<li>Setup: %s</li>
-<li>Fee: %s</li>
-</ul>
-</li>
-</ul>
-`, nrcLabelEN, billingLabelEN) + commonEN
-	} else if templateType == "iaas" && lang == "it" {
-		tec = fmt.Sprintf(`<ul>
-<li><b>Modalit&agrave; di fatturazione</b>
-<ul>
-<li>Corrispettivi Una Tantum: %s</li>
-<li>Canone: %s</li>
-</ul>
-</li>
-</ul>
-`, nrcLabel, billingLabel) + commonIT
-	} else if templateType == "iaas" && lang == "en" {
-		tec = fmt.Sprintf(`<ul>
-<li><b>Billing Methods</b>
-<ul>
-<li>Setup: %s</li>
-<li>Fee: %s</li>
-</ul>
-</li>
-</ul>
-`, nrcLabelEN, billingLabelEN) + commonEN
-	} else {
-		// Default: standard non-colo IT
-		tec = fmt.Sprintf(`<ul>
-<li><b>Modalit&agrave; di fatturazione</b>
-<ul>
-<li>Corrispettivi Una Tantum: %s</li>
-<li>Canone: %s anticipata</li>
-</ul>
-</li>
-</ul>
-`, nrcLabel, billingLabel) + commonIT
 	}
+
+	tec := renderBillingBlock(title, billingRows(templateType, isColo, en, nrcLabel, billingLabel)) + common
 
 	if strings.TrimSpace(legalNotes) != "" {
 		tec += "<p>" + legalNotes + "</p>"
