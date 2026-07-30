@@ -1,4 +1,4 @@
-import { Button, Icon, Modal, PhoneInput } from '@mrsmith/ui';
+import { Button, Icon, Modal, PhoneInput, VisuallyHidden } from '@mrsmith/ui';
 import { useEffect, useId, useMemo, useState, type FormEvent } from 'react';
 import type { ProviderReference } from '../api/types';
 import styles from './ProviderContactModal.module.css';
@@ -112,7 +112,7 @@ export function ProviderContactForm({
         <label htmlFor={emailId}>
           Email
           <span className={styles.requiredMarker} aria-hidden="true" />
-          <span className={styles.srOnly}> obbligatorio</span>
+          <VisuallyHidden> obbligatorio</VisuallyHidden>
         </label>
         <input
           id={emailId}

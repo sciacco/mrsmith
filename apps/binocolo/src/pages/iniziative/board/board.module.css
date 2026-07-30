@@ -970,18 +970,6 @@
   font-size: 0.75rem;
 }
 .composerError { margin: var(--space-1) 0 0; color: var(--color-danger-hover); font-size: 0.8125rem; }
-.srStatus {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
 /* ── vista tabella ── */
 .tableWrap {
   background: var(--color-bg-elevated);

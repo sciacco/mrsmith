@@ -298,6 +298,7 @@ Reuse these before writing anything new. NEVER re-implement a listed component i
 | `ToggleSwitch` | 44×24 pill switch; `role="switch"`, hidden native checkbox; spring thumb; preferred over raw checkboxes for booleans |
 | `Tooltip` | Hover/focus tooltip: `placement`, show/hide delays, `maxWidth` |
 | `UserMenu` | "Agent {name}" avatar dropdown; Escape + click-outside close, `aria-expanded`/`aria-haspopup` |
+| `VisuallyHidden` | Content available to assistive technologies but not visually rendered; defaults to `<span>` and supports semantic intrinsic elements through `as` |
 
 **Component rules:**
 
@@ -363,7 +364,7 @@ Row entrance animation applies to the first render after navigation only. Refetc
 - Min height **44px** (touch-friendly); border 1.5px `--color-border`.
 - Focus: `0 0 0 3px var(--color-accent-glow)` ring + subtle background shift, via `:focus-visible`.
 - Labels: form-label type style (§5).
-- **Required fields:** no literal `*`. Use a small red dot next to the label (`--color-danger`), `aria-hidden="true"`, paired with visually-hidden text `obbligatorio` (or an equivalent `aria-label`). Keep native `required` on the control; the dot is only the visual affordance.
+- **Required fields:** no literal `*`. Use a small red dot next to the label (`--color-danger`), `aria-hidden="true"`, paired with `<VisuallyHidden>obbligatorio</VisuallyHidden>` (or an equivalent `aria-label`). Keep native `required` on the control; the dot is only the visual affordance.
 - **Validation errors:** inline message below the field — 0.75rem, `--color-danger-hover`; set `aria-invalid="true"` and link the message with `aria-describedby`; switch the input border to danger. The message persists until the input is corrected.
 
 ### 14.2 Buttons
@@ -431,6 +432,16 @@ Target: **WCAG 2.1 AA.**
 - **Focus management:** `Modal` (native `<dialog>`) traps focus natively. `Drawer` MUST move focus into the panel on open and restore it to the trigger on close. Native `<dialog>` restores focus only on `close()`: a dialog unmounted while still open (`{open ? <Drawer open …/> : null}`) drops focus to `<body>`, so restore in effect cleanup too, guarded on the trigger still being connected.
 - **Overlays:** click-outside closes; `aria-expanded`/`aria-haspopup` on triggers; `role="alert"` on toasts.
 - **Motion:** `prefers-reduced-motion` respected globally (§8.4).
+
+### 16.1 Visually hidden content
+
+Use the shared `VisuallyHidden` component for content that must remain in the accessibility tree without being visually rendered. It changes presentation only: it does not add a role, live-region behavior, or substitute HTML semantics.
+
+- **Static content:** the default `<span>` is appropriate for hidden text such as an icon-only control label: `<VisuallyHidden>Apri dettagli</VisuallyHidden>`.
+- **Structural content:** preserve the required HTML element through `as`. A hidden table caption MUST remain a caption: `<VisuallyHidden as="caption">Ordini del cliente</VisuallyHidden>`. Do not place a `<span>` where the document structure requires `<caption>` or another semantic element.
+- **Live regions:** keep the explicit ARIA contract on the component, for example `<VisuallyHidden role="status" aria-live="polite" aria-atomic="true">{announcement}</VisuallyHidden>`. When migrating an existing region, preserve its `role`, `aria-live`, `aria-atomic`, and related attributes; `VisuallyHidden` must not infer or replace them.
+
+The component forwards intrinsic attributes and refs, and composes a consumer `className` with its scoped CSS Module class. Do not recreate its hiding recipe in app CSS and do not replace it with `display: none` or `visibility: hidden`, which remove content from assistive technologies.
 
 ---
 

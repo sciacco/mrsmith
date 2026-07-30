@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ApiError } from '@mrsmith/api-client';
-import { Button, Icon, SearchInput, SingleSelect, Skeleton } from '@mrsmith/ui';
+import { Button, Icon, SearchInput, SingleSelect, Skeleton, VisuallyHidden } from '@mrsmith/ui';
 import { downloadInvoicesExcel, useCustomersWithInvoices, useInvoices, type InvoiceQueryParams } from '../api/queries';
 import { useApiClient } from '../api/client';
 import type { InvoiceDocument } from '../types';
@@ -49,7 +49,7 @@ function InvoiceCard({ document }: { document: InvoiceDocument }) {
       {expanded && (
         <div id={panelId} className={s.lineTableWrap}>
           <table className={s.lineTable}>
-            <caption className={s.srOnly}>Righe del documento {document.doc} {document.num_documento}</caption>
+            <VisuallyHidden as="caption">Righe del documento {document.doc} {document.num_documento}</VisuallyHidden>
             <thead><tr><th>Descrizione</th><th>Articolo</th><th>Serial number</th><th className={s.numeric}>Quantità</th><th className={s.numeric}>Prezzo unitario</th><th className={s.numeric}>Totale riga</th><th>Conto ricavo</th></tr></thead>
             <tbody>{document.lines.map(line => (
               <tr key={line.progressivo_riga}>

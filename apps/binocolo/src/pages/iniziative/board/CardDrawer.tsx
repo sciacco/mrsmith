@@ -1,6 +1,6 @@
 import { useRef, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
-import { Button, Drawer, Icon, Skeleton, useToast } from '@mrsmith/ui';
+import { Button, Drawer, Icon, Skeleton, VisuallyHidden, useToast } from '@mrsmith/ui';
 import type { MAInitiativeCardView } from '../../../api/types';
 import { errorLabel } from '../../ricerche/helpers';
 import { ActivityTimeline } from '../../../components/company/activity/ActivityTimeline';
@@ -368,7 +368,7 @@ export function CardDrawer({
             </div>
             {noteError ? <p id="card-annotation-error" className={styles.composerError} role="alert">{noteError}</p> : null}
             {dismissError ? <p className={styles.composerError} role="alert">{dismissError}</p> : null}
-            <span className={styles.srStatus} role="status">{announcement}</span>
+            <VisuallyHidden role="status">{announcement}</VisuallyHidden>
           </div>
           <div className={styles.composerActions}>
             {note ? <Button variant="ghost" size="sm" onClick={discardDraft}>Annulla</Button> : null}

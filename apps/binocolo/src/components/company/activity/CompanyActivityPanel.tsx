@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Drawer, SingleSelect, Skeleton } from '@mrsmith/ui';
+import { Button, Drawer, SingleSelect, Skeleton, VisuallyHidden } from '@mrsmith/ui';
 import { useAnnotationMutations, useCompanyActivity } from '../../../hooks/useCompanyActivity';
 import { ActivityTimeline } from './ActivityTimeline';
 import styles from './CompanyActivityPanel.module.css';
@@ -172,7 +172,7 @@ export function CompanyActivityPanel({ companyKey, companyName, vatCode }: { com
                 </div>
               </div>
               {error ? <p id="company-annotation-error" className={styles.error} role="alert">{error}</p> : null}
-              <span className={styles.srStatus} role="status">{announcement}</span>
+              <VisuallyHidden role="status">{announcement}</VisuallyHidden>
             </div>
           </div>
         </Drawer>

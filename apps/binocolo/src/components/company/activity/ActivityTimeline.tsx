@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Modal } from '@mrsmith/ui';
+import { Button, Modal, VisuallyHidden } from '@mrsmith/ui';
 import type { MACompanyActivityLookup, MACompanyActivitySession, MATargetOutcome } from '../../../api/types';
 import { useAnnotationMutations } from '../../../hooks/useCompanyActivity';
 import { compactDateTime, relativeDate, shortAuthor } from '../../../lib/displayFormatting';
@@ -141,7 +141,7 @@ export function ActivityTimeline({
 
   if (visible.length === 0) return (
     <p ref={(element) => { timelineRef.current = element; }} className={styles.empty} tabIndex={-1}>
-      <span className={styles.srStatus} role="status">{announcement}</span>
+      <VisuallyHidden role="status">{announcement}</VisuallyHidden>
       {emptyLabel}
     </p>
   );
@@ -149,7 +149,7 @@ export function ActivityTimeline({
   return (
     <>
     <div ref={(element) => { timelineRef.current = element; }} className={`${styles.timeline} ${compact ? styles.compact : ''}`} tabIndex={-1}>
-      <span className={styles.srStatus} role="status">{announcement}</span>
+      <VisuallyHidden role="status">{announcement}</VisuallyHidden>
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       {visible.map((item) => {
         const annotation = item.event === 'nota';

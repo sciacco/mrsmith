@@ -1,4 +1,4 @@
-import { Button, Icon, Modal } from '@mrsmith/ui';
+import { Button, Icon, Modal, VisuallyHidden } from '@mrsmith/ui';
 import { useState, type FormEvent } from 'react';
 import { normalizeManualVat, validateManualDomain, validateManualVat } from '../../lib/companyIdentifiers';
 import styles from './DirectCompanyModal.module.css';
@@ -39,7 +39,7 @@ export function DirectCompanyModal({ open, submitting, onClose, onSubmit, onOpen
       <form className={styles.form} onSubmit={(event) => void submit(event)} noValidate>
         <p className={styles.copy}>Aggiungi una segnalazione direttamente all’iniziativa. Il dominio è opzionale e verrà verificato senza bloccare la creazione.</p>
         <div className={styles.field}>
-          <label htmlFor="direct-card-vat" className={styles.label}><span className={styles.requiredDot} aria-hidden="true" /><span>P.IVA / codice fiscale</span><span className={styles.srOnly}>obbligatorio</span></label>
+          <label htmlFor="direct-card-vat" className={styles.label}><span className={styles.requiredDot} aria-hidden="true" /><span>P.IVA / codice fiscale</span><VisuallyHidden>obbligatorio</VisuallyHidden></label>
           <input id="direct-card-vat" className={`${styles.input} ${errors.vatCode ? styles.inputError : ''}`} value={vatCode} onChange={(event) => { setVatCode(event.target.value); if (errors.vatCode) setErrors((current) => ({ ...current, vatCode: validateManualVat(event.target.value) ?? undefined })); }} required autoComplete="off" placeholder="01234567890" aria-invalid={Boolean(errors.vatCode) || undefined} aria-describedby={errors.vatCode ? 'direct-card-vat-error' : 'direct-card-vat-hint'} />
           <p id="direct-card-vat-hint" className={styles.hint}>11 cifre oppure 16 caratteri alfanumerici.</p>
           {errors.vatCode ? <p id="direct-card-vat-error" className={styles.error}>{errors.vatCode}</p> : null}

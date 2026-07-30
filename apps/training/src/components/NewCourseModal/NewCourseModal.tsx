@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Modal, SingleSelect, useToast } from '@mrsmith/ui';
+import { Button, Modal, SingleSelect, VisuallyHidden, useToast } from '@mrsmith/ui';
 import { useCreateCourse, useTrainingLookups } from '../../api/queries';
 import styles from './NewCourseModal.module.css';
 
@@ -123,7 +123,7 @@ export function NewCourseModal({ open, isPeopleAdmin, onClose, onCreated }: NewC
         <div className={styles.field}>
           <label htmlFor="nc-title" className={styles.label}>
             Titolo <span className={styles.req} aria-hidden="true" />
-            <span className="sr-only"> (obbligatorio)</span>
+            <VisuallyHidden> (obbligatorio)</VisuallyHidden>
           </label>
           <input
             id="nc-title"

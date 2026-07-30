@@ -8,6 +8,7 @@ import {
   StatusBadge,
   TableToolbar,
   Tooltip,
+  VisuallyHidden,
   useTableFilter,
 } from '@mrsmith/ui';
 import { useNavigate } from 'react-router-dom';
@@ -331,9 +332,9 @@ export default function OrdiniSalesPage() {
               Successivo
             </Button>
           </div>
-          <div className={styles.visuallyHidden} aria-live="polite" aria-atomic="true">
+          <VisuallyHidden as="div" aria-live="polite" aria-atomic="true">
             Pagina {page} di {totalPages}
-          </div>
+          </VisuallyHidden>
         </>
       )}
 

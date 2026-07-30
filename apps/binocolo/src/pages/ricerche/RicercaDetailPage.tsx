@@ -1,5 +1,5 @@
 import { ApiError } from '@mrsmith/api-client';
-import { Button, Icon, Modal, Skeleton, Tooltip, useToast } from '@mrsmith/ui';
+import { Button, Icon, Modal, Skeleton, Tooltip, VisuallyHidden, useToast } from '@mrsmith/ui';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -977,7 +977,7 @@ function ProgressPanel({
         <div>
           {done && !failed && !collapsed ? (
             <div className={styles.rerunControls} onClick={(event) => event.stopPropagation()}>
-              <span id="progress-title" className={styles.srOnly}>Esecuzione completata</span>
+              <VisuallyHidden id="progress-title">Esecuzione completata</VisuallyHidden>
               <Button onClick={() => onResume(forceRerun)} loading={resumeBusy} leftIcon={<Icon name="refresh-cw" />}>
                 Riesegui
               </Button>
@@ -1196,7 +1196,7 @@ function ManualAddCompanyModal({
           <label htmlFor="manual-add-vat" className={styles.requiredLabel}>
             <span className={styles.dotRequired} aria-hidden="true" />
             <span>P.IVA / codice fiscale</span>
-            <span className={styles.srOnly}>obbligatorio</span>
+            <VisuallyHidden>obbligatorio</VisuallyHidden>
           </label>
           <input
             id="manual-add-vat"

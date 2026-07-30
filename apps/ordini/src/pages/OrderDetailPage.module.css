@@ -543,15 +543,6 @@
   vertical-align: middle;
 }
 
-.visuallyHidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
-
 .sendBox {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

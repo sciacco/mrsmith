@@ -1,5 +1,5 @@
 import { useDeferredValue, useState } from 'react';
-import { Button, Icon, SearchInput, Tooltip } from '@mrsmith/ui';
+import { Button, Icon, SearchInput, Tooltip, VisuallyHidden } from '@mrsmith/ui';
 import { ApiError } from '@mrsmith/api-client';
 import type { User } from '../../api/users';
 import { useCustomers } from '@mrsmith/features';
@@ -141,7 +141,7 @@ export function GestioneUtentiPage() {
                     <th>Creato il</th>
                     <th>last_login</th>
                     <th className={styles.actionsHeader}>
-                      <span className={styles.visuallyHidden}>Azioni</span>
+                      <VisuallyHidden>Azioni</VisuallyHidden>
                     </th>
                   </tr>
                 </thead>

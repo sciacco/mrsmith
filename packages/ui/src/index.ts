@@ -28,6 +28,8 @@ export { Tooltip } from './components/Tooltip/Tooltip';
 export type { TooltipPlacement } from './components/Tooltip/Tooltip';
 export { Icon } from './components/Icon/Icon';
 export type { IconName } from './components/Icon/Icon';
+export { VisuallyHidden } from './components/VisuallyHidden/VisuallyHidden';
+export type { VisuallyHiddenProps } from './components/VisuallyHidden/VisuallyHidden';
 export { MultiSelect } from './components/MultiSelect/MultiSelect';
 export { SingleSelect } from './components/SingleSelect/SingleSelect';
 export { SearchInput } from './components/SearchInput/SearchInput';

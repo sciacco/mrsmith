@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ApiError } from '@mrsmith/api-client';
-import { Button, Modal, useToast } from '@mrsmith/ui';
+import { Button, Modal, VisuallyHidden, useToast } from '@mrsmith/ui';
 import { useCreatePlan } from '../../api/queries';
 import styles from './NewPlanModal.module.css';
 
@@ -67,7 +67,7 @@ export function NewPlanModal({ open, defaultYear, prevYearAvailable, onClose, on
           <label htmlFor="np-year" className={styles.label}>
             Anno
             <span className={styles.req} aria-hidden="true" />
-            <span className="sr-only"> (obbligatorio)</span>
+            <VisuallyHidden> (obbligatorio)</VisuallyHidden>
           </label>
           <input
             id="np-year"

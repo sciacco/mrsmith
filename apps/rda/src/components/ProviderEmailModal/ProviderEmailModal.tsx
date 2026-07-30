@@ -1,4 +1,4 @@
-import { Button, Icon, Modal, Skeleton } from '@mrsmith/ui';
+import { Button, Icon, Modal, Skeleton, VisuallyHidden } from '@mrsmith/ui';
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useProviderMutations, useSendProviderEmail } from '../../api/queries';
 import type {
@@ -486,7 +486,7 @@ export function ProviderEmailModal({
 }
 
 function RequiredMarker() {
-  return <><span className={styles.requiredMarker} aria-hidden="true" /><span className={styles.srOnly}> obbligatorio</span></>;
+  return <><span className={styles.requiredMarker} aria-hidden="true" /><VisuallyHidden> obbligatorio</VisuallyHidden></>;
 }
 
 function RecipientPicker({
@@ -583,7 +583,7 @@ function RecipientPicker({
       </div>
       <p className={styles.recipientHint}>{activeRole === 'to' ? "Destinatari principali dell'email." : 'Destinatari in copia.'}</p>
       {error ? <p id={errorId} className={styles.fieldError}>{error}</p> : null}
-      <span className={styles.srOnly} aria-live="polite">{selectedContacts.length} destinatari selezionati in {activeRole === 'to' ? 'A' : 'CC'}</span>
+      <VisuallyHidden aria-live="polite">{selectedContacts.length} destinatari selezionati in {activeRole === 'to' ? 'A' : 'CC'}</VisuallyHidden>
     </fieldset>
   );
 }
