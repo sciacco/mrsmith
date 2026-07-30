@@ -428,12 +428,6 @@ export interface MACreateInitiativeCardResponse {
   domainVerification?: 'queued';
 }
 
-export interface MACardEvent extends MATargetOutcome {}
-
-export interface MACardEventListResponse {
-  items: MACardEvent[];
-}
-
 export interface MACardCloseResponse {
   card: MAInitiativeCard;
   registeredFacts?: string[];
@@ -749,8 +743,8 @@ export interface MACompanyDossier {
   updatedAt?: string;
 }
 
-// Company registry (mig 090, INIZIATIVE-PRD.md §6): closed-vocabulary facts +
-// free-text notes, valid across every initiative. Presentation only.
+// Company registry (mig 090, INIZIATIVE-PRD.md §6): closed-vocabulary facts
+// valid across every initiative. Presentation only.
 export type MACompanyFactKind = 'non_vende' | 'in_trattativa_altrui' | 'da_evitare' | 'gia_cliente' | 'partner';
 
 export interface MACompanyFact {

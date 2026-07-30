@@ -145,7 +145,6 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/sessions/{id}/initiative", h.handleSetMASessionInitiative)
 	handle("GET /binocolo/v1/ma/initiatives/{id}", h.handleGetMAInitiativeBoard)
 	handle("POST /binocolo/v1/ma/initiatives/{id}/cards", h.handleCreateMAInitiativeCard)
-	handle("GET /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/events", h.handleGetMAInitiativeCardEvents)
 	handle("GET /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/dossier", h.handleGetMACardDossier)
 	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/state", h.handleSetMACardState)
 	handle("POST /binocolo/v1/ma/initiatives/{id}/cards/{companyKey}/close", h.handleCloseMACard)
@@ -652,23 +651,6 @@ func (h *Handler) handleCreateMAInitiativeCard(w http.ResponseWriter, r *http.Re
 	}
 	h.completeMATraceSuccess(r, http.StatusCreated)
 	httputil.JSON(w, http.StatusCreated, result)
-}
-
-func (h *Handler) handleGetMAInitiativeCardEvents(w http.ResponseWriter, r *http.Request) {
-	id, ok := maInitiativeID(w, r)
-	if !ok {
-		return
-	}
-	companyKey, ok := maCompanyKeyPath(w, r)
-	if !ok {
-		return
-	}
-	events, err := h.ma.getInitiativeCardEvents(r.Context(), id, companyKey)
-	if err != nil {
-		h.maFailure(w, r, "ma_initiative_card_events_get", err, "initiative_id", id, "company_key", companyKey)
-		return
-	}
-	httputil.JSON(w, http.StatusOK, map[string]any{"items": events})
 }
 
 func (h *Handler) handleGetMACardDossier(w http.ResponseWriter, r *http.Request) {

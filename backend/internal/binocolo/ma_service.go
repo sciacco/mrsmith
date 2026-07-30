@@ -2767,31 +2767,6 @@ func maCardDossierStatus(deep MADeepAnalysis) string {
 	}
 }
 
-// getInitiativeCardEvents carica il diario di una card (B4 passo 2): eventi
-// ancorati all'iniziativa OR alle sessioni agganciate, così gli esiti storici
-// di D2 (contattato/buon_lead/no_go) restano visibili.
-func (s *maService) getInitiativeCardEvents(ctx context.Context, initiativeID, companyKey string) ([]MATargetOutcome, error) {
-	if s.store == nil {
-		return nil, errMAStoreUnavailable
-	}
-	companyKey = normalizeMACompanyKey(companyKey)
-	if companyKey == "" {
-		return nil, fmt.Errorf("%w: companyKey", errMAStrategyInvalid)
-	}
-	if _, err := s.store.GetMAInitiative(ctx, initiativeID); err != nil {
-		return nil, err
-	}
-	sessions, err := s.store.ListMASessionsByInitiative(ctx, initiativeID)
-	if err != nil {
-		return nil, err
-	}
-	sessionIDs := make([]string, 0, len(sessions))
-	for _, session := range sessions {
-		sessionIDs = append(sessionIDs, session.ID)
-	}
-	return s.store.ListMAInitiativeCardEvents(ctx, initiativeID, sessionIDs, companyKey)
-}
-
 // requireOperationalInitiativeCard is the common guard for every card write
 // (B4 passo 8): l'iniziativa deve esistere e non essere archiviata, la card
 // deve esistere.

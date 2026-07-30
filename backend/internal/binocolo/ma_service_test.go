@@ -1910,10 +1910,6 @@ func (f *fakeMAWorkspaceStore) ListMACardProvenances(context.Context, string, []
 	return nil, errors.New("not implemented")
 }
 
-func (f *fakeMAWorkspaceStore) ListMAInitiativeCardEvents(context.Context, string, []string, string) ([]MATargetOutcome, error) {
-	return nil, errors.New("not implemented")
-}
-
 func (f *fakeMAWorkspaceStore) ListMALatestCardEvents(context.Context, string, []string) (map[string]string, error) {
 	return nil, errors.New("not implemented")
 }

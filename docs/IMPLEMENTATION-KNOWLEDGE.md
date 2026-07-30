@@ -255,6 +255,15 @@ Alyante ERP ID
 - Database invariant (migration 123, issue #88): after the application rollback window closed, `ma_target.company_key` became `NOT NULL`; all 16 company-key references measured by probe Q17 have explicit `ON DELETE RESTRICT` foreign keys to `ma_company`; and `ma_target` is unique on `(session_id, company_key)`. Practical rule: keep application guards for readable domain errors, but declare a proven identity invariant in the database as soon as mixed-version rollback no longer depends on the permissive schema.
 - Open questions: merging two companies has no design and no observed case — when the first real one appears it gets its own issue.
 
+### Binocolo Company Annotations Live in `ma_target_outcome`
+
+- Context: Binocolo company annotations shown across the company page, initiative cards, drawers, and activity history.
+- Discovery: the canonical annotation store is `binocolo.ma_target_outcome`, identified by `event = 'nota'`. The original `binocolo.ma_company_note` rows were copied by the operational backfill `082_ma_company_note_to_outcome.sql`; the application no longer reads or writes that table, and there is no fallback, dual-read, or dual-write path. Annotation provenance is carried in `payload.annotationOrigin`: `legacy_registry` marks migrated registry notes and `system_domain` marks annotations created by the automatic domain writer. An absent origin denotes an ordinary analyst-created annotation.
+- Practical rule: every new annotation reader or writer must use `ma_target_outcome` and preserve the annotation event, scope, audit fields, soft-delete metadata, and `annotationOrigin`. Do not restore `ma_company_note` as a fallback or compatibility source. Keep the legacy table and the backfill available temporarily for reconciliation and rollback; dropping the table requires a separate approved destructive migration after deployment observation, exact backfill parity, absence of new writes and DB dependencies, closure of the old-binary rollback window, and an explicit retention/audit decision.
+- Evidence: migration `deploy/migrations/124_binocolo_ma_annotations.sql`; backfill `deploy/migrations/backfill/082_ma_company_note_to_outcome.sql`; annotation store paths in `backend/internal/binocolo/ma_store.go`; automatic writer in `backend/internal/binocolo/ma_card_domain_job.go`; cleanup tracked by GitHub issue #94. The post-backfill sweep recorded in issue #90 observed 68 annotations across 88 companies, including 31 `legacy_registry` and 0 `system_domain`; treat this as a point-in-time observation, not current parity certification.
+- Used by: `apps/binocolo` company activity and initiative-card surfaces.
+- Open questions: whether and when to drop `binocolo.ma_company_note`; decide only against the operational gates above.
+
 ### Binocolo ATECO 2025 Codes Are Resolver-Gated
 
 - Context: Binocolo M&A ATECO candidate selection and OpenAPI.it Company `IT-search` calls.

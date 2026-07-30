@@ -186,7 +186,6 @@ export function AziendePage() {
                     <span>{company.sessionCount} {company.sessionCount === 1 ? 'ricerca' : 'ricerche'}</span>
                     <span>{company.initiativeCount} {company.initiativeCount === 1 ? 'iniziativa' : 'iniziative'}</span>
                     {company.hasDeep ? <span className={styles.deepBadge}>Deep disponibile</span> : null}
-                    {company.companyKeys.length > 1 ? <span>{company.companyKeys.length} schede</span> : null}
                   </span>
 
                   <Icon className={styles.openIcon} name="arrow-right" size={18} />

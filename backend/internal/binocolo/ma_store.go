@@ -169,7 +169,6 @@ type maWorkspaceStore interface {
 	ListMACompanyFactsActive(ctx context.Context, companyKeys []string) (map[string][]string, error)
 	ListMASessionsByInitiative(ctx context.Context, initiativeID string) ([]MASessionSummary, error)
 	ListMACardProvenances(ctx context.Context, initiativeID string, companyKeys []string) (map[string][]MACardProvenance, error)
-	ListMAInitiativeCardEvents(ctx context.Context, initiativeID string, sessionIDs []string, companyKey string) ([]MATargetOutcome, error)
 	ListMALatestCardEvents(ctx context.Context, initiativeID string, companyKeys []string) (map[string]string, error)
 	FindMALatestTargetForCard(ctx context.Context, initiativeID, companyKey string) (sessionID, targetID string, err error)
 	ResolveMACompany(ctx context.Context, observation maCompanyObservation) (string, error)
@@ -4144,67 +4143,6 @@ ORDER BY r.rated_at DESC
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate ma card provenances: %w", err)
-	}
-	return out, nil
-}
-
-// ListMAInitiativeCardEvents loads the diario of one card (B4 passo 2):
-// events anchored directly to the Iniziativa (new-style, initiative_id =
-// initiativeID) OR to one of the Iniziativa's sessions (legacy contattato/
-// buon_lead/no_go emitted by D2) — so the historical outcomes surface in the
-// same timeline. Newest first.
-func (s *SQLStore) ListMAInitiativeCardEvents(ctx context.Context, initiativeID string, sessionIDs []string, companyKey string) ([]MATargetOutcome, error) {
-	if s == nil || s.db == nil {
-		return nil, errors.New("binocolo ma store not configured")
-	}
-	out := []MATargetOutcome{}
-	args := []any{initiativeID, companyKey}
-	sessionClause := "FALSE"
-	if len(sessionIDs) > 0 {
-		placeholders := make([]string, len(sessionIDs))
-		for i, id := range sessionIDs {
-			placeholders[i] = fmt.Sprintf("$%d", i+3)
-			args = append(args, id)
-		}
-		sessionClause = fmt.Sprintf("o.session_id IN (%s)", strings.Join(placeholders, ", "))
-	}
-	query := fmt.Sprintf(`
-SELECT o.id::text, COALESCE(o.session_id::text, ''), COALESCE(o.initiative_id::text, ''), o.company_key,
-       o.event, COALESCE(o.note, ''), COALESCE(o.payload::text, '{}'),
-       COALESCE(o.created_by_email, ''), o.created_at,
-       o.updated_at, COALESCE(o.updated_by_email, ''),
-       o.deleted_at, COALESCE(o.deleted_by_email, '')
-FROM binocolo.ma_target_outcome o
-WHERE o.company_key = $2
-  AND (o.initiative_id = $1::uuid OR %s)
-  AND o.deleted_at IS NULL
-ORDER BY o.created_at DESC
-`, sessionClause)
-	rows, err := s.db.QueryContext(ctx, query, args...)
-	if err != nil {
-		return nil, fmt.Errorf("list ma initiative card events: %w", err)
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var item MATargetOutcome
-		var payload string
-		var updatedAt, deletedAt sql.NullTime
-		if err := rows.Scan(&item.ID, &item.SessionID, &item.InitiativeID, &item.CompanyKey,
-			&item.Event, &item.Note, &payload, &item.CreatedByEmail, &item.CreatedAt,
-			&updatedAt, &item.UpdatedByEmail, &deletedAt, &item.DeletedByEmail); err != nil {
-			return nil, fmt.Errorf("scan ma initiative card event: %w", err)
-		}
-		item.Payload = json.RawMessage(payload)
-		if updatedAt.Valid {
-			item.UpdatedAt = &updatedAt.Time
-		}
-		if deletedAt.Valid {
-			item.DeletedAt = &deletedAt.Time
-		}
-		out = append(out, item)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate ma initiative card events: %w", err)
 	}
 	return out, nil
 }
