@@ -945,8 +945,7 @@ func (s *maService) listCompanyActivity(ctx context.Context, companyKey string, 
 	return s.store.ListMACompanyActivity(ctx, companyKey, includeDeleted)
 }
 
-// getCompanyRegistry loads the full registry (facts + notes) for the dossier
-// §6 section.
+// getCompanyRegistry loads registry facts for the dossier §6 section.
 func (s *maService) getCompanyRegistry(ctx context.Context, companyKey string) (MACompanyRegistry, error) {
 	if s.store == nil {
 		return MACompanyRegistry{}, errMAStoreUnavailable

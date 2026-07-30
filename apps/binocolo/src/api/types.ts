@@ -768,17 +768,8 @@ export interface MACompanyFact {
   revokeNote?: string;
 }
 
-export interface MACompanyNote {
-  id: string;
-  companyKey: string;
-  body: string;
-  createdByEmail?: string;
-  createdAt: string;
-}
-
 export interface MACompanyRegistry {
   facts: MACompanyFact[];
-  notes: MACompanyNote[];
 }
 
 export interface MACompanyOverview {

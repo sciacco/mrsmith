@@ -633,30 +633,17 @@ type MACompanyFact struct {
 	RevokeNote       string     `json:"revokeNote,omitempty"`
 }
 
-// MACompanyNote is an append-only free-text note of the company registry
-// (mig 090, PRD §6): the expressiveness the closed fact vocabulary does not
-// give. Registry content, not a log-of-events entry.
-type MACompanyNote struct {
-	ID               string    `json:"id"`
-	CompanyKey       string    `json:"companyKey"`
-	Body             string    `json:"body"`
-	CreatedBySubject string    `json:"-"`
-	CreatedByEmail   string    `json:"createdByEmail,omitempty"`
-	CreatedAt        time.Time `json:"createdAt"`
-}
-
-// MACompanyRegistry is the aggregate returned by the registry read endpoint:
-// facts include both active and revoked (the UI shows active, can reveal
-// history), notes are the append-only timeline.
+// MACompanyRegistry is the facts-only aggregate returned by the registry read
+// endpoint. Facts include both active and revoked; the UI shows active facts and
+// can reveal their history.
 type MACompanyRegistry struct {
 	Facts []MACompanyFact `json:"facts"`
-	Notes []MACompanyNote `json:"notes"`
 }
 
 // MACompanyOverview is the read-only aggregate for the future Scheda azienda:
 // identity from the latest target, deep-dive lifecycle reference, cross-session
-// appearances, and existing initiative cards. Registry facts/notes intentionally
-// stay in the dedicated registry endpoint.
+// appearances, and existing initiative cards. Registry facts intentionally stay
+// in the dedicated registry endpoint.
 type MACompanyOverview struct {
 	Identity    MACompanyOverviewIdentity     `json:"identity"`
 	Deep        *MADeepAnalysis               `json:"deep,omitempty"`

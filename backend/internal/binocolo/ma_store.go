@@ -3347,8 +3347,8 @@ RETURNING id::text
 	return true, nil
 }
 
-// GetMACompanyRegistry loads the full registry (facts active + revoked, notes
-// chronological) for the dossier §6 section and the F4/board reads.
+// GetMACompanyRegistry loads registry facts (active and revoked) for the
+// dossier §6 section and the F4/board reads.
 func (s *SQLStore) GetMACompanyRegistry(ctx context.Context, companyKey string) (MACompanyRegistry, error) {
 	if s == nil || s.db == nil {
 		return MACompanyRegistry{}, errors.New("binocolo ma store not configured")
@@ -3365,7 +3365,7 @@ ORDER BY created_at DESC
 		return MACompanyRegistry{}, fmt.Errorf("list ma company facts: %w", err)
 	}
 	defer factRows.Close()
-	out := MACompanyRegistry{Facts: []MACompanyFact{}, Notes: []MACompanyNote{}}
+	out := MACompanyRegistry{Facts: []MACompanyFact{}}
 	for factRows.Next() {
 		var fact MACompanyFact
 		var revokedAt sql.NullTime
@@ -3383,26 +3383,6 @@ ORDER BY created_at DESC
 		return MACompanyRegistry{}, fmt.Errorf("iterate ma company facts: %w", err)
 	}
 
-	noteRows, err := s.db.QueryContext(ctx, `
-SELECT id::text, company_key, body, created_by_subject, created_by_email, created_at
-FROM binocolo.ma_company_note
-WHERE company_key = $1
-ORDER BY created_at DESC
-`, companyKey)
-	if err != nil {
-		return MACompanyRegistry{}, fmt.Errorf("list ma company notes: %w", err)
-	}
-	defer noteRows.Close()
-	for noteRows.Next() {
-		var note MACompanyNote
-		if err := noteRows.Scan(&note.ID, &note.CompanyKey, &note.Body, &note.CreatedBySubject, &note.CreatedByEmail, &note.CreatedAt); err != nil {
-			return MACompanyRegistry{}, fmt.Errorf("scan ma company note: %w", err)
-		}
-		out.Notes = append(out.Notes, note)
-	}
-	if err := noteRows.Err(); err != nil {
-		return MACompanyRegistry{}, fmt.Errorf("iterate ma company notes: %w", err)
-	}
 	return out, nil
 }
 
