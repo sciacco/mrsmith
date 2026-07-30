@@ -125,7 +125,7 @@ func GenerateTermsAndConditions(
 <li><b>Modalit&agrave; di fatturazione</b>
 <ul>
 <li>Corrispettivi Una Tantum: %s</li>
-<li>Canone: %s anticipata</li>
+<li>Canone: %s</li>
 </ul>
 </li>
 </ul>
