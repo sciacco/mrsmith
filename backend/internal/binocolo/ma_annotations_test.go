@@ -67,14 +67,11 @@ func TestMAAnnotationServiceValidationAndDomainErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create annotation: %v", err)
 	}
-	if annotation.Note != "nota valida" || annotation.SessionID != "" || len(store.outcomes) != 1 {
+	if annotation.Note != "nota  valida" || annotation.SessionID != "" || len(store.outcomes) != 1 {
 		t.Fatalf("unexpected annotation: %#v, stored=%d", annotation, len(store.outcomes))
 	}
 	if _, err := service.createAnnotation(context.Background(), "unknown", MAAnnotationCreateRequest{Body: "nota"}, "", ""); !errors.Is(err, errMACompanyKeyUnknown) {
 		t.Fatalf("unknown company error = %v", err)
-	}
-	if err := service.updateAnnotation(context.Background(), annotation.ID, strings.Repeat("x", 1001), "", ""); !errors.Is(err, errMAStrategyInvalid) {
-		t.Fatalf("oversize update error = %v", err)
 	}
 	store.updateAnnotationErr = errMAAnnotationNotFound
 	if err := service.updateAnnotation(context.Background(), annotation.ID, "testo", "", ""); !errors.Is(err, errMAAnnotationNotFound) {
@@ -92,16 +89,14 @@ func TestMAAnnotationServiceValidationAndDomainErrors(t *testing.T) {
 
 func TestValidateMAAnnotationBody(t *testing.T) {
 	body, err := validateMAAnnotationBody("  testo\n  annotazione  ")
-	if err != nil || body != "testo annotazione" {
-		t.Fatalf("normalized body = %q, err = %v", body, err)
+	if err != nil || body != "testo\n  annotazione" {
+		t.Fatalf("trimmed body = %q, err = %v", body, err)
 	}
 	if _, err := validateMAAnnotationBody(" \n "); err == nil {
 		t.Fatal("empty body must be rejected")
 	}
-	if _, err := validateMAAnnotationBody(strings.Repeat("è", 1001)); err == nil {
-		t.Fatal("body over 1000 runes must be rejected")
-	}
-	if _, err := validateMAAnnotationBody(strings.Repeat("è", 1000)); err != nil {
-		t.Fatalf("1000-rune body rejected: %v", err)
+	longBody := strings.Repeat("è", 1001)
+	if body, err := validateMAAnnotationBody(longBody); err != nil || body != longBody {
+		t.Fatalf("long body = %q, err = %v", body, err)
 	}
 }

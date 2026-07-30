@@ -171,7 +171,6 @@ export function ActivityTimeline({
                 <div className={styles.editor}>
                   <textarea
                     value={draft}
-                    maxLength={1000}
                     rows={4}
                     onChange={(event) => setDraft(event.target.value)}
                     onKeyDown={(event) => {

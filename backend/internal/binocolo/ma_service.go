@@ -769,12 +769,9 @@ func (s *maService) revokeCompanyFact(ctx context.Context, id, note, subject, em
 }
 
 func validateMAAnnotationBody(body string) (string, error) {
-	body = cleanText(body, 0)
+	body = strings.TrimSpace(body)
 	if body == "" {
 		return "", fmt.Errorf("%w: body", errMAStrategyInvalid)
-	}
-	if len([]rune(body)) > 1000 {
-		return "", fmt.Errorf("%w: body exceeds 1000 characters", errMAStrategyInvalid)
 	}
 	return body, nil
 }

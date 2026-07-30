@@ -160,14 +160,12 @@ export function CompanyActivityPanel({ companyKey, companyName, vatCode }: { com
                 ref={composerRef}
                 value={body}
                 rows={3}
-                maxLength={1000}
                 placeholder="Aggiungi annotazione…"
                 aria-invalid={Boolean(error)}
                 aria-describedby={error ? 'company-annotation-error' : undefined}
                 onChange={(event) => { setBody(event.target.value); setError(''); setDismissError(''); }}
               />
               <div className={styles.composerFooter}>
-                <span>{body.length}/1.000</span>
                 <div className={styles.composerActions}>
                   {body ? <Button variant="ghost" size="sm" onClick={discardDraft}>Annulla</Button> : null}
                   <Button variant="primary" size="sm" disabled={!body.trim()} loading={mutations.create.isPending} onClick={() => void submit()}>Aggiungi</Button>
