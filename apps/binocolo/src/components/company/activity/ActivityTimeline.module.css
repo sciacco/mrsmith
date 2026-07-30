@@ -15,8 +15,9 @@
   position: absolute;
   top: var(--space-4);
   bottom: calc(-1 * var(--space-4));
-  left: 5px;
+  left: calc(var(--space-3) / 2);
   width: 1px;
+  transform: translateX(-50%);
   background: var(--color-border-subtle);
 }
 

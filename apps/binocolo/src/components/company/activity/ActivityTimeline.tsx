@@ -2,35 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Modal } from '@mrsmith/ui';
 import type { MACompanyActivityLookup, MACompanyActivitySession, MATargetOutcome } from '../../../api/types';
 import { useAnnotationMutations } from '../../../hooks/useCompanyActivity';
+import { compactDateTime, relativeDate, shortAuthor } from '../../../lib/displayFormatting';
 import { eventLabel, TECHNICAL_ACTIVITY_EVENTS } from './eventLabel';
 import styles from './ActivityTimeline.module.css';
-
-function shortAuthor(email?: string) {
-  if (!email) return 'Autore non disponibile';
-  return email.split('@')[0] || email;
-}
-
-function dateTime(value?: string) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return new Intl.DateTimeFormat('it-IT', { dateStyle: 'short', timeStyle: 'short' }).format(date);
-}
-
-function relativeDate(value?: string) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  const minutes = Math.max(0, Math.floor((Date.now() - date.getTime()) / 60_000));
-  if (minutes < 1) return 'ora';
-  if (minutes < 60) return `${minutes} min fa`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} h fa`;
-  const days = Math.floor(hours / 24);
-  if (days === 1) return 'ieri';
-  if (days < 7) return `${days} giorni fa`;
-  return new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: 'short' }).format(date);
-}
 
 function contextLabel(
   item: MATargetOutcome,
@@ -181,7 +155,7 @@ export function ActivityTimeline({
           >
             <span className={styles.dot} aria-hidden="true" />
             <div className={styles.content}>
-              <p className={styles.eyebrow}>{kind.toUpperCase()} · {context}</p>
+              {!compact ? <p className={styles.eyebrow}>{kind.toUpperCase()} · {context}</p> : null}
               {item.deletedAt ? <span className={styles.deletedLabel}>Annotazione eliminata</span> : null}
               {editing === item.id ? (
                 <div className={styles.editor}>
@@ -208,9 +182,9 @@ export function ActivityTimeline({
                 <p className={styles.text}>{eventLabel(item, sessionTitles)}</p>
               )}
               <p className={styles.meta}>
-                {authorLabel(item)} · {relativeDates ? relativeDate(item.createdAt) : dateTime(item.createdAt)}
-                {item.updatedAt ? ` · modificata ${dateTime(item.updatedAt)} da ${shortAuthor(item.updatedByEmail)}` : ''}
-                {item.deletedAt ? ` · eliminata ${dateTime(item.deletedAt)} da ${shortAuthor(item.deletedByEmail)}` : ''}
+                {compact ? `${context} · ` : ''}{authorLabel(item)} · {relativeDates ? relativeDate(item.createdAt) : compactDateTime(item.createdAt)}
+                {item.updatedAt ? ` · modificata ${relativeDates ? relativeDate(item.updatedAt) : compactDateTime(item.updatedAt)} da ${shortAuthor(item.updatedByEmail)}` : ''}
+                {item.deletedAt ? ` · eliminata ${relativeDates ? relativeDate(item.deletedAt) : compactDateTime(item.deletedAt)} da ${shortAuthor(item.deletedByEmail)}` : ''}
               </p>
               {editable && editing !== item.id ? (
                 <div className={styles.actions}>
