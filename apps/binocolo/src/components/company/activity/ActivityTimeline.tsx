@@ -22,6 +22,15 @@ function contextLabel(
   return 'Scheda azienda';
 }
 
+function sessionDetailLabel(
+  item: MATargetOutcome,
+  sessionMap: Map<string, MACompanyActivitySession>,
+) {
+  if (!item.initiativeId || !item.sessionId) return '';
+  const session = sessionMap.get(item.sessionId);
+  return session ? `Ricerca ${session.title}` : 'Ricerca';
+}
+
 function authorLabel(item: MATargetOutcome) {
   const payload = item.payload as Record<string, unknown> | undefined;
   if (payload?.annotationOrigin === 'system_domain') return 'Verifica automatica del dominio';
@@ -146,6 +155,7 @@ export function ActivityTimeline({
         const annotation = item.event === 'nota';
         const editable = annotation && !item.deletedAt && (allowAllAnnotations || (Boolean(editableInitiativeId) && item.initiativeId === editableInitiativeId));
         const context = contextLabel(item, initiativeMap, sessionMap);
+        const sessionDetail = sessionDetailLabel(item, sessionMap);
         const kind = eventKindLabel(item);
         return (
           <article
@@ -182,7 +192,7 @@ export function ActivityTimeline({
                 <p className={styles.text}>{eventLabel(item, sessionTitles)}</p>
               )}
               <p className={styles.meta}>
-                {compact ? `${context} · ` : ''}{authorLabel(item)} · {relativeDates ? relativeDate(item.createdAt) : compactDateTime(item.createdAt)}
+                {compact ? `${context} · ` : ''}{!compact && sessionDetail ? `${sessionDetail} · ` : ''}{authorLabel(item)} · {relativeDates ? relativeDate(item.createdAt) : compactDateTime(item.createdAt)}
                 {item.updatedAt ? ` · modificata ${relativeDates ? relativeDate(item.updatedAt) : compactDateTime(item.updatedAt)} da ${shortAuthor(item.updatedByEmail)}` : ''}
                 {item.deletedAt ? ` · eliminata ${relativeDates ? relativeDate(item.deletedAt) : compactDateTime(item.deletedAt)} da ${shortAuthor(item.deletedByEmail)}` : ''}
               </p>
@@ -207,7 +217,7 @@ export function ActivityTimeline({
     <Modal
       open={deleteTarget !== null}
       onClose={() => { setDeleteTarget(null); setDeleteError(''); }}
-      title="Eliminare questa annotazione?"
+      title="Elimina annotazione"
       size="sm"
       dismissible={!mutations.remove.isPending}
     >

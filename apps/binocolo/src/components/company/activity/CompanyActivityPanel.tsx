@@ -89,10 +89,7 @@ export function CompanyActivityPanel({ companyKey, companyName, vatCode }: { com
             <Button size="sm" variant="secondary" onClick={() => void activity.refetch()}>Riprova</Button>
           </div>
         ) : activeAnnotations.length === 0 ? (
-          <div className={styles.empty}>
-            <p>Nessuna annotazione registrata.</p>
-            <p>Le annotazioni nate dalla Scheda, dalle iniziative o da processi automatici saranno visibili qui.</p>
-          </div>
+          <p className={styles.empty}>Nessuna annotazione</p>
         ) : (
           <ActivityTimeline
             items={activeAnnotations.slice(0, 3)}
