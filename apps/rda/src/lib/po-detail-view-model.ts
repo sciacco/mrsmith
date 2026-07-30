@@ -1,8 +1,8 @@
 import type { PoActionModel, PoDetail, ProviderReference, ProviderSummary } from '../api/types';
-import { countQuoteAttachments } from './attachments.js';
-import type { BudgetSelection } from './budgets.js';
-import { formatMoney, normalizeCurrency, parseMistraMoney } from './format.js';
-import { QUALIFICATION_REF } from './provider-refs.js';
+import { countQuoteAttachments } from './attachments.ts';
+import type { BudgetSelection } from './budgets.ts';
+import { formatMoney, normalizeCurrency, parseMistraMoney } from './format.ts';
+import { QUALIFICATION_REF } from './provider-refs.ts';
 
 export interface POReadinessOptions {
   provider?: ProviderSummary;

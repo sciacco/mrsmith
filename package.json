@@ -3,7 +3,7 @@
   "private": true,
   "packageManager": "pnpm@10.34.5",
   "engines": {
-    "node": ">=22.6.0"
+    "node": ">=22.10.0"
   },
   "scripts": {
     "dev": "concurrently --names backend,apps --prefix-colors blue,green \"cd backend && air\" \"pnpm --filter './apps/*' --parallel --if-present dev\"",

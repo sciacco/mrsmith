@@ -1,5 +1,5 @@
 import type { Article, PoRow, RowPayload } from '../api/types';
-import { parseMistraMoney } from './format.js';
+import { parseMistraMoney } from './format.ts';
 
 export type ServiceMode = 'recurring' | 'one_shot';
 

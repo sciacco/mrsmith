@@ -2,7 +2,7 @@ import {
   buildPaymentMethodOptions,
   preferredPaymentMethodCode,
   requiresPaymentMethodVerification,
-} from './payment-options.js';
+} from './payment-options.ts';
 import type { PaymentMethod, ProviderSummary } from '../api/types';
 
 function assert(condition: boolean, message: string) {

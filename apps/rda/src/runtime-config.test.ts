@@ -1,4 +1,4 @@
-import { getRdaQuoteThreshold, setRuntimeConfig } from './runtime-config.js';
+import { getRdaQuoteThreshold, setRuntimeConfig } from './runtime-config.ts';
 
 function assertEqual<T>(actual: T, expected: T, message: string) {
   if (actual !== expected) throw new Error(`${message}: expected ${String(expected)}, got ${String(actual)}`);

@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b tsconfig.build.json && vite build",
     "lint": "tsc --noEmit",
-    "test": "node --test --experimental-strip-types --experimental-specifier-resolution=node src/features/iaas/*.test.ts",
+    "test": "node --test --experimental-strip-types",
     "preview": "vite preview"
   },
   "dependencies": {

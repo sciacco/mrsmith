@@ -1,4 +1,4 @@
-import { canDownloadPOPDF } from './po-pdf.js';
+import { canDownloadPOPDF } from './po-pdf.ts';
 
 function assertEqual<T>(actual: T, expected: T, message: string) {
   if (actual !== expected) throw new Error(`${message}: expected ${String(expected)}, got ${String(actual)}`);

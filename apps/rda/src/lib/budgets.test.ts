@@ -1,6 +1,6 @@
-import type { BudgetForUser } from '../api/types.js';
-import { budgetDisplayLabel, budgetSelectionKey, findBudget, selectedBudgetID } from './budgets.js';
-import { buildPatchPOPayload, type POHeaderDraft } from './po-payload.js';
+import type { BudgetForUser } from '../api/types.ts';
+import { budgetDisplayLabel, budgetSelectionKey, findBudget, selectedBudgetID } from './budgets.ts';
+import { buildPatchPOPayload, type POHeaderDraft } from './po-payload.ts';
 
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message);

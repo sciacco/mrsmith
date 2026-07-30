@@ -1,5 +1,5 @@
-import type { PlanEnrollment } from '../api/types.js';
-import { daysUntilPipelineReference, pipelineOverdueDays } from './pipelineTiming.js';
+import type { PlanEnrollment } from '../api/types.ts';
+import { daysUntilPipelineReference, pipelineOverdueDays } from './pipelineTiming.ts';
 
 function assertEqual<T>(actual: T, expected: T, message: string) {
   if (actual !== expected) throw new Error(`${message}: expected ${String(expected)}, got ${String(actual)}`);

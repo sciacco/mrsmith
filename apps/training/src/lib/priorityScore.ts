@@ -1,6 +1,6 @@
-import type { PlanEnrollment } from '../api/types.js';
-import { classifyAlertLevel, type AlertLevel } from './alertLevel.js';
-import { daysUntilPipelineReference } from './pipelineTiming.js';
+import type { PlanEnrollment } from '../api/types.ts';
+import { classifyAlertLevel, type AlertLevel } from './alertLevel.ts';
+import { daysUntilPipelineReference } from './pipelineTiming.ts';
 
 const SEVERITY_WEIGHT: Record<AlertLevel, number> = {
   critical: 1000,

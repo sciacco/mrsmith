@@ -1,6 +1,6 @@
 import type { BudgetForUser, CreatePOPayload, PatchPOPayload, PaymentMethod, ProviderSummary } from '../api/types';
-import { budgetBinding, budgetBindingFromSelection, findBudget, selectedBudgetID, type BudgetSelection } from './budgets.js';
-import { DEFAULT_RDA_CURRENCY, normalizeCurrency } from './format.js';
+import { budgetBinding, budgetBindingFromSelection, findBudget, selectedBudgetID, type BudgetSelection } from './budgets.ts';
+import { DEFAULT_RDA_CURRENCY, normalizeCurrency } from './format.ts';
 
 export type POType = 'STANDARD' | 'ECOMMERCE';
 

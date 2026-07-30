@@ -3,7 +3,7 @@ import {
   countQuoteAttachments,
   defaultAttachmentTypeForPOState,
   isAttachmentType,
-} from './attachments.js';
+} from './attachments.ts';
 
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message);

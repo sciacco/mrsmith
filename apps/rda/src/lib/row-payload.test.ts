@@ -1,4 +1,4 @@
-import { buildRowPayload, draftFromPoRow, rowPreviewTotal } from './row-payload.js';
+import { buildRowPayload, draftFromPoRow, rowPreviewTotal } from './row-payload.ts';
 import type { Article } from '../api/types';
 
 function assertEqual<T>(actual: T, expected: T, message: string) {

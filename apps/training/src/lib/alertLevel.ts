@@ -1,5 +1,5 @@
-import type { PlanEnrollment } from '../api/types.js';
-import { daysUntilPipelineReference } from './pipelineTiming.js';
+import type { PlanEnrollment } from '../api/types.ts';
+import { daysUntilPipelineReference } from './pipelineTiming.ts';
 
 export type AlertLevel = 'critical' | 'warning' | 'info';
 

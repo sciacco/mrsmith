@@ -1,5 +1,5 @@
-import type { PoActionModel, PoDetail, ProviderSummary } from '../api/types.js';
-import { buildPOReadinessItems, buildTabBadges, selectedModeID, type POHeaderState } from './po-detail-view-model.js';
+import type { PoActionModel, PoDetail, ProviderSummary } from '../api/types.ts';
+import { buildPOReadinessItems, buildTabBadges, selectedModeID, type POHeaderState } from './po-detail-view-model.ts';
 
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message);

@@ -1,5 +1,5 @@
-import type { PlanEnrollment } from '../api/types.js';
-import { classifyAlertLevel } from './alertLevel.js';
+import type { PlanEnrollment } from '../api/types.ts';
+import { classifyAlertLevel } from './alertLevel.ts';
 
 function assertEqual<T>(actual: T, expected: T, message: string) {
   if (actual !== expected) throw new Error(`${message}: expected ${String(expected)}, got ${String(actual)}`);

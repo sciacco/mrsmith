@@ -1,8 +1,8 @@
 import type { PoApprover, PoPreview, RdaPermissions } from '../api/types';
-import { inboxConfig, inboxOrder, type InboxKind } from './inbox.js';
-import { isApprover, parseMistraMoney } from './format.js';
-import { isRequesterDeletablePOState } from './po-permissions.js';
-import { stateLabel } from './state-labels.js';
+import { inboxConfig, inboxOrder, type InboxKind } from './inbox.ts';
+import { isApprover, parseMistraMoney } from './format.ts';
+import { isRequesterDeletablePOState } from './po-permissions.ts';
+import { stateLabel } from './state-labels.ts';
 
 export type RdaDashboardView = 'todo' | 'mine' | 'all';
 export type RdaDashboardQuickFilter = 'own-draft' | 'own-open';

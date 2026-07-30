@@ -1,5 +1,5 @@
-import type { PoPreview, RdaPermissions } from '../api/types.js';
-import { buildRdaDashboardModel, filterRdaDashboardRows, isRdaInboxActionablePO } from './rda-dashboard.js';
+import type { PoPreview, RdaPermissions } from '../api/types.ts';
+import { buildRdaDashboardModel, filterRdaDashboardRows, isRdaInboxActionablePO } from './rda-dashboard.ts';
 
 function assertEqual<T>(actual: T, expected: T, message: string) {
   if (actual !== expected) throw new Error(`${message}: expected ${String(expected)}, got ${String(actual)}`);

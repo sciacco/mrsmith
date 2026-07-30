@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b tsconfig.build.json && vite build",
     "lint": "tsc --noEmit",
-    "test": "tsc -p tsconfig.test.json && node ../../artifacts/claude/training-tests/lib/alertLevel.test.js && node ../../artifacts/claude/training-tests/lib/pipelineTiming.test.js && node ../../artifacts/claude/training-tests/lib/priorityScore.test.js && node ../../artifacts/claude/training-tests/lib/temporalGrouping.test.js",
+    "test": "node --test --experimental-strip-types",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -21,6 +21,7 @@
   },
   "devDependencies": {
     "@mrsmith/vite-config": "workspace:*",
+    "@types/node": "^22.10.2",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",

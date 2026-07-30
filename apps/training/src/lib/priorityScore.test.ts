@@ -1,5 +1,5 @@
-import type { PlanEnrollment } from '../api/types.js';
-import { priorityScore } from './priorityScore.js';
+import type { PlanEnrollment } from '../api/types.ts';
+import { priorityScore } from './priorityScore.ts';
 
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message);

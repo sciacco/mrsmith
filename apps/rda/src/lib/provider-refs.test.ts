@@ -1,4 +1,4 @@
-import { canManageProviderContacts, isValidOptionalProviderRefPhone } from './provider-refs.js';
+import { canManageProviderContacts, isValidOptionalProviderRefPhone } from './provider-refs.ts';
 
 function assertEqual(actual: unknown, expected: unknown, message: string) {
   if (actual !== expected) {
