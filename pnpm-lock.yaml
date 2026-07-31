@@ -1208,6 +1208,15 @@ importers:
         specifier: ~5.6.3
         version: 5.6.3
 
+  packages/format:
+    devDependencies:
+      '@mrsmith/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      typescript:
+        specifier: ~5.6.3
+        version: 5.6.3
+
   packages/tsconfig: {}
 
   packages/ui:

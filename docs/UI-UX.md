@@ -449,9 +449,11 @@ The component forwards intrinsic attributes and refs, and composes a consumer `c
 
 - UI language is **Italian** — a deliberate choice, no i18n layer. Shared-component defaults ("Seleziona...", "Cerca...") are Italian.
 - User greeting: `Agent {name}` in UserMenu.
-- **Numbers:** `it-IT` — thousands `.`, decimals `,` (e.g. `1.234,56`). Use `Intl.NumberFormat('it-IT')`.
-- **Currency:** `Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' })` → `1.234,56 €`. Wire/API values stay canonical (`"1234.56"`, see MoneyInput §10).
-- **Dates:** `dd/mm/yyyy` via `Intl.DateTimeFormat('it-IT')`.
+- **Canonical formatting for new frontend code:** use `@mrsmith/format`. Existing consumers are unchanged; this guidance does not require migrating them.
+- **Numbers:** use `formatNumber` and `formatCurrency` with the `it-IT` defaults — decimal `,`; grouping follows native locale/runtime behavior (e.g. `12.345,67`). Wire/API values stay canonical (`"1234.56"`, see MoneyInput §10).
+- **Temporal semantics:** use `formatLocalDate` for civil dates, `formatLocalDateTime` for local legacy civil datetimes, and `formatInstant` for offset-bearing instants. Local date and local date-time formatters do not apply timezone conversion; `formatInstant` defaults to `Europe/Rome` (including daylight-saving rules).
+- **Dates:** `dd/mm/yyyy` via the `it-IT` defaults of `@mrsmith/format` (or `Intl.DateTimeFormat('it-IT')` where the package is not applicable).
+- Formatters return `null` when a value cannot be formatted; the UI fallback or placeholder remains the responsibility of the consuming context.
 - Use the typographic ellipsis `…`, not `...`, in new copy.
 
 ---
