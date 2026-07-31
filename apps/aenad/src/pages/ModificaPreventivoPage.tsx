@@ -1,3 +1,4 @@
+import { formatInstant, formatLocalDate } from '@mrsmith/format';
 import { Button, Icon, SingleSelect, Skeleton, useToast } from '@mrsmith/ui';
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -1306,7 +1307,7 @@ export function ModificaPreventivoPage() {
               <div className={styles.invoiceMeta}>
                 <span className={styles.invoiceMetaTitle}>PREVENTIVO DIGITAL</span>
                 <div className={styles.invoiceMetaText}>
-                  Data: {documentDate ? new Date(documentDate).toLocaleDateString('it-IT') : '-'}
+                  Data: {formatLocalDate(documentDate) ?? '-'}
                 </div>
               </div>
             </div>
@@ -1448,7 +1449,7 @@ export function ModificaPreventivoPage() {
               </div>
               {quoteQuery.data.hubspot_synced_at && (
                 <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                  Ultimo sync: {new Date(quoteQuery.data.hubspot_synced_at).toLocaleString('it-IT')}
+                  Ultimo sync: {formatInstant(quoteQuery.data.hubspot_synced_at) ?? '-'}
                 </div>
               )}
               {quoteQuery.data.hubspot_sync_error && (
@@ -1529,7 +1530,7 @@ export function ModificaPreventivoPage() {
                         <div className={styles.logHeader}>
                           <div className={styles.logTitle}>{evt.event_type}</div>
                           <div className={styles.logTime}>
-                            {new Date(evt.created_at).toLocaleString('it-IT')}
+                            {formatInstant(evt.created_at) ?? '-'}
                           </div>
                         </div>
                         <div className={styles.logActor}>Operatore: {evt.actor_subject}</div>
@@ -1573,7 +1574,7 @@ export function ModificaPreventivoPage() {
                       <div className={styles.pdfExportMeta}>
                         <span className={styles.pdfExportTitle}>Revisione N. {exportItem.revision}</span>
                         <span className={styles.pdfExportDate}>
-                          Data: {new Date(exportItem.created_at).toLocaleString('it-IT')}
+                          Data: {formatInstant(exportItem.created_at) ?? '-'}
                         </span>
                         {exportItem.hubspot_attachment_status && (
                           <span style={{ fontSize: '0.725rem', display: 'flex', alignItems: 'center', gap: '4px' }}>

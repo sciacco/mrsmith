@@ -1,3 +1,4 @@
+import { formatLocalDate } from '@mrsmith/format';
 import { Button, Icon, Skeleton, useToast } from '@mrsmith/ui';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -7,20 +8,6 @@ import styles from './PreventiviPage.module.css';
 
 
 const PAGE_SIZE = 50;
-
-function formatDate(value: string | null) {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (!Number.isNaN(date.getTime())) {
-    return date.toLocaleDateString('it-IT', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
-  }
-  return value;
-}
-
 export function PreventiviPage() {
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
@@ -157,7 +144,7 @@ export function PreventiviPage() {
                       onClick={() => navigate(`/preventivi/${row.id}`)}
                     >
                       <td className={styles.monoCell}>{row.quote_number || `Draft #${row.id}`}</td>
-                      <td>{formatDate(row.document_date)}</td>
+                      <td>{formatLocalDate(row.document_date) ?? '-'}</td>
                       <td>{row.customer_name || '-'}</td>
                       <td className={styles.descriptionCell}>{row.description || '-'}</td>
                       <td>{getAuthoringStatusBadge(row.authoring_status)}</td>

@@ -1,3 +1,4 @@
+import { formatLocalDate } from '@mrsmith/format';
 import { Button, Icon, SingleSelect, Skeleton, Drawer } from '@mrsmith/ui';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -40,24 +41,6 @@ function dateError(dateFrom: string, dateTo: string) {
   if (days <= 0) return 'La data iniziale deve precedere la data finale.';
   if (days > MAX_DAYS) return `Il periodo massimo consultabile e di ${MAX_DAYS} giorni.`;
   return null;
-}
-
-function formatDate(value: string | null) {
-  if (!value) return '-';
-  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (match) {
-    const [, year, month, day] = match;
-    return `${day}/${month}/${year}`;
-  }
-  const date = new Date(value);
-  if (!Number.isNaN(date.getTime())) {
-    return date.toLocaleDateString('it-IT', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
-  }
-  return value;
 }
 
 export function ArchivioPage() {
@@ -295,7 +278,7 @@ function DocumentTable({ rows, onRowClick }: { rows: AenadDocument[]; onRowClick
               onClick={() => onRowClick(row)}
             >
               <td className={styles.monoCell}>{row.NumDoc ?? '-'}</td>
-              <td>{formatDate(row.DataDoc)}</td>
+              <td>{formatLocalDate(row.DataDoc) ?? '-'}</td>
               <td>{row.Anagr_Nome ?? '-'}</td>
               <td className={styles.descriptionCell}>{row.DescDoc ?? '-'}</td>
               <td className={styles.numCol}>{formatMoney(row.TotNetto)}</td>
@@ -330,7 +313,7 @@ function DocumentDetailsDrawer({
       onClose={onClose}
       size="lg"
       title={`Documento N. ${doc.NumDoc ?? '-'}`}
-      subtitle={`Data: ${formatDate(doc.DataDoc)} | Cliente: ${doc.Anagr_Nome ?? '-'}`}
+      subtitle={`Data: ${formatLocalDate(doc.DataDoc) ?? '-'} | Cliente: ${doc.Anagr_Nome ?? '-'}`}
       headerExtra={
         <div style={{ display: 'flex', gap: 8 }}>
           <ScaricaPdfButton doc={doc} size="sm" />

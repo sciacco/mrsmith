@@ -1,13 +1,4 @@
-const moneyFormatter = new Intl.NumberFormat('it-IT', {
-  style: 'currency',
-  currency: 'EUR',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 4,
-});
-
-const quantityFormatter = new Intl.NumberFormat('it-IT', {
-  maximumFractionDigits: 4,
-});
+import { formatCurrency, formatNumber } from '@mrsmith/format';
 
 /** Converte una stringa decimale API in numero, solo per preview/calcoli locali non persistiti. */
 export function parseDecimal(value: string | null): number | null {
@@ -18,14 +9,14 @@ export function parseDecimal(value: string | null): number | null {
 
 export function formatMoney(value: string | number | null): string {
   const parsed = typeof value === 'number' ? value : parseDecimal(value);
-  if (parsed == null || Number.isNaN(parsed)) return '-';
-  return moneyFormatter.format(parsed);
+  return formatCurrency(parsed, 'EUR', {
+    format: { minimumFractionDigits: 2, maximumFractionDigits: 4 },
+  }) ?? '-';
 }
 
 export function formatQuantity(value: string | null): string {
   const parsed = parseDecimal(value);
-  if (parsed == null) return '-';
-  return quantityFormatter.format(parsed);
+  return formatNumber(parsed, { format: { maximumFractionDigits: 4 } }) ?? '-';
 }
 
 /** Riduce la forma canonica a 4 decimali ("1.5000") alla forma di editing ("1.5"). */

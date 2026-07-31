@@ -99,18 +99,18 @@ function parseLocalDate(value: string): CalendarParts | null {
   const match = DATE_PREFIX.exec(value);
   if (!match) return null;
 
-  const date = parseCalendarDate(match[1], match[2], match[3]);
+  const date = parseCalendarDate(match[1]!, match[2]!, match[3]!);
   if (!date) return null;
   if (match[4] === '') return date;
 
-  const rfcTail = RFC3339_TAIL.exec(match[4]);
+  const rfcTail = RFC3339_TAIL.exec(match[4]!);
   if (rfcTail) {
-    const clock = parseClock(rfcTail[1], rfcTail[2], rfcTail[3], rfcTail[4]);
-    return clock && validOffset(rfcTail[5]) ? date : null;
+    const clock = parseClock(rfcTail[1]!, rfcTail[2]!, rfcTail[3]!, rfcTail[4]);
+    return clock && validOffset(rfcTail[5]!) ? date : null;
   }
 
-  const sqlTail = SQL_TAIL.exec(match[4]);
-  if (sqlTail) return parseClock(sqlTail[1], sqlTail[2], sqlTail[3], sqlTail[4]) ? date : null;
+  const sqlTail = SQL_TAIL.exec(match[4]!);
+  if (sqlTail) return parseClock(sqlTail[1]!, sqlTail[2]!, sqlTail[3]!, sqlTail[4]) ? date : null;
   return null;
 }
 
@@ -118,9 +118,9 @@ function parseLocalDateTime(value: string): (CalendarParts & ClockParts) | null 
   const match = LOCAL_DATE_TIME.exec(value);
   if (!match) return null;
 
-  const date = parseCalendarDate(match[1], match[2], match[3]);
+  const date = parseCalendarDate(match[1]!, match[2]!, match[3]!);
   if (!date) return null;
-  const clock = parseClock(match[4], match[5], match[6] ?? '00', match[7]);
+  const clock = parseClock(match[4]!, match[5]!, match[6] ?? '00', match[7]);
   return clock ? { ...date, ...clock } : null;
 }
 
@@ -200,9 +200,9 @@ export function formatInstant(
     const match = INSTANT.exec(value);
     if (!match) return null;
 
-    const date = parseCalendarDate(match[1], match[2], match[3]);
-    const clock = parseClock(match[4], match[5], match[6], match[7]);
-    if (!date || !clock || !validOffset(match[8])) return null;
+    const date = parseCalendarDate(match[1]!, match[2]!, match[3]!);
+    const clock = parseClock(match[4]!, match[5]!, match[6]!, match[7]);
+    if (!date || !clock || !validOffset(match[8]!)) return null;
 
     const instant = new Date(value);
     if (!Number.isFinite(instant.getTime())) return null;
