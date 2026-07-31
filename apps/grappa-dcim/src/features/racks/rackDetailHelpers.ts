@@ -1,4 +1,8 @@
+import { formatInstant, formatNumber } from '@mrsmith/format';
 import type { RackPowerSummaryPoint } from '../../api/types';
+import { createRackDetailFormatterAdapter } from './rackDetailFormatters';
+
+const rackDetailFormatterAdapter = createRackDetailFormatterAdapter({ formatInstant, formatNumber });
 
 export function buildSparklinePath(points: RackPowerSummaryPoint[], width: number, height: number): string {
   const valid = points.filter((p) => p.kilowatt !== undefined);
@@ -30,8 +34,9 @@ export function formatRelativeTime(isoDate?: string): string {
 }
 
 export function formatDate(isoDate?: string): string {
-  if (!isoDate) return '—';
-  return new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'short', year: 'numeric' }).format(
-    new Date(isoDate),
-  );
+  return rackDetailFormatterAdapter.formatDate(isoDate);
+}
+
+export function formatRackNumber(value?: number | null): string {
+  return rackDetailFormatterAdapter.formatRackNumber(value);
 }

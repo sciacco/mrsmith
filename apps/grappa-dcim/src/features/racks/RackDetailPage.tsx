@@ -6,12 +6,11 @@ import { ViewState } from '../../components/ViewState';
 import {
   buildSparklinePath,
   formatDate,
+  formatRackNumber,
   formatRelativeTime,
 } from './rackDetailHelpers';
 import { buildRackUnitMap, normalizeRackUnitCount } from './rackUnitMap';
 import styles from './rackDetail.module.css';
-
-const powerFmt = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 2 });
 
 export function RackDetailPage() {
   const { rackId: rackIdStr } = useParams<{ rackId: string }>();
@@ -112,7 +111,7 @@ function RackDetailHeader({ rack }: { rack: RackDetail }) {
             <div className={styles.powerBarFill} style={{ width: `${powerPercent}%` }} />
           </div>
           <span className={styles.powerLabel}>
-            Impegnata {powerFmt.format(rack.committedPower)} / {powerFmt.format(rack.soldPower)} kW
+            Impegnata {formatRackNumber(rack.committedPower)} / {formatRackNumber(rack.soldPower)} kW
           </span>
         </div>
       ) : null}
@@ -354,7 +353,7 @@ function PowerCard({ sockets }: { sockets: RackSocket[] }) {
               {socket.magnetotermico || socket.position || `Socket ${socket.id}`}
             </span>
             {socket.latestAmpere !== undefined ? (
-              <span className={styles.socketAmpere}>{powerFmt.format(socket.latestAmpere)} A</span>
+              <span className={styles.socketAmpere}>{formatRackNumber(socket.latestAmpere)} A</span>
             ) : null}
           </div>
         ))}
@@ -373,7 +372,7 @@ function SparklineCard({ points }: { points: RackPowerSummaryPoint[] }) {
       <h2 className={styles.sideCardTitle}>kWh ultimi 7 gg</h2>
       {path ? (
         <div className={styles.sparklineWrap}>
-          <span className={styles.sparklineLabel}>{powerFmt.format(Math.min(...values))}</span>
+          <span className={styles.sparklineLabel}>{formatRackNumber(Math.min(...values))}</span>
           <svg viewBox="0 0 100 28" className={styles.sparkline} aria-hidden="true">
             <polyline
               points={path}
@@ -384,7 +383,7 @@ function SparklineCard({ points }: { points: RackPowerSummaryPoint[] }) {
               strokeLinejoin="round"
             />
           </svg>
-          <span className={styles.sparklineLabel}>{powerFmt.format(Math.max(...values))}</span>
+          <span className={styles.sparklineLabel}>{formatRackNumber(Math.max(...values))}</span>
         </div>
       ) : (
         <p className={styles.sideCardEmpty}>Dati non disponibili</p>

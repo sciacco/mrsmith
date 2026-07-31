@@ -5,14 +5,14 @@ import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useRackFilterOptions, useRacks } from '../../api/queries';
 import type { RackListItem } from '../../api/types';
 import { ViewState } from '../../components/ViewState';
+import { formatRackNumber } from './rackDetailHelpers';
+import { formatRackPowerLabel } from './rackSearchHelpers';
 import styles from './rackSearch.module.css';
 
 const defaultStatusOptions = [
   { value: 'active', label: 'Solo attivi' },
   { value: 'all', label: 'Tutti' },
 ];
-
-const powerFormatter = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 2 });
 
 export function RackSearchPage() {
   const { rackId } = useParams();
@@ -269,7 +269,7 @@ function serialOrderLabel(item: RackListItem) {
 }
 
 function powerLabel(value?: number) {
-  return value === undefined || value === 0 ? '-' : `${powerFormatter.format(value)} kW`;
+  return formatRackPowerLabel(value, formatRackNumber);
 }
 
 function isActiveRack(status?: string) {
