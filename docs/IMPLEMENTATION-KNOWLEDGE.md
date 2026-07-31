@@ -1,15 +1,15 @@
 # Implementation Knowledge Handbook
 
-This document is the canonical handbook for reusable implementation knowledge discovered while building apps in this repo.
+This document is the index of the canonical handbook for reusable implementation knowledge discovered while building apps in this repo. The entries themselves live in [`docs/knowledge/`](knowledge/), one file per app or cross-cutting domain.
 
-Use it to capture facts that are easy to rediscover badly and expensive to relearn later: identifier mappings, cross-system joins, hidden business rules, exclusions, legacy quirks, API/DB mismatches, and operational conventions that affect future implementations.
+Use the handbook to capture facts that are easy to rediscover badly and expensive to relearn later: identifier mappings, cross-system joins, hidden business rules, exclusions, legacy quirks, API/DB mismatches, and operational conventions that affect future implementations.
 For Appsmith migrations, use [docs/APPSMITH-MIGRATION-PLAYBOOK.md](APPSMITH-MIGRATION-PLAYBOOK.md) first to extract and pin verified contracts, then record any reusable discoveries here.
 
-## How to Use This Document
+## How to Use This Handbook
 
-- Read the relevant sections before planning a new app, integration, or cross-system feature.
-- Update this document in the same change set when implementation work uncovers reusable knowledge that other apps are likely to need.
-- Prefer adding curated entries under a stable domain section instead of app-specific notes or a chronological dump.
+- Load progressively: read this index first, then open only the files relevant to the work — the file of the app being changed, plus the cross-cutting files its work touches (identity, auth, data contracts, deployment).
+- Update the handbook in the same change set when implementation work uncovers reusable knowledge: add the entry to the right `knowledge/` file AND add its line to this index. An entry without an index line is invisible.
+- Placement rule: a rule that only one app enforces goes in that app's file; a rule that binds anyone crossing a system (an identity mapping, a vendor contract, a shared-database column quirk, an auth behavior) goes in the matching domain file — even if it has a single consumer today.
 - Keep each entry actionable: describe the fact, the practical rule it implies, the evidence, and where it matters.
 
 ## Entry Format
@@ -25,1087 +25,177 @@ Use this format for new knowledge entries:
 - Used by: apps or domains already depending on it
 - Open questions: only if unresolved details remain
 
-## Domains
-
-Add new discoveries under the most relevant domain:
-
-- Cross-system identity and keys
-- Customer eligibility and exclusion rules
-- API and backend contract quirks
-- Legacy data model constraints
-- Auth and transport behavior
-- Deployment and runtime integration rules
-
-## Cross-System Identity and Keys
-
-### Customer Identity Across Systems
-
-- Context: customer lookup, filtering, and joins across Alyante, Mistra, and Grappa.
-- Discovery: the same customer is represented with different keys across systems. Alyante ERP ID is the shared business identifier. In Mistra, `customers.customer.id` stores that ERP ID directly. In Grappa, `cli_fatturazione.codice_aggancio_gest` stores the ERP ID, while `cli_fatturazione.id` is a separate internal Grappa identifier.
-- Practical rule: when moving from Grappa data to Mistra data, use `cli_fatturazione.codice_aggancio_gest -> customers.customer.id`. Do not assume `cli_fatturazione.id` matches Mistra customer IDs.
-- Evidence: `customers.customer`, `loader.erp_clienti_provenienza`, `cli_fatturazione`; prior analysis captured in the legacy cross-db identity note.
-- Used by: customer selectors and pricing/credit flows in `apps/listini-e-sconti`.
-- Open questions: none on the identifier mapping itself.
-
-#### Systems Involved
-
-| System | Database | Main table | Primary key meaning |
-| --- | --- | --- | --- |
-| Alyante | — | — | ERP company ID |
-| Mistra | PostgreSQL | `customers.customer` | `id` = Alyante ERP ID |
-| Mistra | PostgreSQL | `loader.hubs_company` | `numero_azienda` = Alyante ERP ID (varchar) |
-| Grappa | MySQL | `cli_fatturazione` | `id` = internal Grappa ID |
-
-#### Key Mapping
-
-```text
-Alyante ERP ID
-    |
-    ├── Mistra PG:  customers.customer.id
-    |
-    ├── Mistra PG:  loader.hubs_company.numero_azienda     (HubSpot mirror; varchar)
-    |
-    └── Grappa MySQL: cli_fatturazione.codice_aggancio_gest
-                      cli_fatturazione.id                    (internal Grappa ID)
-```
-
-`loader.hubs_company.numero_azienda` carries the Alyante ERP ID on the HubSpot mirror side. When a flow starts from a HubSpot deal or company (e.g. quote→order conversion in `backend/internal/quotes/order_conversion.go`, or the `HubSpot Company Lookup from Grappa` recipe below), reading `numero_azienda` avoids a round-trip to Alyante MSSQL for the same value. Treat it as the same identifier — stored as `varchar` rather than `int` — and cast to the integer form when joining against `customers.customer.id`. Evidence: Appsmith package `Ordini gestione portale` (`gpUtils` module) which reads `loader.hubs_company.numero_azienda as customer_number` in `get_quote_by_id`, mirrored by the Go port `loadQuoteOrderSource`.
-
-#### ERP Bridge in Mistra
-
-- Context: filtering customers eligible for billing-related flows.
-- Discovery: `loader.erp_clienti_provenienza.numero_azienda` links back to `customers.customer.id`, and `fatgamma > 0` marks a customer as active for billing.
-- Practical rule: when a flow needs ERP-linked or billing-eligible customers in Mistra, join through `loader.erp_clienti_provenienza` and treat `fatgamma > 0` as the current eligibility signal unless product requirements say otherwise.
-- Evidence: `loader.erp_clienti_provenienza.numero_azienda`, `loader.erp_clienti_provenienza.fatgamma`.
-- Used by: customer list variants described in `apps/listini-e-sconti/listini-e-sconti-migspec-phaseA.md`.
-- Open questions: confirm with the domain team whether `fatgamma > 0` is the durable business rule or a current operational shortcut.
-
-### HubSpot Company Lookup from Grappa
-
-- Context: audit trail flows that create HubSpot notes/tasks after pricing, credit, or discount changes.
-- Discovery: the Grappa customer ID must be resolved to a HubSpot company ID via a two-step cross-database lookup:
-  1. Grappa → ERP ID: `SELECT codice_aggancio_gest FROM cli_fatturazione WHERE id = :grappa_id` (Grappa MySQL)
-  2. ERP ID → HubSpot ID: `SELECT id FROM loader.hubs_company WHERE numero_azienda = :erp_id::varchar` (Mistra PG)
-- Practical rule: backend services that need to write to HubSpot from a Grappa context must query both databases sequentially. Cache the mapping if performance is a concern — the mapping changes infrequently.
-- Evidence: Appsmith `HS_utils` module method `CompanyByGrappaId`, queries `get_erp_id` and `get_hubspot_id_by_erp_code`.
-- Used by: IaaS Prezzi risorse, IaaS Credito omaggio, Sconti variabile energia (all in `apps/listini-e-sconti`).
-- Open questions: none.
-
-### Grappa Rack Customer Display Uses `cli_fatturazione.intestazione`
-
-- Context: Grappa DCIM rack search, rack registry filtering, and any Grappa UI that needs a human-readable customer name for `racks.id_anagrafica`.
-- Discovery: `racks.id_anagrafica` stores the internal Grappa customer ID, which resolves to `cli_fatturazione.id`; the customer display name is `cli_fatturazione.intestazione`.
-- Practical rule: for rack search/display, join `racks.id_anagrafica -> cli_fatturazione.id` and expose `cli_fatturazione.intestazione` as the customer name. Do not show only the numeric customer code when a customer name is needed.
-- Evidence: `docs/grappa/grappa_cli_fatturazione.json`, `docs/grappa/grappa_racks.json`, Grappa DCIM rack search contract in `backend/internal/grappadcim/racks.go`.
-- Used by: `apps/grappa-dcim` Rack search.
-- Open questions: none.
-
-### Grappa Rack Equipment Occupancy Uses `apparato.unit`
-
-- Context: Grappa DCIM rack detail U-map and any UI that places `apparato` rows in rack units.
-- Discovery: `apparato.unit_position` is the starting rack U, while `apparato.unit` is the number of rack units occupied by the equipment. A multi-U apparatus must cover consecutive rack units starting at `unit_position`.
-- Practical rule: expose a business-facing occupied height field, such as `occupiedUnits`, derived from `apparato.unit` with a 1U fallback. Do not treat `apparato.unit` as an alternate position when rendering the rack map.
-- Evidence: `docs/grappa/grappa_apparato.json`, Grappa DCIM audit note in `apps/grappa-dcim/docs/GRAPPA-DCIM.md`, and rack detail implementation in `apps/grappa-dcim/src/features/racks`.
-- Used by: `apps/grappa-dcim` Rack detail.
-- Open questions: none.
-
-### Grappa Apparato Types Are Controlled By DCIM Lookup
-
-- Context: Grappa DCIM apparato create/update and any UI that presents `apparato.type`.
-- Discovery: MrSmith owns a Grappa-side `dcim_equipment_type_visuals` lookup for the allowed apparato types and their presentation metadata. The legacy `apparato.type` column remains textual for compatibility, but user create/update flows must use only active lookup values.
-- Practical rule: read type choices from `GET /api/grappa-dcim/v1/equipment/type-options`; do not rebuild the picker from distinct `apparato.type` values. Existing historical rows with non-lookup values may still be displayed, but new writes must be rejected unless the type is active in the lookup.
-- Evidence: `deploy/migrations/020_grappa_dcim_equipment_type_visuals.sql`, backend validation in `backend/internal/grappadcim/equipment.go`, and badges in `apps/grappa-dcim/src/features/equipment`.
-- Used by: `apps/grappa-dcim` Apparati, rack U-map, Server, and Storage views.
-- Open questions: none.
-
-## Customer Eligibility and Exclusion Rules
-
-### Known Grappa Customer Exclusions
-
-- Context: customer selectors used by IaaS pricing and credit pages.
-- Discovery: some flows explicitly exclude specific `cli_fatturazione.codice_aggancio_gest` values.
-- Practical rule: do not silently generalize active-billing customer selectors across pages; verify whether exclusion codes must be preserved for that use case.
-- Evidence: current documented exclusions from existing migration analysis.
-- Used by: IaaS Prezzi risorse, IaaS Credito omaggio.
-- Open questions: whether these exclusions are permanent business rules or should become configurable.
-
-| Code | Excluded in |
-| --- | --- |
-| `385` | IaaS Prezzi risorse, IaaS Credito omaggio |
-| `485` | IaaS Credito omaggio |
-
-## Cloud / IaaS (Cloudstack) Billing
-
-### Cloudstack IaaS Charge Categories Are Fixed Backend-Side
-
-- Context: IaaS Pay Per Use consumption views and any future billing/exploration surface over Grappa `cdl_charges`.
-- Discovery: `cdl_charges.usage_type` is a flat code list. For human-facing consumption analysis it is grouped into fixed macro-categories, and `usage_type = 9999` (Credit) is a bookkeeping line, not real consumption, so it is excluded from all consumption totals and from the category composition.
-- Practical rule: group usage_type into **VM** (2), **Storage** (6,7,8,9), **Licenze Windows** (9998), **Altro** (1,3,26,27,NULL,unknown), and always exclude 9999. Compute the period total as the sum of the four returned categories so the KPI total and the pie stay consistent. Apply the same grouping in any new IaaS consumption surface instead of re-deriving it.
-- Evidence: `backend/internal/panoramica/handler_iaas.go` (`categoryFromUsageType`, `handleChargesByCategory`); `apps/panoramica-cliente/SPEC.md` IaaS entity/view sections.
-- Used by: `apps/panoramica-cliente` IaaS Pay Per Use.
-- Open questions: none.
-
-### Grappa DATE Columns Serialize as RFC3339 When Scanned to String
-
-- Context: any Go backend query against Grappa (MySQL) that selects a `DATE`/`DATETIME` column and scans it into a `string` (or returns it in JSON).
-- Discovery: the MySQL DSN runs with `parseTime`, so `DATE` columns come back as `time.Time`; `database/sql` then formats `time.Time` → `string` as RFC3339 (e.g. `2025-12-22T00:00:00Z`), not `2025-12-22`. This silently breaks YYYY-MM-DD validation and date formatting on the client and caused 400 `invalid_from_parameter` on the IaaS drill-down.
-- Practical rule: when a Go handler must return a clean date string for a `DATE`/`DATETIME` value, wrap the expression in `DATE_FORMAT(col, '%Y-%m-%d')` (or cast to CHAR) in SQL. Do not rely on scanning a raw DATE into a string. Frontend date helpers that consume these values should also tolerate an optional time/timezone suffix (take the first 10 chars).
-- Evidence: `backend/internal/panoramica/handler_iaas.go` `bucketExpression` (DATE_FORMAT-wrapped after the fix) and regression test `TestBucketExpressionValidation`; `apps/panoramica-cliente/src/hooks/useChargeDrill.ts` `parseDate`.
-- Used by: `apps/panoramica-cliente` IaaS Pay Per Use.
-- Open questions: none.
-
-## API and Backend Contract Quirks
-
-### Google Shared Drive Service Accounts Need Explicit Trash and Access Handling
-
-- Context: shared Google Drive integration used by MrSmith mini-app document contexts.
-- Discovery: a Service Account added directly to a Shared Drive with the Google **Contributor** role can read metadata, list children, create folders, and read files uploaded manually by an analyst. Drive API calls for Shared Drives require the Shared Drive flags (`supportsAllDrives`, plus `includeItemsFromAllDrives`/`corpora=drive`/`driveId` when listing). Renaming preserves the folder ID and web link. Moving a folder elsewhere in the same Shared Drive also preserves its ID, so the backend must enforce the configured context root by walking parent ancestry. A trashed folder is still returned successfully with `trashed=true`; its descendants are also returned with `trashed=true`, so trash must be detected explicitly. Removing the Service Account from the Shared Drive makes an existing folder lookup return Google `404 notFound`, indistinguishable from a missing or invalid ID rather than a `403 permissionDenied`.
-- Practical rule: use one DB-configured Service Account directly, bind each `(app, context)` to a Shared Drive and hard root, and validate both `driveId` and ancestry on every operation. Treat `trashed=true` as a dedicated domain error. Treat Google 404 as “not found or not accessible”; do not claim that revoked membership can be distinguished from deletion. Contributor is the verified minimum role for the initial `GetItem`/`ListChildren`/`CreateFolder` surface.
-- Evidence: live spike against `MrSmith — Spike Google Drive` on 2026-07-29, recorded in GitHub issue #85.
-- Used by: `backend/internal/platform/googledrive` (migration 126 for its `mrsmith.googledrive_credential` + `mrsmith.googledrive_context` tables); first consumer `apps/binocolo`.
-- Open questions: none for the verified initial surface.
-
-### Direct User-Triggered Emails Go Through the Email Ledger
-
-- Context: any mini-app that sends an email as a user action tied to a domain object (e.g. RDA sending a PO email to a supplier) and needs "sent N times, last on … by … to …" before offering a resend.
-- Discovery: the shared SMTP client (`backend/internal/platform/email`) does not track sends; the notifications worker tracks only its own deliveries. A global ledger was introduced: `emailledger.Send(ctx, msg, Correlation, Actor)` sends synchronously and always records the attempt in `mrsmith.email_send`, keyed by `app + entity_type + entity_id + purpose`. `status = 'accepted'` means the SMTP relay (Postal) accepted the message, not that it was delivered. The subject is stored, the body is not. Failures (SMTP or insert) are logged with `component=email` and flow into `mrsmith.diagnostic_event` automatically.
-- Practical rule: user-triggered direct emails must go through `backend/internal/platform/emailledger`, never through the raw `email.Client`. Read counts/history via the Go API (`Count`, `List`) inside the owning app's endpoints, which keep their own authz; there is no shared HTTP read surface. Policy-driven notification emails stay on `internal/notifications` and are outside the ledger (future convergence possible by making the worker a ledger producer).
-- Evidence: `backend/internal/platform/emailledger/emailledger.go`, migration `deploy/migrations/108_anisetta_mrsmith_email_ledger.sql`, wiring in `backend/cmd/server/main.go`.
-- Used by: `backend/internal/rda` (injected as `Deps.EmailLedger` for the in-progress PO email feature).
-- Open questions: none.
-
-### OpenAPI.it Wrappers Stay Backend-Side
-
-- Context: any MrSmith app that needs OpenAPI.it services such as CAP or Company.
-- Discovery: OpenAPI.it specs use bearer authentication with service-specific hosts. CAP uses `https://cap.openapi.it` in production and `https://test.cap.openapi.it` for sandbox; Company uses `https://company.openapi.com` in production and `https://test.company.openapi.com` for sandbox. The token is shared backend secret material and must not be exposed through frontend config or browser clients.
-- Practical rule: call OpenAPI.it through `backend/internal/platform/openapiit`. Configure `OPENAPI_IT_API_TOKEN` as a backend-only secret, `OPENAPI_IT_CAP_BASE_URL` only when overriding the default CAP production host, and `OPENAPI_IT_COMPANY_BASE_URL` only when overriding the default Company production host. Apps should inject the shared backend client into app-specific handlers rather than adding a generic public proxy.
-- Evidence: `apps/binocolo/docs/cap.openapi.json`, `apps/binocolo/docs/company.openapi.json`, `backend/internal/platform/openapiit`, and backend config env wiring.
-- Used by: `apps/binocolo` endpoint test workspace, future CAP/address validation and enrichment flows.
-- Open questions: none.
-
-### OpenAPI.it CAP `cod_fisco` Can Be Alphanumeric
-
-- Context: CAP suppressed-municipality responses.
-- Discovery: the CAP spec models `comuni_soppressi.cod_fisco` as a number, but its example contains alphanumeric Belfiore/cadastral codes such as `A627`.
-- Practical rule: treat CAP fiscal/cadastral code fields as strings in MrSmith DTOs, even when the vendor schema says number.
-- Evidence: `apps/binocolo/docs/cap.openapi.json`, endpoint `/comuni_soppressi`.
-- Used by: `backend/internal/platform/openapiit` CAP DTOs.
-- Open questions: none.
-
-### Binocolo M&A Uses Company `IT-search` With ATECO-First Fallback
-
-- Context: Binocolo M&A target discovery and future Italian-company research workflows.
-- Discovery: V1 target discovery should stay on the Company `IT-search` endpoint and keep the OpenAPI.it token backend-only. ATECO-filtered estimates are attempted first, but they are too narrow when the aggregate estimate is below 10 candidates. Search surface evaluation is distinct from the operational acquisition limit: `searchLimit` caps paid result retrieval, not dry-run census probing. LLM models and prompts are runtime configuration in Anisetta, with multiple selectable models/prompts per scope and one default per scope.
-- Practical rule: run M&A surface dry-runs without `limit`; a single Company `IT-search` dry-run returns the full search count. Mark a path `too_broad` when that count is greater than 1000 and block confirmation until filters are narrowed. Select the ATECO strategy only when it is not `too_broad` and its aggregate estimate is at least 10; otherwise prefer a non-broad expanded strategy, or a non-broad weak ATECO strategy if expanded is too broad. Missing shareholder age or non-derivable fields should become `match parziale`, not automatic exclusion. Do not hardcode Binocolo M&A prompts in Go; store prompt text in `binocolo.llm_prompt` and resolve the selected/default prompt at request time.
-- Practical rule: every mutating Binocolo M&A workflow that can call LLM tools or vendor APIs must create a `binocolo.ma_operation_trace` row before external calls and append ordered `ma_operation_trace_event` rows for LLM rounds, tool calls/results, cache hits/misses, vendor requests/responses, and final outcome. Keep payloads raw for debugging, redacting only token-like fields.
-- Evidence: Binocolo Target M&A implementation in `backend/internal/binocolo/ma_service.go`, scoring rules in `backend/internal/binocolo/ma_rules.go`, surface metadata migration `deploy/migrations/028_binocolo_ma_surface_estimates.sql`, prompt tool migration `deploy/migrations/029_binocolo_ma_strategy_prompt_tools.sql`, and trace migration `deploy/migrations/031_binocolo_ma_operation_trace.sql`.
-- Used by: `apps/binocolo` `/target`.
-- Open questions: whether the threshold should become an admin-configurable value after real usage data.
-
-### Binocolo Domain Identity, Provenance, and Thesis Fit Are Separate Axes
-
-- Context: Binocolo company overview, web-validation detail, domain registry, and `associate_domain` jobs.
-- Discovery: `identity_state` describes certainty in the company↔domain relationship; `method` describes who or what associated the domain; `web_validation_state` describes whether the site's activity is coherent with the acquisition thesis. A manual association can therefore be authoritative (`method=manual`, `identity_state=vouched`) while the business activity is independently `confirmed` or rejected.
-- Practical rule: never derive identity copy or badges from `selected_domain` or `web_validation_state`, and never translate `confirmed` as “sito/dominio confermato”. Use the global registry as the canonical current identity, retain session validation as historical context, and preserve an on-page fiscal-identity upgrade to `verified` without changing `method=manual`.
-- Evidence: domain presenter in `apps/binocolo/src/lib/domainIdentity.ts`, company verification UI, and strict registry synchronization in `backend/internal/binocolo/ma_gated_search_job.go`.
-- Used by: `apps/binocolo` company overview and Binocolo M&A domain-association jobs.
-- Open questions: none.
-
-### Binocolo M&A Long Session Work Uses `ma_job`
-
-- Context: async Binocolo M&A work that operates on a whole session after strategy creation or target acquisition.
-- Discovery: `binocolo.ma_job` is the concurrency boundary for long session jobs. The table has a partial unique index on `(session_id, job_type)` for `queued/running` rows and a per-row lease (`locked_by`, `lease_until`) so multiple backend replicas do not execute the same job concurrently.
-- Practical rule: add new long-running session sidecars as new `job_type` values on `ma_job`, not as request-context goroutines or ad hoc tables, unless they need a materially different locking model. Sidecar jobs that do not own the session lifecycle, such as web validation, must not flip the session to `running`/`failed`; they should persist their own artifacts and let the session detail surface them.
-- Practical rule: Brave/domain-resolution calls are not free. To improve official-domain recall, prefer increasing the first query result count up to the capped maximum over adding automatic second-pass searches; only add extra queries when the first result set is clearly insufficient and the cost tradeoff is explicit.
-- Practical rule: enrichment job `limit` values should cap useful work items, not a fixed top-list window. Batch selection must skip fresh/reusable artifacts first, then prioritize the remaining candidates deterministically, so repeated jobs advance through the pending session instead of reprocessing the same first page.
-- Practical rule: workers must fetch only the `job_type` values supported by their binary, and an unexpected `job_type` must release its lease rather than marking the row failed. Adding a new job type in a rolling deploy otherwise lets an older replica consume and terminally fail work that a newer replica created.
-- Practical rule: job types introduced after the original worker should use `pending -> processing` instead of `queued -> running` when they must be safe while older replicas are still live. Older workers only poll `queued/running`; the newer worker polls both state pairs. Enable the producer endpoint only after the producer code writes the rollout-safe state.
-- Practical rule: initiative-scoped jobs without a search session use nullable `ma_job.session_id`/`strategy_version_id` and set `initiative_id`. Because PostgreSQL treats NULL session keys as distinct, add an initiative/resource-scoped partial unique index; an application-level active-job check may be retained as a second guard. `card_domain_verify` is the reference implementation.
-- Evidence: migrations `049_binocolo_ma_job.sql`, `056_binocolo_ma_web_validation_job.sql`, and `057_binocolo_ma_job_rollout_safe_states.sql`, worker `backend/internal/binocolo/ma_job_worker.go`, and web-validation job `backend/internal/binocolo/ma_web_validation_job.go`.
-- Used by: Binocolo M&A estimate, execute, and target web validation.
-- Open questions: none.
-
-### Binocolo `/azienda` Is A Standalone Quick-Review Tool, Never The MA Dossier Destination
-
-- Context: Binocolo M&A navigation from session/board/card surfaces; cross-workstream wiring of the deep cached dossier.
-- Discovery: `/azienda` (`CompanyDossierPage`, handlers `handleGetCompanyDossier`/`handleCreateCompanyDossier` in `backend/internal/binocolo/handler.go`, service `getCompanyDossier`/`companyDossier`) is a **standalone tool for quick review of an arbitrary company by P.IVA**. It is deliberately decoupled from the MA flow: it reads no card, no initiative, and is not the place where the MA working dossier lives. The deep cached company-keyed artifact is consumed by the **MA card-dossier** at `/iniziative/:id/dossier/:companyKey` (`IniziativaCardDossierPage`), which is self-sufficient (deep + registry + context-scoped thesis reading + IRL + diary).
-- Practical rule: no link inside the MA flow (search detail modal, board card, drawer, inspector) may point to `/azienda` expecting the working dossier, the deep cached dossier, or the registry. The card-dossier `/iniziative/:id/dossier/:companyKey` is the only MA destination for those. `/azienda` is reserved for ad-hoc P.IVA lookups outside any MA session/initiative.
-- Evidence: `apps/binocolo/src/App.tsx:10` (nav label "Dossier azienda" → `/azienda`), `apps/binocolo/src/pages/CompanyDossierPage.tsx:782` (h1 "Dossier azienda"), `apps/binocolo/src/pages/iniziative/IniziativaBoardPage.tsx:277` ("Apri dossier" navigates to the card-dossier, not `/azienda`), `apps/binocolo/src/pages/iniziative/CompanyRegistrySection.tsx` (registry lives under `pages/iniziative/`, consumed by the card-dossier). The PRD `apps/binocolo/docs/INIZIATIVE-PRD.md` §6/§7 ratified this on 2026-07-02 (decision D-B); the implementation plan `INIZIATIVE-IMPLEMENTATION-PLAN.md` had stale F2/F4 instructions pointing to `/azienda?vat=` and was emended as EA-1 on 2026-07-05.
-- Used by: every Binocolo surface that links the working dossier of an MA target (D2 search detail, D3 board/drawer, DX target inspector).
-- Open questions: none.
-
-### Binocolo Internal Company Finder Uses Fiscal Identity Groups
-
-- Context: Binocolo entry points that must recognize a company already seen in searches, initiatives, or the verified-domain registry.
-- **Read the next entry first.** Everything below describes the world *before* migration 120 (issue #86), when `company_key` was recalculated from the vendor payload at every read. It is kept because the measurement that justified the change lives here, and because the finder's grouping behaviour is unchanged. The key is no longer derived: it is owned, and deriving it in new code is the regression this pair of entries exists to prevent.
-- Discovery (historical, pre-migration 120): `company_key` was derived vendor-first (`vendor_id` → P.IVA → codice fiscale → ragione sociale, `maTargetDedupeKey` in `ma_rules.go`), and OpenAPI.it's `id`/`openapiNumber` is a per-company MongoDB ObjectId that it assigns once on ingest. **The key is therefore stable across sessions**, and the vendor-first precedence is precisely what makes it so. An earlier version of this entry claimed the opposite ("not stable *because* deduplication is vendor-first") and inverted the causality; issue #81 was opened on that mistaken premise. `GET /binocolo/v1/ma/companies?query=…` nonetheless groups the internal corpus by normalized P.IVA, then codice fiscale, falling back to `company_key` only when neither fiscal identifier exists — which stays the right defensive design, because the stability is inherited from a vendor field rather than guaranteed by us. The endpoint is read-only and never calls the external company vendor.
-- Measured 2026-07-25 (probe `apps/binocolo/docs/IDENTITA-AZIENDA-PROBE.sql`, Q1→Q13, run by the user on Anisetta): 1.507 distinct `company_key` = 1.507 distinct fiscal identities, **zero companies holding two keys**; all 1.584 `ma_target` rows carry a `vendor_id` and in 1.583 it is the key, so the P.IVA/codice-fiscale/name branches of the precedence have never fired. P.IVA present at birth on 1.783 rows out of 1.784. No P.IVA↔CF conflict; one name per company. Decoding the ObjectId creation timestamps, 1.324 of the 1.507 ids fall in June 2021 and the rest spread about one per month up to June 2026; what that says about OpenAPI.it's internals is unknown to us, so draw no conclusion from it — the evidence that the vendor has not renumbered is Q11 (zero companies holding two ObjectIds), not the timestamp distribution. Caveat: the whole corpus was created in the six weeks 2026-06-15 → 2026-07-24, so long-run stability of those ids is unmeasured.
-- Practical rule (still current): reuse the internal finder for “già vista” checks and navigation from known-company flows. Navigate with `primaryCompanyKey` and keep `companyKeys` as a contract rather than an observed case — sibling keys have never materialized, so it currently always holds exactly one entry, and `/aziende/:companyKey` being key-scoped shows the *whole* history today, not a partial one. Do not use `/binocolo/v1/companies/search` for corpus deduplication because that endpoint searches the external registry. On `maTargetDedupeKey` the rule has changed shape but not direction: it no longer keys anything persisted (see the next entry), and the old warning — "never fix it to put P.IVA first, it would re-key the corpus" — is now stronger, because calling it from a writer at all would re-attach our identity to the supplier. `036_binocolo_ma_target_rating.sql:3` and `066_binocolo_ma_sector_eval_label.sql:5` documented the precedence wrongly as `vat>tax>vendor>nome` and were corrected in `5662c3d`.
-- Evidence: `backend/internal/binocolo/ma_rules.go` `maTargetDedupeKey`, `backend/internal/binocolo/ma_store.go` `SearchMACompanies` (the `stable_key` CTE), `backend/internal/binocolo/ma_service.go` `searchCompanies`, `backend/internal/binocolo/ma_vendor.go` (`VendorID` from `id`/`companyDetails.openapiNumber`), and `apps/binocolo/src/pages/aziende/AziendePage.tsx`.
-- Used by: `apps/binocolo` `/aziende`; reusable contract for direct initiative-card creation.
-- Open questions: none. Issue #86 (below) turned the derived key into an owned one; this entry describes how the finder groups, which is unchanged.
-
-### Binocolo `company_key` Is An Owned Identifier, Never A Derivation
-
-- Context: any Binocolo write that creates, persists, or looks up a company — search runs, manual add, direct initiative cards, the verified-domain registry, deep dossiers.
-- Discovery (issue #86, migration 120/121): `company_key` used to be **recalculated at every read** from the vendor payload (`vendor_id` → P.IVA → CF → ragione sociale) and was not stored on `ma_target` at all. It is now an **owned, opaque identifier**: the existing 1.507 keys were *adopted* as-is (`ma_company.origin = 'adopted'`, so no URL, no row, and none of the ~15 `company_key`-keyed tables were re-keyed) and every new company gets a UUID (`origin = 'assigned'`). Identity is resolved through `binocolo.ma_company` + `binocolo.ma_company_identifier`, the latter keyed `(namespace, value)` with a **unified fiscal namespace** — `vat`/`tax` are role metadata, not separate namespaces, so company A's P.IVA colliding with company B's codice fiscale fails instead of being silently allowed.
-- Practical rule: **never derive a company key from a payload.** `maTargetDedupeKey` survives for exactly one job — deduplicating rows *inside* one vendor response — and calling it from a writer would re-attach our identity to the supplier. To assign or look up, call the resolver (`ResolveMACompany`, or `resolveMACompanyBatchTx` when you already hold a transaction); to read, read `ma_target.company_key`. Readers err on a blank key instead of falling back. The resolver detects *all* conflicts before writing anything (a first unique violation would abort the transaction and lose the rest of the list), never rejects a company for lacking a fiscal identifier (it marks it `identity_state = 'vendor_only'`, which the monitor counts as a defect), and attaches newly-observed identifiers even when the company is already known — that attach-on-found is what lets a supplier change its ids without breaking continuity. **The key a row already carries is the expected company, not a fallback**: if an observed identifier belongs to a different company the resolver raises a conflict instead of re-keying the row, because re-keying leaves that row's rating, dossier and thesis readings behind on the old key — the very orphaning the work exists to prevent. A conflict rolls the caller's transaction back and is written to `ma_company_identity_conflict` in a **second** transaction, owned by the service layer.
-- Evidence: migrations `deploy/migrations/120_binocolo_ma_company_identity.sql`, `121_…_backfill.sql`, and `123_binocolo_ma_company_integrity.sql`; `backend/internal/binocolo/ma_company_identity.go` (`extractMACompanyIdentifiers`, `planMACompanyResolution`), `ma_company_identity_store.go`, `ma_store.go` (`ReplaceMATargets`, `InsertMATarget`); probe Q15→Q18 and Q20 in `apps/binocolo/docs/IDENTITA-AZIENDA-PROBE.sql`.
-- Used by: every Binocolo write path; `apps/binocolo` navigation, which is unaffected because the keys did not change.
-- Database invariant (migration 123, issue #88): after the application rollback window closed, `ma_target.company_key` became `NOT NULL`; all 16 company-key references measured by probe Q17 have explicit `ON DELETE RESTRICT` foreign keys to `ma_company`; and `ma_target` is unique on `(session_id, company_key)`. Practical rule: keep application guards for readable domain errors, but declare a proven identity invariant in the database as soon as mixed-version rollback no longer depends on the permissive schema.
-- Open questions: merging two companies has no design and no observed case — when the first real one appears it gets its own issue.
-
-### Binocolo Company Annotations Live in `ma_target_outcome`
-
-- Context: Binocolo company annotations shown across the company page, initiative cards, drawers, and activity history.
-- Discovery: the canonical annotation store is `binocolo.ma_target_outcome`, identified by `event = 'nota'`. The original `binocolo.ma_company_note` rows were copied by the operational backfill `082_ma_company_note_to_outcome.sql`; the application no longer reads or writes that table, and there is no fallback, dual-read, or dual-write path. Annotation provenance is carried in `payload.annotationOrigin`: `legacy_registry` marks migrated registry notes and `system_domain` marks annotations created by the automatic domain writer. An absent origin denotes an ordinary analyst-created annotation.
-- Practical rule: every new annotation reader or writer must use `ma_target_outcome` and preserve the annotation event, scope, audit fields, soft-delete metadata, and `annotationOrigin`. Do not restore `ma_company_note` as a fallback or compatibility source. Keep the legacy table and the backfill available temporarily for reconciliation and rollback; dropping the table requires a separate approved destructive migration after deployment observation, exact backfill parity, absence of new writes and DB dependencies, closure of the old-binary rollback window, and an explicit retention/audit decision.
-- Evidence: migration `deploy/migrations/124_binocolo_ma_annotations.sql`; backfill `deploy/migrations/backfill/082_ma_company_note_to_outcome.sql`; annotation store paths in `backend/internal/binocolo/ma_store.go`; automatic writer in `backend/internal/binocolo/ma_card_domain_job.go`; cleanup tracked by GitHub issue #94. The post-backfill sweep recorded in issue #90 observed 68 annotations across 88 companies, including 31 `legacy_registry` and 0 `system_domain`; treat this as a point-in-time observation, not current parity certification.
-- Used by: `apps/binocolo` company activity and initiative-card surfaces.
-- Open questions: whether and when to drop `binocolo.ma_company_note`; decide only against the operational gates above.
-
-### Binocolo ATECO 2025 Codes Are Resolver-Gated
-
-- Context: Binocolo M&A ATECO candidate selection and OpenAPI.it Company `IT-search` calls.
-- Discovery: OpenAPI.it `IT-search` expects the ATECO query parameter without dots, while the ATECO 2025 source list uses canonical dotted codes. LLM-generated codes are not authoritative enough for deterministic searches. The legacy monolith gates ATECO selection through `search_ateco_2025`; the V2.1 intent pipeline instead gates selection through an initial level-2 taxonomy payload plus the deterministic `list_ateco_children` hierarchy tool.
-- Practical rule: store ATECO 2025 in `binocolo.codici_ateco_2025`, keep canonical `codice` for UI/audit, derive `codice_search` by removing dots for vendor calls, and reject codes that are not present in the table or were not shown to the model in the same resolver call. In the monolith path, "shown" means returned by `search_ateco_2025`; in the V2.1 path, it means either a level-2 division loaded from the DB or a descendant returned by `list_ateco_children`.
-- Evidence: `apps/binocolo/docs/codici_ateco_2025.json`, migrations `deploy/migrations/027_anisetta_binocolo_ateco_2025.sql` and `deploy/migrations/052_anisetta_mrsmith_binocolo_ma_strategy_ateco_hierarchy.sql`, and Binocolo ATECO resolver/tool wiring in `backend/internal/binocolo`.
-- Used by: `apps/binocolo` `/target` and `/test` company search.
-- Open questions: none.
-
-### Binocolo Province Selection Is Tool-Gated
-
-- Context: Binocolo M&A territory selection and OpenAPI.it Company `IT-search` province filters.
-- Discovery: Italian province-to-region membership should be deterministic, not inferred by the LLM. Binocolo caches OpenAPI.it CAP `/province` responses in `binocolo.province_cache`, and those responses include province code, name, and region.
-- Practical rule: require M&A strategy drafting to select `provinces` only from the backend `list_italian_provinces_regions` tool results. When a prompt names a region, expand it to the province codes returned by that tool. Reject province codes that were not returned by the tool in the same strategy conversation.
-- Evidence: OpenAPI.it CAP province DTOs in `backend/internal/platform/openapiit`, Binocolo province cache/store in `backend/internal/binocolo`, and M&A tool wiring in `backend/internal/binocolo/ma_service.go`.
-- Used by: `apps/binocolo` `/target`.
-- Open questions: none.
-
-### OpenAPI.it DocuEngine Payloads Need Defensive Decoding And Vendor-Paced Polling
-
-- Context: Binocolo filing acquisition (`backend/internal/platform/openapiit` DocuEngine client, `ma_filing` jobs) and any future OpenAPI.it document-service integration.
-- Discovery: DocuEngine serves an empty `GET /requests` collection as HTTP `404` with error code `221` ("no requests related to your account"), so on a fresh account a pre-POST reconciliation loop fails forever and the POST never fires. The free tier allows **1440 GET/day per endpoint**, which a 2s worker tick burns in hours. Production scalars diverge from the spec: `GET /requests/{id}` returns `documents` as an array of filename strings (Download objects only come from `/requests/{id}/documents`), and `fileSize` is a number in production but a string in the spec examples — a rigid struct field makes the whole decode fail and the job spins in a silent "transient" poll loop (`attempts=0`, business row frozen, logs show `cannot unmarshal`). `GET /requests` has no server-side filters, so reconciliation works by name + time window + per-id GET. Separately, a manual upload and a camerale purchase of the *same* deposited filing always produce different md5s, because DocuEngine prepends a cover page containing a unique request header — two validated, aligned filings for one deposit is the systemic case, not a re-deposit.
-- Practical rule: map empty-collection HTTP errors inside the client, never at call sites. Decouple vendor poll cadence from the worker tick (per-job interval, e.g. 30s). Decode OpenAPI.it scalars with flexible types (`DocuFlexString`/`DocuFlexInt64`-style). Resolve duplicate filings by extract identity (identical key figures → canonical is the one with `balance_sheet_id`; any divergence or missing extract → conservative ambiguous), never by md5.
-- Evidence: production incident 2026-07-22 (fix `b9aed1d`) and smoke findings the same day; `backend/internal/binocolo/ma_filing_*.go`.
-- Used by: Binocolo bilanci/NI acquisition (`filing_search`/`filing_acquire`/`filing_ingest` jobs).
-- Open questions: none.
-
-### Mistral OCR Page Markdown Excludes Tables When `include_blocks` Is On
-
-- Context: Binocolo filing ingest OCR (`mistral-ocr-4-0` through the platform LLM client) and any future OCR consumer.
-- Discovery: with `include_blocks=true` the per-page markdown does **not** contain the tables — only links like `[tbl-N.md](tbl-N.md)`; the actual content lives in `extras.tables[{id, format:"markdown", content}]` (duplicated in `blocks` of type `table`, with typed header/footer, bbox, per-page confidence). Italian filings come in two layouts: CCIAA fascicles with a cover page (CF in clear on p.1, repeated headers, page offsets, verbale at the end) versus "naked" XBRL-derived PDFs where the CF appears **only inside tbl-0** — so identity validation must look across multiple pages and inside tables. Batch mode can take hours and must never be used for interactive flows.
-- Practical rule: reassemble page text **at read time** with a single shared helper for all consumers; persist the vendor markdown untouched. Never rely on page-1 markdown alone for identity checks.
-- Evidence: live smoke 2026-07-22 on real fascicles (real 2023 figures: attivo=passivo 920.586; negatives rendered as `(6.709)`; header row `|   | 31-12-2023 | 31-12-2022  |`).
-- Used by: Binocolo filing ingest and NI reading.
-- Open questions: none.
-
-### OpenAPI.it IT-full Closing Dates Are Local Midnight Serialized In UTC
-
-- Context: any consumer of IT-full balance-sheet payloads that derives a date key.
-- Discovery: the vendor serializes a closing date as local midnight expressed in UTC evening — FY2025 arrives as `2025-12-30T23:00:00` — so `raw[:10]` lands on the wrong day.
-- Practical rule: when deriving a calendar date, round hour ≥ 12 up to the next day (`maBaselineExerciseDate`). Apply the correction only in new read paths: persisted vintage keys (`deepVintageKey`) were written from the raw prefix and must not be re-derived.
-- Evidence: fix `318f271` in Binocolo bilanci.
-- Used by: Binocolo adjusted-valuation path; any new IT-full consumer.
-- Open questions: none.
-
-### Company Domain Search Queries Must Never Contain Fiscal Identifiers
-
-- Context: resolving a company's official website from anagraphic data (Binocolo domain resolver; any future company-web lookup).
-- Discovery: putting the P.IVA/CF in a web-search query (Brave or fastcrw) returns **only registries and aggregators** (paginegialle, registroimprese, cerved…) and never the official site — company sites do not expose fiscal ids in indexable titles/snippets, registries do. Registries also never mention the official domain, so the two-phase "query VAT → registry page → extract domain" idea is a dead end. The strong identity signal is instead the **on-page** P.IVA (a legal obligation, art. 35 DPR 633/72) — which lives in the footer, exactly what Firecrawl-style `onlyMainContent` scraping strips; a foreign 11-digit id on a legal page is an equally strong wrong-entity/group-site signal. Name matching must use whole-word sets, never substrings ("safe" must not match "creditsafe"), and "sito ufficiale" in the primary query biases results toward directories. In practice the dominant residual bottleneck is scraper fetchability (renderer failures, SSRF guards, anti-bot), not acceptance logic.
-- Practical rule: keep fiscal identifiers out of search queries but match them on-page with full-page scrapes (`ScrapeFull`, www-first fallback); treat a reject without verified identity as recall-unsafe (route to review, never to discard).
-- Evidence: eval splits and live probes 2026-06-30 → 2026-07-02 on real sessions (Liguria, Nord-Est); `backend/internal/binocolo/ma_web_validation_job.go`, `backend/internal/platform/scrape`.
-- Used by: Binocolo UC2 gate, associate-domain remedies, direct-card verification.
-- Open questions: none.
-
-### CSS Module Keyframes Are Scoped; Global Animation Names Wake Dormant Rules
-
-- Context: frontend styling in any `apps/*` CSS module.
-- Discovery: `@keyframes` declared in a CSS module are scoped to that module. An `animation: someName` without a local keyframe of that name is a reference to a **global** keyframe — it silently does nothing until someone later defines `someName` in `global.css`, at which point dormant animations wake up in pages nobody touched (observed with `rowEnter` in Binocolo Iniziative).
-- Practical rule: before adding a keyframe name to `global.css`, grep the workspace for existing `animation:` references to that name; keep module animations fully local (keyframe + usage in the same module) unless a global animation is intended.
-- Evidence: Binocolo `/aziende` implementation review, 2026-07-18 (issue #76 remediation).
-- Used by: all frontend apps.
-- Open questions: none.
-
-### Training Directory Chips Are Action-First
-
-- Context: `apps/training` People directory (`/persone`) and backend `GET /api/training/v1/people/directory`.
-- Discovery: directory chips are planning/action flags, not passive HR-style person statuses. The directory must not derive chips from dormant employee fields such as hire date, manager hierarchy, or other external HR-ish attributes.
-- Practical rule: expose `PersonSummary.flags` with action-first booleans (`da_pianificare`, `compliance_gap`, `scadenze_imminenti`, `failed_recente`, `senza_formazione_attiva`) and derive them only from Training-domain plans, enrollments, mandatory rules, courses, certifications, and mandatory coverage. Do not reintroduce legacy passive chips such as "a norma", "nuovo assunto", or "senza piano".
-- Evidence: Training M4 directory refactor in `backend/internal/training/store_directory.go`, `backend/internal/training/types.go`, and `apps/training/src/pages/PeoplePage.tsx`.
-- Used by: `apps/training` `/persone` directory and planning bulk assignment flows.
-- Open questions: none.
-
-### Training Rule Populations Stay Training-Side
-
-- Context: `apps/training` compliance rules, custom groups, directory filters, and planning suggestions.
-- Discovery: rule populations are owned by the Training domain and must remain limited to `all`, `team`, `skill_area`, and `custom_group`; custom group membership is resolved live from Training tables.
-- Practical rule: do not add manager, role, hire-date, site, or external HR population predicates to Training mandatory rules. If a population does not fit team, skill area, or all employees, model it as a Training custom group.
-- Evidence: Training M5 rule/group schema in `deploy/migrations/016_training_m5_rules_groups.sql`, population resolver view `training.v_mandatory_rule_population`, and backend handlers under `backend/internal/training`.
-- Used by: `apps/training` `/compliance/regole`, `/persone/gruppi`, `/persone`, and `/pianificazione`.
-- Open questions: none.
-
-### Training Compliance Courses Become Mandatory Through Rules
-
-- Context: `apps/training` catalog course metadata and compliance rule CRUD.
-- Discovery: a Training course can be linked to a compliance framework without being mandatory for anyone. Per-person obbligatorietà exists only when an active `training.mandatory_rules` row applies to that person and course.
-- Practical rule: catalog and course UI should describe `course.is_compliance_course` + `course.compliance_framework` as compliance metadata. Pipeline badges, alert priority, and enrollment exports must use rule-derived `requiredByRule`, not course metadata.
-- Evidence: migration `deploy/migrations/017_training_compliance_course_semantics.sql`, enrollment rule resolution in `backend/internal/training/store.go`, rule validation in `backend/internal/training/store_rules_groups.go`, and frontend badge logic in `apps/training/src/components/PipelineCard/PipelineCard.tsx`.
-- Used by: `apps/training` `/catalogo`, `/compliance/regole`, `/pipeline`, `/persone`, and planning suggestions from mandatory gaps.
-- Open questions: none.
-
-### Training People Admin Can Create Local Employees
-
-- Context: `apps/training` People directory (`/persone`) and backend `POST /api/training/v1/people`.
-- Discovery: `training.employee` remains primarily a local read model, but People admins need a manual escape hatch to add people immediately for training planning.
-- Practical rule: only People-admin flows may create local employee rows. Creation must be audited, enforce unique email and active team selection, and must not be available from login or employee self-service workflows.
-- Evidence: approved Persone page create-person implementation in `backend/internal/training/store_mutations.go`, `backend/internal/training/handler.go`, and `apps/training/src/components/PersonCreateModal/PersonCreateModal.tsx`.
-- Used by: `apps/training` `/persone` manual create flow.
-- Open questions: none.
-
-### CP Backoffice Active Biometric Users Are Balance-Based
-
-- Context: `apps/cp-backoffice` Accessi biometrici PDF export and any future biometric active-user report.
-- Discovery: an active biometric user is not simply the latest completed row or the hidden Lenel flag. The business rule is the per-user completed-request balance: completed `activation` count minus completed `deactivation` count must be greater than zero.
-- Practical rule: group `customers.biometric_request` by `user_struct_id`, filter `br.request_completed IS TRUE`, and include only users where activation/deactivation balance is `> 0`. Use the biometric user (`user_struct_id`) as the requester; report the latest completed activation confirmation date when present.
-- Evidence: product clarification during CP Backoffice PDF export implementation; Mistra `customers.biometric_request` request type enum values `activation` and `deactivation`.
-- Used by: `apps/cp-backoffice` Accessi biometrici active-users PDF export.
-- Open questions: none.
-
-### Fornitori Provider Contacts Follow Appsmith Payload Semantics
-
-- Context: `apps/fornitori` provider detail contacts, `apps/rda` PO recipient contacts, and backend `POST/PUT /fornitori/v1/provider/{id}/reference` plus `POST/PUT /rda/v1/providers/{id}/references`.
-- Discovery: Appsmith does not send empty `first_name`, `last_name`, or `email` fields for provider contacts. On reference create, empty `phone` must be omitted because Mistra `provider_ref_new` inserts it directly and the `provider_ref` phone check accepts `NULL` but not `''`; on reference edit, empty `phone` must be sent as `''` because `provider_ref_edit` converts it with `NULLIF` and uses key presence to clear the value. `QUALIFICATION_REF` is also a special reference type: Mistra's standard provider-reference functions reject creating, editing, or deleting it.
-- Practical rule: Fornitori and RDA contact forms should omit empty name/email fields. The backend provider-reference proxies must omit empty `phone` on `POST`, include `phone` on `PUT` even when empty, be used **only** for non-qualification reference types (`ADMINISTRATIVE_REF`, `TECHNICAL_REF`, `OTHER_REF`), and reject `QUALIFICATION_REF` with a clear error. The QUALIFICATION_REF contact is owned by Mistra and is created/edited via `PUT /provider/{id}` (the `ref` field of `provider-edit`); never write to `provider_qualifications.provider_ref` directly from the portal backend.
-- Evidence: Appsmith contact-save snippet provided during the Fornitori migration; `docs/mistra-dist.yaml` provider-ref schemas; `docs/arak_schema.json` functions `provider_ref_new` and `provider_ref_edit`.
-- Used by: `apps/fornitori` detail page contacts and `apps/rda` PO recipient contacts.
-- Open questions: none.
-
-### RDA New Supplier Requests Must Use Provider Draft Create
-
-- Context: `apps/rda` supplier creation from `/rda/new` and any RDA inline new-provider form.
-- Discovery: Mistra `POST /arak/provider-qualification/v1/provider` follows the full provider-create schema and requires `default_payment_method`, while the RDA flow only requests a supplier census draft. The legacy RDA datasource used `POST /arak/provider-qualification/v1/provider/draft`.
-- Practical rule: RDA must create new suppliers through the RDA-owned `POST /api/rda/v1/providers/draft`, which proxies Mistra draft create, not the full provider create. Keep full provider create for the Fornitori app where users can manage complete provider records. RDA users should not need `app_fornitori_access` for supplier lookup, supplier draft creation, or PO recipient contact management.
-- Evidence: `docs/mistra-dist.yaml` schemas `provider-new` and `provider-draft-new`; `docs/arak_schema.json` functions `provider_new` and `provider_draft_new`; RDA audit datasource `nuovoFornitore`.
-- Used by: `apps/rda` `/rda/new` supplier request modal and legacy inline new-provider form.
-- Open questions: none.
-
-### RDA Approval Inbox Actionability Is State-Gated
-
-- Context: `apps/rda` dashboard, L1/L2 approval inbox, and any future RDA inbox aggregation.
-- Discovery: Mistra `GET /arak/rda/v1/po/pending-approval` can surface intermediate provider-qualification waits such as `PENDING_APPROVAL_PROVIDER`. Those rows can include approver metadata, but the RDA detail action bar only permits L1/L2 approval when `state == PENDING_APPROVAL`.
-- Practical rule: treat upstream inbox membership as visibility, not sufficient actionability. Add an inbox action context only when the PO state matches the action handled by that inbox; keep `PENDING_APPROVAL_PROVIDER` visible for tracking but out of "Da fare" and out of actionable approval inbox rows until Mistra advances it to `PENDING_APPROVAL`.
-- Evidence: RDA dashboard actionability predicate in `apps/rda/src/lib/rda-dashboard.ts`, detail action guard in `apps/rda/src/components/ActionBar.tsx`, and Mistra pending-approval endpoint contract.
-- Used by: `apps/rda` dashboard and approver inbox pages.
-- Open questions: none.
-
-### RDA Payment Method Standard Rule
-
-- Context: `apps/rda` PO create/edit flows and backend `POST/PATCH /api/rda/v1/pos`.
-- Discovery: the standard payment methods for an RDA PO are the selected supplier default and the CDLAN default from `provider_qualifications.payment_method_default_cdlan`. Other payment methods are valid only when the catalog row exists and `provider_qualifications.payment_method.rda_available` is true.
-- Practical rule: show supplier default first, CDLAN default second, then RDA-available methods. Warn users only when the selected method is neither supplier default nor CDLAN default. Backend create/patch must validate the effective payment code against `provider_qualifications.payment_method`, allowing a non-RDA method only when it matches the selected supplier default.
-- Evidence: legacy RDA audit payment option rule, `provider_qualifications.payment_method`, `provider_qualifications.payment_method_default_cdlan`, and backend validation in `backend/internal/rda`.
-- Used by: `apps/rda` `/rda/new`, `/rda/po/:id`, and RDA backend PO create/patch validation.
-- Open questions: none.
-
-### RDA Currency Is A PO-Level Display Contract
-
-- Context: `apps/rda` PO create/edit flows, PO lists, inboxes, row tables, and attachment threshold messaging.
-- Discovery: RDA currency belongs to the PO header (`currency` on Mistra RDA create/detail/preview/patch), not to rows. It selects the displayed money symbol for PO and row amounts; it does not convert values, recalculate totals, or change row payloads.
-- Practical rule: persist only `EUR`, `USD`, or `GBP` at PO level, default existing/missing values to `EUR`, and pass the PO currency into all money formatting. Keep numeric thresholds, row economics, and Mistra row create/replace payloads unchanged.
-- Evidence: `docs/mistra-dist.yaml` RDA `currency` fields; implementation in `apps/rda/src/lib/format.ts`, `apps/rda/src/lib/po-payload.ts`, and `backend/internal/rda`.
-- Used by: `apps/rda` `/rda/new`, `/rda/po/:id`, PO lists, inboxes, row composer, and RDA backend PO create/patch.
-- Open questions: none.
-
-### RDA Attachment Type Is User-Selected At Upload
-
-- Context: `apps/rda` PO attachment uploads and draft submit validation.
-- Discovery: Mistra `POST /arak/rda/v1/po/{id}/attachment` requires multipart `attachment_type` with enum `quote`, `transport_document`, or `other`. RDA users need to choose that type during upload; the configured submit threshold is a quote rule, not a generic attachment count.
-- Practical rule: the RDA frontend should send the selected `attachment_type` with every uploaded file. The BFF must validate the enum and forward it to Mistra, keeping the legacy fallback only when old clients omit the field (`DRAFT -> quote`, `PENDING_VERIFICATION -> transport_document`). For `total_price >= RDA_QUOTE_THRESHOLD`, submit requires at least two attachments with `attachment_type == quote`; `RDA_QUOTE_THRESHOLD` defaults to `3000` and is exposed to the browser as `rdaQuoteThreshold` from `/config`.
-- Evidence: `docs/mistra-dist.yaml` schema `po-attachment-upload`; RDA backend `handleUploadAttachment` and `handleSubmitPO`; frontend attachment helper in `apps/rda/src/lib/attachments.ts`; runtime threshold wiring in `backend/internal/platform/config` and `apps/rda/src/runtime-config.ts`.
-- Used by: `apps/rda` `/rda/new`, `/rda/po/:id`, and RDA backend attachment upload/submit validation.
-- Open questions: none.
-
-### RDA PO PDF Download Is State-Gated
-
-- Context: `apps/rda` PO detail PDF download and backend `GET /api/rda/v1/pos/{id}/pdf`.
-- Discovery: users must not download the generated PO PDF until the PO has reached one of the approved/post-approval states explicitly allowed by the business flow.
-- Practical rule: show and proxy PO PDF download only for `APPROVED`, `PENDING_SEND`, `SENT`, `PENDING_VERIFICATION`, `PENDING_DISPUTE`, `DELIVERED_AND_COMPLIANT`, and `CLOSED`. Block all other states, including Mistra/server intermediary states such as `PENDING_PDF_GENERATION` and `PENDING_ERP_SAVE`.
-- Evidence: RDA implementation plan correction from product; frontend `canDownloadPOPDF`; backend `canDownloadPOPDF`.
-- Used by: `apps/rda` `/rda/po/:id` and RDA backend PDF proxy.
-- Open questions: none.
-
-### RDA Patch Payload Null Semantics
-
-- Context: `apps/rda` PO header edits forwarded to Mistra `rda-patch`.
-- Discovery: Mistra rejects `budget_user_id: null` with `Value is not nullable`; in `rda-patch`, only `cost_center` is nullable. Optional text fields such as `description`, `note`, and `provider_offer_code` are strings, and `provider_offer_date` must be a valid date when present.
-- Practical rule: for RDA PATCH payloads, omit `budget_user_id` for cost-center budgets, send `cost_center: null` only when switching to a user budget, and send optional text fields as strings rather than `null`. Omit an empty `provider_offer_date` instead of sending `null` or an invalid empty date.
-- Evidence: `docs/mistra-dist.yaml` schema `rda-patch`; observed Mistra 400 response from `PATCH /rda/v1/pos/{id}`; implementation in `apps/rda/src/lib/po-payload.ts`.
-- Used by: `apps/rda` PO detail and new-RDA wizard header save flows.
-- Open questions: whether Mistra exposes a supported way to clear an existing `provider_offer_date`; the current safe behavior omits empty dates on PATCH.
-
-### RDA PO Recipients Use The Dedicated Recipients Endpoint
-
-- Context: `apps/rda` PO contact selection, clone flows, and any backend code that changes the provider recipients of an RDA PO.
-- Discovery: Mistra exposes `PATCH /arak/rda/v1/po/{id}/recipients` for recipient selection. This endpoint accepts `recipient_ids` as an array and an empty array clears the selection. Recipient changes are not part of the generic PO header patch contract.
-- Practical rule: the RDA frontend and BFF must save header fields and recipient selections as separate operations. Use `PATCH /api/rda/v1/pos/{id}/recipients` for selection and clearing, including clone recipient copy and provider-change clearing. Do not send `recipient_ids` through `PATCH /api/rda/v1/pos/{id}`.
-- Evidence: `docs/mistra-dist.yaml` path `/arak/rda/v1/po/{id}/recipients`; backend `backend/internal/rda/handler.go` and `backend/internal/rda/clone.go`; frontend `apps/rda/src/api/queries.ts`.
-- Used by: `apps/rda` PO detail, `/rda/new`, and PO clone.
-- Open questions: none.
-
-### RDA Budget Selection Keys
-
-- Context: `apps/rda` budget selection in new/clone/edit RDA flows.
-- Discovery: Mistra `budget-for-user` can return multiple spendable entries with the same `budget_id` and different `cost_center` values, for example `Trasferte` for two cost centers. A select value based only on `budget_id` makes those options indistinguishable and always resolves to the first matching budget.
-- Practical rule: frontend form state must store a composite budget selection key built from `budget_id` plus the active binding (`cost_center` or `user_id`/`budget_user_id`). Payload builders must then translate that key back to numeric `budget_id` plus exactly one of `cost_center` or `budget_user_id`.
-- Detail/read-only views must display the budget association returned on the PO itself. Do not substitute it with an entry from the current viewer's budget catalog by `budget_id` alone; `/budget-for-user` is only the selectable catalog for edits and creation.
-- Evidence: `docs/mistra-dist.yaml` schema `budget-for-user`; implementation in `apps/rda/src/lib/budgets.ts`, `apps/rda/src/components/BudgetSelect.tsx`, and `apps/rda/src/lib/po-payload.ts`.
-- Used by: `apps/rda` `/rda/new`, PO header edit, new PO modal, and clone PO modal.
-- Open questions: none.
-
-### RDA Row Totals Are Normalized By The BFF
-
-- Context: `apps/rda` PO row tables in the new wizard and PO detail page.
-- Discovery: Mistra exposes the PO aggregate `total_price`, but row responses may not include a useful `total_price` per row. Legacy Appsmith displayed a computed row total instead.
-- Practical rule: `GET /api/rda/v1/pos/{id}` should normalize every row with `price` for goods and `total_price` before returning it to the frontend. Preserve a positive upstream `total_price` or `total` when present; otherwise calculate goods as `price * qty` and services as `(MRC * qty * initial_subscription_months) + (NRC * qty)`, using read names `montly_fee` and `activation_fee`. Because Arak's detail function may omit the stored good `price`, enrich rows from `rda.purchase_order_row` when available.
-- Evidence: `docs/mistra-dist.yaml` `rda-row`; `docs/arak_schema.json` functions `get_purchase_order_rows_detail` and `create_purchase_order_row`; Appsmith audit row-total notes; backend `backend/internal/rda/row_totals.go`.
-- Used by: `apps/rda` row tables and wizard row composer.
-- Open questions: none.
-
-### RDA Good Row Create Still Needs Empty Renew Detail
-
-- Context: backend `POST /api/rda/v1/pos/{id}/rows` for RDA goods.
-- Discovery: Mistra's `rda-row-create` schema requires `renew_detail` at the root even for `type=good`, although no renew fields are meaningful for goods. Omitting it returns `400` with `property "renew_detail" is missing`.
-- Practical rule: when creating good rows, forward `renew_detail: {}` along with `price` and the calculated `total`. Do not include service-only renewal fields for goods. Send calculated `total` for service rows too, because Arak stores it in `purchase_order_row.total` and the PO aggregate sums that column.
-- Evidence: Mistra schema `docs/mistra-dist.yaml` `rda-row-create`; `docs/arak_schema.json` functions `create_purchase_order_row` and `purchase_order_total_calculation`; observed upstream 400 during PO row create; backend `backend/internal/rda/validation.go`.
-- Used by: `apps/rda` row composer and row modal.
-- Open questions: none.
-
-### RDA Row Edit Is A BFF Replace Operation
-
-- Context: `apps/rda` PO row editing in `/rda/new` and PO detail.
-- Discovery: Mistra exposes row create and delete (`POST /arak/rda/v1/po/{id}/row`, `DELETE /arak/rda/v1/po/{id}/row/{rowid}`) but no real row update endpoint.
-- Practical rule: expose row edit to the browser only through `PUT /api/rda/v1/pos/{id}/rows/{rowId}`. The BFF must validate the caller and draft PO, create the replacement row first, and delete the old row only after create succeeds. If delete fails after create, return `409 ROW_REPLACE_DELETE_FAILED` so the UI refetches and shows the operator that both rows may be present.
-- Evidence: `docs/mistra-dist.yaml` RDA row paths and backend `backend/internal/rda/validation.go`.
-- Used by: `apps/rda` row modal and row tables.
-- Open questions: none.
-
-### RDA Portal Deep Links Include App Mount And App Route
-
-- Context: portal notifications, emails, and any backend-generated links to RDA PO detail pages.
-- Discovery: the production/static RDA app is mounted at `/apps/rda/`, while the React router route for PO detail is `/rda/po/:poId`. A backend-generated production deep link therefore needs both parts: `/apps/rda/rda/po/{poID}`. In local split-server development, an explicit `RDA_APP_URL` should be used when configured; otherwise the RDA Vite dev URL is `http://localhost:5190/rda/po/{poID}`.
-- Practical rule: do not link backend notifications directly to `/rda/po/{poID}` in production. Build RDA PO links through the app-mount-aware helper and use `MRSMITH_PUBLIC_BASE_URL` only to make email links absolute.
-- Evidence: `apps/rda/vite.config.ts` base `/apps/rda/` for builds, `apps/rda/src/routes.tsx` route `/rda/po/:poId`, backend helper `backend/internal/rda/notifications.go`.
-- Used by: Notifications V1 RDA approval notifications.
-- Open questions: none.
-
-### RDA Comment Mentions Notify Through MrSmith, Not Mistra
-
-- Context: `apps/rda` PO detail comment mentions and backend `POST /api/rda/v1/pos/{id}/comments`.
-- Discovery: Mistra `po-comment-new` accepts only `comment`; it does not persist or process mention recipients. MrSmith owns the notification side effect after Mistra successfully creates the comment.
-- Practical rule: the frontend should submit only users selected from the RDA mention dropdown. The RDA BFF must forward only the comment text to Mistra, validate selected mention recipients against enabled `users_int` users, and create `rda_comment_mention` notifications with the standard RDA PO deep link. Manually typed `@email` text is display-only and must not notify. Self-mentions are skipped unless `NOTIFY_SELF_MENTIONS=true`, which is intended only for local/development testing.
-- Evidence: `docs/mistra-dist.yaml` schema `po-comment-new`; RDA frontend `MentionInput`; backend `backend/internal/rda/validation.go` and `backend/internal/rda/notifications.go`.
-- Used by: `apps/rda` PO detail comments.
-- Open questions: none.
-
-### RDA Article Catalog Type Comes From The BFF
-
-- Context: `apps/rda` row creation in `/rda/new` and PO detail row modal.
-- Discovery: Mistra exposes RDA articles filtered by `type=good|service`, but the row UI must select an article first and derive the row type from that selected catalog item.
-- Practical rule: the RDA row picker should load the unified catalog once with `GET /api/rda/v1/articles`, then filter locally by code, description, and the Italian type labels (`bene` / `servizio`). The RDA BFF fetches both good and service catalogs when `type` is omitted, normalizes every item to `{code, description, type}`, and deduplicates by `code`. Keep `?search=...` and `?type=good|service` only for compatibility or deliberately typed consumers.
-- Evidence: backend `backend/internal/rda/articles.go`; frontend `apps/rda/src/api/queries.ts`, `apps/rda/src/components/ArticleCombobox.tsx`, and `apps/rda/src/lib/row-payload.ts`.
-- Used by: `apps/rda` `/rda/new` row composer and PO detail row modal.
-- Open questions: none.
-
-### Manutenzioni Radar Excludes Terminal Maintenance States
-
-- Context: `GET /api/manutenzioni/v1/maintenances/radar`, used by `apps/manutenzioni` on the Registro Manutenzioni page.
-- Discovery: maintenance records with status `cancelled` or `superseded` are lifecycle history, not actionable operational windows. Counting them in the radar makes the upcoming-window buckets noisy and misleading.
-- Practical rule: Manutenzioni radar-style operational summaries must always exclude `cancelled` and `superseded`, even when the caller passes explicit status filters. Keep the full register/list endpoints available for searching those terminal records.
-- Evidence: `backend/internal/manutenzioni/read.go` `handleMaintenanceRadar`; regression coverage in `backend/internal/manutenzioni/radar_test.go`.
-- Used by: `apps/manutenzioni` Registro Manutenzioni radar.
-- Open questions: none.
-
-### Manutenzioni Service Taxonomy Is A Catalog, Targets Are Instances
-
-- Context: `apps/manutenzioni` impact modeling, create/detail flows, service-dependency graph, and configuration pages.
-- Discovery: `maintenance.service_taxonomy` is not a generic label lookup. It is the stable catalog of maintainable services/objects, with an owning technical domain, target nature, default audience, and dependency-graph participation. `maintenance.maintenance_service_taxonomy` records how a catalog item participates in one maintenance (`operated` or `dependent`, expected severity, audience override, source). `maintenance.maintenance_target` is the concrete per-maintenance instance layer and can exist without a catalog item.
-- Practical rule: do not create `service_taxonomy` rows for punctual instances such as a specific node, tenant, circuit, room, or customer asset. Model those as `maintenance_target` rows with `target_type_id`, `display_name`, and optional `service_taxonomy_id`. `maintenance_target.target_type_id` does not have to equal the linked catalog item's `target_type_id`, because the target may be a subpart or instance of the catalog object. Treat `ref_table`, `ref_id`, and `external_key` as optional external anchors, not guaranteed typed FKs or user-facing labels.
-- Evidence: `docs/manutenzioni_schema.sql` tables `service_taxonomy`, `maintenance_service_taxonomy`, `service_dependency`, and `maintenance_target`; backend validation in `backend/internal/manutenzioni/mutations_impact.go`; read/API shape in `backend/internal/manutenzioni/reference.go` and `children_read.go`; frontend impact workbench in `apps/manutenzioni/src/components/ImpactWorkbench.tsx`; detailed rulebook in `apps/manutenzioni/SERVICE-TAXONOMY-REFERENCE.md`.
-- Used by: `apps/manutenzioni` create page, maintenance detail impact workspace, target management, cockpit readiness, service-dependency configuration.
-- Open questions: none for the current model; a future registry may type allowed external reference sources.
-
-### Cross-Database Mini-App Summaries Must Merge In Code, Not In One SQL Join
-
-- Context: mini-apps that read business records from one DB and enrich them with replica/loader data from another DB in the same request path.
-- Discovery: the MrSmith backend wires `ANISETTA_DSN`, `MISTRA_DSN`, `GRAPPA_DSN`, and other stores as separate `*sql.DB` handles. A handler cannot issue a single SQL statement that joins tables across those DSN boundaries. `apps/richieste-fattibilita` hit this when `rdf_richieste` (Anisetta) needed HubSpot deal/company enrichment from `loader.hubs_*` (Mistra).
-- Practical rule: when a screen needs cross-DB enrichment, fetch the base rows from the owning DB, batch-load enrichment rows from the secondary DB, merge in Go, and only then apply filters that depend on enriched fields (for example customer/company name filters). Do not plan a “server-side join” as a single SQL query unless the data is confirmed to live behind the same connection.
-- Evidence: separate DB wiring in `backend/cmd/server/main.go`; merge implementation in `backend/internal/rdf/handler.go` for `GET /rdf/v1/richieste/summary`.
-- Used by: `apps/richieste-fattibilita`.
-- Open questions: none.
-
-### Quotes Create Flow Uses Context-Specific Category Exclusions
-
-- Context: `apps/quotes` service-category loading for Nuova Proposta versus other quotes views.
-- Discovery: the Appsmith Nuova Proposta `get_product_category` query excludes only category ids `12` and `13`, while other quotes references and later repo specs may exclude `12,13,14,15`. A single hardcoded "standard" exclusion set caused QA drift in the create flow.
-- Practical rule: quotes category endpoints should support context-specific exclusions instead of assuming one global standard-flow filter. For the create wizard, pass explicit excluded ids and keep the filtering contract in the request, not hidden in the frontend.
-- Evidence: `apps/quotes/check/out_08.md`, `apps/quotes/src/api/queries.ts` `useCategories`, `backend/internal/quotes/handler_reference.go` `exclude_ids` support.
-- Used by: `apps/quotes` Nuova Proposta wizard.
-- Open questions: if another quotes surface needs the broader `12,13,14,15` exclusion, keep that as an explicit caller decision rather than reusing the create-flow contract.
-
-### Quotes IaaS Template Derivation Must Be DB-Driven
-
-- Context: `apps/quotes` Nuova Proposta IaaS path and `POST /quotes/v1/quotes`.
-- Discovery: hardcoded frontend template-ID maps can drift from `quotes.template` and produce dead-end create flows where no kit is derivable, even when template metadata exists in DB.
-- Practical rule: derive IaaS kit/services from `quotes.template` (`template_type`, `kit_id`, `service_category_id`) and treat DB metadata as the single source of truth. For template-linked kits, bypass standard catalog eligibility (`is_active/ecommerce/quotable`) when resolving the kit; backend create must still reject missing template kit IDs or non-existent kit IDs.
-- Evidence: `apps/quotes/src/pages/QuoteCreatePage.tsx`, `apps/quotes/src/api/queries.ts` (`include_ids`), `backend/internal/quotes/handler_reference.go` (`include_ids` merge), `backend/internal/quotes/handler_quotes.go`, `backend/internal/quotes/handler_create_test.go`.
-- Used by: `apps/quotes` create wizard and create endpoint validation.
-- Open questions: none.
-
-### Quotes Replacement Orders Need Appsmith Column Names Plus Customer Scoping
-
-- Context: `SOSTITUZIONE` order pickers in quotes create/detail flows.
-- Discovery: the Appsmith dataset shape comes from Alyante `Tsmi_Ordini.NOME_TESTATA_ORDINE` with `STATO_ORDINE IN ('Evaso', 'Confermato')`; in this Alyante schema the customer scope column is `ID_CLIENTE`, not `NUMERO_AZIENDA`.
-- Practical rule: when loading replacement-order options, query `NOME_TESTATA_ORDINE`, keep the `STATO_ORDINE` filter, and scope orders by the resolved ERP customer via `loader.hubs_company.numero_azienda -> Tsmi_Ordini.ID_CLIENTE`.
-- Evidence: `apps/quotes/check/out_07.md`, `backend/internal/quotes/handler_reference.go` `customerOrdersQuery`, `backend/internal/quotes/handler_reference_test.go`.
-- Used by: `apps/quotes` create and detail replacement-order selectors.
-- Open questions: none.
-
-### Quotes Publish Payment Labels Use Loader ERP Column Names
-
-- Context: quotes publish orchestration when generating HubSpot terms and conditions.
-- Discovery: payment-method labels must be read from `loader.erp_metodi_pagamento.desc_pagamento` keyed by `cod_pagamento`; older aliases `descrizione` / `codice` are wrong for this schema and broke the publish path.
-- Practical rule: any quotes publish or save logic that needs the payment-method label should use `cod_pagamento` / `desc_pagamento`, and backend tests should pin those column names because similar stale aliases have already regressed once.
-- Evidence: `backend/internal/quotes/handler_publish.go` `paymentMethodLabelQuery`, `backend/internal/quotes/handler_publish_test.go`, `apps/quotes/check/fix_QA.md`.
-- Used by: `apps/quotes` publish flow.
-- Open questions: none.
-
-### Quotes Deal Number Must Come From HubSpot `codice`, Not Deal Title
-
-- Context: `apps/quotes` Nuova Proposta deal picker, quote creation payload, and detail header rendering.
-- Discovery: `quotes.quote.deal_number` is the HubSpot deal code, while `loader.hubs_deal.name` is the human title. Reusing `d.name` in the wizard create payload stores the title in `deal_number`, which breaks downstream views that expect the code.
-- Practical rule: quotes deal reference APIs should expose both `name` and `deal_number` (`loader.hubs_deal.codice`), wizard search should include the code, and quote create should persist `selectedDeal.deal_number`, never the title.
-- Evidence: `backend/internal/quotes/handler_reference.go`, `apps/quotes/src/pages/QuoteCreatePage.tsx`, `apps/quotes/src/components/HeaderTab.tsx`, production quotes `1373` and `1374` created on 2026-04-12 with `deal_number` incorrectly set to `TEST ALESSANDRA - NON ELIMINARE`.
-- Used by: `apps/quotes` deal list, create flow, and detail header.
-- Open questions: whether to add a separate backfill for already-corrupted `quotes.quote.deal_number` rows.
-
-### HubSpot Deal Codes Match ERP Orders After Separator Normalization
-
-- Context: Reports AOV detail and any flow matching ERP order numbers to HubSpot deals.
-- Discovery: ERP order codes conventionally use `XXXXXXX-YYYY`, while `loader.hubs_deal.codice` can store the corresponding deal as `XXXXXXX/YYYY`.
-- Practical rule: match order codes to deal codes with whitespace trimming and `/` -> `-` normalization on both sides. When displaying the matched deal, keep the original deal code from `loader.hubs_deal.codice` and pair it with `loader.hubs_deal.name`.
-- Evidence: `loader.v_ordini_ric_spot.nome_testata_ordine`, `loader.hubs_deal.codice`, `loader.hubs_deal.name`, Reports AOV detail implementation.
-- Used by: `apps/reports` AOV detail.
-- Open questions: none.
-
-### Quotes Customer Default Payment Must Use Alyante `CODICE_PAGAMENTO`
-
-- Context: quotes create enrichment endpoint `GET /quotes/v1/customer-payment/{customerId}` against Alyante `Tsmi_Anagrafiche_clienti`.
-- Discovery: this Alyante environment exposes the customer default payment as `CODICE_PAGAMENTO`; the stale alias `AN_CONDPAG` is invalid and causes `mssql: Invalid column name 'AN_CONDPAG'`. The legacy Appsmith contract already used `ISNULL(CAST(CODICE_PAGAMENTO as INT), 402)`.
-- Practical rule: any quotes customer-payment lookup should query `CODICE_PAGAMENTO` and preserve the `402` fallback semantics in SQL or equivalent null-safe backend logic. Keep a backend test that pins that positive contract.
-- Evidence: `apps/quotes/quotes-migspec-phaseA.md`, `apps/quotes/APPSMITH-AUDIT.md`, `backend/internal/quotes/handler_reference.go`, `backend/internal/quotes/handler_reference_test.go`.
-- Used by: `apps/quotes` create flow payment-method prefill.
-- Open questions: none.
-
-### Quotes Republish Must Unlock Published HubSpot Quotes First
-
-- Context: republishing an existing HubSpot-backed quote from `apps/quotes`.
-- Discovery: published HubSpot quotes are locked (`hs_locked=true`) and reject direct property updates with `Published Quote cannot be edited`. The legacy Appsmith `Dettaglio.mainForm.mandaSuHubspot()` flow explicitly PATCHed `hs_status=DRAFT` before syncing changes, and HubSpot's legacy quotes docs require moving published quotes back to `DRAFT`, `PENDING_APPROVAL`, or `REJECTED` before editing.
-- Practical rule: any republish/update flow for an existing HubSpot quote must fetch live quote status first and, if the quote is locked or already in a published state (`APPROVED` / `APPROVAL_NOT_NEEDED`), unlock it with `hs_status=DRAFT` before updating properties or line items. Do not rely only on the local DB status.
-- Evidence: `apps/quotes/quotes-main.tar.gz` -> `quotes-main/pages/Dettaglio/jsobjects/mainForm/mainForm.js`, `backend/internal/platform/hubspot/quotes.go`, `backend/internal/quotes/handler_publish.go`, HubSpot legacy quotes docs ("Properties set by quote state", last modified 2026-03-30).
-- Used by: `apps/quotes` republish flow and `GET /quotes/v1/quotes/:id/hs-status`.
-- Open questions: none.
-
-### Quotes Pending Approval Status Is Finalized From HubSpot
-
-- Context: `apps/quotes` proposals published with legal notes and stored locally as `PENDING_APPROVAL`.
-- Discovery: HubSpot is the source of truth after approval review. Local pending quotes must be synchronized from HubSpot `hs_status`; `hs_sign_status` is separate and remains out of scope for local status transitions.
-- Practical rule: the backend scheduled worker should inspect only local quotes with `status = PENDING_APPROVAL` and `hs_quote_id IS NOT NULL`. It may update local status to `APPROVED`, `APPROVAL_NOT_NEEDED`, or `REJECTED`; it must skip `DRAFT`, `PENDING_APPROVAL`, empty, and unknown HubSpot statuses. Conversion to order remains allowed only for local `APPROVED`. HubSpot lookup failures, local update failures, runtime config failures, and advisory-lock release failures must be logged as `WARN` records with `component = quotes` and an explicit `operation`, so deployments with diagnostics enabled persist them to `mrsmith.diagnostic_event`.
-- Evidence: GitHub issue #44 implementation plan; `backend/internal/quotes/status_sync.go`; `apps/quotes/QUOTES-SPEC.md`.
-- Used by: `apps/quotes` list/detail status display and order-conversion gating.
-- Open questions: none.
-
-### Quotes Order Conversion Uses Vodka Bridge Plus HubSpot Note Attachment
-
-- Context: `apps/quotes` conversion from proposal to legacy Vodka/daiquiri sales order.
-- Discovery: the active Appsmith conversion flow creates the Vodka `orders` header and `orders_rows`, records `orders.legacy_orders`, generates the order PDF through `GET /orders/v1/order/pdf/{orderId}/generate`, uploads it to HubSpot Files under `/deal-documents`, then creates a HubSpot note associated to the deal with association type `214`. The dormant `AssociateFileToDeal` query is not part of the active flow and contains a bad field reference. The conversion page also blocks every proposal status except `APPROVED`.
-- Practical rule: retry and status logic should use `orders.legacy_orders.quote_id -> vodka_id` as the canonical bridge, but only when the source quote is still `APPROVED`. Do not recreate Vodka orders when the bridge exists. If a matching Vodka order exists by `cdlan_ndoc` + `cdlan_anno` without the bridge, stop with a conflict instead of creating a duplicate. Attach the PDF through the note association, not the dormant file-to-deal endpoint. Persist HubSpot conversion metadata in `orders.legacy_orders.jdata.hubspot` (`deal_id`, `file_id`, `note_id`, etc.) so retries skip already-completed HubSpot steps and Ordini revert can best-effort delete the note and file. Use `quotes.template.lang` as the converted order language for both `orders.profile_lang` and `orders_rows.cdlan_descart`; if the template language is missing, fall back to Italian and do not use the customer profile language. Keep Vodka PDF-facing text fields such as `orders.cdlan_note`, `orders.data_decorrenza`, `orders.cdlan_rif_*`, and selected `orders_rows` string display values as empty strings rather than `NULL` for converted orders, and normalize legacy `NULL` values before gateway PDF calls because the gw-int order PDF path can fail while scanning nullable text into non-null Go strings. Do not normalize operational date sentinels such as `orders.cdlan_dataconferma`, `orders_rows.cdlan_data_attivazione`, or `orders_rows.data_annullamento`: Ordini and/or gw-int use `NULL` differently from an empty date string.
-- Evidence: `apps/quotes/quotes-main.tar.gz` `Converti in ordine/jsobjects/utilsCopy/utilsCopy.js`; recovered `artifacts/Ordini-gestione-portale.json` `gpUtils.newOrderFromQuote` and `gpUtils.rowsFromQuote`; Mistra trigger `quotes.update_kit_product_rows()` already derives quote row language from `quotes.template.lang`; implementation in `backend/internal/quotes/order_conversion.go`.
-- Used by: `apps/quotes` `POST /api/quotes/v1/quotes/{id}/convert-order` and `GET /api/quotes/v1/quotes/{id}/order-conversion`.
-- Open questions: none.
-
-### Vodka Orders Match Alyante Extended Rows By Document
-
-- Context: `apps/ordini` quote-converted order reverts and any future guard that must prove whether a Vodka order has reached Alyante ERP.
-- Discovery: Alyante exposes `Tsmi_Ordini_Esteso` with document-level fields `NUM_DOC_GAMMA`, `ANNO_DOCUMENTO`, `NUM_DOCUMENTO` and row-level fields such as `ARTICOLO`, `QTA`, `SERIALNUMBER`, and `STATO_DOCUMENTO`. A Vodka order can be checked against that view by matching `orders.cdlan_ndoc` to `NUM_DOC_GAMMA` when numeric, `orders.cdlan_anno` to `ANNO_DOCUMENTO`, and falling back to trimmed `NUM_DOCUMENTO` for string document numbers.
-- Practical rule: do not treat Vodka `cdlan_stato = 'BOZZA'` as proof that no ERP row exists. Before deleting or reverting a quote-created order, query `Tsmi_Ordini_Esteso` by document number/year and block the action if any row is returned. Use `orders_rows.cdlan_codart`, `cdlan_serialnumber`, and `cdlan_qta` only as diagnostics or future stricter matching; document/year presence is already enough to prove ERP push.
-- Evidence: `docs/vodka-tables.sql`, Alyante view contract provided during Ordini revert planning, and `backend/internal/ordini/workflow_revert.go`.
-- Used by: `apps/ordini` `POST /api/ordini/v1/orders/{id}/revert-conversion`.
-- Open questions: whether `NUM_DOCUMENTO` stores any alternate formatting that should be normalized beyond trimming if non-numeric document numbers appear in production.
-
-### Panoramica Orders Summary Text Columns Can Be NULL
-
-- Context: `GET /api/panoramica/v1/orders/summary` backed by `loader.v_ordini_sintesi`.
-- Discovery: production data can return `NULL` for multiple `loader.v_ordini_sintesi` text fields used by the summary endpoint, including `stato` and `numero_ordine`, even though the original backend/frontend contract modeled them as required strings.
-- Practical rule: scan summary text columns with `sql.NullString` in backend handlers and normalize them deliberately before JSON encoding; do not scan those columns directly into Go `string` fields.
-- Evidence: backend failures `list_orders_summary_scan` on 2026-04-09 for `stato` and `numero_ordine` (`converting NULL to string is unsupported`), fixed in `backend/internal/panoramica/handler_orders.go`.
-- Used by: nothing anymore — the summary endpoint and the Ordini Ricorrenti (OLD) page were removed on 2026-06-10; the general rule (scan loader text columns with `sql.NullString`) still applies to all loader-backed handlers.
-- Open questions: none.
-
-### RDF `fornitori_preferiti` Must Be Treated as Nullable Text
-
-- Context: `GET /api/rdf/v1/richieste/summary`, `GET /api/rdf/v1/richieste/{id}/full`, and any RDF flow that reads `public.rdf_richieste.fornitori_preferiti`.
-- Discovery: the authoritative schema snapshot marks `rdf_richieste.fornitori_preferiti` as nullable `text` with default `''`, so production rows can legitimately contain `NULL`. Scanning that column directly into Go `string` fields causes runtime failures (`converting NULL to string is unsupported`).
-- Practical rule: scan `fornitori_preferiti` with `sql.NullString` in RDF handlers and normalize `NULL`, `''`, and empty array literals to `[]` before encoding JSON. Keep the API contract as `number[]`; do not surface `null` to the frontend for this field.
-- Evidence: `docs/anisetta_schema.json` (`rdf_richieste.fornitori_preferiti` `nullable: true`), backend failure `list_richieste_summary_scan` on 2026-04-16, and fixes in `backend/internal/rdf/handler.go`.
-- Used by: `apps/richieste-fattibilita` summary/detail flows and manager actions that reload a richiesta after writes.
-- Open questions: none.
-
-### Loader `quantita` Must Be Treated as Decimal (Nullable) Across Reports and Panoramica
-
-- Context: report/order endpoints reading `quantita` from loader views such as `v_ordini_ric_spot`, `v_ordini_sintesi`, and `v_ordini_ricorrenti_conrinnovo`.
-- Discovery: `quantita` is defined as `double precision` in Mistra loader view contracts and can be fractional (for example `7.5`) and nullable. Scanning into Go `int`/`sql.NullInt64` causes runtime failures (`Scan error ... converting driver.Value type float64 ... to int`) and/or truncation risk.
-- Practical rule: for loader-backed APIs, scan `quantita` with `sql.NullFloat64` and expose it as nullable decimal in JSON/TS contracts (`*float64` in Go responses, `number | null` in TS). Do not cast/round to int unless an explicit business rule requires integer quantities.
-- Evidence: `docs/mistradb/mistra_loader.json` (`quantita` column type `double precision` on loader views), backend failure on `POST /api/reports/v1/orders/preview` on 2026-04-14 with value `7.5`, and follow-up fixes in reports/panoramica handlers.
-- Used by: `apps/reports` (`orders`, `active-lines`, `pending-activations`, `upcoming-renewals`) and `apps/panoramica-cliente` (`orders/summary`, `orders/detail`).
-- Open questions: none.
-
-### Loader `tipo_documento` Is Fixed-Width Padded; `v_ordini_ric_spot` Is The Canonical Recurring+Spot Source
-
-- Context: any query distinguishing recurring (`TSC-ORDINE-RIC`) from spot (`TSC-ORDINE`) orders in `loader.erp_ordini`.
-- Discovery: the ERP loader pads `tipo_documento` to fixed width, so spot orders are stored as `'TSC-ORDINE    '` (14 chars, trailing spaces) in a `varchar(100)` column. Exact equality (`tipo_documento = 'TSC-ORDINE'`) silently matches zero spot rows. The view `loader.v_ordini_ric_spot` already handles this (`TRIM(BOTH FROM tipo_documento)` in its WHERE) and is the canonical recurring+spot row source (same shape as `v_ordini_ricorrenti`, also excludes `CDL-AUTO`).
-- Practical rule: never compare `tipo_documento` with raw equality — use `btrim(tipo_documento)` or, better, query `loader.v_ordini_ric_spot` instead of rebuilding the join. Note the view requires at least one non-CDL-AUTO order row, so customer/status lookups built on it match exactly what an order grid built on it can show.
-- Evidence: read-only probe on Mistra dev DB (2026-06-10): `length(tipo_documento) = 14` for both values; `loader.v_ordini_ric_spot` definition in `docs/mistradb/mistra_loader.json`; used by `backend/internal/reports/handler_ordini.go` and `backend/internal/panoramica/handler_orders.go`.
-- Used by: `apps/reports` order endpoints, `apps/panoramica-cliente` Ordini Ricorrenti e Spot.
-- Open questions: none.
-
-### Spot Orders Carry One-Off Amounts In `canone`; MRC Must Be Reclassified As NRC
-
-- Context: any report or app showing NRC/MRC for orders that include spot documents (`TSC-ORDINE`).
-- Discovery: for spot orders the ERP stores the one-off amount in the row's `canone` field (with `setup` typically 0), so the conventional `quantita * canone AS mrc` produces a fictitious monthly recurring charge for spot rows.
-- Practical rule: when `btrim(tipo_documento) = 'TSC-ORDINE'`, fold the amount into NRC (`setup + COALESCE(quantita * canone, 0)`) and emit `mrc` as NULL (UI shows an empty cell, order totals omit the MRC label). Recurring orders keep `setup` and `quantita * canone` as-is.
-- Evidence: Mistra dev DB spot rows (e.g. order `OC/0001116/2026-2026`: `setup = 0`, `canone = 50`, qta 2/28/32) verified 2026-06-10; implemented in `backend/internal/panoramica/handler_orders.go` (orders/detail).
-- Used by: `apps/panoramica-cliente` Ordini Ricorrenti e Spot.
-- Open questions: `stato_riga` semantics (Da attivare/Attiva/Cessata) are modeled on recurring lifecycles; spot rows inherit them and may show misleading states.
-
-### Reports AOV Replacement MRC Matching
-
-- Context: AOV calculations in `apps/reports` that subtract replaced-order MRC for substitution orders (`tipo_ordine = 'A'`) from `loader.v_ordini_ric_spot`.
-- Discovery: Appsmith's AOV replacement lookup treats `sost_ord` as a semicolon-separated list of replaced order names, normalizes order names by replacing `/` with `-`, and counts only replaced rows whose `data_disdetta` equals the replacing order's `data_conferma`. When a substitution has no matching replaced-order rows, legacy AOV leaves old MRC, net MRC, and AOV as `NULL`; do not coalesce that case to `0`.
-- Practical rule: AOV old-MRC subqueries should match `REPLACE(odv.nome_testata_ordine, '/', '-')` against `string_to_array(REPLACE(o.sost_ord, '/', '-'), ';')`, keep `odv.annullato = 0`, and require `odv.data_disdetta = o.data_conferma`. Include `o.data_disdetta` in inner grouping where existing grouped queries require it. For by-category AOV, compute economics at order level using the same `totale_mrc_new`, `totale_nrc`, and `valore_aov` semantics as detail/by-type/by-sales, then assign each order to one current-order product category using the largest current-row AOV contribution. Do not subtract replaced-order rows into their old product categories, because that creates negative category-only rows and makes category counts fan out beyond the detail order count.
-- Evidence: Appsmith AOV diff `artifacts/ad4f4244a1c1b59d16b4fe0982d37faa1c639ef0.diff`; backend implementation and tests in `backend/internal/reports/handler_aov.go` and `backend/internal/reports/handler_quantita_test.go`.
-- Used by: `apps/reports` AOV detail, by-type, by-category, and by-sales datasets.
-- Open questions: none.
-
-### Reports AOV CDL-CLOUD Adds Fixed NRC
-
-- Context: AOV calculations in `apps/reports` over `loader.v_ordini_ric_spot`.
-- Discovery: each sales-order row with `codice_prodotto = 'CDL-CLOUD'` contributes an extra fixed 600 euro NRC value. The amount is per matching row, not multiplied by `quantita`.
-- Practical rule: include the fixed amount in both `totale_nrc` and `valore_aov` for AOV detail and aggregate views. The detail payload should expose a boolean flag so the UI can mark affected orders with a warning dot.
-- Evidence: business rule provided during AOV update; backend implementation in `backend/internal/reports/handler_aov.go`.
-- Used by: `apps/reports` AOV detail, by-type, by-category, and by-sales datasets.
-- Open questions: none.
-
-### Reports Carbone Export Payloads May Need Template-Specific Key Aliases
-
-- Context: XLSX exports in `backend/internal/reports` rendered through Carbone templates.
-- Discovery: Carbone export payload keys do not have to match the preview API contract exactly. `Accessi attivi` preview still exposes `stato`, but the XLSX template expects Grappa-specific aliases, so the backend now rewrites the export payload to emit `stato grappa` and `stato_grappa` instead of `stato`.
-- Practical rule: when a Carbone template is already pinned to legacy field names, adapt the backend export payload in the export path only; do not widen or rename the preview API/frontend contract unless the UI actually needs the new keys too.
-- Evidence: `backend/internal/reports/handler_accessi.go` `activeLinesExportRows`, `backend/internal/reports/handler_quantita_test.go`, reports template references `AccessiTemplateID = a482f92419a0c17bb9bfae00c64d251c6a527f95c67993d86bf2d11d9e2e7a9e`.
-- Used by: `apps/reports` `Accessi attivi` XLSX export.
-- Open questions: none.
-
-### Slow Read Endpoints Must Fit Server Write Timeout
-
-- Context: slow report-style endpoints behind the shared Go HTTP server, including `GET /api/panoramica/v1/iaas/monthly-charges`.
-- Discovery: a handler can finish its SQL work and still surface as a client-side transport failure if response delivery exceeds the server write budget or the downstream connection closes first. In that case, naive access logs can still misleadingly report a clean `200` unless the response writer captures downstream write errors.
-- Practical rule: when a read endpoint is expected to run for tens of seconds, align `http.Server.WriteTimeout` with that runtime budget and make access logs record downstream write failures and request-context cancellation separately from normal completions.
-- Practical rule: any synchronous endpoint that fans out batches of LLM or vendor calls will overrun the shared 60s write budget and lose the entire result (observed: a 138-call model-comparison run died at 175s with HTTP 000; a 10-call brief regeneration was truncated). Either move the work to an async job (`ma_job` pattern), or explicitly clear the deadlines via `http.NewResponseController` — which requires the wrapping response recorder in `backend/pkg/middleware` to implement `Unwrap()` — and bound each inner call with its own timeout so one slow call becomes a counted failure instead of sinking the request.
-- Evidence: Panoramica local-dev failure on 2026-04-09 where `monthly-charges` took ~44s, Vite logged `socket hang up`, and backend access logging needed downstream write-error tracking to distinguish true delivery from handler completion.
-- Used by: `apps/panoramica-cliente` IaaS PPU monthly charges view; shared backend middleware in `backend/pkg/middleware`.
-- Open questions: whether future report endpoints should adopt per-handler query deadlines or asynchronous export flows instead of relying on a larger shared write timeout.
-
-### Database Diagnostics Are A Low-Volume Error Inbox, Not Access Logging
-
-- Context: support/debugging when stdout/container logs are not easy to inspect.
-- Discovery: MrSmith can persist warning/error diagnostics to Anisetta through the async `internal/diagnostics` sink while keeping normal access logs on stdout.
-- Practical rule: do not store routine 2xx/3xx request logs in SQL. Use `mrsmith.diagnostic_event` for low-volume `WARN`/`ERROR` events, 4xx/5xx API access summaries, panic recovery details, and support correlation by `request_id`. The sink must stay bounded, async, sanitized, and fail-open.
-- Evidence: diagnostics migration `deploy/migrations/008_anisetta_mrsmith_diagnostics.sql` and `backend/internal/diagnostics`.
-- Used by: backend-wide warning/error visibility and support request correlation.
-- Open questions: whether frontend browser exceptions should feed the same table in a later phase.
-
-### AFC Tools Order PDF Missing in Arxivar Surfaces as `ARX_DOC_NUMBER_NOT_FOUND`
-
-- Context: `GET /api/afc-tools/v1/orders/{orderId}/pdf`, which proxies the Mistra/gw-int order PDF endpoint used by the AFC Tools XConnect orders view.
-- Discovery: when the upstream order document has not yet landed in Arxivar, the external gateway can return HTTP `500` with JSON body `{"message":"ARX_DOC_NUMBER_NOT_FOUND"}` instead of a cleaner 404-style missing-resource response.
-- Practical rule: mrsmith should normalize this exact upstream signal to an app-level “PDF not ready yet” state for the AFC Tools order-PDF flow, rather than surfacing it as a generic technical failure. Do not generalize other upstream 500s into the same UX state without an equally specific domain signal.
-- Evidence: direct gateway call on 2026-04-19 to `gw-int /orders/v1/order/pdf/301`; AFC domain interpretation that `ARX` refers to Arxivar, the documental system.
-- Used by: `apps/afc-tools` XConnect order PDF download flow and `backend/internal/afctools/gateway.go`.
-- Open questions: whether other gw-int PDF/document endpoints use the same Arxivar-coded missing-document pattern and should be normalized separately.
-
-### GW `/orders/v1/erp` Accepts Only the Legacy Appsmith Payload Shape
-
-- Context: `apps/ordini` INVIA in ERP flow pushing order rows to Alyante through gw-int.
-- Discovery: the gateway decodes the JSON body into a Go struct named `Orders` that ignores unknown keys but rejects type mismatches with HTTP 400. Error reporting is layered: plain type mismatches (e.g. number into a string field) are collected by `encoding/json` and only the earliest is reported after the full decode, while custom date unmarshalers abort immediately — so one empty-date error (`parsing time "" as "2006-01-02"`) can mask several type errors, and each fix reveals the next failure. The legacy Appsmith `GW_SendToErp` action ran with smart JSON substitution ON, so the gateway's field types are exactly the JS types the legacy app produced: vodka varchar columns stay strings even when numeric-looking (`cdlan_anno` varchar(4), `cdlan_qta`/`cdlan_prezzo`/`cdlan_prezzo_attivazione`/`cdlan_prezzo_cessazione` varchar(20)); `parseInt()`'d fields are numbers (`cdlan_dur_rin`, `cdlan_tacito_rin`, `cdlan_int_fatturazione`, `cdlan_int_fatturazione_att`); int columns are numbers (`cdlan_systemodv`, `cdlan_systemodv_row`, `cdlan_evaso`, `cdlan_chiuso`); `cdlan_commerciale` and `cdlan_sost_ord` use `?? " "` (single space) fallbacks. The action sent exactly 42 fields and never included `cdlan_data_attivazione`, `data_annullamento`, `data_decorrenza`, `confirm_data_attivazione`, `order_id`/`orders_id`, `cdlan_cliente_id`, or any `profile_*`/`written_by`/`service_type`/`is_colo`/`from_cp`/`is_arxivar` field — `cdlanDataAttivazione` and `confirmDataAttivazione` are commented out in the Appsmith JS, evidence the empty-date rejection was hit before. `cdlan_codice_kit` carries the composite `CONCAT(cdlan_codice_kit,'-',index_kit)` (the app's `bundle_code`), not the raw kit code.
-- Practical rule: treat the legacy Appsmith payload as the de-facto gateway contract, both field set and JSON value types. Never add fields beyond that shape (a NULL date sent as `""` rejects the whole row) and derive each field's type from what the legacy app evaluated, not from what looks semantically right — numeric-looking vodka varchars go out as strings. Forward `cdlan_qta`/`cdlan_prezzo*` verbatim, never through a float round-trip: production rows mix decimal separators in the same record (e.g. `orders_rows` 7876 has `cdlan_prezzo = "10,00"` and `cdlan_prezzo_attivazione = "350.00"`), the ERP has always received the stored format, and normalizing (`"10,00"` → `"10"`, `"350.00"` → `"350"`) is an untested contract change. When a row send fails with a decode 400, fix the reported field and expect more masked ones behind it.
-- Evidence: production logs 2026-06-12 (`order_id=1905`, `row_id=7842`: upstream 400 `parsing time "" as "2006-01-02"`, then `cannot unmarshal number into Go struct field Orders.cdlan_anno of type string`); `apps/ordini/Ordini.json.gz` `GW_SendToErp` action (`pluginSpecifiedTemplates: [{value: true}]`), `SendToErp` JS object, and `RigheOrdine` query (no casts on price/qty columns); `docs/vodka-tables.sql` column types; `backend/internal/ordini/gateway.go` `buildSendToERPPayload`.
-- Used by: `POST /api/ordini/v1/orders/{id}/send-to-erp`.
-- Open questions: whether `/orders/v1/set-order-activation` shares the same strict date decoding for malformed (non-empty) date strings.
-
-## Deployment and Runtime Integration Rules
-
-### MrSmith-Owned Tables In Anisetta
-
-- Context: cross-app MrSmith platform features that need durable storage or runtime configuration.
-- Discovery: Anisetta is already wired through `ANISETTA_DSN` and contains several legacy/application domains in `public`; MrSmith-owned platform data should not be added to `public`.
-- Practical rule: create MrSmith platform tables in the dedicated `mrsmith` schema on Anisetta. Runtime-editable configuration should live in `mrsmith.runtime_config` as namespaced JSONB key/value rows so operational values, such as support notification recipients, can change without restarting the backend.
-- Evidence: support request migration `deploy/migrations/004_anisetta_mrsmith_support.sql`.
-- Used by: contextual support requests.
-- Open questions: none.
-
-### GW Internal CDLAN Calls Use The Shared Arak Client
-
-- Context: backend handlers that call `https://gw-int.cdlan.net` for ERP, PDF, Arxivar, or Mistra-NG style bridge operations.
-- Discovery: MrSmith already wires a service-account HTTP client for this host through `backend/internal/platform/arak.Client` and the `ARAK_BASE_URL`, `ARAK_SERVICE_TOKEN_URL`, `ARAK_SERVICE_CLIENT_ID`, and `ARAK_SERVICE_CLIENT_SECRET` env vars.
-- Practical rule: new mini-app BFF modules should inject and use the shared `*arak.Client` for `gw-int` calls. Do not add app-specific gateway credentials such as `GW_INT_*` unless the shared client is proven insufficient for a different upstream.
-- Evidence: existing `arak.Client` wiring in `backend/cmd/server/main.go`; Ordini migration decision for ERP/PDF/Arxivar calls.
-- Used by: `apps/ordini` implementation planning; `apps/rda`, `apps/fornitori`, and `apps/afc-tools` gateway/API proxy patterns.
-- Open questions: none.
-
-### New DSN-Backed Mini-Apps Must Update Both Dev and Preprod Env Templates
-
-- Context: introducing a new launcher-backed mini-app that needs backend DSNs and optional split-server frontend URL overrides.
-- Discovery: contributor defaults and deployment defaults are documented in two different places: local/backend-facing samples live in `backend/.env.example`, while the repo's pre-production sample lives at the root `.env.preprod.example`. Updating only the backend-local example leaves the real deploy template stale.
-- Practical rule: when a new mini-app adds config such as `<APP>_APP_URL` or `<DB>_DSN`, update `backend/internal/platform/config/config.go`, `backend/.env.example`, and the root `.env.preprod.example` in the same change set. Treat both env examples as part of repo-fit wiring, not optional documentation.
-- Evidence: Coperture rollout on 2026-04-17 added `COPERTURE_APP_URL` / `DBCOPERTURE_DSN` in `backend/internal/platform/config/config.go`, `backend/.env.example`, and `.env.preprod.example`.
-- Used by: `apps/coperture`; future DSN-backed mini-apps.
-- Open questions: none.
-
-### Backend-Served SPAs Must Be Copied Explicitly Into `/static/apps/<slug>`
-
-- Context: production and pre-production deployments where the Go server serves multiple Vite bundles from a shared static root.
-- Discovery: adding an app to the launcher catalog and giving it a Vite `base` like `/apps/reports/` is not enough to make it deployable. The final runtime image must also copy that app's built dist directory into `/static/apps/<slug>`, otherwise the `staticspa` handler has no `index.html` to fall back to and deep links return the backend's plain 404.
-- Practical rule: every new backend-served SPA needs the full pathing chain verified together: launcher/catalog href, Vite build base, local dev override if needed, Docker `COPY --from=frontend /app/apps/<slug>/dist /static/apps/<slug>`, and a `staticspa` deep-link regression test.
-- Evidence: `deploy/Dockerfile`, `backend/internal/platform/staticspa/handler.go`, `backend/internal/platform/applaunch/catalog.go`, and the 2026-04-15 production `reports` regression where `/apps/reports/` 404ed because `/static/apps/reports/index.html` was missing from the image.
-- Used by: `budget`, `compliance`, `kit-products`, `listini-e-sconti`, `panoramica-cliente`, `quotes`, `reports`.
-- Open questions: none.
-
-### Frontend Production Builds Must Exclude Node-Only Test Files
-
-- Context: Vite/React mini-apps with `src/**/*.test.ts` files that use Node's built-in test modules such as `node:test` or `node:assert/strict`.
-- Discovery: Docker production builds run `pnpm install --frozen-lockfile && pnpm -r build` in a fresh frontend stage. If a mini-app build script uses `tsc -b` against the default app `tsconfig.json`, TypeScript compiles tests included by `"include": ["src"]`. In that fresh deploy image, Node typings are not guaranteed to be available, so Node-only test imports can break the production build even when the app bundle itself is valid.
-- Practical rule: when adding local TypeScript test files to a frontend mini-app, add or reuse `tsconfig.build.json` that extends the app `tsconfig.json` and excludes `src/**/*.test.ts` / `src/**/*.test.tsx`, then point the package `build` script at `tsc -b tsconfig.build.json && vite build`. Keep the test script responsible for running those files directly.
-- Evidence: `apps/simulatori-vendita/tsconfig.build.json`; `apps/fornitori/tsconfig.build.json`; `make deploy-prod` failure on 2026-04-28 from `apps/fornitori/src/lib/providerAttention.test.ts` and `providerState.test.ts` importing `node:test` during the Docker frontend stage.
-- Used by: `apps/simulatori-vendita`, `apps/fornitori`.
-- Open questions: none.
-
-### Packages Imported By `vite.config.ts` Must Ship Runnable JavaScript
-
-- Context: shared workspace packages consumed from an app's `vite.config.ts`, such as `@mrsmith/vite-config`.
-- Discovery: workspace packages normally ship TypeScript source (`"main": "src/index.ts"`), which works for app code because Vite transpiles it. Config files are different: Vite bundles `vite.config.ts` with esbuild but externalizes bare imports, so Node itself loads the imported package at config-load time. Locally this can still work by accident (Node ≥ 22.18 strips types natively), but the Docker frontend stage runs `node:20-slim`, which fails with `ERR_UNKNOWN_FILE_EXTENSION` on `.ts`.
-- Practical rule: any workspace package meant to be imported from `vite.config.ts` (or any other Node-executed config) must ship plain ESM JavaScript with a hand-written `.d.ts` for editor types — no `.ts` entry point, no build step. Local success does not prove Docker success; verify with `docker build --target frontend -f deploy/Dockerfile .`.
-- Evidence: `packages/vite-config/src/index.js`; `make deploy-prod` failure on 2026-07-13 (`apps/compliance build: ERR_UNKNOWN_FILE_EXTENSION ... /app/packages/vite-config/src/index.ts`) after the issue #49 migration, local Node 26 vs Docker `node:20-slim`.
-- Used by: `packages/vite-config` and all 24 mini-app `vite.config.ts` files.
-- Open questions: none.
-
-### Docker Frontend Builds Must Exclude Local Vite Env Files
-
-- Context: Vite mini-app production images built by `deploy/Dockerfile`.
-- Discovery: `.gitignore` excludes `.env.local`, but Docker does not use `.gitignore`. Without a matching `.dockerignore`, `COPY apps/ apps/` can copy app-local Vite env files into the frontend build stage. Vite then inlines `VITE_*` values at build time, so a local `VITE_DEV_AUTH_BYPASS=true` can produce a production bundle that bypasses Keycloak and sends the literal `dev-token`.
-- Practical rule: production Docker contexts must exclude `**/.env.local` and `**/.env.*.local`, and production bundles should be checked for dev-auth markers such as `dev-token` or `VITE_DEV_AUTH_BYPASS=true` before deploy. Runtime env changes cannot repair an already-built Vite bundle; rebuild from a clean context.
-- Evidence: `deploy/Dockerfile` copies `apps/` wholesale; no repo `.dockerignore` was present during the 2026-04-28 Fornitori production auth incident; `apps/fornitori/.env.local` contained `VITE_DEV_AUTH_BYPASS=true`; the built `apps/fornitori/dist` bundle inlined the bypass condition as true and included `dev-token`.
-- Used by: all Vite mini-app production builds, especially apps using `@mrsmith/auth-client`.
-- Open questions: whether to add a hard production-build guard in `@mrsmith/auth-client` in addition to Docker context hygiene.
-
-### Production Deploy Builds Run On The Target Host From A Git Archive
-
-- Context: `make deploy-prod` production releases.
-- Discovery: developer workstations may not have Docker available, or may use incompatible local container tooling on Apple Silicon. Production deploys therefore stream a committed Git archive over SSH and run `docker buildx build --load -` directly on the production host.
-- Practical rule: production deploys require only `git` and `ssh` locally, but require Docker Engine, buildx, compose v2, and outbound build-network access on the target host. Deploys use committed source only and default to a clean-worktree guard; rollback retags immutable release image tags like `mrsmith:prod-YYYYmmddHHMMSS` instead of loading uploaded tarballs. If `deploy/Dockerfile` starts copying new root paths, update the `git archive` allowlist in `scripts/deploy/prod.sh` in the same change.
-- Evidence: `scripts/deploy/prod.sh`, `Makefile`, `.env.deploy.prod.example`, and `docs/PROD-DEPLOY.md`.
-- Used by: production deploy and rollback workflow.
-- Open questions: none.
-
-### Portal Launcher Tiles Must Use Supported Portal Icon Keys
-
-- Context: adding or changing entries in `backend/internal/platform/applaunch/catalog.go`.
-- Discovery: launcher tile icons are rendered from the portal-local registry in `apps/portal/src/components/Icon/icons.tsx`, not from an open-ended icon namespace. Reusing a string that is not in that registry leaves the tile without a matching portal icon; during Energia in DC wiring, `bolt` was rejected and the tile used the already-supported `chart` key instead.
-- Practical rule: when wiring a new launcher tile, verify the icon key against `apps/portal/src/components/Icon/icons.tsx` or reuse an already-proven key from `apps/portal/src/data/apps.ts`. Do not invent icon names in `catalog.go` without checking portal support first.
-- Evidence: `apps/portal/src/components/Icon/icons.tsx`, `apps/portal/src/data/apps.ts`, `backend/internal/platform/applaunch/catalog.go`.
-- Used by: launcher-backed apps including `reports`, `coperture`, and `energia-dc`.
-- Open questions: none.
-
-### HubSpot Writes Go Through A Shared Async Queue On Anisetta
-
-- Context: backend-driven HubSpot integrations that must not block the user-facing save, starting with raenad quote → deal creation (parent #56).
-- Discovery: HubSpot calls are persisted as rows in `mrsmith.hubspot_request` on Anisetta and processed asynchronously with retry/backoff, instead of fire-and-forget goroutines or a synchronous call. A unique `dedupe_key` makes enqueue idempotent (`raenad:quote:{id}:deal:create` for the first deal; `raenad:quote:{id}:deal:update` for quote-owned updates), `attempt_count`/`max_attempts`/`next_attempt_at` drive backoff, statuses are `pending|locked|succeeded|failed|dead|cancelled`, and per-try detail is appended to `mrsmith.hubspot_request_attempt`. The local entity reference (e.g. `raenad.quote.hubspot_deal_id`) stays NULL until the worker completes, so a reconciler can re-enqueue `hubspot_sync_status='pending'` rows that have no matching live request. V1 also queues manual PDF attachment to HubSpot instead of doing it synchronously.
-- Practical rule: enqueue HubSpot writes via `mrsmith.hubspot_request` with a stable `dedupe_key`; never make the user-facing save or manual PDF attach request depend on a synchronous HubSpot response. Use latest-wins coalescing for `hubspot.update_deal`: each relevant quote save upserts the single update request `raenad:quote:{id}:deal:update` and overwrites a non-locked retryable payload (`pending`, `failed`, or previously `succeeded`) with the newest quote-owned state. The payload must include the source `quote.updated_at` (or an equivalent sync version). If an update request is already `locked`, do not blindly overwrite the in-flight payload; the worker must compare the payload source version with the current quote after the attempt and re-arm a latest update if the quote changed during processing. If the update worker runs before `hubspot_deal_id` exists, it must defer/retry until `hubspot.create_deal` succeeds; update payloads must not modify `dealstage`. Gate the worker through `mrsmith.runtime_config` (namespace `raenad`, key `hubspot_queue_worker`) like other workers. Claim due rows with the `hubspot_request_due_idx` partial index under an advisory lock, and reconcile via the `(entity_type, entity_id)` index.
-- Evidence: `deploy/migrations/024_mrsmith_hubspot_queue.sql`, `deploy/migrations/004_anisetta_mrsmith_support.sql` (mrsmith schema + runtime_config), and the worker-switch precedent in `deploy/migrations/011_quotes_hubspot_status_sync_config.sql`.
-- Used by: raenad quote → HubSpot deal creation; reusable for any future backend-owned HubSpot write.
-- Open questions: backend worker, reconciler, and backoff curve land in later #56 sub-phases.
-
-### Raenad HubSpot Deal Pipeline Config Lives In Anisetta Runtime Config
-
-- Context: creating HubSpot deals for new Aenad quotes (parent #56).
-- Discovery: Aenad V1 uses a single HubSpot pipeline/stage pair for new quote deals: pipeline id `3883934920`, initial deal stage id `5521139911`. This is operational runtime configuration, not raenad quote-domain data. A previous local table idea (`raenad.hubspot_pipeline_config`) was removed before deployment to avoid duplicating HubSpot as a second source of truth.
-- Practical rule: read the active deal pipeline config from `mrsmith.runtime_config` on Anisetta, namespace `raenad`, key `hubspot_deal_pipeline`, value `{"pipeline_id": "3883934920", "initial_dealstage_id": "5521139911"}`. When a quote/deal is created, copy the ids actually used into `raenad.quote.hubspot_pipeline_id` and `raenad.quote.hubspot_dealstage_id` as per-quote snapshots.
-- Evidence: `deploy/migrations/024_mrsmith_hubspot_queue.sql`, `deploy/migrations/023_raenad_schema.sql`.
-- Used by: raenad quote → HubSpot deal creation.
-
-### Raenad Stage Choices Come From The HubSpot Loader Mirror
-
-- Context: user-driven stage transitions for new Aenad quotes (parent #56).
-- Discovery: HubSpot pipeline and stage metadata is already mirrored in Mistra `loader.hubs_pipeline` (`id`, `label`) and `loader.hubs_stages` (`id`, `label`, `pipeline`, `display_order`). V1 does not need a local stage mapping table or hardcoded action list: the stages in the configured HubSpot pipeline are already aligned with the app.
-- Practical rule: list selectable target stages from `loader.hubs_stages` filtered by the configured `pipeline_id`, ordered by `display_order` and `label`, joining `loader.hubs_pipeline` only when the pipeline label is needed. Treat the mirror as read-only and potentially delayed: writes still go through the backend HubSpot integration. For an Aenad-initiated transition, accept `expected_dealstage_id` and `target_dealstage_id`, verify the target exists in the configured pipeline mirror, fetch the live HubSpot deal, stop with conflict if the live stage differs from `expected_dealstage_id`, otherwise update HubSpot and persist the resulting `hubspot_dealstage_id`/label snapshot on `raenad.quote`.
-- Evidence: `docs/mistradb/mistra_loader.json`, existing joins in `backend/internal/rdf/handler.go` and `backend/internal/quotes/handler_reference.go`.
-- Used by: raenad stage selector and Aenad-initiated HubSpot stage transition.
-
-### Raenad Deal Owner Maps From User Email To HubSpot Owner
-
-- Context: assigning HubSpot owners when creating deals for new Aenad quotes (parent #56).
-- Discovery: HubSpot owners are mirrored in Mistra `loader.hubs_owner` with `id`, `email`, `first_name`, `last_name`, and `archived`. The V1 owner should follow the authenticated Aenad user when possible, with an operational fallback owner configured on Anisetta.
-- Practical rule: resolve `hubspot_owner_id` by matching the authenticated user's email case-insensitively against `loader.hubs_owner.email` where `archived = false`. If no active owner matches, read `mrsmith.runtime_config` on Anisetta, namespace `raenad`, key `hubspot_deal_owner`, value `{"fallback_owner_email": "service01@cdlan.it"}`, and resolve that email against active `loader.hubs_owner`. If neither lookup resolves, fail deal creation/sync as misconfigured instead of creating an unowned deal. Send the resolved owner id to HubSpot as the deal owner.
-- Evidence: `docs/mistradb/mistra_loader.json`, `deploy/migrations/024_mrsmith_hubspot_queue.sql`.
-- Used by: raenad quote → HubSpot deal creation.
-
-### Raenad Deal Create Uses Only Standard HubSpot Properties In V1
-
-- Context: minimum HubSpot deal property mapping for new Aenad quotes (parent #56).
-- Discovery: V1 does not require custom mandatory HubSpot properties beyond the agreed standard deal mapping.
-- Practical rule: create/update HubSpot deals with `dealname = "{quote_number} - {customer_name}"`, `amount = raenad.quote.total_net`, `closedate = document_date + 30 days`, configured `pipeline`, configured initial `dealstage` on create only, resolved `hubspot_owner_id`, company association, and optional contact association. Ordinary quote-owned updates may refresh name, amount, closedate, owner, and associations, but must not change `dealstage`.
-- Evidence: issue #56 grill-me decisions; `deploy/migrations/024_mrsmith_hubspot_queue.sql`.
-- Used by: raenad quote → HubSpot deal create/update payloads.
-
-### Raenad UI/UX Planning Is Deferred Until Backend Contracts Are Stable
-
-- Context: planning the new Aenad Preventivi area (parent #56/#61).
-- Discovery: the UI/UX needs its own grill-me session and likely child subtickets, but should not be designed before backend API, lifecycle, HubSpot sync, article search, PDF, and attachment contracts are stable.
-- Practical rule: defer UI/UX specification and frontend implementation until the backend contract is complete. Track the deferred UI/UX scope in #61; do not make frontend layout or workflow decisions in backend planning tickets beyond preserving necessary API affordances.
-- Evidence: issue #56/#61 grill-me decisions.
-- Used by: future Aenad Preventivi UI planning and implementation.
-
-### Aenad Quote Line Defaults Live In Anisetta Runtime Config
-
-- Context: creating item lines for new Aenad quotes from Alyante article search (parent #56/#60).
-- Discovery: the Alyante V1 article query does not return `cod_iva`, and purchase cost is manual. The V1 default VAT code is `22`, stored as runtime config rather than hardcoded in the frontend.
-- Practical rule: read quote-line defaults from `mrsmith.runtime_config` on Anisetta, namespace `aenad`, key `quote_defaults`, value `{"cod_iva": "22"}`. Use this only as an initialization default; users can still edit `cod_iva`, and persisted lines keep both `cod_iva` and `iva_percent_snapshot`.
-- Evidence: `deploy/migrations/024_mrsmith_hubspot_queue.sql`, `deploy/migrations/023_raenad_schema.sql`.
-- Used by: raenad quote line creation, Alyante product import.
-
-### Raenad Payment Methods Come From loader.erp_metodi_pagamento
-
-- Context: selecting and validating payment method on new Aenad quotes (parent #56).
-- Discovery: Mistra loader mirrors ERP payment methods in `loader.erp_metodi_pagamento` with `cod_pagamento`, `desc_pagamento`, and `selezionabile`.
-- Practical rule: list/select payment methods from `loader.erp_metodi_pagamento` where `selezionabile = true`, ordered by `desc_pagamento`/`cod_pagamento`. Persist `cod_pagamento` into `raenad.quote.payment_method_code` and `desc_pagamento` into `payment_method_label` as a printable snapshot. `payment_bank_details` remains a quote snapshot field supplied by backend rules or later implementation details; do not infer it from the loader table because the mirror exposes only code, description, and selectability.
-- Evidence: `docs/mistradb/mistra_loader.json`, `deploy/migrations/023_raenad_schema.sql`.
-- Used by: raenad quote header editing and mark-ready validation.
-
-### Raenad Ready Quotes Return To Draft On Commercial Changes
-
-- Context: authoring lifecycle for new Aenad quotes (parent #56).
-- Discovery: `ready` is a manual user action, not an automatic promotion, and relevant edits after `ready` must force the quote back to `draft`.
-- Practical rule: when `authoring_status = 'ready'`, changes to customer/company/contact snapshot or HubSpot refs, document header fields (`document_date`, description/title, payment method, bank details), quote lines, quantities, prices, discounts, VAT, purchase cost, or any DB-owned totals must set `authoring_status = 'draft'` and make the latest PDF revision stale. Pure internal notes do not force draft. HubSpot stage changes do not force draft because commercial state remains HubSpot-owned.
-- Evidence: issue #56/#58 grill-me decisions; `deploy/migrations/023_raenad_schema.sql`.
-- Used by: raenad quote save/update endpoints and PDF stale-state handling.
-
-## Auth and Transport Behavior
-
-### Keycloak Role User Lookups Must Include Group-Derived Membership
-
-- Context: backend services that need the current enabled users for a Keycloak realm role.
-- Discovery: `GET /admin/realms/{realm}/roles/{role-name}/users` returns users assigned directly to the role, but does not cover users who inherit the role through Keycloak groups.
-- Practical rule: use `backend/internal/platform/keycloak.Client.UsersByRealmRole` for backend role-user resolution. It combines direct role users with groups that carry the role, recursively visits subgroup children, pages group members, excludes disabled users and blank emails, and deduplicates by Keycloak user ID. V1 intentionally does not expand composite roles.
-- Evidence: Keycloak Admin REST role users/groups and group members endpoints; Keycloak issue `keycloak/keycloak#19391` documents the direct lookup limitation for group-inherited users.
-- Used by: future backend-only role recipient or operator resolution flows.
-- Open questions: none for realm roles; client-role and composite-role expansion would need separate explicit design.
-
-### RDA Approval Permissions Come From users_int.role
-
-- Context: `apps/rda` approver inboxes, PO action bar, and privileged RDA transitions.
-- Discovery: Keycloak controls only base RDA app access with `app_rda_access`. The operational RDA approval flags are stored in Arak Postgres under `users_int.user.role -> users_int.role` and must be read by the backend using the authenticated user's token email.
-- Practical rule: expose and consume `GET /api/rda/v1/me/permissions` for `is_approver`, `is_afc`, `is_approver_no_leasing`, `is_approver_extra_budget`, `can_see_all_po`, and `skip_approval`. Inboxes and privileged transitions must check only the action booleans, not `app_rda_approver_*` Keycloak roles, `app_devadmin` overrides, `can_see_all_po`, or `skip_approval`, because Mistra/Arak validates the same domain permissions with `Requester-Email`. Treat `can_see_all_po` as list/detail visibility and `skip_approval` as non-authoritative for manual approval of existing POs.
-- Evidence: legacy RDA `user_permissions` SQL in `apps/rda/audit/05_datasource_catalog.md`; A2 plan in `artifacts/A2.md`; backend implementation in `backend/internal/rda/permissions.go`, `arak.go`, and `validation.go`.
-- Used by: `apps/rda` navigation, inbox guards, `ActionBar`, and RDA backend transition handlers.
-- Open questions: none.
-
-### Devadmin Must Be Centralized as a Superuser Override
-
-- Context: Keycloak-role authorization across launcher visibility, backend ACL middleware, and app-specific elevated permissions.
-- Discovery: role checks implemented independently (`acl.RequireRole`, launcher catalog filtering, and direct role checks like quotes delete) drift unless they share a single superuser rule.
-- Practical rule: implement `app_devadmin` as a centralized override in shared authz helpers and consume those helpers everywhere role checks are performed (backend ACL, portal catalog filters, app-specific elevated checks, and frontend role-gated controls). Avoid raw `includes`/`slices.Contains` role checks in feature code.
-- Evidence: `backend/internal/authz/authz.go`, `backend/internal/acl/acl.go`, `backend/internal/platform/applaunch/catalog.go`, `backend/internal/quotes/handler_quotes.go`, `packages/auth-client/src/roles.ts`, `apps/quotes/src/components/QuoteTable.tsx`.
-- Used by: portal app visibility, all ACL-protected backend app routes, quotes delete authorization.
-- Open questions: none.
-
-### Shared SPA Clients Must Not Hit Protected APIs Before a Bearer Token Exists
-
-- Context: frontend mini-apps using `@mrsmith/auth-client` plus `@mrsmith/api-client` for Keycloak-protected `/api/*` requests.
-- Discovery: if the shared API client sends a request when `getAccessToken()` returns `undefined`, the backend logs a noisy `401 missing_bearer`, then a forced refresh-and-retry can immediately succeed with `200`. When app wrappers also call `login()` from request-level 401 handlers, that pattern can escalate into visible remount/refetch loops.
-- Practical rule: shared API clients must acquire a bearer token before the first network request, treat "no token available" as a local unauthorized error, and reserve backend retries for true stale-token 401s. Reauthentication should be driven centrally by `AuthProvider` refresh failure handling, not per-app query error callbacks.
-- Evidence: `packages/api-client/src/client.ts`, `packages/auth-client/src/AuthProvider.tsx`, and the 2026-04-17 `apps/richieste-fattibilita` loop on `GET /api/rdf/v1/richieste/summary` alternating `401 missing_bearer` and `200`.
-- Used by: portal and all mini-apps using the shared API/auth client stack.
-- Open questions: none.
-
-### Keycloak Initialization Must Be Idempotent In AuthProvider
-
-- Context: frontend apps wrapped in React `StrictMode` while using `@mrsmith/auth-client`.
-- Discovery: React 18 development mode can rerun effects, and calling `keycloak.init()` more than once on the same Keycloak instance can produce a transient failed bootstrap that surfaces as `unauthenticated` and shows the mini-app "Accesso richiesto" page.
-- Practical rule: `AuthProvider` must start Keycloak initialization once per provider instance and let repeated effect executions subscribe to the same init promise. Stale effect results must not overwrite a newer/authenticated state.
-- Evidence: `packages/auth-client/src/AuthProvider.tsx`; observed mini-app entry flicker after adding root role gates.
-- Used by: all portal mini-apps and the portal launcher in development and production builds.
-- Open questions: none.
-
-### Mini-App Auth Fallbacks Must Fail Closed and Retry Local Preflight Unauthorized Errors
-
-- Context: Vite mini-app bootstraps using `useOptionalAuth()`, app-shell auth gates, and React Query startup fetches.
-- Discovery: if an app-local auth fallback reports `authenticated: true` without a token, routed pages mount before Keycloak state is usable. Once the shared API client correctly refuses to send bearerless requests, those startup fetches fail locally with no backend logs; if React Query also disables retries for every `401`, the page can freeze in a false "not authorized" state.
-- Practical rule: optional-auth fallbacks must default to `unauthenticated`, mini-app shells must gate route rendering on `authenticated` rather than `loading` alone, and query retry policies must keep retry disabled for real backend ACL failures while allowing retries for local auth-preflight `401`s.
-- Evidence: `apps/*/src/hooks/useOptionalAuth.ts`, `apps/*/src/App.tsx`, `apps/*/src/main.tsx`, `apps/richieste-fattibilita/src/lib/format.ts`, and the 2026-04-17 first-load `richieste-fattibilita` empty-state error with no matching backend request.
-- Used by: all mini-apps consuming `@mrsmith/auth-client` and `@mrsmith/api-client`.
-- Open questions: none.
-
-### Mini-App Shells Must Gate Routes With Launcher Roles
-
-- Context: direct browser entry to `/apps/<app>/` while authenticated in Keycloak but missing that app's launcher role.
-- Discovery: launcher visibility and backend ACL were already role-gated, but mini-app roots rendered their nav and route trees after checking only authentication. This let unassigned users see app workspaces, empty tables, or data-error states before backend ACL stopped data access.
-- Practical rule: every mini-app root must use `getAppAccessState()` with `APP_ACCESS_ROLES` before rendering app nav or calling `useRoutes`. Non-allowed states should render only the shared shell header and `AccessNotice`; `app_devadmin` remains the central bypass through `hasAnyRole()`.
-- Evidence: `packages/auth-client/src/roles.ts`, `packages/ui/src/components/AccessNotice/AccessNotice.tsx`, and `apps/*/src/App.tsx`.
-- Used by: all Vite mini-apps mounted under `/apps/<app>/`.
-- Open questions: none.
-
-### Route-Scoped Roles Share the App Launcher Role Set
-
-- Context: a user should open an existing mini-app but only operate one route/tab inside it.
-- Discovery: a single `APP_ACCESS_ROLES[app]` value is both the mini-app shell gate and the frontend mirror of launcher visibility, while backend ACL is the real authorization boundary for each API route.
-- Practical rule: put every role that may enter the app in the launcher/app access union, then enforce narrower route/API permissions separately. The frontend should hide or redirect unavailable tabs for UX, but backend handlers must use the precise role helper for each operation. Do not treat a broad app role as implicitly allowed on a route-scoped workflow when product has split that workflow into a dedicated role; users who need both surfaces should receive both roles.
-- Evidence: CP Backoffice full role `app_cpbackoffice_access`, biometric-only role `app_cpbackoffice_biometric_access`, `backend/internal/cpbackoffice/handler.go`, `backend/internal/platform/applaunch/catalog.go`, `packages/auth-client/src/roles.ts`, and `apps/cp-backoffice/src/App.tsx`.
-- Used by: CP Backoffice biometric-only access.
-- Open questions: none.
-
-## Legacy Data Model Constraints
-
-### LLM Registry Cutover Did Not Preserve IDs; Legacy FKs to binocolo.llm_* Break on Write
-
-- Context: any Anisetta table persisting LLM provenance (`model_id`/`prompt_id`) resolved at runtime from the shared registry.
-- Discovery: migration 047 copied `binocolo.llm_model`/`llm_prompt` into `mrsmith.llm_model`/`llm_prompt` without preserving row ids (`gen_random_uuid()` on insert), and the Go resolver (`backend/internal/platform/llm/resolver.go`) reads only `mrsmith.*`. Tables that kept FKs to the legacy `binocolo.llm_*` (e.g. `ma_deep_analysis`, mig 037) violate the FK on every post-cutover write; the failure stayed latent until 2026-07-03 because no new deep analysis had been persisted since the cutover (`POST /binocolo/v1/ma/deep/regenerate-briefs` returned a generic 500 at the first successfully generated brief).
-- Practical rule: provenance columns must FK to `mrsmith.llm_model(id)`/`mrsmith.llm_prompt(id)` (or carry no FK); never to `binocolo.llm_*`. When repointing an existing table, first remap historical values old→new via the preserved natural keys — models on `(app='binocolo', scope, model)`, prompts on `(app='binocolo', scope, name)`, both unique on mrsmith — and NULL what no longer matches (out-of-band registry edits).
-- Evidence: `deploy/migrations/047_anisetta_mrsmith_llm_registry.sql` (INSERT..SELECT without `id`), `deploy/migrations/037_binocolo_ma_deep_analysis.sql` (legacy FKs), fix in `deploy/migrations/098_binocolo_ma_deep_llm_registry_fk.sql`; dormant `binocolo.ma_model_audit` (mig 026) has the same legacy FKs but no remaining Go writer (audit goes to `mrsmith.llm_call_audit`).
-- Used by: `backend/internal/binocolo` deep-dive worker and brief regeneration; template for any future repoint.
-- Open questions: none.
-
-### Aenad Document Totals Are Database-Owned First-Tranche Calculations
-
-- Context: Aenad document rows and headers in Mistra schema `aenad`.
-- Discovery: first-tranche totals are derived from `TDocRighe` numeric row fields and `TIva.PercIva`; `Sconti` is free text but current supported values are percentage chains such as `10%` and `5+3%`.
-- Practical rule: compute row purchase as `PrezzoAcquisto * Qta`, net as `PrezzoNetto * Qta` after sequential discounts, gross as net plus VAT from `CodIva -> TIva.PercIva`, and gain as net minus purchase. Do not rewrite `TDocRighe.Sconti`; parse it only for calculation. Header totals are sums of the calculated row fields.
-- Evidence: `deploy/migrations/021_aenad_document_totals.sql` and schema documentation in `docs/mistradb/mistra_aenad.json`.
-- Used by: `apps/aenad` archive totals and future Aenad write flows.
-- Open questions: forced VAT, eco-contributions, withholding, split payment, fidelity, and payment-derived totals are not part of the first tranche.
-
-### Aenad Monetary And Quantity Fields Are numeric(18,4) Exposed As Decimal Strings
-
-- Context: Aenad amounts, prices, quantities, and stock fields in Mistra schema `aenad` (DAZERO source structure).
-- Discovery: monetary and quantity columns (`TDocTestate` totals, `TDocRighe.Qta`/`PrezzoNetto`/`ImportoNettoRiga`, `TArticoli` prices, and the rest of the per-table list in `docs/mistradb/mistra_aenad.json`) are `numeric(18,4)`. JSON numbers and Go int64/float64 cannot carry these values losslessly.
-- Practical rule: Go reads them with a SQL `::text` cast scanned into `sql.NullString` and exposes them as decimal strings (`*string` in DTOs, `string | null` in frontend API types); writes accept validated decimal strings (dot separator, max 14 integer digits, max 4 decimals) and bind with explicit `$n::numeric(18,4)` casts. Rounding happens only in the database functions, to 4 decimals at function boundaries; the frontend converts to number only for non-persisted preview calculations and display formatting.
-- Evidence: `backend/internal/aenad/documents.go` (`normalizeDecimal`, `::text` scans), `deploy/migrations/021_aenad_document_totals.sql`, `apps/aenad/src/utils/format.ts`.
-- Used by: `apps/aenad` archive, document detail, and row editing; any future Aenad view exposing fields from the numeric list.
-- Open questions: none.
-
-### Aenad Offer Print Semantics: Easyfatt Inline Markers, Spacer Rows, Display-Ready Columns
-
-- Context: replicating the legacy Easyfatt "Offerta" printouts (examples in `artifacts/aenad/`) for Carbone PDF generation from Mistra schema `aenad`.
-- Discovery: `TDocRighe.Desc` carries Easyfatt inline formatting markers: `**` toggles bold and `//` toggles italic; markers are often unclosed prefixes that style the rest of the line (`"**SERVIZI UNA TANTUM"`, `"//OPZIONALE"`), closed inline pairs also occur (`"**RICONDIZIONATO** Docking…"`), and descriptions can be multi-line with `\r\n`. No `__` markers or URLs appear in 2025-2026 preventivi. Fully-NULL `TDocRighe` rows are intentional visual spacers between items in the printout (the existing rows endpoint filters them out; a print replica must keep them). `Sconti` is already display-formatted (`"30%"`, `"35+5%"`), and the printed "Iva" column is literally `CodIva` (`"22"`), not `TIva.PercIva`. The printed title comes from `TTipiDoc.TitoloReport` (`'Q'` → `"Offerta"`, while `Nome` is `"Preventivo"`). `TDocTestate.NomeReport` records which Easyfatt report printed the document: `"SHELLI CDLAN offerta"` (full supply-conditions closing block, double signature, clausole 1341-1342) vs `"SHELLI CDLAN offerta noleggio-servizi"` (privacy-only closing); the most common report `"SHELLI preventivo"` is a different layout not covered by the offer template.
-- Practical rule: when rendering offer rows for print, fetch ALL rows ordered by `IDDocRiga` without the empty-row filter; convert `Desc` markers to HTML per line (escape HTML first, toggle `<b>` on `**` and `<i>` on `//` skipping `://`, close open tags at end of line, join lines with `<br>`); pass `Sconti` and `CodIva` through verbatim; take the document title from `TTipiDoc.TitoloReport`; drive the conditions-block variant from an explicit caller flag (the legacy equivalent is the operator's report choice, recorded in `NomeReport`).
-- Evidence: read-only inspection of docs `IDDoc` 215441/215464/215564 (Num 879/901/994, matching `artifacts/aenad/` PDFs); `docs/mistradb/mistra_aenad.json`.
-- Used by: aenad offer PDF generation (Carbone template + `backend/internal/aenad` PDF endpoint).
-- Open questions: `QtaShown` vs `Qta` divergence never observed — `Qta` is used.
-
-### Raenad Is The Operational Quote Schema, Separate From The Aenad Archive
-
-- Context: new Aenad quote-creation flow (parent #56); the existing `aenad` schema stays the read-only historical archive.
-- Discovery: new quotes live in a dedicated lowercase-only Mistra schema `raenad` (`quote`, `quote_line`, `quote_pdf_export`, `quote_event`), not as an extension of legacy mixed-case `aenad`. Totals are DB-owned, replicating the verified `aenad` 021 calc logic (sequential `discount_multiplier`, `line_net`, header recalc triggers with a `raenad.skip_header_recalc` guard and a bulk `raenad.recalculate_quote_totals` procedure). Money/quantity are `numeric(18,4)`; non-economic rows (`line_type` `spacer`/`description`) leave all economic columns NULL.
-- Practical rule: build the new quote flow against `raenad`; keep object/column names lowercase; reuse the aenad calc shape (do not invent a new discount/VAT algorithm); expose `numeric(18,4)` as decimal strings over the API exactly as the aenad archive does.
-- Evidence: `deploy/migrations/023_raenad_schema.sql`, `deploy/migrations/021_aenad_document_totals.sql`.
-- Used by: raenad quote authoring; future raenad backend/API/UI.
-- Open questions: none for the schema; lifecycle/state mapping is a later #56 sub-phase.
-
-### Raenad Quote Numbers Use common.new_document_number('AE-')
-
-- Context: numbering new raenad quotes.
-- Discovery: `quote_number` defaults to `common.new_document_number('AE-')`, which draws from the shared global `common.document_seq` and returns `AE-<n>/<YYYY>` (e.g. `AE-1003/2026`). The sequence is shared across document types, so numbers are globally unique but not per-prefix contiguous.
-- Practical rule: let the database assign the number via the column default (NOT NULL UNIQUE); do not implement an app-side counter or assume gap-free `AE-` numbering. Use the same `common.new_document_number(prefix)` helper for any future document type.
-- Evidence: `deploy/migrations/023_raenad_schema.sql`, `common.new_document_number` / `common.document_seq` in `docs/mistradb/mistra_common.json`.
-- Used by: raenad quote creation.
-- Open questions: none.
-
-### Raenad Stores A Printable Customer/Contact Snapshot Decoupled From The HubSpot Mirror
-
-- Context: persisting customer/contact data on a raenad quote for stable PDFs/exports.
-- Discovery: `raenad.quote` keeps a full printable snapshot of customer (`customer_*`, `numero_azienda_snapshot`) and contact (`contact_first_name/_last_name/_full_name/_email/_role`) alongside HubSpot reference ids. There is no physical FK to `loader.hubs_company`/`loader.hubs_contact` because that mirror can lag behind HubSpot writes; `contact_full_name` is retained even though derivable, and the contact mirror only exposes `id/firstname/lastname/email` (no phone in V1).
-- Practical rule: copy a customer/contact snapshot onto the quote at authoring time and render PDFs/exports from the snapshot, not from a live mirror join; treat `numero_azienda_snapshot` as the Alyante ERP id captured at that moment. Keep HubSpot ids as text reference fields, not FKs.
-- Evidence: `deploy/migrations/023_raenad_schema.sql`; mirror columns in `docs/mistradb/mistra_loader.json`.
-- Used by: raenad quote authoring, PDF/export rendering.
-- Open questions: none for V1.
-
-### Raenad VAT Is cod_iva Plus A Persisted iva_percent_snapshot
-
-- Context: VAT calculation on raenad quote lines (V1: standard calculation only).
-- Discovery: each item line stores both `cod_iva` (the printable code) and `iva_percent_snapshot` (numeric). The line trigger uses `iva_percent_snapshot` when present and only falls back to resolving it from `aenad."TIva".PercIva` via `cod_iva` when NULL — so `aenad."TIva"` remains the shared VAT master on the same Mistra DB (no VAT table is copied into `raenad`). `raenad` models VAT explicitly: `line_vat = round(line_net * pct/100, 4)`, `line_gross = line_net + line_vat` (a deliberate, minor rounding-order difference from aenad's `gross = net*(1+pct)`).
-- Practical rule: persist both `cod_iva` and `iva_percent_snapshot` so exports stay stable if the VAT master changes later; resolve the snapshot once at calc time. Forced VAT, eco-contributi, and ritenute are out of V1.
-- Evidence: `deploy/migrations/023_raenad_schema.sql`, `aenad."TIva"` in `docs/mistradb/mistra_aenad.json`.
-- Used by: raenad line/header totals, PDF/export.
-- Open questions: none for V1.
-
-### Raenad PDF Exports Are Immutable Revisions
-
-- Context: persisting generated PDFs and attaching them to HubSpot deals.
-- Discovery: `raenad.quote_pdf_export` rows are immutable revisions, unique on `(quote_id, revision)`. A BEFORE UPDATE trigger blocks changes to the content columns (`revision`, `filename`, `content_type`, `checksum_sha256`, `render_payload`, `created_at`, `created_by`); only the `hubspot_*` attachment-status fields are mutable. V1 uses a dedicated raenad PDF template configured by `mrsmith.runtime_config` key `raenad.carbone_quote_template` with value shape `{"template_id":"<id>"}`; it does not reuse or fall back to the legacy `aenad.carbone_offerta` template. The PDF binary is not persisted in V1: the document is reproducible through Carbone from the dedicated template plus the saved `render_payload` and checksum metadata. Manual HubSpot attachment is queue-scoped to the export revision: `operation='hubspot.attach_pdf'`, `entity_type='raenad.quote_pdf_export'`, `entity_id=<export_id>`, and dedupe key `raenad:quote:{quote_id}:pdf-export:{export_id}:attach`.
-- Practical rule: never overwrite an export row; create a new revision instead. Store metadata, checksum, and `render_payload`, not PDF bytes. PDF create/download require the dedicated template config and return `raenad_pdf_not_configured` when it is missing or invalid. Attachment enqueue only requires Mistra plus the queue/config DB and does not call Carbone or HubSpot synchronously; Carbone, HubSpot upload, note creation, and retry/dead handling belong to the worker. The worker regenerates from the saved `render_payload`, uploads privately under `/mrsmith/raenad/quote-pdfs`, creates a deal-associated note, and updates only `hubspot_attachment_status` plus the other `hubspot_*` fields, preserving export history and quote sync state.
-- Evidence: `deploy/migrations/023_raenad_schema.sql`, `deploy/migrations/024_mrsmith_hubspot_queue.sql`, `backend/internal/raenad/pdf_export.go`, `backend/internal/raenad/hubspot_queue.go`, `backend/internal/raenad/hubspot_worker.go`.
-- Used by: raenad PDF generation and HubSpot deal attachment.
-- Open questions: the concrete Carbone template asset/id still must be supplied in runtime config per environment.
-
-### Grappa DCIM Rack Media Is Not A V1 Feature
-
-- Context: `apps/grappa-dcim` rack detail parity from the current Grappa application.
-- Discovery: the Grappa `media` table exists in the schema, but the current application data does not populate it for rack operations. Treating `media.unit_id` and `side` as the basis for rack front/back UI created a target-only feature, not real parity.
-- Practical rule: do not expose rack media endpoints, rack media mutation UI, or front/back photo controls in Grappa DCIM V1 unless product explicitly reopens the feature with live-data evidence. Keep `units` for the U-space grid; media may appear only in legacy cleanup paths such as deleting orphanable media rows when hard-deleting a rack.
-- Evidence: `docs/grappa/grappa_media.json`; removed public media contract in `backend/internal/grappadcim/handler.go`, `backend/internal/grappadcim/racks_types.go`, `apps/grappa-dcim/src/api/types.ts`, `apps/grappa-dcim/src/features/racks/RackDetailPage.tsx`, and `apps/grappa-dcim/src/features/racks/RackPages.tsx`.
-- Used by: `apps/grappa-dcim` rack detail and future Grappa DCIM migration corrections.
-- Open questions: none for V1.
-
-### Grappa DCIM Grid Layouts Are Visual Blocks, Not One Layout Per Islet
-
-- Context: `apps/grappa-dcim` rack/island map parity from the previous Yii2 PHP implementation and `artifacts/mappe/totali.json`.
-- Discovery: the map shape is a collection of visual blocks. Classical DCs usually map one islet to one block, but MMRs can split the same logical islet into multiple blocks: `MMRB` and `MMRA` both use `islet_name = side` twice, and `MMRA` duplicates the visible title `Fila D`.
-- Practical rule: persisted Step 1 layouts must be keyed per visual block, not uniquely per `islets.id`. Use neutral current-model names such as `dcim_layout_blocks` and `layout-grid-v1`, not user-facing or schema names with `legacy`. Bind rack cells by `datacenter_id + islet_id + cell.pos -> positions.num`; never treat the JSON `pos` value as `positions.id`. Occupancy and rack details must stay live from `positions`/`racks`, not copied into layout JSON. Import is a CLI flow; plenum cells are linked to `plenums` through a dedicated binding table.
-- Evidence: `artifacts/mappe/handoff.md`, `artifacts/mappe/schema.json`, `artifacts/mappe/totali.json`, and Step 1 spec `apps/grappa-dcim/docs/LAYOUT-STEP1.md`.
-- Used by: `apps/grappa-dcim` layout transition planning.
-- Open questions: none.
-
-### Grappa DCIM Positions Are Whole Tiles; Half Racks Live On `racks`, Not `positions`
-
-- Context: `apps/grappa-dcim` rack/island maps (the Sale e MMR detail panel, the 2D layout grid, and the 3D scene), all fed by `positions` joined to `racks`.
-- Discovery: a `positions` row is one physical tile (mattonella) and has no A/B half concept — its columns are only `id, status, type, num, islets_id`, where `type` is `Full` or `Half`. The half-rack split lives entirely on `racks` (`racks.type` = `Full`/`Half`, `racks.pos` = `F`/`A`/`B`, `racks.positions_id` -> `positions.id`). So a `Half` tile can host two active racks (`A` = mezzo alto, `B` = mezzo basso) that both point at the same `positions.id`. A naive `positions LEFT JOIN racks ON racks.positions_id = positions.id` fans that one tile into two rows; counting rows double-counts the tile (e.g. DC4 reported 80 "posizioni" for 78 physical tiles) and any first-row-wins dedup silently drops the B rack. Separately, `listRacksForDatacenter` (the map `racks` array) has no active-state filter, so it returns every rack incl. `cessato`/`spento`/`chiuso` — never use its length as a rack count next to a tile grid (DC4: 152 vs 57 active). The occupancy signal differs by tile type and is **not** "is there a rack record": for a **Full** tile the truth is `positions.status` — a `status='free'` tile can legitimately carry an active rack record (the armadio physically exists but is not sold; CED2A1 had 3 such tiles num 1/5/18), so plain rack presence must NOT mark it occupied. The exception is **condiviso**: `racks.shared` (varchar(2), value `'Si'`/`'No'`) flags a cabinet hosting equipment from multiple customers — it is occupied and can **never** be free, even when `positions.status='free'` (CED2A1 num 5, `P0-I1-R5`). For a **Half** tile each side is occupied iff a rack sits on that `pos`, and `shared` again means condiviso.
-- Practical rule: group join rows by `positions.id` into one tile carrying its 0–2 racks before counting or rendering. Select `r.shared` alongside the rack columns and carry it as a bool (`EqualFold(shared, "Si")`). Then classify per **rack slot (posto): Full = 1, Half = 2** (not per tile, not per rack row — the only granularity where totals match the coloured regions; a partially-filled Half is otherwise ambiguous): **Full** = `shared` rack → `shared` (condiviso); else `positions.status` mapped to occupied/reserved/free. **Half** side = rack present → (`shared` ? `shared` : `occupied`); else `reserved` (if tile reserved) else `free`. Treat `shared`/condiviso as a distinct, important state with its own colour (never folded into free; surfaced separately in counts and legend). For any "racks in this room" figure, filter to active racks — do not reuse the unfiltered map `racks` array. Keep this map metric (layout occupancy per posto) distinct from the room-list "rack" column (active racks / declared `datacenter.rack` capacity), which is the only metric valid for rooms without a layout.
-- Evidence: `docs/grappa/grappa_positions.json` (no `pos` column), `docs/grappa/grappa_racks.json` (`type`/`pos`/`positions_id`/`shared`); backend grouping in `backend/internal/grappadcim/layout.go` (`scanPositions`, `positionsSelectSQL` selecting `r.shared`) returning `Position.racks []PositionRack{...Shared bool}`; shared FE helpers `apps/grappa-dcim/src/features/facilities/positions.ts` (`fullSlotStatus`, `slotStatus`, `isSharedRack`, `summarizeSlots` → `{occupied, free, reserved, shared, total}`, `rackAt`, `fullRack`, `isHalfPosition`); renderers in `FacilitiesPages.tsx` (`DatacenterMapPanel` + LayoutPage occupancy + `positionEffectiveStatus`), `LayoutGrid.tsx`, `LayoutScene.tsx` (`STATUS_COLORS.shared`).
-- Used by: `apps/grappa-dcim` facilities map, 2D layout grid, and 3D scene.
-- Open questions: none.
-
-### Alyante Product Translation Write Contract
-
-- Context: server-side sync of product short descriptions from kit-products into Alyante ERP table `MG87_ARTDESC`.
-- Discovery: the live Appsmith datasource query updates `MG87_DESCART` and filters with suffixed legacy column names: `MG87_DITTA_CG18`, `MG87_OPZIONE_MG5E`, `MG87_LINGUA_MG52`, `MG87_CODART_MG66`. Earlier backend assumptions using `MG87_DESCRIZIONE`, `MG87_DITTA`, `MG87_OPZIONE`, `MG87_LINGUA`, `MG87_CODART` do not match this environment.
-- Practical rule: when writing product short descriptions to Alyante, use `UPDATE MG87_ARTDESC SET MG87_DESCART = ?` with `MG87_DITTA_CG18 = 1`, `MG87_OPZIONE_MG5E = '                    '`, `MG87_LINGUA_MG52 = 'ITA'/'ING'`, and `MG87_CODART_MG66 = code.padEnd(25, ' ')`.
-- Evidence: verified Appsmith query `update MG87_ARTDESC set MG87_DESCART = {{this.params.descr}} where MG87_DITTA_CG18 = 1 and MG87_OPZIONE_MG5E = '                    ' and MG87_LINGUA_MG52 = {{this.params.lang}} AND MG87_CODART_MG66 = {{this.params.code}}`; backend adapter in `backend/internal/kitproducts/alyante.go`.
-- Used by: `apps/kit-products` product translation sync.
-- Open questions: none for this environment; if another Alyante tenant exposes different column names, verify its datasource query before generalizing.
-
-### `common.vocabulary` Is Not Universally Read-Only for Mini-Apps
-
-- Context: mini-apps reading or administering entries in Mistra `common.vocabulary`.
-- Discovery: `kit_product_group` entries are admin-managed from `apps/kit-products`, while runtime consumers may intentionally keep reading `common.vocabulary.name`, with translations staying administrative-only for that feature slice. Vocabulary is therefore not a uniformly read-only reference table.
-- Practical rule: per feature, decide and document which side owns writes (admin mini-app vs upstream system) and which field consumers actually read; do not assume read-only semantics or translated fields without checking the consuming code path.
-- Evidence: `apps/kit-products/src/views/settings/ProductGroupsPage.tsx`, kit-products backend module.
-- Used by: `apps/kit-products`; any future app touching `common.vocabulary`.
-- Open questions: none.
+## Index
+
+### Cross-System Identity and Keys — [`knowledge/cross-system-identity.md`](knowledge/cross-system-identity.md)
+
+- [Customer Identity Across Systems](knowledge/cross-system-identity.md#customer-identity-across-systems)
+- [HubSpot Company Lookup from Grappa](knowledge/cross-system-identity.md#hubspot-company-lookup-from-grappa)
+- [Known Grappa Customer Exclusions](knowledge/cross-system-identity.md#known-grappa-customer-exclusions)
+- [Cross-Database Mini-App Summaries Must Merge In Code, Not In One SQL Join](knowledge/cross-system-identity.md#cross-database-mini-app-summaries-must-merge-in-code-not-in-one-sql-join)
+- [HubSpot Deal Codes Match ERP Orders After Separator Normalization](knowledge/cross-system-identity.md#hubspot-deal-codes-match-erp-orders-after-separator-normalization)
+
+### Platform Integrations — [`knowledge/platform-integrations.md`](knowledge/platform-integrations.md)
+
+- [Google Shared Drive Service Accounts Need Explicit Trash and Access Handling](knowledge/platform-integrations.md#google-shared-drive-service-accounts-need-explicit-trash-and-access-handling)
+- [Direct User-Triggered Emails Go Through the Email Ledger](knowledge/platform-integrations.md#direct-user-triggered-emails-go-through-the-email-ledger)
+- [OpenAPI.it Wrappers Stay Backend-Side](knowledge/platform-integrations.md#openapiit-wrappers-stay-backend-side)
+- [OpenAPI.it CAP `cod_fisco` Can Be Alphanumeric](knowledge/platform-integrations.md#openapiit-cap-cod_fisco-can-be-alphanumeric)
+- [OpenAPI.it DocuEngine Payloads Need Defensive Decoding And Vendor-Paced Polling](knowledge/platform-integrations.md#openapiit-docuengine-payloads-need-defensive-decoding-and-vendor-paced-polling)
+- [Mistral OCR Page Markdown Excludes Tables When `include_blocks` Is On](knowledge/platform-integrations.md#mistral-ocr-page-markdown-excludes-tables-when-include_blocks-is-on)
+- [OpenAPI.it IT-full Closing Dates Are Local Midnight Serialized In UTC](knowledge/platform-integrations.md#openapiit-it-full-closing-dates-are-local-midnight-serialized-in-utc)
+- [Company Domain Search Queries Must Never Contain Fiscal Identifiers](knowledge/platform-integrations.md#company-domain-search-queries-must-never-contain-fiscal-identifiers)
+- [HubSpot Writes Go Through A Shared Async Queue On Anisetta](knowledge/platform-integrations.md#hubspot-writes-go-through-a-shared-async-queue-on-anisetta)
+
+### Auth and Transport Behavior — [`knowledge/auth-transport.md`](knowledge/auth-transport.md)
+
+- [Keycloak Role User Lookups Must Include Group-Derived Membership](knowledge/auth-transport.md#keycloak-role-user-lookups-must-include-group-derived-membership)
+- [Devadmin Must Be Centralized as a Superuser Override](knowledge/auth-transport.md#devadmin-must-be-centralized-as-a-superuser-override)
+- [Shared SPA Clients Must Not Hit Protected APIs Before a Bearer Token Exists](knowledge/auth-transport.md#shared-spa-clients-must-not-hit-protected-apis-before-a-bearer-token-exists)
+- [Keycloak Initialization Must Be Idempotent In AuthProvider](knowledge/auth-transport.md#keycloak-initialization-must-be-idempotent-in-authprovider)
+- [Mini-App Auth Fallbacks Must Fail Closed and Retry Local Preflight Unauthorized Errors](knowledge/auth-transport.md#mini-app-auth-fallbacks-must-fail-closed-and-retry-local-preflight-unauthorized-errors)
+- [Mini-App Shells Must Gate Routes With Launcher Roles](knowledge/auth-transport.md#mini-app-shells-must-gate-routes-with-launcher-roles)
+- [Route-Scoped Roles Share the App Launcher Role Set](knowledge/auth-transport.md#route-scoped-roles-share-the-app-launcher-role-set)
+
+### Deployment and Runtime Integration Rules — [`knowledge/deployment-runtime.md`](knowledge/deployment-runtime.md)
+
+- [Slow Read Endpoints Must Fit Server Write Timeout](knowledge/deployment-runtime.md#slow-read-endpoints-must-fit-server-write-timeout)
+- [Database Diagnostics Are A Low-Volume Error Inbox, Not Access Logging](knowledge/deployment-runtime.md#database-diagnostics-are-a-low-volume-error-inbox-not-access-logging)
+- [MrSmith-Owned Tables In Anisetta](knowledge/deployment-runtime.md#mrsmith-owned-tables-in-anisetta)
+- [GW Internal CDLAN Calls Use The Shared Arak Client](knowledge/deployment-runtime.md#gw-internal-cdlan-calls-use-the-shared-arak-client)
+- [New DSN-Backed Mini-Apps Must Update Both Dev and Preprod Env Templates](knowledge/deployment-runtime.md#new-dsn-backed-mini-apps-must-update-both-dev-and-preprod-env-templates)
+- [Production Deploy Builds Run On The Target Host From A Git Archive](knowledge/deployment-runtime.md#production-deploy-builds-run-on-the-target-host-from-a-git-archive)
+
+### Frontend Platform and Builds — [`knowledge/frontend-platform.md`](knowledge/frontend-platform.md)
+
+- [CSS Module Keyframes Are Scoped; Global Animation Names Wake Dormant Rules](knowledge/frontend-platform.md#css-module-keyframes-are-scoped-global-animation-names-wake-dormant-rules)
+- [Backend-Served SPAs Must Be Copied Explicitly Into `/static/apps/<slug>`](knowledge/frontend-platform.md#backend-served-spas-must-be-copied-explicitly-into-staticappsslug)
+- [Frontend Production Builds Must Exclude Node-Only Test Files](knowledge/frontend-platform.md#frontend-production-builds-must-exclude-node-only-test-files)
+- [Packages Imported By `vite.config.ts` Must Ship Runnable JavaScript](knowledge/frontend-platform.md#packages-imported-by-viteconfigts-must-ship-runnable-javascript)
+- [Docker Frontend Builds Must Exclude Local Vite Env Files](knowledge/frontend-platform.md#docker-frontend-builds-must-exclude-local-vite-env-files)
+- [Portal Launcher Tiles Must Use Supported Portal Icon Keys](knowledge/frontend-platform.md#portal-launcher-tiles-must-use-supported-portal-icon-keys)
+
+### Shared Data Contracts — [`knowledge/shared-data-contracts.md`](knowledge/shared-data-contracts.md)
+
+- [Grappa DATE Columns Serialize as RFC3339 When Scanned to String](knowledge/shared-data-contracts.md#grappa-date-columns-serialize-as-rfc3339-when-scanned-to-string)
+- [Panoramica Orders Summary Text Columns Can Be NULL](knowledge/shared-data-contracts.md#panoramica-orders-summary-text-columns-can-be-null)
+- [Loader `quantita` Must Be Treated as Decimal (Nullable) Across Reports and Panoramica](knowledge/shared-data-contracts.md#loader-quantita-must-be-treated-as-decimal-nullable-across-reports-and-panoramica)
+- [Loader `tipo_documento` Is Fixed-Width Padded; `v_ordini_ric_spot` Is The Canonical Recurring+Spot Source](knowledge/shared-data-contracts.md#loader-tipo_documento-is-fixed-width-padded-v_ordini_ric_spot-is-the-canonical-recurringspot-source)
+- [Spot Orders Carry One-Off Amounts In `canone`; MRC Must Be Reclassified As NRC](knowledge/shared-data-contracts.md#spot-orders-carry-one-off-amounts-in-canone-mrc-must-be-reclassified-as-nrc)
+- [Alyante Product Translation Write Contract](knowledge/shared-data-contracts.md#alyante-product-translation-write-contract)
+- [`common.vocabulary` Is Not Universally Read-Only for Mini-Apps](knowledge/shared-data-contracts.md#commonvocabulary-is-not-universally-read-only-for-mini-apps)
+
+### RDA — [`knowledge/rda.md`](knowledge/rda.md)
+
+- [RDA New Supplier Requests Must Use Provider Draft Create](knowledge/rda.md#rda-new-supplier-requests-must-use-provider-draft-create)
+- [RDA Approval Inbox Actionability Is State-Gated](knowledge/rda.md#rda-approval-inbox-actionability-is-state-gated)
+- [RDA Payment Method Standard Rule](knowledge/rda.md#rda-payment-method-standard-rule)
+- [RDA Currency Is A PO-Level Display Contract](knowledge/rda.md#rda-currency-is-a-po-level-display-contract)
+- [RDA Attachment Type Is User-Selected At Upload](knowledge/rda.md#rda-attachment-type-is-user-selected-at-upload)
+- [RDA PO PDF Download Is State-Gated](knowledge/rda.md#rda-po-pdf-download-is-state-gated)
+- [RDA Patch Payload Null Semantics](knowledge/rda.md#rda-patch-payload-null-semantics)
+- [RDA PO Recipients Use The Dedicated Recipients Endpoint](knowledge/rda.md#rda-po-recipients-use-the-dedicated-recipients-endpoint)
+- [RDA Budget Selection Keys](knowledge/rda.md#rda-budget-selection-keys)
+- [RDA Row Totals Are Normalized By The BFF](knowledge/rda.md#rda-row-totals-are-normalized-by-the-bff)
+- [RDA Good Row Create Still Needs Empty Renew Detail](knowledge/rda.md#rda-good-row-create-still-needs-empty-renew-detail)
+- [RDA Row Edit Is A BFF Replace Operation](knowledge/rda.md#rda-row-edit-is-a-bff-replace-operation)
+- [RDA Portal Deep Links Include App Mount And App Route](knowledge/rda.md#rda-portal-deep-links-include-app-mount-and-app-route)
+- [RDA Comment Mentions Notify Through MrSmith, Not Mistra](knowledge/rda.md#rda-comment-mentions-notify-through-mrsmith-not-mistra)
+- [RDA Article Catalog Type Comes From The BFF](knowledge/rda.md#rda-article-catalog-type-comes-from-the-bff)
+- [RDA Approval Permissions Come From users_int.role](knowledge/rda.md#rda-approval-permissions-come-from-users_introle)
+
+### Raenad / Aenad — [`knowledge/raenad-aenad.md`](knowledge/raenad-aenad.md)
+
+- [Raenad HubSpot Deal Pipeline Config Lives In Anisetta Runtime Config](knowledge/raenad-aenad.md#raenad-hubspot-deal-pipeline-config-lives-in-anisetta-runtime-config)
+- [Raenad Stage Choices Come From The HubSpot Loader Mirror](knowledge/raenad-aenad.md#raenad-stage-choices-come-from-the-hubspot-loader-mirror)
+- [Raenad Deal Owner Maps From User Email To HubSpot Owner](knowledge/raenad-aenad.md#raenad-deal-owner-maps-from-user-email-to-hubspot-owner)
+- [Raenad Deal Create Uses Only Standard HubSpot Properties In V1](knowledge/raenad-aenad.md#raenad-deal-create-uses-only-standard-hubspot-properties-in-v1)
+- [Raenad UI/UX Planning Is Deferred Until Backend Contracts Are Stable](knowledge/raenad-aenad.md#raenad-uiux-planning-is-deferred-until-backend-contracts-are-stable)
+- [Aenad Quote Line Defaults Live In Anisetta Runtime Config](knowledge/raenad-aenad.md#aenad-quote-line-defaults-live-in-anisetta-runtime-config)
+- [Raenad Payment Methods Come From loader.erp_metodi_pagamento](knowledge/raenad-aenad.md#raenad-payment-methods-come-from-loadererp_metodi_pagamento)
+- [Raenad Ready Quotes Return To Draft On Commercial Changes](knowledge/raenad-aenad.md#raenad-ready-quotes-return-to-draft-on-commercial-changes)
+- [Aenad Document Totals Are Database-Owned First-Tranche Calculations](knowledge/raenad-aenad.md#aenad-document-totals-are-database-owned-first-tranche-calculations)
+- [Aenad Monetary And Quantity Fields Are numeric(18,4) Exposed As Decimal Strings](knowledge/raenad-aenad.md#aenad-monetary-and-quantity-fields-are-numeric184-exposed-as-decimal-strings)
+- [Aenad Offer Print Semantics: Easyfatt Inline Markers, Spacer Rows, Display-Ready Columns](knowledge/raenad-aenad.md#aenad-offer-print-semantics-easyfatt-inline-markers-spacer-rows-display-ready-columns)
+- [Raenad Is The Operational Quote Schema, Separate From The Aenad Archive](knowledge/raenad-aenad.md#raenad-is-the-operational-quote-schema-separate-from-the-aenad-archive)
+- [Raenad Quote Numbers Use common.new_document_number('AE-')](knowledge/raenad-aenad.md#raenad-quote-numbers-use-commonnew_document_numberae-)
+- [Raenad Stores A Printable Customer/Contact Snapshot Decoupled From The HubSpot Mirror](knowledge/raenad-aenad.md#raenad-stores-a-printable-customercontact-snapshot-decoupled-from-the-hubspot-mirror)
+- [Raenad VAT Is cod_iva Plus A Persisted iva_percent_snapshot](knowledge/raenad-aenad.md#raenad-vat-is-cod_iva-plus-a-persisted-iva_percent_snapshot)
+- [Raenad PDF Exports Are Immutable Revisions](knowledge/raenad-aenad.md#raenad-pdf-exports-are-immutable-revisions)
+
+### Binocolo — [`knowledge/binocolo.md`](knowledge/binocolo.md)
+
+- [Binocolo M&A Uses Company `IT-search` With ATECO-First Fallback](knowledge/binocolo.md#binocolo-ma-uses-company-it-search-with-ateco-first-fallback)
+- [Binocolo Domain Identity, Provenance, and Thesis Fit Are Separate Axes](knowledge/binocolo.md#binocolo-domain-identity-provenance-and-thesis-fit-are-separate-axes)
+- [Binocolo M&A Long Session Work Uses `ma_job`](knowledge/binocolo.md#binocolo-ma-long-session-work-uses-ma_job)
+- [Binocolo `/azienda` Is A Standalone Quick-Review Tool, Never The MA Dossier Destination](knowledge/binocolo.md#binocolo-azienda-is-a-standalone-quick-review-tool-never-the-ma-dossier-destination)
+- [Binocolo Internal Company Finder Uses Fiscal Identity Groups](knowledge/binocolo.md#binocolo-internal-company-finder-uses-fiscal-identity-groups)
+- [Binocolo `company_key` Is An Owned Identifier, Never A Derivation](knowledge/binocolo.md#binocolo-company_key-is-an-owned-identifier-never-a-derivation)
+- [Binocolo Company Annotations Live in `ma_target_outcome`](knowledge/binocolo.md#binocolo-company-annotations-live-in-ma_target_outcome)
+- [Binocolo ATECO 2025 Codes Are Resolver-Gated](knowledge/binocolo.md#binocolo-ateco-2025-codes-are-resolver-gated)
+- [Binocolo Province Selection Is Tool-Gated](knowledge/binocolo.md#binocolo-province-selection-is-tool-gated)
+- [LLM Registry Cutover Did Not Preserve IDs; Legacy FKs to binocolo.llm_* Break on Write](knowledge/binocolo.md#llm-registry-cutover-did-not-preserve-ids-legacy-fks-to-binocolollm_-break-on-write)
+
+### Quotes — [`knowledge/quotes.md`](knowledge/quotes.md)
+
+- [Quotes Create Flow Uses Context-Specific Category Exclusions](knowledge/quotes.md#quotes-create-flow-uses-context-specific-category-exclusions)
+- [Quotes IaaS Template Derivation Must Be DB-Driven](knowledge/quotes.md#quotes-iaas-template-derivation-must-be-db-driven)
+- [Quotes Replacement Orders Need Appsmith Column Names Plus Customer Scoping](knowledge/quotes.md#quotes-replacement-orders-need-appsmith-column-names-plus-customer-scoping)
+- [Quotes Publish Payment Labels Use Loader ERP Column Names](knowledge/quotes.md#quotes-publish-payment-labels-use-loader-erp-column-names)
+- [Quotes Deal Number Must Come From HubSpot `codice`, Not Deal Title](knowledge/quotes.md#quotes-deal-number-must-come-from-hubspot-codice-not-deal-title)
+- [Quotes Customer Default Payment Must Use Alyante `CODICE_PAGAMENTO`](knowledge/quotes.md#quotes-customer-default-payment-must-use-alyante-codice_pagamento)
+- [Quotes Republish Must Unlock Published HubSpot Quotes First](knowledge/quotes.md#quotes-republish-must-unlock-published-hubspot-quotes-first)
+- [Quotes Pending Approval Status Is Finalized From HubSpot](knowledge/quotes.md#quotes-pending-approval-status-is-finalized-from-hubspot)
+- [Quotes Order Conversion Uses Vodka Bridge Plus HubSpot Note Attachment](knowledge/quotes.md#quotes-order-conversion-uses-vodka-bridge-plus-hubspot-note-attachment)
+
+### Grappa DCIM — [`knowledge/grappa-dcim.md`](knowledge/grappa-dcim.md)
+
+- [Grappa Rack Customer Display Uses `cli_fatturazione.intestazione`](knowledge/grappa-dcim.md#grappa-rack-customer-display-uses-cli_fatturazioneintestazione)
+- [Grappa Rack Equipment Occupancy Uses `apparato.unit`](knowledge/grappa-dcim.md#grappa-rack-equipment-occupancy-uses-apparatounit)
+- [Grappa Apparato Types Are Controlled By DCIM Lookup](knowledge/grappa-dcim.md#grappa-apparato-types-are-controlled-by-dcim-lookup)
+- [Grappa DCIM Rack Media Is Not A V1 Feature](knowledge/grappa-dcim.md#grappa-dcim-rack-media-is-not-a-v1-feature)
+- [Grappa DCIM Grid Layouts Are Visual Blocks, Not One Layout Per Islet](knowledge/grappa-dcim.md#grappa-dcim-grid-layouts-are-visual-blocks-not-one-layout-per-islet)
+- [Grappa DCIM Positions Are Whole Tiles; Half Racks Live On `racks`, Not `positions`](knowledge/grappa-dcim.md#grappa-dcim-positions-are-whole-tiles-half-racks-live-on-racks-not-positions)
+
+### Training — [`knowledge/training.md`](knowledge/training.md)
+
+- [Training Directory Chips Are Action-First](knowledge/training.md#training-directory-chips-are-action-first)
+- [Training Rule Populations Stay Training-Side](knowledge/training.md#training-rule-populations-stay-training-side)
+- [Training Compliance Courses Become Mandatory Through Rules](knowledge/training.md#training-compliance-courses-become-mandatory-through-rules)
+- [Training People Admin Can Create Local Employees](knowledge/training.md#training-people-admin-can-create-local-employees)
+
+### Reports — [`knowledge/reports.md`](knowledge/reports.md)
+
+- [Reports AOV Replacement MRC Matching](knowledge/reports.md#reports-aov-replacement-mrc-matching)
+- [Reports AOV CDL-CLOUD Adds Fixed NRC](knowledge/reports.md#reports-aov-cdl-cloud-adds-fixed-nrc)
+- [Reports Carbone Export Payloads May Need Template-Specific Key Aliases](knowledge/reports.md#reports-carbone-export-payloads-may-need-template-specific-key-aliases)
+
+### Ordini — [`knowledge/ordini.md`](knowledge/ordini.md)
+
+- [Vodka Orders Match Alyante Extended Rows By Document](knowledge/ordini.md#vodka-orders-match-alyante-extended-rows-by-document)
+- [GW `/orders/v1/erp` Accepts Only the Legacy Appsmith Payload Shape](knowledge/ordini.md#gw-ordersv1erp-accepts-only-the-legacy-appsmith-payload-shape)
+
+### Manutenzioni — [`knowledge/manutenzioni.md`](knowledge/manutenzioni.md)
+
+- [Manutenzioni Radar Excludes Terminal Maintenance States](knowledge/manutenzioni.md#manutenzioni-radar-excludes-terminal-maintenance-states)
+- [Manutenzioni Service Taxonomy Is A Catalog, Targets Are Instances](knowledge/manutenzioni.md#manutenzioni-service-taxonomy-is-a-catalog-targets-are-instances)
+
+### Fornitori — [`knowledge/fornitori.md`](knowledge/fornitori.md)
+
+- [Fornitori Provider Contacts Follow Appsmith Payload Semantics](knowledge/fornitori.md#fornitori-provider-contacts-follow-appsmith-payload-semantics)
+
+### Panoramica Cliente — [`knowledge/panoramica-cliente.md`](knowledge/panoramica-cliente.md)
+
+- [Cloudstack IaaS Charge Categories Are Fixed Backend-Side](knowledge/panoramica-cliente.md#cloudstack-iaas-charge-categories-are-fixed-backend-side)
+
+### Richieste Fattibilità — [`knowledge/richieste-fattibilita.md`](knowledge/richieste-fattibilita.md)
+
+- [RDF `fornitori_preferiti` Must Be Treated as Nullable Text](knowledge/richieste-fattibilita.md#rdf-fornitori_preferiti-must-be-treated-as-nullable-text)
+
+### CP Backoffice — [`knowledge/cp-backoffice.md`](knowledge/cp-backoffice.md)
+
+- [CP Backoffice Active Biometric Users Are Balance-Based](knowledge/cp-backoffice.md#cp-backoffice-active-biometric-users-are-balance-based)
+
+### AFC Tools — [`knowledge/afc-tools.md`](knowledge/afc-tools.md)
+
+- [AFC Tools Order PDF Missing in Arxivar Surfaces as `ARX_DOC_NUMBER_NOT_FOUND`](knowledge/afc-tools.md#afc-tools-order-pdf-missing-in-arxivar-surfaces-as-arx_doc_number_not_found)

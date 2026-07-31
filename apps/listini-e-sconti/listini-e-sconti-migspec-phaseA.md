@@ -43,7 +43,7 @@ The audit identifies 9 candidate domain entities across 2 databases (db-mistra P
 - Cross-database identity: `customers.customer.id` (Mistra) vs `cli_fatturazione.id` (Grappa) — relationship unclear
 
 **Open questions:**
-- ~~**Q1:**~~ **RESOLVED:** `customers.customer.id` = Alyante ERP ID. `cli_fatturazione.id` = internal Grappa ID. Bridge: `cli_fatturazione.codice_aggancio_gest` = ERP ID. See `docs/IMPLEMENTATION-KNOWLEDGE.md#customer-identity-across-systems`.
+- ~~**Q1:**~~ **RESOLVED:** `customers.customer.id` = Alyante ERP ID. `cli_fatturazione.id` = internal Grappa ID. Bridge: `cli_fatturazione.codice_aggancio_gest` = ERP ID. See `docs/knowledge/cross-system-identity.md#customer-identity-across-systems`.
 - ~~**Q2:**~~ **RESOLVED:** Keep separate endpoints per datasource. Mistra and Grappa have different customer ID spaces (ERP ID vs internal Grappa ID) — unifying would add complexity without benefit. Maintain: (A) Mistra all customers, (B) Mistra ERP-linked, (C) Grappa active billing — as separate backend endpoints.
 - ~~**Q3:**~~ **RESOLVED:** Keep exclusions hardcoded (385 for IaaS Prezzi, 385+485 for IaaS Credito) for compatibility with Appsmith during coexistence period. The two apps will run side by side temporarily.
 
@@ -379,7 +379,7 @@ The audit identifies 9 candidate domain entities across 2 databases (db-mistra P
 ## Questions for the Domain Expert
 
 ### Identity & Structure
-1. ~~**Q1:**~~ **RESOLVED.** See `docs/IMPLEMENTATION-KNOWLEDGE.md#customer-identity-across-systems`.
+1. ~~**Q1:**~~ **RESOLVED.** See `docs/knowledge/cross-system-identity.md#customer-identity-across-systems`.
 2. ~~**Q2:**~~ **RESOLVED.** Separate endpoints per datasource — no unification of Mistra/Grappa customer lists.
 3. ~~**Q3:**~~ **RESOLVED.** Hardcoded exclusions for coexistence with Appsmith.
 
