@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
+import { formatInstant } from '@mrsmith/format';
 import { Button, Drawer, Skeleton } from '@mrsmith/ui';
 import { usePlanAudit } from '../../api/queries';
 import type { PlanAuditEvent, PlanningSummary } from '../../api/types';
+import { formatRequiredBudget } from '../../lib/formatBudget';
 import styles from './PlanHistoryDrawer.module.css';
 
 interface PlanHistoryDrawerProps {
@@ -102,7 +104,7 @@ export function PlanClosedSummary({ plan, onOpenHistory }: { plan: PlanningSumma
         <div>
           <h2 className={styles.summaryTitle}>Riepilogo chiusura</h2>
           <p className={styles.summarySub}>
-            {formatEuro(plan.budget_spent)} allocati su {formatEuro(plan.budget_total)}
+            {formatRequiredBudget(plan.budget_spent)} allocati su {formatRequiredBudget(plan.budget_total)}
           </p>
         </div>
         <Button variant="secondary" size="sm" onClick={onOpenHistory}>Storico completo</Button>
@@ -168,7 +170,7 @@ function eventDetail(event: PlanAuditEvent): string | null {
   if (event.event_type === 'bulk_review_applied' && count !== undefined) return `${count} richieste gestite`;
   if (event.event_type === 'plan_budget_changed') {
     const to = numericPayload(event, 'to');
-    return to !== undefined ? `Nuovo budget ${formatEuro(to)}` : null;
+    return to !== undefined ? `Nuovo budget ${formatRequiredBudget(to)}` : null;
   }
   if (event.event_type === 'plan_status_changed' && event.payload.expired_enrollments_count) {
     return `${event.payload.expired_enrollments_count} iscrizioni scadute`;
@@ -197,20 +199,9 @@ function statusLabel(status: PlanningSummary['status']): string {
 }
 
 function formatDateTime(value: string): string {
-  return new Intl.DateTimeFormat('it-IT', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value));
+  return formatInstant(value, { format: { dateStyle: 'medium', timeStyle: 'short' } }) ?? '—';
 }
 
 function formatDate(value: string): string {
-  return new Intl.DateTimeFormat('it-IT', { dateStyle: 'medium' }).format(new Date(value));
-}
-
-function formatEuro(value: number): string {
-  return new Intl.NumberFormat('it-IT', {
-    style: 'currency',
-    currency: 'EUR',
-    maximumFractionDigits: 0,
-  }).format(value);
+  return formatInstant(value, { format: { dateStyle: 'medium' } }) ?? '—';
 }

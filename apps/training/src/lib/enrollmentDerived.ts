@@ -1,3 +1,4 @@
+import { formatNumber } from '@mrsmith/format';
 import type { PlanEnrollment } from '../api/types';
 
 export interface EnrollmentDraft {
@@ -52,9 +53,9 @@ export function isDirty(draft: EnrollmentDraft, enrollment: PlanEnrollment): boo
 }
 
 export function formatEuroCompact(value: number): string {
-  return new Intl.NumberFormat('it-IT', { maximumFractionDigits: 0 }).format(Math.round(value));
+  return formatNumber(Math.round(value), { format: { maximumFractionDigits: 0 } }) ?? '';
 }
 
 export function formatEuro2(value: number): string {
-  return new Intl.NumberFormat('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(value);
+  return formatNumber(value, { format: { minimumFractionDigits: 0, maximumFractionDigits: 2 } }) ?? '';
 }

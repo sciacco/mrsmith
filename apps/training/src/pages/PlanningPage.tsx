@@ -16,6 +16,7 @@ import { PlanHero } from '../components/PlanHero';
 import { PlanClosedSummary, PlanHistoryDrawer } from '../components/PlanHistoryDrawer';
 import { ReviewActionDrawer } from '../components/ReviewActionDrawer';
 import { SuggestionCard } from '../components/SuggestionCard';
+import { formatRequiredBudget } from '../lib/formatBudget';
 import styles from './PlanningPage.module.css';
 
 interface PlanningPageProps {
@@ -255,7 +256,7 @@ export function PlanningPage({ isPeopleAdmin }: PlanningPageProps) {
               <p className={styles.emptySubtitle}>Nessuna azione richiesta.</p>
               {plan.enrollments_planned > 0 && (
                 <p className={styles.emptyFooter}>
-                  {plan.enrollments_planned} iscrizioni pianificate · {formatEuro(plan.budget_spent)} allocati
+                  {plan.enrollments_planned} iscrizioni pianificate · {formatRequiredBudget(plan.budget_spent)} allocati
                 </p>
               )}
             </div>
@@ -324,14 +325,6 @@ export function PlanningPage({ isPeopleAdmin }: PlanningPageProps) {
       )}
     </main>
   );
-}
-
-function formatEuro(value: number): string {
-  return new Intl.NumberFormat('it-IT', {
-    style: 'currency',
-    currency: 'EUR',
-    maximumFractionDigits: 0,
-  }).format(value);
 }
 
 function SeverityChip({

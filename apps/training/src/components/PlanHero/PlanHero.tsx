@@ -1,5 +1,6 @@
 import { Button, Icon } from '@mrsmith/ui';
 import type { PlanningSummary } from '../../api/types';
+import { formatRequiredBudget } from '../../lib/formatBudget';
 import { PlanKebabMenu } from '../PlanKebabMenu';
 import styles from './PlanHero.module.css';
 
@@ -41,14 +42,6 @@ function lifecycleLabel(status: PlanningSummary['status']): string | null {
     case 'missing':
       return null;
   }
-}
-
-function formatEuro(value: number): string {
-  return new Intl.NumberFormat('it-IT', {
-    style: 'currency',
-    currency: 'EUR',
-    maximumFractionDigits: 0,
-  }).format(value);
 }
 
 export function PlanHero({
@@ -132,17 +125,17 @@ export function PlanHero({
         <div className={styles.metricsRow}>
           <div className={styles.metric}>
             <span className={styles.metricLabel}>Speso</span>
-            <span className={styles.metricValue}>{formatEuro(summary.budget_spent)}</span>
+            <span className={styles.metricValue}>{formatRequiredBudget(summary.budget_spent)}</span>
           </div>
           <div className={styles.metric}>
             <span className={styles.metricLabel}>Residuo</span>
             <span className={`${styles.metricValue} ${styles.metricValueResidual}`}>
-              {formatEuro(summary.budget_residual)}
+              {formatRequiredBudget(summary.budget_residual)}
             </span>
           </div>
           <div className={styles.metric}>
             <span className={styles.metricLabel}>Totale</span>
-            <span className={styles.metricValueMuted}>{formatEuro(summary.budget_total)}</span>
+            <span className={styles.metricValueMuted}>{formatRequiredBudget(summary.budget_total)}</span>
           </div>
         </div>
         <div className={styles.progress} aria-hidden="true">

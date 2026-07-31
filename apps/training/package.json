@@ -7,12 +7,13 @@
     "dev": "vite",
     "build": "tsc -b tsconfig.build.json && vite build",
     "lint": "tsc --noEmit",
-    "test": "node --test --experimental-strip-types",
+    "test": "node --import ./scripts/register-ts-loader.mjs --test --experimental-strip-types",
     "preview": "vite preview"
   },
   "dependencies": {
     "@mrsmith/api-client": "workspace:*",
     "@mrsmith/auth-client": "workspace:*",
+    "@mrsmith/format": "workspace:*",
     "@mrsmith/ui": "workspace:*",
     "@tanstack/react-query": "^5.62.0",
     "react": "^18.3.1",

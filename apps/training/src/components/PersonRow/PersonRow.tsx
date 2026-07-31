@@ -1,3 +1,4 @@
+import { formatLocalDate } from '@mrsmith/format';
 import { Icon } from '@mrsmith/ui';
 import { Link } from 'react-router-dom';
 import type { PersonSummary } from '../../api/types';
@@ -21,11 +22,6 @@ function initialsOf(name: string): string {
     .join('');
 }
 
-function formatDate(value: string | undefined): string {
-  if (!value) return '';
-  return value.slice(0, 10);
-}
-
 export function PersonRow({ person, selected, expanded, onToggleSelect, onToggleExpand }: PersonRowProps) {
   return (
     <div className={`${styles.row} ${selected ? styles.selected : ''} ${expanded ? styles.expanded : ''}`}>
@@ -47,7 +43,7 @@ export function PersonRow({ person, selected, expanded, onToggleSelect, onToggle
         <span className={styles.deadline}>
           {person.next_deadline ? (
             <>
-              <Icon name="clock" size={14} /> {person.next_deadline.label} {formatDate(person.next_deadline.date)}
+              <Icon name="clock" size={14} /> {person.next_deadline.label} {formatLocalDate(person.next_deadline.date) ?? ''}
             </>
           ) : (
             <span className={styles.muted}>—</span>

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ApiError } from '@mrsmith/api-client';
+import { formatLocalDate } from '@mrsmith/format';
 import { Button, Skeleton, useToast } from '@mrsmith/ui';
 import { useCreateEnrollment, usePersonProfile, useTrainingLookups } from '../api/queries';
 import type {
@@ -14,6 +15,7 @@ import type {
 import { EnrollmentDrawer } from '../components/EnrollmentDrawer';
 import { PersonEditModal } from '../components/PersonEditModal';
 import { classifyAlertLevel } from '../lib/alertLevel';
+import { formatRequiredBudget } from '../lib/formatBudget';
 import styles from './PersonPage.module.css';
 
 interface PersonPageProps {
@@ -31,12 +33,12 @@ function initialsOf(name: string): string {
 
 function formatDate(value: string | undefined): string {
   if (!value) return '';
-  return value.slice(0, 10);
+  return formatLocalDate(value) ?? '';
 }
 
 function formatMoney(value: number | undefined): string {
   if (value === undefined || value === 0) return '—';
-  return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(value);
+  return formatRequiredBudget(value);
 }
 
 function apiErrorMessage(error: unknown, fallback: string): string {

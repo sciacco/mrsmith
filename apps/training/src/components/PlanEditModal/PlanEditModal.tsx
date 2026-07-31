@@ -3,6 +3,7 @@ import { ApiError } from '@mrsmith/api-client';
 import { Button, Modal, useToast } from '@mrsmith/ui';
 import { useUpdatePlan } from '../../api/queries';
 import type { PlanningSummary } from '../../api/types';
+import { formatRequiredBudget } from '../../lib/formatBudget';
 import styles from './PlanEditModal.module.css';
 
 interface PlanEditModalProps {
@@ -92,7 +93,7 @@ export function PlanEditModal({ open, plan, onClose }: PlanEditModalProps) {
             }}
             placeholder="es. 150000"
           />
-          <p className={styles.hint}>Speso attuale: {formatEuro(plan.budget_spent)}</p>
+          <p className={styles.hint}>Speso attuale: {formatRequiredBudget(plan.budget_spent)}</p>
         </div>
 
         <div className={styles.field}>
@@ -127,12 +128,4 @@ export function PlanEditModal({ open, plan, onClose }: PlanEditModalProps) {
       </form>
     </Modal>
   );
-}
-
-function formatEuro(value: number): string {
-  return new Intl.NumberFormat('it-IT', {
-    style: 'currency',
-    currency: 'EUR',
-    maximumFractionDigits: 0,
-  }).format(value);
 }

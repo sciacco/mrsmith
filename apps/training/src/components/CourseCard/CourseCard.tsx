@@ -1,4 +1,5 @@
 import type { CatalogCourseWithCounts } from '../../api/types';
+import { formatRequiredBudget } from '../../lib/formatBudget';
 import styles from './CourseCard.module.css';
 
 interface CourseCardProps {
@@ -14,14 +15,6 @@ const DELIVERY_LABEL: Record<string, string> = {
   on_the_job: 'On the job',
   mixed: 'Misto',
 };
-
-function formatEuro(value: number): string {
-  return new Intl.NumberFormat('it-IT', {
-    style: 'currency',
-    currency: 'EUR',
-    maximumFractionDigits: 0,
-  }).format(value);
-}
 
 export function CourseCard({ course, currentYear, onOpen }: CourseCardProps) {
   return (
@@ -53,7 +46,7 @@ export function CourseCard({ course, currentYear, onOpen }: CourseCardProps) {
         {course.defaultCost !== undefined && (
           <>
             <span className={styles.sep}>·</span>
-            <span className={styles.numeric}>{formatEuro(course.defaultCost)}</span>
+            <span className={styles.numeric}>{formatRequiredBudget(course.defaultCost)}</span>
           </>
         )}
       </p>

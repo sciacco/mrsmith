@@ -10,6 +10,7 @@ import {
   useTrainingWorkspace,
 } from '../../api/queries';
 import type { CatalogCourse, PersonSummary, PlanningSuggestion, TrainingRequest } from '../../api/types';
+import { formatRequiredBudget } from '../../lib/formatBudget';
 import styles from './ReviewActionDrawer.module.css';
 
 export interface CreateFromSuggestionConfig {
@@ -48,18 +49,10 @@ function personRank(p: PersonSummary): number {
   return 3;
 }
 
-function formatEuro(value: number): string {
-  return new Intl.NumberFormat('it-IT', {
-    style: 'currency',
-    currency: 'EUR',
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
 function formatCourseEstimate(hours: number | undefined, cost: number | undefined, vendorName?: string): string {
   return [
     hours !== undefined ? `${hours}h` : 'ore da definire',
-    cost !== undefined ? `${formatEuro(cost)}/persona` : 'costo da definire',
+    cost !== undefined ? `${formatRequiredBudget(cost)}/persona` : 'costo da definire',
     vendorName || null,
   ].filter(Boolean).join(' · ');
 }
@@ -71,7 +64,7 @@ function formatTotalHours(hoursPerPerson: number | undefined, peopleCount: numbe
 
 function formatTotalCost(costPerPerson: number | undefined, peopleCount: number): string {
   if (costPerPerson === undefined) return 'costo da definire';
-  return formatEuro(costPerPerson * peopleCount);
+  return formatRequiredBudget(costPerPerson * peopleCount);
 }
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -222,7 +215,7 @@ function CreateFromSuggestion({
                 : 'Nessuna persona selezionata'}
               {selectedIds.size > 0 && courseCost !== undefined && (
                 <span className={styles.totalsLabel}>
-                  {' '}({selectedIds.size} × {formatEuro(courseCost)})
+                  {' '}({selectedIds.size} × {formatRequiredBudget(courseCost)})
                 </span>
               )}
             </span>
@@ -701,14 +694,14 @@ function CreateFromScratch({
                 ? [
                     `${selectedIds.size} ${selectedIds.size === 1 ? 'persona' : 'persone'}`,
                     totalHours !== undefined ? `${totalHours}h` : 'ore da definire',
-                    totalCost !== undefined ? formatEuro(totalCost) : 'costo da definire',
+                    totalCost !== undefined ? formatRequiredBudget(totalCost) : 'costo da definire',
                   ].join(' · ')
                 : 'Nessuna persona selezionata'}
             </span>
             {selectedCourse && (
               <span className={`${styles.summaryLine} ${residualAfter !== undefined && residualAfter < 0 ? styles.totalsWarning : ''}`}>
                 {residualAfter !== undefined
-                  ? `Residuo dopo: ${formatEuro(residualAfter)}${residualPct !== null ? ` (${residualPct}%)` : ''}`
+                  ? `Residuo dopo: ${formatRequiredBudget(residualAfter)}${residualPct !== null ? ` (${residualPct}%)` : ''}`
                   : 'Residuo dopo: costo da definire'}
               </span>
             )}

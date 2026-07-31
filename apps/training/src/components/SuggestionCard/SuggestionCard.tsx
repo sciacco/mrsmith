@@ -1,5 +1,6 @@
 import { Button } from '@mrsmith/ui';
 import type { PlanningSuggestion } from '../../api/types';
+import { formatRequiredBudget } from '../../lib/formatBudget';
 import styles from './SuggestionCard.module.css';
 
 interface SuggestionCardProps {
@@ -23,14 +24,6 @@ const SEVERITY_LABEL: Record<PlanningSuggestion['severity'], string> = {
   warning: 'ATTENZIONE',
   info: 'INFO',
 };
-
-function formatEuro(value: number): string {
-  return new Intl.NumberFormat('it-IT', {
-    style: 'currency',
-    currency: 'EUR',
-    maximumFractionDigits: 0,
-  }).format(value);
-}
 
 export function SuggestionCard({
   suggestion,
@@ -65,7 +58,7 @@ export function SuggestionCard({
             <> · {suggestion.suggested_course_hours}h</>
           )}
           {suggestion.suggested_course_cost !== undefined && (
-            <> · {formatEuro(suggestion.suggested_course_cost)}/persona</>
+            <> · {formatRequiredBudget(suggestion.suggested_course_cost)}/persona</>
           )}
         </p>
       )}
@@ -78,7 +71,7 @@ export function SuggestionCard({
         <div className={styles.budgetRow}>
           <div className={styles.budgetMetric}>
             <span className={styles.budgetLabel}>Costo stimato</span>
-            <span className={styles.budgetValue}>{formatEuro(suggestion.estimated_cost)}</span>
+            <span className={styles.budgetValue}>{formatRequiredBudget(suggestion.estimated_cost)}</span>
           </div>
           <span className={styles.budgetSeparator} aria-hidden="true">·</span>
           <div className={styles.budgetMetric}>
@@ -88,7 +81,7 @@ export function SuggestionCard({
                 residualAfter < 0 ? styles.budgetValueNegative : styles.budgetValueResidual
               }`}
             >
-              {formatEuro(residualAfter)}
+              {formatRequiredBudget(residualAfter)}
             </span>
           </div>
         </div>

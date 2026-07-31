@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button, Drawer, SingleSelect, useToast } from '@mrsmith/ui';
 import { useArchiveCourse, useTrainingLookups, useUpdateCourse } from '../../api/queries';
 import type { CatalogCourseWithCounts } from '../../api/types';
+import { formatRequiredBudget } from '../../lib/formatBudget';
 import styles from './CourseDetailDrawer.module.css';
 
 interface CourseDetailDrawerProps {
@@ -23,14 +24,6 @@ const PROVIDER_OPTIONS = [
   { value: 'internal', label: 'Interna' },
   { value: 'external', label: 'Esterna' },
 ];
-
-function formatEuro(value: number): string {
-  return new Intl.NumberFormat('it-IT', {
-    style: 'currency',
-    currency: 'EUR',
-    maximumFractionDigits: 0,
-  }).format(value);
-}
 
 export function CourseDetailDrawer({ course, isPeopleAdmin, currentYear, onClose }: CourseDetailDrawerProps) {
   const { toast } = useToast();
@@ -294,7 +287,7 @@ export function CourseDetailDrawer({ course, isPeopleAdmin, currentYear, onClose
             </div>
             {course.defaultCost !== undefined && (
               <div className={styles.historyMetric}>
-                <span className={styles.historyValue}>{formatEuro(course.defaultCost)}</span>
+                <span className={styles.historyValue}>{formatRequiredBudget(course.defaultCost)}</span>
                 <span className={styles.historyLabel}>costo medio iscrizione</span>
               </div>
             )}
