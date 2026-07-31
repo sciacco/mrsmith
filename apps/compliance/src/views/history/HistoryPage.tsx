@@ -4,12 +4,8 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { isUpstreamAuthFailed } from '../../api/errors';
 import { useHistory } from '../../api/queries';
 import { ExportButtons } from '../../components/ExportButtons';
+import { formatRequestDate } from '../../utils/format';
 import styles from './HistoryPage.module.css';
-
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-}
 
 export function HistoryPage() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -84,7 +80,7 @@ export function HistoryPage() {
                       }}
                     >
                       <span className={styles.domainName}>{entry.domain}</span>
-                      <span className={styles.cellText}>{formatDate(entry.request_date)}</span>
+                      <span className={styles.cellText}>{formatRequestDate(entry.request_date)}</span>
                       <span className={styles.cellText}>{entry.reference}</span>
                       <span>
                         <span

@@ -1,6 +1,7 @@
 import { Skeleton } from '@mrsmith/ui';
 import type { ReleaseRequest, ReleaseDomain } from '../../api/types';
 import { DomainList } from '../../components/DomainList';
+import { formatRequestDate } from '../../utils/format';
 import styles from './ReleasesPage.module.css';
 
 interface ReleaseDetailProps {
@@ -10,11 +11,6 @@ interface ReleaseDetailProps {
   onEdit: () => void;
   onAddDomains: () => void;
   onEditDomain: (d: { id: number; domain: string }) => void;
-}
-
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 }
 
 function formatOrigin(release: ReleaseRequest): string {
@@ -33,7 +29,7 @@ export function ReleaseDetail({ release, domains, domainsLoading, onEdit, onAddD
         </div>
         <div>
           <h2 className={styles.detailTitle}>{release.reference}</h2>
-          <p className={styles.detailMeta}>{formatDate(release.request_date)}</p>
+          <p className={styles.detailMeta}>{formatRequestDate(release.request_date)}</p>
         </div>
       </div>
 
@@ -71,7 +67,7 @@ export function ReleaseDetail({ release, domains, domainsLoading, onEdit, onAddD
           </div>
           <div>
             <p className={styles.infoLabel}>Data</p>
-            <p className={styles.infoValue}>{formatDate(release.request_date)}</p>
+            <p className={styles.infoValue}>{formatRequestDate(release.request_date)}</p>
           </div>
         </div>
       </div>

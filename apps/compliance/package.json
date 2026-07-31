@@ -12,6 +12,7 @@
   "dependencies": {
     "@mrsmith/api-client": "workspace:*",
     "@mrsmith/auth-client": "workspace:*",
+    "@mrsmith/format": "workspace:*",
     "@mrsmith/ui": "workspace:*",
     "@tanstack/react-query": "^5.62.0",
     "@tanstack/react-virtual": "^3.0.0",

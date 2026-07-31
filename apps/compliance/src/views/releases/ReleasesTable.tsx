@@ -1,15 +1,11 @@
 import type { ReleaseRequest } from '../../api/types';
+import { formatRequestDate } from '../../utils/format';
 import styles from './ReleasesPage.module.css';
 
 interface ReleasesTableProps {
   releases: ReleaseRequest[];
   selectedId: number | null;
   onSelect: (id: number) => void;
-}
-
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 }
 
 function formatOrigin(release: ReleaseRequest): string {
@@ -40,7 +36,7 @@ export function ReleasesTable({ releases, selectedId, onSelect }: ReleasesTableP
                 <path d="M6 9l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
-            <span className={styles.rowText}>{formatDate(rel.request_date)}</span>
+            <span className={styles.rowText}>{formatRequestDate(rel.request_date)}</span>
             <span className={styles.rowText}>{formatOrigin(rel)}</span>
             <span className={styles.rowText}>{rel.reference}</span>
             <svg className={styles.rowChevron} width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">

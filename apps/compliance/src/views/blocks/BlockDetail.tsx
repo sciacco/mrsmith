@@ -1,6 +1,7 @@
 import { Skeleton } from '@mrsmith/ui';
 import type { BlockRequest, BlockDomain } from '../../api/types';
 import { DomainList } from '../../components/DomainList';
+import { formatRequestDate } from '../../utils/format';
 import styles from './BlocksPage.module.css';
 
 interface BlockDetailProps {
@@ -10,11 +11,6 @@ interface BlockDetailProps {
   onEdit: () => void;
   onAddDomains: () => void;
   onEditDomain: (d: { id: number; domain: string }) => void;
-}
-
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 }
 
 export function BlockDetail({ block, domains, domainsLoading, onEdit, onAddDomains, onEditDomain }: BlockDetailProps) {
@@ -29,7 +25,7 @@ export function BlockDetail({ block, domains, domainsLoading, onEdit, onAddDomai
         </div>
         <div>
           <h2 className={styles.detailTitle}>{block.reference}</h2>
-          <p className={styles.detailMeta}>{formatDate(block.request_date)}</p>
+          <p className={styles.detailMeta}>{formatRequestDate(block.request_date)}</p>
         </div>
       </div>
 
@@ -67,7 +63,7 @@ export function BlockDetail({ block, domains, domainsLoading, onEdit, onAddDomai
           </div>
           <div>
             <p className={styles.infoLabel}>Data</p>
-            <p className={styles.infoValue}>{formatDate(block.request_date)}</p>
+            <p className={styles.infoValue}>{formatRequestDate(block.request_date)}</p>
           </div>
         </div>
       </div>

@@ -1,17 +1,13 @@
 import { useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { BlockRequest } from '../../api/types';
+import { formatRequestDate } from '../../utils/format';
 import styles from './BlocksPage.module.css';
 
 interface BlocksTableProps {
   blocks: BlockRequest[];
   selectedId: number | null;
   onSelect: (id: number) => void;
-}
-
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 }
 
 export function BlocksTable({ blocks, selectedId, onSelect }: BlocksTableProps) {
@@ -58,7 +54,7 @@ export function BlocksTable({ blocks, selectedId, onSelect }: BlocksTableProps) 
                     <path d="M6 6l6 6M12 6l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                   </svg>
                 </div>
-                <span className={styles.rowText}>{formatDate(block.request_date)}</span>
+                <span className={styles.rowText}>{formatRequestDate(block.request_date)}</span>
                 <span className={styles.rowText}>{block.method_description}</span>
                 <span className={styles.rowText}>{block.reference}</span>
                 <svg className={styles.rowChevron} width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
