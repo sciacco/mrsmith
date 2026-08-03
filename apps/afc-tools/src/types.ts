@@ -201,6 +201,22 @@ export interface OrderRow {
 // DDT cespiti: dynamic columns (preserve 1:1 Appsmith binding behavior).
 export type DdtCespitoRow = Record<string, unknown>;
 
+// RDA DDT Purchase Order: one flat row per eligible transport-document
+// attachment. Mirrors backend/internal/afctools/rda_ddt.go RDADDTAttachmentRow.
+export interface RDADdtAttachmentRow {
+  po_id: number;
+  po_code: string | null;
+  attachment_id: number;
+  file_name: string;
+  created: string; // RFC3339 instant
+  requester_first_name: string | null;
+  requester_last_name: string | null;
+  requester_email: string | null;
+  project: string;
+  subject: string | null;
+  cost_center: string | null;
+}
+
 export interface TransactionsExportResponse {
   renderId: string;
   renderUrl: string;

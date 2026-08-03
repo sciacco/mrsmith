@@ -7,6 +7,7 @@ import type {
   MissingArticle,
   OrderHeader,
   OrderRow,
+  RDADdtAttachmentRow,
   SalesOrderSummary,
   WhmcsInvoiceLine,
   WhmcsTransaction,
@@ -89,6 +90,19 @@ export function useDdtCespiti() {
   });
 }
 
+// RDA DDT Purchase Order: the query is enabled only after the user presses
+// Cerca (runId !== null); a new runId forces a fresh fetch even for the same
+// date range.
+export function useRdaDdtAttachments(from: string, to: string, runId: number | null) {
+  const api = useApiClient();
+  return useQuery<RDADdtAttachmentRow[]>({
+    queryKey: ['afc-tools', 'rda', 'ddt', runId ?? 'idle', from, to],
+    queryFn: () => api.get<RDADdtAttachmentRow[]>(`/afc-tools/v1/rda/ddt?from=${from}&to=${to}`),
+    enabled: runId !== null,
+    retry: false,
+  });
+}
+
 // Non-query exports (imperative — used from button onClick handlers).
 
 export function buildTransactionsURL(from: string, to: string): string {
@@ -102,4 +116,15 @@ export async function fetchTransactions(
   to: string,
 ): Promise<WhmcsTransaction[]> {
   return api.get<WhmcsTransaction[]>(buildTransactionsURL(from, to));
+}
+
+// Downloads the DDT ZIP for the selected POs over the authenticated blob
+// endpoint. The backend streams application/zip.
+export async function downloadRdaDdtZip(
+  api: ReturnType<typeof useApiClient>,
+  from: string,
+  to: string,
+  poIds: number[],
+): Promise<Blob> {
+  return api.postBlob('/afc-tools/v1/rda/ddt/download', { from, to, poIds });
 }

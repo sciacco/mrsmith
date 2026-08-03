@@ -103,6 +103,7 @@ Use this format for new knowledge entries:
 - [RDA Comment Mentions Notify Through MrSmith, Not Mistra](knowledge/rda.md#rda-comment-mentions-notify-through-mrsmith-not-mistra)
 - [RDA Article Catalog Type Comes From The BFF](knowledge/rda.md#rda-article-catalog-type-comes-from-the-bff)
 - [RDA Approval Permissions Come From users_int.role](knowledge/rda.md#rda-approval-permissions-come-from-users_introle)
+- [RDA DDT Documents Are Queried Directly On Arak With A Half-Open Civil-Day Range](knowledge/rda.md#rda-ddt-documents-are-queried-directly-on-arak-with-a-half-open-civil-day-range)
 
 ### Raenad / Aenad — [`knowledge/raenad-aenad.md`](knowledge/raenad-aenad.md)
 

@@ -24,6 +24,7 @@ type Deps struct {
 	Alyante *sql.DB
 	Carbone *CarboneService
 	Arak    *arak.Client
+	ArakDB  *sql.DB
 }
 
 type Handler struct {
@@ -63,6 +64,10 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 
 	// Alyante — Report DDT cespiti
 	handle("GET /afc-tools/v1/ddt-cespiti", h.handleDdtCespiti)
+
+	// Arak — RDA DDT Purchase Order
+	handle("GET /afc-tools/v1/rda/ddt", h.handleRDADDT)
+	handle("POST /afc-tools/v1/rda/ddt/download", h.handleRDADDTDownload)
 }
 
 // -- Shared helpers --

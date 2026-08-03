@@ -685,6 +685,7 @@ func main() {
 		Alyante: alyanteDB,
 		Carbone: afcToolsCarboneSvc,
 		Arak:    arakCli,
+		ArakDB:  arakDB,
 	})
 	aenad.RegisterRoutes(api, aenad.Deps{Mistra: mistraDB, Logger: logger, ConfigDB: anisettaDB, Carbone: aenadCarboneSvc})
 	raenad.RegisterRoutes(api, raenad.Deps{Mistra: mistraDB, ConfigDB: anisettaDB, Alyante: alyanteDB, HubSpot: raenadHubSpot, HubSpotStage: raenadHubSpotStage, Carbone: aenadCarboneSvc, Logger: logger})
