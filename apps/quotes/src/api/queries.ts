@@ -149,6 +149,18 @@ export function useCreateQuote() {
   });
 }
 
+export function useDuplicateQuote() {
+  const api = useApiClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) =>
+      api.post<{ id: number; quote_number: string; status: 'DRAFT' }>(`/quotes/v1/quotes/${id}/duplicate`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['quotes'] });
+    },
+  });
+}
+
 // ── Quote detail hooks ──
 
 export function useQuote(id: number) {

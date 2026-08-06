@@ -65,6 +65,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	// ── Quote CRUD ──
 	handle("GET /quotes/v1/quotes", h.handleListQuotes)
 	handle("POST /quotes/v1/quotes", h.handleCreateQuote)
+	handle("POST /quotes/v1/quotes/{id}/duplicate", h.handleDuplicateQuote)
 	handle("GET /quotes/v1/quotes/{id}", h.handleGetQuote)
 	handle("PUT /quotes/v1/quotes/{id}", h.handleUpdateQuote)
 	handle("GET /quotes/v1/quotes/{id}/hs-status", h.handleGetHSStatus)

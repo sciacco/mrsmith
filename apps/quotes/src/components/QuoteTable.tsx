@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Button, Icon, Skeleton, Tooltip } from '@mrsmith/ui';
+import { Button, Icon, Skeleton, Tooltip, useToast } from '@mrsmith/ui';
 import { hasRole } from '@mrsmith/auth-client';
 import type { Quote } from '../api/types';
 import { StatusBadge } from './StatusBadge';
 import { KebabMenu } from './KebabMenu';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
-import { useDeleteQuote } from '../api/queries';
+import { useDeleteQuote, useDuplicateQuote } from '../api/queries';
 import styles from './QuoteTable.module.css';
 
 interface QuoteTableProps {
@@ -38,8 +38,11 @@ export function QuoteTable({ quotes, isLoading, isFetching, hasFilters, onClearF
   const currentDir = params.get('dir') ?? 'desc';
   const { user } = useOptionalAuth();
   const canDelete = hasRole(user?.roles, 'app_quotes_delete');
+  const { toast } = useToast();
   const deleteQuote = useDeleteQuote();
+  const duplicateQuote = useDuplicateQuote();
   const [deletingQuoteId, setDeletingQuoteId] = useState<number | null>(null);
+  const [duplicatingQuoteId, setDuplicatingQuoteId] = useState<number | null>(null);
 
   const handleDelete = (id: number) => {
     if (deleteQuote.isPending) return;
@@ -47,6 +50,24 @@ export function QuoteTable({ quotes, isLoading, isFetching, hasFilters, onClearF
     deleteQuote.mutate(id, {
       onSettled: () => {
         setDeletingQuoteId(current => (current === id ? null : current));
+      },
+    });
+  };
+
+  const handleDuplicate = (id: number) => {
+    if (duplicateQuote.isPending) return;
+    duplicateQuote.reset();
+    setDuplicatingQuoteId(id);
+    duplicateQuote.mutate(id, {
+      onSuccess: result => {
+        toast(`Proposta ${result.quote_number} duplicata`, 'success');
+        navigate(`/quotes/${result.id}`);
+      },
+      onError: () => {
+        toast('Duplicazione non completata. Verifica la proposta e riprova.', 'error');
+      },
+      onSettled: () => {
+        setDuplicatingQuoteId(current => (current === id ? null : current));
       },
     });
   };
@@ -113,6 +134,9 @@ export function QuoteTable({ quotes, isLoading, isFetching, hasFilters, onClearF
   const deleteError = deleteQuote.isError
     ? (deleteQuote.error instanceof Error ? deleteQuote.error.message : 'Errore durante la cancellazione')
     : null;
+  const duplicateError = duplicateQuote.isError
+    ? 'Duplicazione non completata. Verifica la proposta e riprova.'
+    : null;
 
   return (
     <>
@@ -123,6 +147,19 @@ export function QuoteTable({ quotes, isLoading, isFetching, hasFilters, onClearF
             type="button"
             className={styles.errorDismiss}
             onClick={() => deleteQuote.reset()}
+            aria-label="Chiudi"
+          >
+            &times;
+          </button>
+        </div>
+      )}
+      {duplicateError && (
+        <div className={styles.errorBar} role="alert">
+          {duplicateError}
+          <button
+            type="button"
+            className={styles.errorDismiss}
+            onClick={() => duplicateQuote.reset()}
             aria-label="Chiudi"
           >
             &times;
@@ -222,17 +259,30 @@ export function QuoteTable({ quotes, isLoading, isFetching, hasFilters, onClearF
             <td><div className={`${styles.cell} ${styles.muted}`}>{abbreviateName(q.owner_name)}</div></td>
             <td><div className={styles.cell}><StatusBadge status={q.status} /></div></td>
             <td className={styles.kebabCell}>
-              <KebabMenu
-                quoteId={q.id}
-                canDelete={canDelete}
-                onDelete={() => handleDelete(q.id)}
-                deleteDisabled={deleteQuote.isPending}
-                deleteLabel={
-                  deleteQuote.isPending
-                    ? (deletingQuoteId === q.id ? 'Eliminazione in corso…' : 'Eliminazione in corso')
-                    : 'Elimina'
-                }
-              />
+              {duplicateQuote.isPending && duplicatingQuoteId === q.id ? (
+                <span className={styles.duplicatePending} role="status" aria-live="polite">
+                  Duplicazione in corso…
+                </span>
+              ) : (
+                <KebabMenu
+                  quoteId={q.id}
+                  canDelete={canDelete}
+                  onDelete={() => handleDelete(q.id)}
+                  deleteDisabled={deleteQuote.isPending}
+                  deleteLabel={
+                    deleteQuote.isPending
+                      ? (deletingQuoteId === q.id ? 'Eliminazione in corso…' : 'Eliminazione in corso')
+                      : 'Elimina'
+                  }
+                  onDuplicate={() => handleDuplicate(q.id)}
+                  duplicateDisabled={duplicateQuote.isPending}
+                  duplicateLabel={
+                    duplicateQuote.isPending
+                      ? (duplicatingQuoteId === q.id ? 'Duplicazione in corso…' : 'Duplicazione in corso')
+                      : 'Duplica'
+                  }
+                />
+              )}
             </td>
           </tr>
         ))}

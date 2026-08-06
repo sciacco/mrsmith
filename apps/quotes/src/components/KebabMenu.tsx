@@ -10,9 +10,21 @@ interface KebabMenuProps {
   onDelete?: () => void;
   deleteDisabled?: boolean;
   deleteLabel?: string;
+  onDuplicate?: () => void;
+  duplicateDisabled?: boolean;
+  duplicateLabel?: string;
 }
 
-export function KebabMenu({ quoteId, canDelete, onDelete, deleteDisabled = false, deleteLabel = 'Elimina' }: KebabMenuProps) {
+export function KebabMenu({
+  quoteId,
+  canDelete,
+  onDelete,
+  deleteDisabled = false,
+  deleteLabel = 'Elimina',
+  onDuplicate,
+  duplicateDisabled = false,
+  duplicateLabel = 'Duplica',
+}: KebabMenuProps) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
@@ -24,15 +36,31 @@ export function KebabMenu({ quoteId, canDelete, onDelete, deleteDisabled = false
 
   useEffect(() => {
     if (!open) return;
-    const handler = (e: MouseEvent) => {
+    const handleClickOutside = (e: MouseEvent) => {
       if (
         ref.current && !ref.current.contains(e.target as Node) &&
         menuRef.current && !menuRef.current.contains(e.target as Node)
       ) close();
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        close();
+        triggerRef.current?.focus();
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
   }, [open, close]);
+
+  useEffect(() => {
+    if (!open) return;
+    menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
+  }, [open]);
 
   // Close on scroll so the menu doesn't drift
   useEffect(() => {
@@ -60,16 +88,22 @@ export function KebabMenu({ quoteId, canDelete, onDelete, deleteDisabled = false
       ref={menuRef}
       className={styles.menu}
       style={{ top: pos.top, left: pos.left }}
+      role="menu"
+      aria-label="Azioni proposta"
     >
       <button
+        type="button"
         className={styles.menuItem}
+        role="menuitem"
         onClick={e => { e.stopPropagation(); navigate(`/quotes/${quoteId}`); }}
       >
         Apri
       </button>
       {canDelete && (
         <button
+          type="button"
           className={`${styles.menuItem} ${styles.menuItemDanger}`}
+          role="menuitem"
           disabled={deleteDisabled}
           title={deleteDisabled ? 'Attendi il completamento della cancellazione corrente.' : undefined}
           onClick={e => { e.stopPropagation(); onDelete?.(); close(); }}
@@ -78,12 +112,14 @@ export function KebabMenu({ quoteId, canDelete, onDelete, deleteDisabled = false
         </button>
       )}
       <button
-        className={`${styles.menuItem} ${styles.menuItemDisabled}`}
-        disabled
-        title="Prossimamente"
-        onClick={e => e.stopPropagation()}
+        type="button"
+        className={styles.menuItem}
+        role="menuitem"
+        disabled={duplicateDisabled}
+        title={duplicateDisabled ? 'Attendi il completamento della duplicazione corrente.' : undefined}
+        onClick={e => { e.stopPropagation(); onDuplicate?.(); close(); }}
       >
-        Duplica
+        {duplicateLabel}
       </button>
     </div>,
     document.body,
@@ -92,10 +128,13 @@ export function KebabMenu({ quoteId, canDelete, onDelete, deleteDisabled = false
   return (
     <div className={styles.wrap} ref={ref}>
       <button
+        type="button"
         ref={triggerRef}
         className={styles.trigger}
         onClick={handleToggle}
         aria-label="Menu azioni"
+        aria-haspopup="menu"
+        aria-expanded={open}
       >
         <Icon name="more-vertical" size={18} />
       </button>
