@@ -13,6 +13,15 @@ Part of the Implementation Knowledge Handbook — see [docs/IMPLEMENTATION-KNOWL
 - Used by: `apps/binocolo` `/target`.
 - Open questions: whether the threshold should become an admin-configurable value after real usage data.
 
+### Binocolo OpenAPI Company Facts Refresh After 24 Hours
+
+- Context: Binocolo Company `IT-search` discovery and IT-full deep analysis.
+- Discovery: exact Company `IT-search` responses are cached for 24 hours. A ready IT-full analysis is likewise reused for 24 hours, measured from its OpenAPI request timestamp (`requested_at`), rather than `updated_at`, because later scorecard or brief writes are not new vendor facts.
+- Practical rule: let the next equivalent search refresh an expired Company-search cache entry. On the next deep-dive request, requeue a ready IT-full row only when its vendor request is older than 24 hours; queued/running work is always reused. The conditional database update is the concurrency guard for a single refresh.
+- Evidence: `backend/internal/binocolo/company_search_cache.go`, `ma_service.go` (`maDeepFreshAt`, deep-dive entry points), and `ma_store.go` (`RefreshMADeepAnalysis`).
+- Used by: Binocolo target discovery, company deep-dive, initiative card deep-dive, and standalone company dossier.
+- Open questions: none.
+
 ### Binocolo Domain Identity, Provenance, and Thesis Fit Are Separate Axes
 
 - Context: Binocolo company overview, web-validation detail, domain registry, and `associate_domain` jobs.

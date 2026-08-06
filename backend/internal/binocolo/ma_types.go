@@ -50,6 +50,11 @@ const (
 	maDeepStatusReady   = "ready"
 	maDeepStatusFailed  = "failed"
 
+	// maDeepCacheTTL keeps the current IT-full analysis fresh without exposing a
+	// separate refresh workflow: the next deep-dive request refreshes a ready row
+	// once it is older than one day.
+	maDeepCacheTTL = 24 * time.Hour
+
 	// maDeepMaxAttempts bounds how many worker ticks poll a running IT-full job
 	// before it is marked failed (timeout guard for the async vendor request).
 	// At the 5s tick interval this is ~5 minutes of polling; the attempt counter
@@ -1615,6 +1620,9 @@ type MADeepAnalysis struct {
 	CostEUR    float64          `json:"costEur,omitempty"`
 	ErrorCode  string           `json:"errorCode,omitempty"`
 	UpdatedAt  *time.Time       `json:"updatedAt,omitempty"`
+	// FetchedAt is internal cache-freshness state. It is the OpenAPI request time,
+	// not UpdatedAt, because derived scorecard/brief writes also update the row.
+	FetchedAt *time.Time `json:"-"`
 }
 
 // MADeepScorecard is the deterministic financial reading of the IT-full payload:

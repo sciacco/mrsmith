@@ -3575,8 +3575,8 @@ func (s *maService) updateParameter(ctx context.Context, key, value, subject, em
 }
 
 // deepDive enqueues the rated (>=1 star) companies of a session for IT-full deep
-// analysis. Companies already analysed (status=ready, cached globally) are skipped
-// and not charged. The projected incremental spend (chargeable x cost_full) gates
+// analysis. A ready analysis is reused for 24 hours; the next request refreshes an
+// older one. The projected incremental spend (chargeable x cost_full) gates
 // the batch unless the analyst acknowledges going over budget. The async worker
 // picks up the queued rows; the returned detail reflects the new statuses.
 // maBriefRegenReport itemizes a brief-regeneration run so the ops caller sees per-row
@@ -4025,9 +4025,16 @@ func maInspectSummarize(devs []maInspectDeviation) MADeepInspectDeviation {
 	return out
 }
 
-// companyDossier is the standalone P.IVA lookup (POST). Cache-first by vat_code: a
-// ready or in-flight analysis is served as-is (no enqueue). A miss or previously
-// failed row queues a fresh IT-full deep analysis directly.
+// maDeepFreshAt is deliberately based on the vendor request timestamp, rather
+// than the row's updated_at: recalculating a scorecard or brief must not extend
+// the freshness of the underlying IT-full facts.
+func maDeepFreshAt(fetchedAt time.Time, now time.Time) bool {
+	return !fetchedAt.IsZero() && fetchedAt.After(now.Add(-maDeepCacheTTL))
+}
+
+// companyDossier is the standalone P.IVA lookup (POST). A ready IT-full result
+// is reused for one day; a later request refreshes it in place. In-flight work is
+// always reused, while a failed/missing result is queued as before.
 func (s *maService) companyDossier(ctx context.Context, vat string, email string) (MACompanyDossier, error) {
 	if s.store == nil {
 		return MACompanyDossier{}, errMAStoreUnavailable
@@ -4036,7 +4043,9 @@ func (s *maService) companyDossier(ctx context.Context, vat string, email string
 	if err != nil {
 		return MACompanyDossier{}, err
 	}
-	if rec != nil && (rec.Status == maDeepStatusReady || rec.Status == maDeepStatusQueued || rec.Status == maDeepStatusRunning) {
+	now := s.now()
+	if rec != nil && (rec.Status == maDeepStatusQueued || rec.Status == maDeepStatusRunning ||
+		(rec.Status == maDeepStatusReady && maDeepFreshAt(rec.FetchedAt, now))) {
 		return mapMACompanyDossier(vat, rec), nil
 	}
 	// La chiave la decide il registro, non la P.IVA digitata (issue #86).
@@ -4056,7 +4065,19 @@ func (s *maService) companyDossier(ctx context.Context, vat string, email string
 		}
 		companyKey = resolved
 	}
-	if err := s.store.EnqueueMADeepAnalysis(ctx, companyKey, vat, "", email); err != nil {
+	if rec != nil && rec.Status == maDeepStatusReady {
+		refreshed, err := s.store.RefreshMADeepAnalysis(ctx, companyKey, vat, "", email, now.Add(-maDeepCacheTTL))
+		if err != nil {
+			return MACompanyDossier{}, err
+		}
+		if !refreshed {
+			latest, err := s.store.GetMADeepByVAT(ctx, vat)
+			if err != nil {
+				return MACompanyDossier{}, err
+			}
+			return mapMACompanyDossier(vat, latest), nil
+		}
+	} else if err := s.store.EnqueueMADeepAnalysis(ctx, companyKey, vat, "", email); err != nil {
 		return MACompanyDossier{}, err
 	}
 	return MACompanyDossier{VATCode: vat, Status: maDeepStatusQueued}, nil
@@ -4154,11 +4175,14 @@ func (s *maService) deepDive(ctx context.Context, sessionID string, ack bool, em
 	if detail.Strategy != nil {
 		budget = maStrategyBudget(detail.Strategy.Strategy, pricing.BudgetDefault)
 	}
+	now := s.now()
 	chargeable := 0
 	for _, c := range candidates {
-		if record, ok := existing[c.key]; ok && record.Status != maDeepStatusFailed {
-			// ready/queued/running are not (re)charged nor (re)enqueued.
-			continue
+		if record, ok := existing[c.key]; ok {
+			if record.Status == maDeepStatusQueued || record.Status == maDeepStatusRunning ||
+				(record.Status == maDeepStatusReady && record.FetchedAt != nil && maDeepFreshAt(*record.FetchedAt, now)) {
+				continue
+			}
 		}
 		chargeable++
 	}
@@ -4173,8 +4197,19 @@ func (s *maService) deepDive(ctx context.Context, sessionID string, ack bool, em
 	}
 	enqueued := 0
 	for _, c := range candidates {
-		if record, ok := existing[c.key]; ok && record.Status != maDeepStatusFailed {
-			// ready/queued/running are not (re)charged nor (re)enqueued.
+		record, exists := existing[c.key]
+		if exists && (record.Status == maDeepStatusQueued || record.Status == maDeepStatusRunning ||
+			(record.Status == maDeepStatusReady && record.FetchedAt != nil && maDeepFreshAt(*record.FetchedAt, now))) {
+			continue
+		}
+		if exists && record.Status == maDeepStatusReady {
+			refreshed, err := s.store.RefreshMADeepAnalysis(ctx, c.key, c.vat, c.tax, email, now.Add(-maDeepCacheTTL))
+			if err != nil {
+				return MASessionDetail{}, err
+			}
+			if refreshed {
+				enqueued++
+			}
 			continue
 		}
 		if err := s.store.EnqueueMADeepAnalysis(ctx, c.key, c.vat, c.tax, email); err != nil {
@@ -4209,8 +4244,12 @@ func (s *maService) deepDiveCompany(ctx context.Context, companyKey, subject, em
 	if err != nil {
 		return MACompanyDeepDiveResponse{}, err
 	}
-	if record, ok := existing[companyKey]; ok && record.Status != maDeepStatusFailed {
-		return MACompanyDeepDiveResponse{Status: record.Status}, nil
+	now := s.now()
+	if record, ok := existing[companyKey]; ok {
+		if record.Status == maDeepStatusQueued || record.Status == maDeepStatusRunning ||
+			(record.Status == maDeepStatusReady && record.FetchedAt != nil && maDeepFreshAt(*record.FetchedAt, now)) {
+			return MACompanyDeepDiveResponse{Status: record.Status}, nil
+		}
 	}
 	identity, source, err := s.resolveCompanyDeepDiveIdentity(ctx, companyKey)
 	if err != nil {
@@ -4219,7 +4258,22 @@ func (s *maService) deepDiveCompany(ctx context.Context, companyKey, subject, em
 	if s.openapiit == nil {
 		return MACompanyDeepDiveResponse{}, errMAOpenAPIITUnavailable
 	}
-	if err := s.store.EnqueueMADeepAnalysis(ctx, companyKey, identity.VATCode, identity.TaxCode, email); err != nil {
+	if record, ok := existing[companyKey]; ok && record.Status == maDeepStatusReady {
+		refreshed, err := s.store.RefreshMADeepAnalysis(ctx, companyKey, identity.VATCode, identity.TaxCode, email, now.Add(-maDeepCacheTTL))
+		if err != nil {
+			return MACompanyDeepDiveResponse{}, err
+		}
+		if !refreshed {
+			latest, err := s.store.ListMADeepAnalysis(ctx, []string{companyKey})
+			if err != nil {
+				return MACompanyDeepDiveResponse{}, err
+			}
+			if current, ok := latest[companyKey]; ok {
+				return MACompanyDeepDiveResponse{Status: current.Status}, nil
+			}
+			return MACompanyDeepDiveResponse{Status: maDeepStatusReady}, nil
+		}
+	} else if err := s.store.EnqueueMADeepAnalysis(ctx, companyKey, identity.VATCode, identity.TaxCode, email); err != nil {
 		return MACompanyDeepDiveResponse{}, err
 	}
 	_ = s.traceEvent(ctx, maTraceEventWrite{

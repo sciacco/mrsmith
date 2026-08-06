@@ -1687,6 +1687,10 @@ func (f *fakeMAWorkspaceStore) EnqueueMADeepAnalysis(context.Context, string, st
 	return nil
 }
 
+func (f *fakeMAWorkspaceStore) RefreshMADeepAnalysis(context.Context, string, string, string, string, time.Time) (bool, error) {
+	return true, nil
+}
+
 func (f *fakeMAWorkspaceStore) EnqueueMADeepAnalysisIfAbsent(context.Context, string, string, string, string) (bool, string, error) {
 	return false, "", nil
 }

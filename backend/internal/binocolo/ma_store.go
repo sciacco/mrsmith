@@ -120,6 +120,7 @@ type maWorkspaceStore interface {
 	FindMACompanySnapshotByIdentity(ctx context.Context, vatOrTax string) (*maCompanySnapshot, error)
 	FindMACompanySnapshotByKey(ctx context.Context, companyKey string) (*maCompanySnapshot, error)
 	EnqueueMADeepAnalysis(ctx context.Context, companyKey, vatCode, taxCode, email string) error
+	RefreshMADeepAnalysis(ctx context.Context, companyKey, vatCode, taxCode, email string, staleBefore time.Time) (bool, error)
 	EnqueueMADeepAnalysisIfAbsent(ctx context.Context, companyKey, vat, tax, email string) (bool, string, error)
 	GetMADeepByFiscalIdentity(ctx context.Context, vat, tax string) (*maDeepVATRecord, error)
 	ListMADeepReadyPayloads(ctx context.Context) ([]maDeepPayloadRow, error)
@@ -4672,7 +4673,8 @@ func (s *SQLStore) ListMADeepAnalysis(ctx context.Context, companyKeys []string)
 		args[i] = key
 	}
 	query := `
-SELECT company_key, status, scorecard, valuation, brief, cost_eur, COALESCE(error_code, ''), updated_at
+SELECT company_key, status, scorecard, valuation, brief, cost_eur, COALESCE(error_code, ''), updated_at,
+       COALESCE(requested_at, created_at)
 FROM binocolo.ma_deep_analysis
 WHERE company_key IN (` + strings.Join(placeholders, ", ") + `)`
 	rows, err := s.db.QueryContext(ctx, query, args...)
@@ -4683,8 +4685,8 @@ WHERE company_key IN (` + strings.Join(placeholders, ", ") + `)`
 	for rows.Next() {
 		var item MADeepAnalysis
 		var scorecardRaw, valuationRaw, briefRaw []byte
-		var updatedAt time.Time
-		if err := rows.Scan(&item.CompanyKey, &item.Status, &scorecardRaw, &valuationRaw, &briefRaw, &item.CostEUR, &item.ErrorCode, &updatedAt); err != nil {
+		var updatedAt, fetchedAt time.Time
+		if err := rows.Scan(&item.CompanyKey, &item.Status, &scorecardRaw, &valuationRaw, &briefRaw, &item.CostEUR, &item.ErrorCode, &updatedAt, &fetchedAt); err != nil {
 			return nil, fmt.Errorf("scan ma deep analysis: %w", err)
 		}
 		if len(scorecardRaw) > 0 {
@@ -4705,8 +4707,10 @@ WHERE company_key IN (` + strings.Join(placeholders, ", ") + `)`
 				item.Brief = &brief
 			}
 		}
-		ts := updatedAt
-		item.UpdatedAt = &ts
+		updated := updatedAt
+		item.UpdatedAt = &updated
+		fetched := fetchedAt
+		item.FetchedAt = &fetched
 		out[item.CompanyKey] = item
 	}
 	if err := rows.Err(); err != nil {
@@ -4845,6 +4849,33 @@ WHERE binocolo.ma_deep_analysis.status = 'failed'
 		return fmt.Errorf("enqueue ma deep analysis: %w", translateMACompanyConstraintError(err, maCompanyConstraintFKOnly))
 	}
 	return nil
+}
+
+// RefreshMADeepAnalysis requeues a ready IT-full record only when its vendor
+// request predates staleBefore. The conditional update is the concurrency guard:
+// simultaneous deep-dive requests can refresh the same company only once.
+func (s *SQLStore) RefreshMADeepAnalysis(ctx context.Context, companyKey, vatCode, taxCode, email string, staleBefore time.Time) (bool, error) {
+	if s == nil || s.db == nil {
+		return false, errors.New("binocolo ma store not configured")
+	}
+	result, err := s.db.ExecContext(ctx, `
+UPDATE binocolo.ma_deep_analysis
+SET status = 'queued', attempts = 0, error_code = NULL, vendor_request_id = NULL, requested_at = NULL,
+    lease_until = NULL, locked_by = NULL,
+    vat_code = COALESCE($2, vat_code), tax_code = COALESCE($3, tax_code),
+    refreshed_by_email = $4, updated_at = now()
+WHERE company_key = $1
+  AND status = 'ready'
+  AND COALESCE(requested_at, created_at) <= $5
+`, companyKey, nullString(vatCode), nullString(taxCode), nullString(email), staleBefore)
+	if err != nil {
+		return false, fmt.Errorf("refresh ma deep analysis: %w", translateMACompanyConstraintError(err, maCompanyConstraintFKOnly))
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("refresh ma deep analysis rows: %w", err)
+	}
+	return affected == 1, nil
 }
 
 func (s *SQLStore) ListMADeepJobs(ctx context.Context, limit int, workerID string) ([]maDeepJob, error) {
@@ -5225,6 +5256,8 @@ type maDeepVATRecord struct {
 	Payload    json.RawMessage
 	ErrorCode  string
 	UpdatedAt  time.Time
+	// FetchedAt tracks the vendor request rather than subsequent derived writes.
+	FetchedAt time.Time
 	// BriefGeneratedAt is the brief-write stamp (nil when never generated), consumed by the
 	// on-read brief-staleness check (maDeepBriefStale) against the newest aligned NI decision.
 	BriefGeneratedAt *time.Time
@@ -5252,12 +5285,13 @@ func (s *SQLStore) GetMADeepByVAT(ctx context.Context, vat string) (*maDeepVATRe
 	var scorecardRaw, valuationRaw, briefRaw, payloadRaw []byte
 	var briefGeneratedAt sql.NullTime
 	err := s.db.QueryRowContext(ctx, `
-SELECT company_key, status, scorecard, valuation, brief, itfull_payload, COALESCE(error_code, ''), updated_at, brief_generated_at
+SELECT company_key, status, scorecard, valuation, brief, itfull_payload, COALESCE(error_code, ''), updated_at,
+       COALESCE(requested_at, created_at), brief_generated_at
 FROM binocolo.ma_deep_analysis
 WHERE `+maDeepFiscalIdentityMatch+`
 ORDER BY (status = 'ready') DESC, updated_at DESC
 LIMIT 1
-`, fiscalKey).Scan(&rec.CompanyKey, &rec.Status, &scorecardRaw, &valuationRaw, &briefRaw, &payloadRaw, &rec.ErrorCode, &rec.UpdatedAt, &briefGeneratedAt)
+`, fiscalKey).Scan(&rec.CompanyKey, &rec.Status, &scorecardRaw, &valuationRaw, &briefRaw, &payloadRaw, &rec.ErrorCode, &rec.UpdatedAt, &rec.FetchedAt, &briefGeneratedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -5299,7 +5333,7 @@ type maRowQuerier interface {
 
 // maDeepVATRecordColumns backs maDeepVATRecord (same shape scanned by GetMADeepByVAT),
 // reused by the fiscal-identity lookups.
-const maDeepVATRecordColumns = `company_key, status, scorecard, valuation, brief, itfull_payload, COALESCE(error_code, ''), updated_at, brief_generated_at`
+const maDeepVATRecordColumns = `company_key, status, scorecard, valuation, brief, itfull_payload, COALESCE(error_code, ''), updated_at, COALESCE(requested_at, created_at), brief_generated_at`
 
 // maDeepFiscalIdentityMatch is the WHERE predicate matching a ma_deep_analysis row to a
 // canonical fiscal_key ($1): vat_code IT-stripped alla forma stabile, tax_code pulito, e la
@@ -5318,7 +5352,7 @@ func scanMADeepVATRecord(scanner interface{ Scan(...any) error }) (*maDeepVATRec
 	var rec maDeepVATRecord
 	var scorecardRaw, valuationRaw, briefRaw, payloadRaw []byte
 	var briefGeneratedAt sql.NullTime
-	if err := scanner.Scan(&rec.CompanyKey, &rec.Status, &scorecardRaw, &valuationRaw, &briefRaw, &payloadRaw, &rec.ErrorCode, &rec.UpdatedAt, &briefGeneratedAt); err != nil {
+	if err := scanner.Scan(&rec.CompanyKey, &rec.Status, &scorecardRaw, &valuationRaw, &briefRaw, &payloadRaw, &rec.ErrorCode, &rec.UpdatedAt, &rec.FetchedAt, &briefGeneratedAt); err != nil {
 		return nil, err
 	}
 	if briefGeneratedAt.Valid {

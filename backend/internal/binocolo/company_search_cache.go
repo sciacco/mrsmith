@@ -16,7 +16,9 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/openapiit"
 )
 
-const companySearchCacheTTL = 30 * 24 * time.Hour
+// Company-search responses are shared for one day: the compact discovery flow
+// keeps upstream traffic low without leaving company facts stale for weeks.
+const companySearchCacheTTL = 24 * time.Hour
 
 type companySearchCacheEntry struct {
 	Response json.RawMessage

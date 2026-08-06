@@ -127,6 +127,7 @@ Use this format for new knowledge entries:
 ### Binocolo — [`knowledge/binocolo.md`](knowledge/binocolo.md)
 
 - [Binocolo M&A Uses Company `IT-search` With ATECO-First Fallback](knowledge/binocolo.md#binocolo-ma-uses-company-it-search-with-ateco-first-fallback)
+- [Binocolo OpenAPI Company Facts Refresh After 24 Hours](knowledge/binocolo.md#binocolo-openapi-company-facts-refresh-after-24-hours)
 - [Binocolo Domain Identity, Provenance, and Thesis Fit Are Separate Axes](knowledge/binocolo.md#binocolo-domain-identity-provenance-and-thesis-fit-are-separate-axes)
 - [Binocolo M&A Long Session Work Uses `ma_job`](knowledge/binocolo.md#binocolo-ma-long-session-work-uses-ma_job)
 - [Binocolo `/azienda` Is A Standalone Quick-Review Tool, Never The MA Dossier Destination](knowledge/binocolo.md#binocolo-azienda-is-a-standalone-quick-review-tool-never-the-ma-dossier-destination)
