@@ -5,6 +5,7 @@ import { hasRole } from '@mrsmith/auth-client';
 import type { Quote } from '../api/types';
 import { StatusBadge } from './StatusBadge';
 import { KebabMenu } from './KebabMenu';
+import { ConfirmDialog } from './ConfirmDialog';
 import { useOptionalAuth } from '../hooks/useOptionalAuth';
 import { useDeleteQuote, useDuplicateQuote } from '../api/queries';
 import styles from './QuoteTable.module.css';
@@ -41,15 +42,26 @@ export function QuoteTable({ quotes, isLoading, isFetching, hasFilters, onClearF
   const { toast } = useToast();
   const deleteQuote = useDeleteQuote();
   const duplicateQuote = useDuplicateQuote();
+  const [pendingDeleteQuote, setPendingDeleteQuote] = useState<Quote | null>(null);
   const [deletingQuoteId, setDeletingQuoteId] = useState<number | null>(null);
   const [duplicatingQuoteId, setDuplicatingQuoteId] = useState<number | null>(null);
 
-  const handleDelete = (id: number) => {
+  const requestDelete = (quote: Quote) => {
     if (deleteQuote.isPending) return;
-    setDeletingQuoteId(id);
-    deleteQuote.mutate(id, {
+    setPendingDeleteQuote(quote);
+  };
+
+  const confirmDelete = () => {
+    if (!pendingDeleteQuote || deleteQuote.isPending) return;
+    const quote = pendingDeleteQuote;
+    setDeletingQuoteId(quote.id);
+    deleteQuote.mutate(quote.id, {
+      onSuccess: () => {
+        toast(`Proposta ${quote.quote_number} eliminata`, 'success');
+      },
       onSettled: () => {
-        setDeletingQuoteId(current => (current === id ? null : current));
+        setPendingDeleteQuote(null);
+        setDeletingQuoteId(current => (current === quote.id ? null : current));
       },
     });
   };
@@ -267,7 +279,7 @@ export function QuoteTable({ quotes, isLoading, isFetching, hasFilters, onClearF
                 <KebabMenu
                   quoteId={q.id}
                   canDelete={canDelete}
-                  onDelete={() => handleDelete(q.id)}
+                  onDelete={() => requestDelete(q)}
                   deleteDisabled={deleteQuote.isPending}
                   deleteLabel={
                     deleteQuote.isPending
@@ -288,6 +300,21 @@ export function QuoteTable({ quotes, isLoading, isFetching, hasFilters, onClearF
         ))}
       </tbody>
     </table>
+      <ConfirmDialog
+        open={pendingDeleteQuote !== null}
+        title="Eliminare la proposta?"
+        message={
+          pendingDeleteQuote
+            ? `La proposta ${pendingDeleteQuote.quote_number} verrà eliminata in modo irreversibile. L'operazione non può essere annullata.`
+            : ''
+        }
+        confirmLabel="Elimina proposta"
+        confirmLoading={deleteQuote.isPending}
+        onConfirm={confirmDelete}
+        onCancel={() => {
+          if (!deleteQuote.isPending) setPendingDeleteQuote(null);
+        }}
+      />
     </>
   );
 }
