@@ -45,18 +45,16 @@ export function Modal({
   }, [open]);
 
   const handleCancel = (e: SyntheticEvent<HTMLDialogElement>) => {
-    if (!dismissible || !closeOnEscape) {
-      e.preventDefault();
-      return;
-    }
-    onClose();
+    // Keep closure controlled by React: otherwise the native close event would
+    // call onClose a second time after this handler.
+    e.preventDefault();
+    if (dismissible && closeOnEscape) onClose();
   };
 
   return (
     <dialog
       ref={dialogRef}
       className={`${styles.dialog} ${styles[resolvedSize]}`}
-      onClose={onClose}
       onCancel={handleCancel}
       onClick={(e) => {
         if (!dismissible) return;
