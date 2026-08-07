@@ -2800,6 +2800,16 @@ textarea {
   font-size: 0.76rem;
 }
 
+.contractualSummary {
+  max-width: 100%;
+  min-width: 0;
+  margin-top: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 @keyframes pageEnter {
   from {
     opacity: 0;

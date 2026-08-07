@@ -2,6 +2,63 @@ import { Icon } from '@mrsmith/ui';
 import type { PoRow } from '../api/types';
 import { formatMoney } from '../lib/format';
 
+function parseContractualNumber(value: unknown): number | null {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value !== 'string') return null;
+
+  const normalized = value.trim().replace(',', '.');
+  if (!normalized) return null;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatContractualNumber(value: number): string {
+  return new Intl.NumberFormat('it-IT', {
+    useGrouping: false,
+    maximumFractionDigits: 20,
+  }).format(value);
+}
+
+function contractualSummary(row: PoRow): string | null {
+  if (row.type !== 'service') return null;
+
+  const nrc = parseContractualNumber(row.activation_fee ?? row.activation_price);
+  const mrc = parseContractualNumber(row.montly_fee ?? row.monthly_fee);
+  if (mrc === 0 && nrc !== null && nrc > 0) return 'Servizio una tantum';
+
+  const fragments: string[] = [];
+  const duration = parseContractualNumber(row.renew_detail?.initial_subscription_months);
+  if (duration !== null && duration > 0) {
+    fragments.push(`Durata ${formatContractualNumber(duration)} mesi`);
+  }
+
+  const nextDuration = parseContractualNumber(row.renew_detail?.next_subscription_months);
+  if (nextDuration !== null && nextDuration > 0) {
+    fragments.push(`Rinnovo ${formatContractualNumber(nextDuration)} mesi`);
+  }
+
+  const recurrence = parseContractualNumber(row.payment_detail?.month_recursion);
+  if (recurrence !== null && recurrence > 0) {
+    const monthLabel = recurrence === 1 ? 'mese' : 'mesi';
+    fragments.push(`Ricorrenza ogni ${formatContractualNumber(recurrence)} ${monthLabel}`);
+  }
+
+  const automaticRenew = row.renew_detail?.automatic_renew;
+  if (typeof automaticRenew === 'boolean') {
+    fragments.push(automaticRenew ? 'Rinnovo automatico' : 'Senza rinnovo automatico');
+    if (automaticRenew) {
+      const cancellationAdvice = parseContractualNumber(row.renew_detail?.cancellation_advice);
+      if (cancellationAdvice !== null && cancellationAdvice > 0) {
+        fragments.push(`Preavviso disdetta ${formatContractualNumber(cancellationAdvice)} gg`);
+      }
+    }
+  }
+
+  return fragments.length > 0 ? fragments.join(' · ') : null;
+}
+
 export function RowTable({
   rows,
   currency,
@@ -46,6 +103,10 @@ export function RowTable({
                       ? `Unitario ${formatMoney(row.price, currency)}`
                       : `NRC ${formatMoney(row.activation_fee ?? row.activation_price, currency)} · MRC ${formatMoney(row.montly_fee ?? row.monthly_fee, currency)}`}
                   </small>
+                  {(() => {
+                    const summary = contractualSummary(row);
+                    return summary ? <span className="contractualSummary">{summary}</span> : null;
+                  })()}
                 </div>
               </td>
               <td data-label="Q.ta">{row.qty ?? '-'}</td>
