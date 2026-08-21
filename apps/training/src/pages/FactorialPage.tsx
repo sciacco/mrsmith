@@ -165,6 +165,7 @@ function EmployeesView() {
           <table className={styles.table}>
             <thead>
               <tr>
+                <th>ID</th>
                 <th>Nome</th>
                 <th>Email di login</th>
                 <th>Responsabile</th>
@@ -174,6 +175,7 @@ function EmployeesView() {
             <tbody>
               {rows.map((e: FactorialEmployee) => (
                 <tr key={e.id}>
+                  <td className={styles.idCell}>{e.id}</td>
                   <td>{e.fullName}</td>
                   <td>{e.loginEmail || <span className={styles.missing}>mancante</span>}</td>
                   <td>{e.manager?.name || <span className={styles.missing}>mancante</span>}</td>
@@ -222,6 +224,7 @@ function TeamsView() {
           <table className={styles.table}>
             <thead>
               <tr>
+                <th>ID</th>
                 <th>Team</th>
                 <th>Lead</th>
                 <th>Membri</th>
@@ -230,6 +233,7 @@ function TeamsView() {
             <tbody>
               {rows.map((t: FactorialTeam) => (
                 <tr key={t.id}>
+                  <td className={styles.idCell}>{t.id}</td>
                   <td>{t.name}</td>
                   <td>
                     {t.leads.length > 0 ? (
@@ -288,6 +292,7 @@ function TrainingsView() {
           <table className={styles.table}>
             <thead>
               <tr>
+                <th>ID</th>
                 <th>Corso</th>
                 <th>Anno</th>
                 <th>Stato</th>
@@ -299,6 +304,7 @@ function TrainingsView() {
             <tbody>
               {rows.map((t: FactorialTraining) => (
                 <tr key={t.id}>
+                  <td className={styles.idCell}>{t.id}</td>
                   <td>
                     <button type="button" className={styles.rowButton} onClick={() => setSelected(t)}>
                       {t.name}
@@ -343,6 +349,7 @@ function MembershipsDrawer({
           <table className={styles.table}>
             <thead>
               <tr>
+                <th>ID persona</th>
                 <th>Persona</th>
                 <th>Stato</th>
                 <th>Scadenza</th>
@@ -352,6 +359,7 @@ function MembershipsDrawer({
             <tbody>
               {rows.map((m) => (
                 <tr key={`${m.employeeId}`}>
+                  <td className={styles.idCell}>{m.employeeId}</td>
                   <td>{m.employeeName || m.employeeId}</td>
                   <td>{m.status || '—'}</td>
                   <td>{m.dueDate ? (formatLocalDate(m.dueDate) ?? '—') : '—'}</td>
