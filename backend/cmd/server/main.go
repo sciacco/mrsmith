@@ -61,6 +61,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/statsrda"
 	"github.com/sciacco/mrsmith/internal/support"
 	"github.com/sciacco/mrsmith/internal/training"
+	"github.com/sciacco/mrsmith/pkg/factorial"
 	"github.com/sciacco/mrsmith/pkg/middleware"
 )
 
@@ -630,6 +631,16 @@ func main() {
 		LLM:         llmSvc,
 		Logger:      logger,
 	})
+	var factorialCli *factorial.Client
+	if cfg.FactorialAPIKey != "" {
+		factorialOpts := []factorial.Option{factorial.WithAPIKey(cfg.FactorialAPIKey)}
+		if cfg.FactorialBaseURL != "" {
+			factorialOpts = append(factorialOpts, factorial.WithBaseURL(cfg.FactorialBaseURL))
+		}
+		factorialCli = factorial.New(factorialOpts...)
+	} else {
+		logger.Info("factorial client disabled without FACTORIAL_API_KEY", "component", "training")
+	}
 	training.RegisterRoutes(api, training.Deps{
 		DB:              anisettaDB,
 		Notifier:        notificationNotifier,
@@ -639,6 +650,7 @@ func main() {
 		StorageMaxBytes: cfg.TrainingStorageMaxBytes,
 		TrainingAppURL:  cfg.TrainingAppURL,
 		StaticDir:       cfg.StaticDir,
+		Factorial:       factorialCli,
 	})
 	panoramica.RegisterRoutes(api, mistraDB, grappaDB, anisettaDB)
 	quotes.RegisterRoutes(api, quotes.Deps{

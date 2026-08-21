@@ -9,6 +9,7 @@ import { CatalogPage } from './pages/CatalogPage';
 import { RulesPage } from './pages/RulesPage';
 import { GroupsPage } from './pages/GroupsPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { FactorialPage } from './pages/FactorialPage';
 
 export function routes(isPeopleAdmin: boolean): RouteObject[] {
   return [
@@ -26,6 +27,7 @@ export function routes(isPeopleAdmin: boolean): RouteObject[] {
     { path: 'pianificazione', element: <PlanningPage isPeopleAdmin={isPeopleAdmin} /> },
     { path: 'catalogo', element: <CatalogPage isPeopleAdmin={isPeopleAdmin} /> },
     { path: 'impostazioni', element: <SettingsPage isPeopleAdmin={isPeopleAdmin} /> },
+    { path: 'factorial', element: <FactorialPage isPeopleAdmin={isPeopleAdmin} /> },
     { path: '*', element: <Navigate to="/" replace /> },
   ];
 }

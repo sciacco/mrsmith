@@ -14,6 +14,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 	"github.com/sciacco/mrsmith/internal/platform/keycloak"
+	"github.com/sciacco/mrsmith/pkg/factorial"
 )
 
 type RoleUserResolver interface {
@@ -29,6 +30,7 @@ type Deps struct {
 	StorageMaxBytes int64
 	TrainingAppURL  string
 	StaticDir       string
+	Factorial       *factorial.Client
 }
 
 type handler struct {
@@ -40,6 +42,7 @@ type handler struct {
 	storageMaxBytes int64
 	trainingAppURL  string
 	staticDir       string
+	factorial       *factorial.Client
 }
 
 func RegisterRoutes(mux *http.ServeMux, deps Deps) {
@@ -64,6 +67,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 		storageMaxBytes: deps.StorageMaxBytes,
 		trainingAppURL:  deps.TrainingAppURL,
 		staticDir:       deps.StaticDir,
+		factorial:       deps.Factorial,
 	}
 
 	protect := acl.RequireRole(applaunch.TrainingAppAccessRoles()...)
@@ -132,6 +136,13 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	mux.Handle("PATCH /training/v1/people/plans/{id}", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpdatePlan)))))
 	mux.Handle("DELETE /training/v1/people/plans/{id}", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleDeletePlan)))))
 	mux.Handle("GET /training/v1/people/plans/{id}/audit", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handlePlanAudit)))))
+
+	// Factorial: interrogazione diagnostica read-only.
+	mux.Handle("GET /training/v1/factorial/status", protect(peopleProtect(http.HandlerFunc(h.handleFactorialStatus))))
+	mux.Handle("GET /training/v1/factorial/employees", protect(peopleProtect(http.HandlerFunc(h.handleFactorialEmployees))))
+	mux.Handle("GET /training/v1/factorial/teams", protect(peopleProtect(http.HandlerFunc(h.handleFactorialTeams))))
+	mux.Handle("GET /training/v1/factorial/trainings", protect(peopleProtect(http.HandlerFunc(h.handleFactorialTrainings))))
+	mux.Handle("GET /training/v1/factorial/trainings/{id}/memberships", protect(peopleProtect(http.HandlerFunc(h.handleFactorialTrainingMemberships))))
 }
 
 func (h *handler) requireStore(next http.Handler) http.Handler {

@@ -24,10 +24,11 @@ const navItems: TabNavItem[] = [
 
 const peopleAdminNavItems: TabNavItem[] = [
   ...navItems,
+  { label: 'Factorial', path: '/factorial' },
   { label: 'Impostazioni', path: '/impostazioni' },
 ];
 
-const ROUTES_WITHOUT_GLOBAL_HEADER = new Set(['/pipeline', '/impostazioni']);
+const ROUTES_WITHOUT_GLOBAL_HEADER = new Set(['/pipeline', '/impostazioni', '/factorial']);
 
 function AppRoutes({ isPeopleAdmin }: { isPeopleAdmin: boolean }) {
   const element = useRoutes(routes(isPeopleAdmin));

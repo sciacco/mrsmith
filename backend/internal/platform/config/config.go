@@ -159,6 +159,10 @@ type Config struct {
 	TrainingJobsEnabled     bool
 	TrainingJobsInterval    time.Duration
 
+	// Factorial HR API
+	FactorialAPIKey  string
+	FactorialBaseURL string
+
 	// Frontend Keycloak (public client, no secret — served to browser via GET /config)
 	KeycloakFrontendURL      string
 	KeycloakFrontendRealm    string
@@ -296,6 +300,9 @@ func Load() Config {
 		TrainingStorageMaxBytes:   int64(positiveIntEnvOr("TRAINING_STORAGE_MAX_BYTES", 20*1024*1024)),
 		TrainingJobsEnabled:       boolEnvOr("TRAINING_JOBS_ENABLED", false),
 		TrainingJobsInterval:      durationEnvOr("TRAINING_JOBS_INTERVAL", 6*time.Hour),
+
+		FactorialAPIKey:  envOr("FACTORIAL_API_KEY", ""),
+		FactorialBaseURL: envOr("FACTORIAL_BASE_URL", ""),
 
 		KeycloakFrontendURL:      keycloakFrontendURL,
 		KeycloakFrontendRealm:    keycloakFrontendRealm,
