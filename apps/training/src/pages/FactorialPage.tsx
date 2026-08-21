@@ -37,6 +37,7 @@ const ACTION_LABELS: Record<string, string> = {
   create_person: 'Persone da creare',
   update_person: 'Persone da aggiornare',
   terminate_person: 'Persone da cessare',
+  unlink_person: 'Cessate da sganciare',
   adopt_team: 'Team da agganciare',
   create_team: 'Team da creare',
   rename_team: 'Team da rinominare',

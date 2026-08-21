@@ -374,3 +374,96 @@ func TestDiffDirectoryIgnoresExemptPersonWithActiveSource(t *testing.T) {
 		t.Fatalf("exempt person must produce no actions, got %+v", actions)
 	}
 }
+
+func TestDiffDirectoryRehireReadoptsUnlinkedTerminatedRecord(t *testing.T) {
+	snapshot := directory.Snapshot{People: []directory.Person{{
+		ExternalID: "f-new",
+		FirstName:  "Paolo",
+		LastName:   "Maladosa",
+		LoginEmail: "paolo.maladosa@example.com",
+		Active:     true,
+	}}}
+	local := directoryLocalState{People: []directoryLocalPerson{{
+		ID:        "employee-1",
+		FirstName: "Paolo",
+		LastName:  "Maladosa",
+		Email:     "paolo.maladosa@example.com",
+		Status:    "terminated",
+	}}}
+
+	actions := diffDirectory(snapshot, local)
+
+	adopt := directorySingleAction(t, actions, directoryActionAdoptPerson)
+	if adopt.PersonID != "employee-1" || adopt.PersonExternalID != "f-new" {
+		t.Fatalf("unexpected adopt action: %+v", adopt)
+	}
+	update := directorySingleAction(t, actions, directoryActionUpdatePerson)
+	if update.Status != "active" {
+		t.Fatalf("rehire must reactivate the record: %+v", update)
+	}
+	if len(directoryActionsByType(actions, directoryActionCreatePerson)) != 0 {
+		t.Fatalf("rehire must not create a duplicate: %+v", actions)
+	}
+}
+
+func TestDiffDirectoryNeverAdoptsFromTerminatedSource(t *testing.T) {
+	snapshot := directory.Snapshot{People: []directory.Person{{
+		ExternalID: "f-old",
+		FirstName:  "Paolo",
+		LastName:   "Maladosa",
+		LoginEmail: "paolo.maladosa@example.com",
+		Active:     false,
+	}}}
+	local := directoryLocalState{People: []directoryLocalPerson{{
+		ID:        "employee-1",
+		FirstName: "Paolo",
+		LastName:  "Maladosa",
+		Email:     "paolo.maladosa@example.com",
+		Status:    "terminated",
+	}}}
+
+	if actions := diffDirectory(snapshot, local); len(actions) != 0 {
+		t.Fatalf("terminated source must not re-adopt an unlinked record, got %+v", actions)
+	}
+}
+
+func TestDiffDirectoryUnlinksTerminatedRecordsStillLinked(t *testing.T) {
+	snapshot := directory.Snapshot{People: []directory.Person{{
+		ExternalID: "f-1",
+		FirstName:  "Mario",
+		LastName:   "Rossi",
+		LoginEmail: "mario.rossi@example.com",
+		Active:     false,
+	}}}
+	local := directoryLocalState{People: []directoryLocalPerson{
+		{
+			ID:         "employee-1",
+			ExternalID: "f-1",
+			FirstName:  "Mario",
+			LastName:   "Rossi",
+			Email:      "mario.rossi@example.com",
+			Status:     "terminated",
+		},
+		{
+			ID:         "employee-2",
+			ExternalID: "f-9",
+			FirstName:  "Ada",
+			LastName:   "Verdi",
+			Email:      "ada.verdi@example.com",
+			Status:     "terminated",
+		},
+	}}
+
+	actions := diffDirectory(snapshot, local)
+
+	unlinks := directoryActionsByType(actions, directoryActionUnlinkPerson)
+	if len(unlinks) != 2 {
+		t.Fatalf("expected two unlinks, got %d (%+v)", len(unlinks), actions)
+	}
+	if unlinks[0].PersonID != "employee-1" || unlinks[1].PersonID != "employee-2" {
+		t.Fatalf("unexpected unlink targets: %+v", unlinks)
+	}
+	if len(directoryActionsByType(actions, directoryActionTerminatePerson)) != 0 {
+		t.Fatalf("already terminated records must not be terminated again: %+v", actions)
+	}
+}

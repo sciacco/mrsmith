@@ -2,6 +2,9 @@
 
 ## Training App
 
+### POC Course Data Is Obsolete — Cleanup Pending
+The courses currently loaded in `training.course` (and the enrollments/plans that reference them) were current only for the POC validation and are to be considered obsolete (decision 2026-08-21, post-briefing HR re-analysis, issue #130). Do not treat them as production data or build reporting on them. Cleanup is deferred until the domain redesign lands: at that point decide what survives (likely nothing of the courses; possibly historical certifications), whether the authoritative history is re-imported from Factorial's training module (218 courses 2018–2026 with per-person memberships, see #131/#132), and deliver the purge as a reviewed migration — never an ad-hoc delete.
+
 ### Calendar Integration Deferred Post Go-Live
 The Training mini-app intentionally excludes Outlook/iCal calendar integration from v1. When Product asks to reopen it, prefer a backend-owned read-only iCal feed for employee-visible training dates. Do not add Microsoft Graph writes or calendar mutation flows without a new product decision.
 

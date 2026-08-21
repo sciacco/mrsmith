@@ -23,6 +23,7 @@ const (
 	directoryActionCreatePerson    = "create_person"
 	directoryActionUpdatePerson    = "update_person"
 	directoryActionTerminatePerson = "terminate_person"
+	directoryActionUnlinkPerson    = "unlink_person"
 	directoryActionAdoptTeam       = "adopt_team"
 	directoryActionCreateTeam      = "create_team"
 	directoryActionRenameTeam      = "rename_team"
@@ -234,7 +235,9 @@ func diffDirectory(snapshot directory.Snapshot, local directoryLocalState) []dir
 		label := directoryPersonLabel(sourcePerson.LastName, sourcePerson.FirstName, sourcePerson.LoginEmail)
 		matched, ok := localPersonByExternal[sourcePerson.ExternalID]
 		if !ok {
-			if candidate, okEmail := localPersonByEmail[sourcePerson.LoginEmail]; okEmail && candidate.ExternalID == "" {
+			// L'adozione per email vale solo per i record fonte attivi: un
+			// record fonte cessato non riaggancia mai un locale sganciato.
+			if candidate, okEmail := localPersonByEmail[sourcePerson.LoginEmail]; okEmail && candidate.ExternalID == "" && sourcePerson.Active {
 				matched, ok = candidate, true
 				if !candidate.Exempt {
 					actions = append(actions, directorySyncAction{
@@ -284,8 +287,15 @@ func diffDirectory(snapshot directory.Snapshot, local directoryLocalState) []dir
 				})
 				continue
 			}
-			if directoryIdentityChanged(matched, sourcePerson) {
-				actions = append(actions, directoryUpdatePersonAction(label, matched, sourcePerson, ""))
+			// Già cessata ma ancora agganciata (dati pre-sgancio): si stacca
+			// l'external_id così un'eventuale riassunzione riaggancia per email.
+			if matched.ExternalID != "" {
+				actions = append(actions, directorySyncAction{
+					Type:             directoryActionUnlinkPerson,
+					Label:            label,
+					PersonID:         matched.ID,
+					PersonExternalID: sourcePerson.ExternalID,
+				})
 			}
 			continue
 		}
@@ -301,7 +311,16 @@ func diffDirectory(snapshot directory.Snapshot, local directoryLocalState) []dir
 	}
 
 	for _, person := range local.People {
-		if person.ExternalID == "" || person.Exempt || handledLocalIDs[person.ID] || person.Status == "terminated" {
+		if person.ExternalID == "" || person.Exempt || handledLocalIDs[person.ID] {
+			continue
+		}
+		if person.Status == "terminated" {
+			actions = append(actions, directorySyncAction{
+				Type:             directoryActionUnlinkPerson,
+				Label:            directoryPersonLabel(person.LastName, person.FirstName, person.Email),
+				PersonID:         person.ID,
+				PersonExternalID: person.ExternalID,
+			})
 			continue
 		}
 		actions = append(actions, directorySyncAction{
@@ -733,6 +752,14 @@ RETURNING id::text`, action.PersonExternalID, action.FirstName, action.LastName,
 			if err := s.directoryTerminatePerson(ctx, tx, syncPrincipal, action); err != nil {
 				return err
 			}
+		case directoryActionUnlinkPerson:
+			if err := s.directoryExecAudited(ctx, tx, syncPrincipal, "employee", action.PersonID, "directory_unlink", `
+UPDATE training.employee
+SET external_id = NULL,
+    updated_at = now()
+WHERE id = $1::uuid`, action.PersonID); err != nil {
+				return err
+			}
 		case directoryActionOpenMembership:
 			personID := action.PersonID
 			if personID == "" {
@@ -815,10 +842,13 @@ func (s *SQLStore) directoryTerminatePerson(ctx context.Context, tx *sql.Tx, pri
 	if action.TerminatedOn != nil {
 		terminatedOn = action.TerminatedOn.Format("2006-01-02")
 	}
+	// external_id azzerato: una futura riassunzione (nuovo record fonte,
+	// stessa email) riaggancia questo record per email invece di collidere.
 	if _, err := tx.ExecContext(ctx, `
 UPDATE training.employee
 SET status = 'terminated'::training.employee_status,
     termination_date = COALESCE($2::date, termination_date, CURRENT_DATE),
+    external_id = NULL,
     updated_at = now()
 WHERE id = $1::uuid`, action.PersonID, terminatedOn); err != nil {
 		return fmt.Errorf("terminate training directory person: %w", err)
