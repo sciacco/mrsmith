@@ -383,6 +383,7 @@ export interface PersonProfile {
     team_code: string;
     teams?: PersonTeamRef[];
     managed_by_directory?: boolean;
+    directory_exempt?: boolean;
     notes?: string;
   };
   compliance: PersonComplianceSection;
@@ -402,6 +403,7 @@ export interface PersonUpdateInput {
   status: PersonStatus;
   teamId: string | null;
   notes?: string;
+  directoryExempt?: boolean;
 }
 
 export interface PersonCreateInput {

@@ -39,8 +39,10 @@ type directoryLocalMembership struct {
 }
 
 type directoryLocalPerson struct {
-	ID          string
-	ExternalID  string
+	ID         string
+	ExternalID string
+	// Exempt: gestione manuale — la sincronizzazione ignora la persona.
+	Exempt      bool
 	FirstName   string
 	LastName    string
 	Email       string
@@ -86,6 +88,8 @@ type DirectorySyncSourceStats struct {
 	SkippedNoLoginEmail int `json:"skippedNoLoginEmail"`
 	SkippedDuplicate    int `json:"skippedDuplicate"`
 	SkippedMembership   int `json:"skippedMembership"`
+	// ExemptLocal: persone locali in gestione manuale, ignorate dalla sync.
+	ExemptLocal int `json:"exemptLocal"`
 }
 
 // DirectorySyncStats is the persisted summary of a run.
@@ -232,13 +236,15 @@ func diffDirectory(snapshot directory.Snapshot, local directoryLocalState) []dir
 		if !ok {
 			if candidate, okEmail := localPersonByEmail[sourcePerson.LoginEmail]; okEmail && candidate.ExternalID == "" {
 				matched, ok = candidate, true
-				actions = append(actions, directorySyncAction{
-					Type:             directoryActionAdoptPerson,
-					Label:            label,
-					PersonID:         candidate.ID,
-					PersonExternalID: sourcePerson.ExternalID,
-					Email:            sourcePerson.LoginEmail,
-				})
+				if !candidate.Exempt {
+					actions = append(actions, directorySyncAction{
+						Type:             directoryActionAdoptPerson,
+						Label:            label,
+						PersonID:         candidate.ID,
+						PersonExternalID: sourcePerson.ExternalID,
+						Email:            sourcePerson.LoginEmail,
+					})
+				}
 			}
 		}
 		if !ok {
@@ -259,6 +265,12 @@ func diffDirectory(snapshot directory.Snapshot, local directoryLocalState) []dir
 		}
 
 		handledLocalIDs[matched.ID] = true
+		// Gestione manuale: la persona resta agganciata (niente doppioni da
+		// create_person) ma la sincronizzazione non la tocca — nessun
+		// aggiornamento, nessuna cessazione, appartenenze intatte.
+		if matched.Exempt {
+			continue
+		}
 		localByExternalAfterMatch[sourcePerson.ExternalID] = matched
 
 		if !sourcePerson.Active {
@@ -289,7 +301,7 @@ func diffDirectory(snapshot directory.Snapshot, local directoryLocalState) []dir
 	}
 
 	for _, person := range local.People {
-		if person.ExternalID == "" || handledLocalIDs[person.ID] || person.Status == "terminated" {
+		if person.ExternalID == "" || person.Exempt || handledLocalIDs[person.ID] || person.Status == "terminated" {
 			continue
 		}
 		actions = append(actions, directorySyncAction{
@@ -460,7 +472,7 @@ func directoryUpdatePersonAction(label string, local directoryLocalPerson, sourc
 	return action
 }
 
-func directorySyncStats(actions []directorySyncAction, snapshot directory.Snapshot) DirectorySyncStats {
+func directorySyncStats(actions []directorySyncAction, snapshot directory.Snapshot, exemptLocal int) DirectorySyncStats {
 	stats := DirectorySyncStats{
 		Counts:  map[string]int{},
 		Samples: map[string][]string{},
@@ -472,6 +484,7 @@ func directorySyncStats(actions []directorySyncAction, snapshot directory.Snapsh
 				SkippedNoLoginEmail: snapshot.SkippedNoLoginEmail,
 				SkippedDuplicate:    snapshot.SkippedDuplicate,
 				SkippedMembership:   snapshot.SkippedMembership,
+				ExemptLocal:         exemptLocal,
 			},
 		},
 	}
@@ -552,8 +565,14 @@ func (s *SQLStore) executeDirectorySync(ctx context.Context, conn *sql.Conn, pro
 	if err != nil {
 		return DirectorySyncStats{}, err
 	}
+	exemptLocal := 0
+	for _, person := range local.People {
+		if person.Exempt {
+			exemptLocal++
+		}
+	}
 	actions := diffDirectory(snapshot, local)
-	stats := directorySyncStats(actions, snapshot)
+	stats := directorySyncStats(actions, snapshot, exemptLocal)
 	if dryRun {
 		return stats, nil
 	}
@@ -591,6 +610,7 @@ ORDER BY name, code`)
 SELECT
   e.id::text,
   COALESCE(e.external_id, ''),
+  e.directory_exempt,
   e.first_name,
   e.last_name,
   e.email::text,
@@ -623,6 +643,7 @@ ORDER BY e.email`)
 		if err := personRows.Scan(
 			&person.ID,
 			&person.ExternalID,
+			&person.Exempt,
 			&person.FirstName,
 			&person.LastName,
 			&person.Email,

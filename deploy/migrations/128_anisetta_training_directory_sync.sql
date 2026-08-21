@@ -3,6 +3,10 @@
 
 ALTER TABLE training.team ADD COLUMN IF NOT EXISTS external_id text;
 
+-- Gestione manuale: la persona è esclusa dalla sincronizzazione anagrafica
+-- (es. somministrati presenti nella directory esterna come cessati).
+ALTER TABLE training.employee ADD COLUMN IF NOT EXISTS directory_exempt boolean NOT NULL DEFAULT false;
+
 CREATE UNIQUE INDEX IF NOT EXISTS idx_team_external_id
   ON training.team(external_id)
   WHERE external_id IS NOT NULL;

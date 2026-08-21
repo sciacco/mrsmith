@@ -7,6 +7,7 @@ export interface DirectorySyncSourceStats {
   skippedNoLoginEmail: number;
   skippedDuplicate: number;
   skippedMembership: number;
+  exemptLocal: number;
 }
 
 export interface DirectorySyncStats {

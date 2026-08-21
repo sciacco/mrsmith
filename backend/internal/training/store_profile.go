@@ -61,7 +61,8 @@ SELECT
   COALESCE(et.primary_name, ''),
   COALESCE(et.primary_code, ''),
   COALESCE(e.notes, ''),
-  COALESCE(e.external_id, '') <> '',
+  COALESCE(e.external_id, '') <> '' AND NOT e.directory_exempt,
+  e.directory_exempt,
   COALESCE(et.teams, '[]')
 FROM training.employee e
 LEFT JOIN LATERAL (
@@ -98,6 +99,7 @@ WHERE e.id = $1::uuid`
 		&identity.TeamCode,
 		&identity.Notes,
 		&identity.ManagedByDirectory,
+		&identity.DirectoryExempt,
 		&teams,
 	)
 	if errors.Is(err, sql.ErrNoRows) {

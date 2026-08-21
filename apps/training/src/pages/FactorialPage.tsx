@@ -496,6 +496,7 @@ function PlanReport({ run }: { run: DirectorySyncRun }) {
         <Fact label="senza email di login" value={source.skippedNoLoginEmail} warnWhenPositive />
         <Fact label="record duplicati" value={source.skippedDuplicate} />
         <Fact label="appartenenze di cessati" value={source.skippedMembership} />
+        <Fact label="in gestione manuale" value={source.exemptLocal ?? 0} />
       </div>
       {groups.length === 0 ? (
         <p className={styles.empty}>Anagrafica allineata: nessuna modifica.</p>

@@ -25,6 +25,7 @@ const emptyDraft = {
   status: 'active' as PersonStatus,
   teamId: null as string | null,
   notes: '',
+  directoryExempt: false,
 };
 
 function apiErrorMessage(error: unknown): string {
@@ -55,6 +56,7 @@ export function PersonEditModal({ open, profile, teams, onClose }: PersonEditMod
       status: identity.status,
       teamId: identity.team_id || null,
       notes: identity.notes ?? '',
+      directoryExempt: identity.directory_exempt === true,
     });
     setSubmitted(false);
   }, [open, profile]);
@@ -72,7 +74,9 @@ export function PersonEditModal({ open, profile, teams, onClose }: PersonEditMod
     [profile.identity_min, teams],
   );
 
-  const managed = profile.identity_min.managed_by_directory === true;
+  const linkedToDirectory =
+    profile.identity_min.managed_by_directory === true || profile.identity_min.directory_exempt === true;
+  const managed = linkedToDirectory && !draft.directoryExempt;
   const managedTeams = profile.identity_min.teams ?? [];
 
   const formValid =
@@ -97,6 +101,7 @@ export function PersonEditModal({ open, profile, teams, onClose }: PersonEditMod
           status: draft.status,
           teamId: draft.teamId,
           notes: draft.notes.trim() || undefined,
+          directoryExempt: linkedToDirectory ? draft.directoryExempt : undefined,
         },
       });
       toast('Persona aggiornata');
@@ -193,6 +198,24 @@ export function PersonEditModal({ open, profile, teams, onClose }: PersonEditMod
           <p className={styles.managedNote}>
             Nome, email, stato e team sono gestiti dalla directory esterna: qui si modificano solo le note.
           </p>
+        )}
+
+        {linkedToDirectory && (
+          <label className={styles.exemptField}>
+            <input
+              type="checkbox"
+              checked={draft.directoryExempt}
+              onChange={(event) =>
+                setDraft((current) => ({ ...current, directoryExempt: event.target.checked }))
+              }
+            />
+            <span>
+              <span className={styles.exemptLabel}>Gestione manuale</span>
+              <span className={styles.exemptHint}>
+                La sincronizzazione ignora la persona: anagrafica, stato e team si gestiscono qui.
+              </span>
+            </span>
+          </label>
         )}
 
         <div className={styles.field}>

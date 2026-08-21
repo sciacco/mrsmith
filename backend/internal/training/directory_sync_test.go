@@ -303,3 +303,74 @@ func TestDiffDirectoryUpdatesLoginEmailMatchedByExternalID(t *testing.T) {
 		t.Fatalf("manual homonym must stay untouched: %+v", actions)
 	}
 }
+
+func TestDiffDirectoryIgnoresExemptPersonWithTerminatedSource(t *testing.T) {
+	terminatedOn := time.Date(2026, 6, 30, 0, 0, 0, 0, time.UTC)
+	snapshot := directory.Snapshot{
+		People: []directory.Person{{
+			ExternalID:   "f-1",
+			FirstName:    "Andrea",
+			LastName:     "Maldotti",
+			LoginEmail:   "andrea.maldotti@example.com",
+			Active:       false,
+			TerminatedOn: &terminatedOn,
+		}},
+		Teams: []directory.Team{{ExternalID: "t-1", Name: "MS"}},
+	}
+	local := directoryLocalState{
+		People: []directoryLocalPerson{{
+			ID:          "employee-1",
+			ExternalID:  "f-1",
+			Exempt:      true,
+			FirstName:   "Andrea",
+			LastName:    "Maldotti",
+			Email:       "andrea.maldotti@example.com",
+			Status:      "active",
+			Memberships: []directoryLocalMembership{{ID: "m-1", TeamID: "team-1"}},
+		}},
+		Teams: []directoryLocalTeam{{ID: "team-1", ExternalID: "t-1", Code: "MS", Name: "MS"}},
+	}
+
+	actions := diffDirectory(snapshot, local)
+
+	if len(actions) != 0 {
+		t.Fatalf("exempt person must produce no actions, got %+v", actions)
+	}
+}
+
+func TestDiffDirectoryIgnoresExemptPersonWithActiveSource(t *testing.T) {
+	snapshot := directory.Snapshot{
+		People: []directory.Person{{
+			ExternalID: "f-1",
+			FirstName:  "Maria",
+			LastName:   "Verdi",
+			LoginEmail: "maria.verdi@example.com",
+			Active:     true,
+		}},
+		Teams: []directory.Team{{
+			ExternalID:        "t-1",
+			Name:              "MS",
+			MemberExternalIDs: []string{"f-1"},
+		}},
+	}
+	local := directoryLocalState{
+		People: []directoryLocalPerson{{
+			ID:        "employee-1",
+			Exempt:    true,
+			FirstName: "Maria",
+			LastName:  "Verdi Bianchi",
+			Email:     "maria.verdi@example.com",
+			Status:    "active",
+		}},
+		Teams: []directoryLocalTeam{{ID: "team-1", ExternalID: "t-1", Code: "MS", Name: "MS"}},
+	}
+
+	actions := diffDirectory(snapshot, local)
+
+	if len(directoryActionsByType(actions, directoryActionCreatePerson)) != 0 {
+		t.Fatalf("exempt person matched by email must suppress create_person: %+v", actions)
+	}
+	if len(actions) != 0 {
+		t.Fatalf("exempt person must produce no actions, got %+v", actions)
+	}
+}

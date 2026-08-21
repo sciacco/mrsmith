@@ -293,25 +293,30 @@ WHERE id = $1::uuid`, teamID).Scan(&active)
 }
 
 type directoryManagedPerson struct {
-	Managed   bool
-	FirstName string
-	LastName  string
-	Email     string
-	Status    string
+	// Managed: agganciata alla directory E non esente — i campi anagrafici
+	// non si modificano a mano.
+	Managed       bool
+	HasExternalID bool
+	Exempt        bool
+	FirstName     string
+	LastName      string
+	Email         string
+	Status        string
 }
 
 func (s *SQLStore) directoryManagedPersonState(ctx context.Context, q sqlRunner, employeeID string) (directoryManagedPerson, error) {
 	var state directoryManagedPerson
 	err := q.QueryRowContext(ctx, `
-SELECT COALESCE(external_id, '') <> '', first_name, last_name, email::text, status::text
+SELECT COALESCE(external_id, '') <> '', directory_exempt, first_name, last_name, email::text, status::text
 FROM training.employee
-WHERE id = $1::uuid`, employeeID).Scan(&state.Managed, &state.FirstName, &state.LastName, &state.Email, &state.Status)
+WHERE id = $1::uuid`, employeeID).Scan(&state.HasExternalID, &state.Exempt, &state.FirstName, &state.LastName, &state.Email, &state.Status)
 	if errors.Is(err, sql.ErrNoRows) {
 		return state, notFoundError("employee_not_found", "persona non trovata")
 	}
 	if err != nil {
 		return state, fmt.Errorf("load training employee directory state: %w", err)
 	}
+	state.Managed = state.HasExternalID && !state.Exempt
 	return state, nil
 }
 
@@ -479,7 +484,11 @@ func (s *SQLStore) UpdatePerson(ctx context.Context, principal Principal, employ
 		if err != nil {
 			return err
 		}
-		if managed.Managed {
+		exempt := managed.Exempt
+		if input.DirectoryExempt != nil {
+			exempt = *input.DirectoryExempt
+		}
+		if managed.HasExternalID && !exempt {
 			if normalized.FirstName != managed.FirstName ||
 				normalized.LastName != managed.LastName ||
 				normalized.Email != managed.Email ||
@@ -505,6 +514,7 @@ SET first_name = $2,
     email = $4,
     status = $5::training.employee_status,
     notes = NULLIF($6, ''),
+    directory_exempt = $7,
     updated_at = now()
 WHERE id = $1::uuid
 RETURNING id::text, status::text`
@@ -517,6 +527,7 @@ RETURNING id::text, status::text`
 			normalized.Email,
 			normalized.Status,
 			normalized.Notes,
+			exempt,
 		).Scan(&response.ID, &response.Status); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return notFoundError("employee_not_found", "persona non trovata")

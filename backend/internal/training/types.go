@@ -346,8 +346,10 @@ type PersonIdentityMin struct {
 	TeamCode  string          `json:"team_code"`
 	Teams     []PersonTeamRef `json:"teams"`
 	// ManagedByDirectory: anagrafica e team arrivano dalla directory esterna.
-	ManagedByDirectory bool   `json:"managed_by_directory"`
-	Notes              string `json:"notes,omitempty"`
+	ManagedByDirectory bool `json:"managed_by_directory"`
+	// DirectoryExempt: gestione manuale, la sincronizzazione ignora la persona.
+	DirectoryExempt bool   `json:"directory_exempt"`
+	Notes           string `json:"notes,omitempty"`
 }
 
 type PersonComplianceMandatoryRule struct {
@@ -443,6 +445,9 @@ type PersonUpdateInput struct {
 	Status    string  `json:"status"`
 	TeamID    *string `json:"teamId"`
 	Notes     string  `json:"notes,omitempty"`
+	// DirectoryExempt: se presente, imposta la gestione manuale (esclusione
+	// dalla sincronizzazione anagrafica).
+	DirectoryExempt *bool `json:"directoryExempt,omitempty"`
 }
 
 type PersonCreateInput struct {

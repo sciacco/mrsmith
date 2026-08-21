@@ -304,7 +304,7 @@ func (s *SQLStore) upsertImportEmployee(ctx context.Context, tx *sql.Tx, row Emp
 		managed   bool
 	}
 	err := tx.QueryRowContext(ctx, `
-SELECT id::text, first_name, last_name, status::text, COALESCE(external_id, '') <> ''
+SELECT id::text, first_name, last_name, status::text, COALESCE(external_id, '') <> '' AND NOT directory_exempt
 FROM training.employee
 WHERE email = $1
 LIMIT 1`, row.Email).Scan(&existing.id, &existing.firstName, &existing.lastName, &existing.status, &existing.managed)
