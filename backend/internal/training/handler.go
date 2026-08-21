@@ -12,6 +12,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/authz"
 	"github.com/sciacco/mrsmith/internal/notifications"
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
+	"github.com/sciacco/mrsmith/internal/platform/directory"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 	"github.com/sciacco/mrsmith/internal/platform/keycloak"
 	"github.com/sciacco/mrsmith/pkg/factorial"
@@ -31,6 +32,7 @@ type Deps struct {
 	TrainingAppURL  string
 	StaticDir       string
 	Factorial       *factorial.Client
+	Directory       directory.Provider
 }
 
 type handler struct {
@@ -43,6 +45,7 @@ type handler struct {
 	trainingAppURL  string
 	staticDir       string
 	factorial       *factorial.Client
+	directory       directory.Provider
 }
 
 func RegisterRoutes(mux *http.ServeMux, deps Deps) {
@@ -68,6 +71,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 		trainingAppURL:  deps.TrainingAppURL,
 		staticDir:       deps.StaticDir,
 		factorial:       deps.Factorial,
+		directory:       deps.Directory,
 	}
 
 	protect := acl.RequireRole(applaunch.TrainingAppAccessRoles()...)
@@ -136,6 +140,9 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	mux.Handle("PATCH /training/v1/people/plans/{id}", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpdatePlan)))))
 	mux.Handle("DELETE /training/v1/people/plans/{id}", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleDeletePlan)))))
 	mux.Handle("GET /training/v1/people/plans/{id}/audit", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handlePlanAudit)))))
+
+	mux.Handle("GET /training/v1/directory/sync/runs", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleListDirectorySyncRuns)))))
+	mux.Handle("POST /training/v1/directory/sync", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleRunDirectorySync)))))
 
 	// Factorial: interrogazione diagnostica read-only.
 	mux.Handle("GET /training/v1/factorial/status", protect(peopleProtect(http.HandlerFunc(h.handleFactorialStatus))))

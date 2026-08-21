@@ -438,13 +438,21 @@ func (s *SQLStore) ImportTrainingRowsDetailed(ctx context.Context, principal Pri
 			if err != nil {
 				return err
 			}
-			teamID, err := s.upsertImportTeam(ctx, tx, row.TeamName)
+			managed, err := s.directoryManagedPersonState(ctx, tx, employeeID)
 			if err != nil {
 				return err
 			}
-			if teamID != "" {
-				if err := s.upsertImportTeamMembership(ctx, tx, employeeID, teamID); err != nil {
+			// I team delle persone sincronizzate arrivano dalla directory
+			// esterna: la colonna team del foglio viene ignorata.
+			if !managed.Managed {
+				teamID, err := s.upsertImportTeam(ctx, tx, row.TeamName)
+				if err != nil {
 					return err
+				}
+				if teamID != "" {
+					if err := s.upsertImportTeamMembership(ctx, tx, employeeID, teamID); err != nil {
+						return err
+					}
 				}
 			}
 			courseID, err := s.upsertImportCourse(ctx, tx, row)

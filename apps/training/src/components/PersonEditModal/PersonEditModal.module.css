@@ -66,6 +66,19 @@
   font-size: 0.875rem;
 }
 
+.readOnlyValue {
+  margin: 0;
+  padding: var(--space-2) 0;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.managedNote {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
 .footer {
   display: flex;
   justify-content: flex-end;

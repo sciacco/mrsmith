@@ -292,6 +292,29 @@ WHERE id = $1::uuid`, teamID).Scan(&active)
 	return nil
 }
 
+type directoryManagedPerson struct {
+	Managed   bool
+	FirstName string
+	LastName  string
+	Email     string
+	Status    string
+}
+
+func (s *SQLStore) directoryManagedPersonState(ctx context.Context, q sqlRunner, employeeID string) (directoryManagedPerson, error) {
+	var state directoryManagedPerson
+	err := q.QueryRowContext(ctx, `
+SELECT COALESCE(external_id, '') <> '', first_name, last_name, email::text, status::text
+FROM training.employee
+WHERE id = $1::uuid`, employeeID).Scan(&state.Managed, &state.FirstName, &state.LastName, &state.Email, &state.Status)
+	if errors.Is(err, sql.ErrNoRows) {
+		return state, notFoundError("employee_not_found", "persona non trovata")
+	}
+	if err != nil {
+		return state, fmt.Errorf("load training employee directory state: %w", err)
+	}
+	return state, nil
+}
+
 func (s *SQLStore) activeTeamMemberships(ctx context.Context, q sqlRunner, employeeID string) ([]activeTeamMembership, error) {
 	rows, err := q.QueryContext(ctx, `
 SELECT id::text, team_id::text
@@ -324,6 +347,18 @@ func membershipReplacementNeeded(active []activeTeamMembership, selectedTeamID s
 		return len(active) > 0
 	}
 	return len(active) != 1 || active[0].TeamID != selectedTeamID
+}
+
+func membershipCoversTeam(active []activeTeamMembership, selectedTeamID string) bool {
+	if selectedTeamID == "" {
+		return len(active) == 0
+	}
+	for _, membership := range active {
+		if membership.TeamID == selectedTeamID {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *SQLStore) CreatePerson(ctx context.Context, principal Principal, input PersonCreateInput) (ActionResponse, error) {
@@ -439,6 +474,29 @@ func (s *SQLStore) UpdatePerson(ctx context.Context, principal Principal, employ
 			return err
 		}
 		replaceMembership := membershipReplacementNeeded(activeMemberships, normalized.TeamID)
+
+		managed, err := s.directoryManagedPersonState(ctx, tx, employeeID)
+		if err != nil {
+			return err
+		}
+		if managed.Managed {
+			if normalized.FirstName != managed.FirstName ||
+				normalized.LastName != managed.LastName ||
+				normalized.Email != managed.Email ||
+				normalized.Status != managed.Status {
+				return validationError(
+					"person_managed_by_directory",
+					"nome, email e stato provengono dalla directory esterna: qui si modificano solo le note",
+				)
+			}
+			if input.TeamID != nil && !membershipCoversTeam(activeMemberships, normalized.TeamID) {
+				return validationError(
+					"person_managed_by_directory",
+					"i team provengono dalla directory esterna",
+				)
+			}
+			replaceMembership = false
+		}
 
 		const updateEmployee = `
 UPDATE training.employee
@@ -1079,12 +1137,47 @@ func (s *SQLStore) UpsertTeam(ctx context.Context, principal Principal, id strin
 	if strings.TrimSpace(input.Code) == "" || strings.TrimSpace(input.Name) == "" {
 		return ActionResponse{}, validationError("code_name_required", "codice e nome obbligatori")
 	}
+	if err := s.ensureTeamNotManaged(ctx, id, input); err != nil {
+		return ActionResponse{}, err
+	}
 	return s.upsertSimple(ctx, principal, "team", id, []upsertField{
 		field("code", strings.TrimSpace(input.Code)),
 		field("name", strings.TrimSpace(input.Name)),
 		field("description", nullableText(input.Description)),
 		field("is_active", boolValue(input.Active, true)),
 	})
+}
+
+func (s *SQLStore) ensureTeamNotManaged(ctx context.Context, id string, input TeamInput) error {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil
+	}
+	var (
+		managed bool
+		code    string
+		name    string
+	)
+	err := s.db.QueryRowContext(ctx, `
+SELECT COALESCE(external_id, '') <> '', code, name
+FROM training.team
+WHERE id = $1::uuid`, id).Scan(&managed, &code, &name)
+	if errors.Is(err, sql.ErrNoRows) {
+		return notFoundError("team_not_found", "team non trovato")
+	}
+	if err != nil {
+		return fmt.Errorf("load training team directory state: %w", err)
+	}
+	if !managed {
+		return nil
+	}
+	if strings.TrimSpace(input.Code) != code || strings.TrimSpace(input.Name) != name {
+		return validationError(
+			"team_managed_by_directory",
+			"codice e nome del team provengono dalla directory esterna",
+		)
+	}
+	return nil
 }
 
 func (s *SQLStore) UpsertSkillArea(ctx context.Context, principal Principal, id string, input SkillAreaInput) (ActionResponse, error) {

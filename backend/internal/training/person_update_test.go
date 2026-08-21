@@ -329,6 +329,7 @@ type personUpdateTestState struct {
 	nextEmployeeID   string
 	nextMembershipID string
 	duplicateEmailID string
+	directoryManaged bool
 	employeeCreated  bool
 	employeeUpdated  bool
 	committed        bool
@@ -445,6 +446,22 @@ func (c *personUpdateTestConn) QueryContext(_ context.Context, query string, arg
 	defer c.state.mu.Unlock()
 
 	switch {
+	case strings.Contains(query, "COALESCE(external_id, '') <> ''") && strings.Contains(query, "FROM training.employee"):
+		id := namedString(args, 0)
+		if id != c.state.employee.ID {
+			return newPersonUpdateRows([]string{"managed", "first_name", "last_name", "email", "status"}, nil), nil
+		}
+		return newPersonUpdateRows(
+			[]string{"managed", "first_name", "last_name", "email", "status"},
+			[][]driver.Value{{
+				c.state.directoryManaged,
+				c.state.employee.FirstName,
+				c.state.employee.LastName,
+				c.state.employee.Email,
+				c.state.employee.Status,
+			}},
+		), nil
+
 	case strings.Contains(query, "SELECT to_jsonb(row)") && strings.Contains(query, "FROM training.employee"):
 		id := namedString(args, 0)
 		switch {

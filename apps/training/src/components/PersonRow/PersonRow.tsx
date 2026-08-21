@@ -33,7 +33,11 @@ export function PersonRow({ person, selected, expanded, onToggleSelect, onToggle
         <Link to={`/persone/${person.id}`} className={styles.name}>
           {person.name}
         </Link>
-        <span className={styles.team}>{person.team_name || '—'}</span>
+        <span className={styles.team}>
+          {person.teams && person.teams.length > 0
+            ? person.teams.map((team) => team.name).join(', ')
+            : person.team_name || '—'}
+        </span>
         <span className={styles.flagCell}>
           <PersonChip flags={person.flags} gaps={person.gaps_open} />
         </span>

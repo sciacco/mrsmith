@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { formatLocalDate } from '@mrsmith/format';
-import { Drawer, Skeleton, StatusBadge } from '@mrsmith/ui';
+import { formatInstant, formatLocalDate } from '@mrsmith/format';
+import { Button, Drawer, Modal, Skeleton, StatusBadge, useToast } from '@mrsmith/ui';
+import {
+  useDirectorySyncRuns,
+  useRunDirectorySync,
+  type DirectorySyncRun,
+} from '../api/directorySync';
 import {
   useFactorialEmployees,
   useFactorialStatus,
@@ -18,13 +23,35 @@ interface FactorialPageProps {
   isPeopleAdmin: boolean;
 }
 
-type View = 'persone' | 'team' | 'formazione';
+type View = 'persone' | 'team' | 'formazione' | 'sincronizzazione';
 
 const VIEWS: { key: View; label: string }[] = [
   { key: 'persone', label: 'Persone' },
   { key: 'team', label: 'Team' },
   { key: 'formazione', label: 'Formazione' },
+  { key: 'sincronizzazione', label: 'Sincronizzazione' },
 ];
+
+const ACTION_LABELS: Record<string, string> = {
+  adopt_person: 'Persone da agganciare',
+  create_person: 'Persone da creare',
+  update_person: 'Persone da aggiornare',
+  terminate_person: 'Persone da cessare',
+  adopt_team: 'Team da agganciare',
+  create_team: 'Team da creare',
+  rename_team: 'Team da rinominare',
+  open_membership: 'Appartenenze da aprire',
+  close_membership: 'Appartenenze da chiudere',
+  set_lead: 'Lead da assegnare',
+  unset_lead: 'Lead da rimuovere',
+};
+
+const ACTION_ORDER = Object.keys(ACTION_LABELS);
+
+function formatRunInstant(value: string | undefined): string {
+  if (!value) return '—';
+  return formatInstant(value, { format: { dateStyle: 'medium', timeStyle: 'short' } }) ?? '—';
+}
 
 function formatEuro(decimal: string | undefined): string {
   if (!decimal) return '—';
@@ -36,7 +63,8 @@ function formatEuro(decimal: string | undefined): string {
 export function FactorialPage({ isPeopleAdmin }: FactorialPageProps) {
   const [params, setParams] = useSearchParams();
   const rawView = params.get('vista');
-  const view: View = rawView === 'team' || rawView === 'formazione' ? rawView : 'persone';
+  const view: View =
+    rawView === 'team' || rawView === 'formazione' || rawView === 'sincronizzazione' ? rawView : 'persone';
 
   const status = useFactorialStatus(isPeopleAdmin);
   const configured = status.data?.configured === true;
@@ -55,7 +83,8 @@ export function FactorialPage({ isPeopleAdmin }: FactorialPageProps) {
         <div>
           <h1 className={styles.title}>Factorial</h1>
           <p className={styles.subtitle}>
-            Dati presenti in Factorial: anagrafica, team e formazione. Sola lettura.
+            Dati presenti in Factorial: anagrafica, team e formazione. Consultazione in sola lettura;
+            la sincronizzazione allinea l'anagrafica del tool.
           </p>
         </div>
         <nav className={styles.viewSwitch} aria-label="Vista dati Factorial">
@@ -91,6 +120,7 @@ export function FactorialPage({ isPeopleAdmin }: FactorialPageProps) {
           {view === 'persone' && <EmployeesView />}
           {view === 'team' && <TeamsView />}
           {view === 'formazione' && <TrainingsView />}
+          {view === 'sincronizzazione' && <SyncView />}
         </>
       )}
     </main>
@@ -333,6 +363,214 @@ function MembershipsDrawer({
         )}
       </div>
     </Drawer>
+  );
+}
+
+function SyncView() {
+  const { toast } = useToast();
+  const runs = useDirectorySyncRuns(true);
+  const runSync = useRunDirectorySync();
+  const [plan, setPlan] = useState<DirectorySyncRun | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const history = runs.data ?? [];
+  const lastRun = history[0];
+
+  async function verify() {
+    try {
+      const run = await runSync.mutateAsync(true);
+      setPlan(run);
+      if ((run.stats?.total ?? 0) === 0) toast('Nessuna modifica da applicare');
+    } catch {
+      toast('Verifica non riuscita', 'error');
+    }
+  }
+
+  async function apply() {
+    setConfirmOpen(false);
+    try {
+      const run = await runSync.mutateAsync(false);
+      setPlan(run);
+      toast('Sincronizzazione applicata');
+    } catch {
+      toast('Sincronizzazione non riuscita', 'error');
+    }
+  }
+
+  const planTotal = plan?.stats?.total ?? 0;
+  const canApply = plan !== null && plan.dryRun && planTotal > 0;
+
+  return (
+    <div className={styles.syncLayout}>
+      <div className={styles.syncActions}>
+        <Button variant="primary" size="md" onClick={verify} loading={runSync.isPending}>
+          Verifica modifiche
+        </Button>
+        {canApply && (
+          <Button variant="secondary" size="md" onClick={() => setConfirmOpen(true)}>
+            Applica sincronizzazione
+          </Button>
+        )}
+      </div>
+
+      {lastRun && (
+        <div className={styles.facts}>
+          <span className={styles.fact}>
+            ultima esecuzione
+            <span className={styles.factValue}>{formatRunInstant(lastRun.startedAt)}</span>
+          </span>
+          <span className={styles.fact}>
+            tipo
+            <span className={styles.factValue}>{lastRun.dryRun ? 'verifica' : 'applicata'}</span>
+          </span>
+          <span className={styles.fact}>
+            esito
+            <span className={lastRun.status === 'failed' ? styles.factValueWarning : styles.factValue}>
+              {runStatusLabel(lastRun.status)}
+            </span>
+          </span>
+          <span className={styles.fact}>
+            richiesta da
+            <span className={styles.factValue}>{lastRun.actor}</span>
+          </span>
+        </div>
+      )}
+
+      {plan ? <PlanReport run={plan} /> : <p className={styles.notice}>
+        La verifica confronta l'anagrafica di Factorial con quella del tool e mostra le modifiche
+        prima di applicarle.
+      </p>}
+
+      <RunHistory runs={history} isLoading={runs.isLoading} isError={runs.isError} />
+
+      <Modal
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title="Applicare la sincronizzazione?"
+        size="sm"
+      >
+        <div className={styles.drawerBody}>
+          <p className={styles.drawerMeta}>
+            {planTotal} modifiche verranno scritte sull'anagrafica del tool. Le persone e i team
+            sincronizzati diventano di sola lettura.
+          </p>
+          <div className={styles.syncActions}>
+            <Button variant="ghost" size="md" onClick={() => setConfirmOpen(false)}>
+              Annulla
+            </Button>
+            <Button variant="primary" size="md" onClick={apply} loading={runSync.isPending}>
+              Applica
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+function runStatusLabel(status: DirectorySyncRun['status']): string {
+  switch (status) {
+    case 'ok':
+      return 'completata';
+    case 'failed':
+      return 'non riuscita';
+    default:
+      return 'in corso';
+  }
+}
+
+function PlanReport({ run }: { run: DirectorySyncRun }) {
+  const stats = run.stats;
+  if (!stats) {
+    return <p className={styles.errorNotice}>{run.error || 'Esecuzione senza resoconto.'}</p>;
+  }
+  const groups = ACTION_ORDER.filter((key) => (stats.counts[key] ?? 0) > 0);
+  const source = stats.source.stats;
+
+  return (
+    <section className={styles.syncPlan}>
+      <div className={styles.facts}>
+        <Fact label="modifiche" value={stats.total} />
+        <Fact label="persone in Factorial" value={source.people} />
+        <Fact label="team in Factorial" value={source.teams} />
+        <Fact label="senza email di login" value={source.skippedNoLoginEmail} warnWhenPositive />
+        <Fact label="record duplicati" value={source.skippedDuplicate} />
+        <Fact label="appartenenze di cessati" value={source.skippedMembership} />
+      </div>
+      {groups.length === 0 ? (
+        <p className={styles.empty}>Anagrafica allineata: nessuna modifica.</p>
+      ) : (
+        <div className={styles.syncGroups}>
+          {groups.map((key) => (
+            <div key={key} className={styles.syncGroup}>
+              <h2 className={styles.syncGroupTitle}>
+                {ACTION_LABELS[key]}
+                <span className={styles.factValue}>{stats.counts[key]}</span>
+              </h2>
+              <ul className={styles.personList}>
+                {(stats.samples[key] ?? []).map((entry, index) => (
+                  <li key={`${key}-${index}`}>{entry}</li>
+                ))}
+              </ul>
+              {(stats.counts[key] ?? 0) > (stats.samples[key]?.length ?? 0) && (
+                <p className={styles.drawerMeta}>
+                  Elenco parziale: {stats.samples[key]?.length ?? 0} voci su {stats.counts[key]}.
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function RunHistory({
+  runs,
+  isLoading,
+  isError,
+}: {
+  runs: DirectorySyncRun[];
+  isLoading: boolean;
+  isError: boolean;
+}) {
+  return (
+    <QueryStates isLoading={isLoading} isError={isError}>
+      {runs.length === 0 ? (
+        <p className={styles.empty}>Nessuna sincronizzazione registrata.</p>
+      ) : (
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Avvio</th>
+                <th>Tipo</th>
+                <th>Esito</th>
+                <th className={styles.numCell}>Modifiche</th>
+                <th>Richiesta da</th>
+              </tr>
+            </thead>
+            <tbody>
+              {runs.map((run) => (
+                <tr key={run.id}>
+                  <td>{formatRunInstant(run.startedAt)}</td>
+                  <td>{run.dryRun ? 'verifica' : 'applicata'}</td>
+                  <td>
+                    <StatusBadge
+                      value={run.status}
+                      label={runStatusLabel(run.status)}
+                      variant={run.status === 'ok' ? 'success' : run.status === 'failed' ? 'danger' : 'neutral'}
+                    />
+                  </td>
+                  <td className={styles.numCell}>{run.stats?.total ?? '—'}</td>
+                  <td className={styles.mutedCell}>{run.actor}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </QueryStates>
   );
 }
 

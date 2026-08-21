@@ -3,6 +3,7 @@ package training
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 )
@@ -56,20 +57,35 @@ SELECT
   e.last_name,
   e.email::text,
   e.status::text,
-  COALESCE(t.id::text, ''),
-  COALESCE(t.name, ''),
-  COALESCE(t.code, ''),
-  COALESCE(e.notes, '')
+  COALESCE(et.primary_id, ''),
+  COALESCE(et.primary_name, ''),
+  COALESCE(et.primary_code, ''),
+  COALESCE(e.notes, ''),
+  COALESCE(e.external_id, '') <> '',
+  COALESCE(et.teams, '[]')
 FROM training.employee e
-LEFT JOIN training.team_membership tm
-  ON tm.employee_id = e.id
-  AND tm.start_date <= now()
-  AND (tm.end_date IS NULL OR tm.end_date >= now())
-LEFT JOIN training.team t ON t.id = tm.team_id
-WHERE e.id = $1::uuid
-ORDER BY tm.start_date DESC NULLS LAST, tm.created_at DESC NULLS LAST
-LIMIT 1`
-	var identity PersonIdentityMin
+LEFT JOIN LATERAL (
+  SELECT
+    (array_agg(t.id::text ORDER BY t.name))[1] AS primary_id,
+    (array_agg(t.name ORDER BY t.name))[1] AS primary_name,
+    (array_agg(t.code ORDER BY t.name))[1] AS primary_code,
+    json_agg(json_build_object(
+      'id', t.id::text,
+      'code', t.code,
+      'name', t.name,
+      'lead', tm.role = 'lead'
+    ) ORDER BY t.name)::text AS teams
+  FROM training.team_membership tm
+  JOIN training.team t ON t.id = tm.team_id
+  WHERE tm.employee_id = e.id
+    AND tm.start_date <= now()
+    AND (tm.end_date IS NULL OR tm.end_date >= now())
+) et ON true
+WHERE e.id = $1::uuid`
+	var (
+		identity PersonIdentityMin
+		teams    string
+	)
 	err := s.db.QueryRowContext(ctx, q, employeeID).Scan(
 		&identity.ID,
 		&identity.Name,
@@ -81,12 +97,17 @@ LIMIT 1`
 		&identity.TeamName,
 		&identity.TeamCode,
 		&identity.Notes,
+		&identity.ManagedByDirectory,
+		&teams,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return identity, notFoundError("employee_not_found", "persona non trovata")
 	}
 	if err != nil {
 		return identity, fmt.Errorf("load training person identity: %w", err)
+	}
+	if err := json.Unmarshal([]byte(teams), &identity.Teams); err != nil {
+		return identity, fmt.Errorf("decode training person teams: %w", err)
 	}
 	return identity, nil
 }

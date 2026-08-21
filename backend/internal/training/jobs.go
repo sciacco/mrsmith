@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/sciacco/mrsmith/internal/notifications"
+	"github.com/sciacco/mrsmith/internal/platform/directory"
 )
 
 type JobRunner struct {
@@ -16,6 +17,8 @@ type JobRunner struct {
 	logger         *slog.Logger
 	trainingAppURL string
 	windows        []int
+	directory      directory.Provider
+	syncDirectory  bool
 }
 
 func NewJobRunner(store *SQLStore, notifier notifications.Notifier, logger *slog.Logger, trainingAppURL string) *JobRunner {
@@ -29,6 +32,17 @@ func NewJobRunner(store *SQLStore, notifier notifications.Notifier, logger *slog
 		trainingAppURL: trainingAppURL,
 		windows:        []int{90, 30, 7},
 	}
+}
+
+// WithDirectorySync enables the periodic anagrafica reconciliation. It stays
+// off unless explicitly enabled: the database is shared across environments.
+func (r *JobRunner) WithDirectorySync(provider directory.Provider, enabled bool) *JobRunner {
+	if r == nil {
+		return r
+	}
+	r.directory = provider
+	r.syncDirectory = enabled && provider != nil
+	return r
 }
 
 func (r *JobRunner) RunOnce(ctx context.Context) (JobRunResponse, error) {
@@ -46,6 +60,11 @@ func (r *JobRunner) RunOnce(ctx context.Context) (JobRunResponse, error) {
 	certifications, err := r.notifyExpiringCertifications(ctx)
 	if err != nil {
 		r.logger.Warn("training certification notification job failed", "error", err)
+	}
+	if r.syncDirectory {
+		if _, err := r.store.RunDirectorySync(ctx, r.directory, "job", false); err != nil {
+			r.logger.Warn("training directory sync job failed", "error", err)
+		}
 	}
 	return JobRunResponse{
 		OK:                         true,

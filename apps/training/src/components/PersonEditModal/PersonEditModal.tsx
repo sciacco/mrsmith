@@ -72,6 +72,9 @@ export function PersonEditModal({ open, profile, teams, onClose }: PersonEditMod
     [profile.identity_min, teams],
   );
 
+  const managed = profile.identity_min.managed_by_directory === true;
+  const managedTeams = profile.identity_min.teams ?? [];
+
   const formValid =
     draft.firstName.trim().length > 0 &&
     draft.lastName.trim().length > 0 &&
@@ -117,6 +120,7 @@ export function PersonEditModal({ open, profile, teams, onClose }: PersonEditMod
               value={draft.firstName}
               onChange={(event) => setDraft((current) => ({ ...current, firstName: event.target.value }))}
               autoComplete="given-name"
+              disabled={managed}
               required
             />
           </div>
@@ -128,6 +132,7 @@ export function PersonEditModal({ open, profile, teams, onClose }: PersonEditMod
               value={draft.lastName}
               onChange={(event) => setDraft((current) => ({ ...current, lastName: event.target.value }))}
               autoComplete="family-name"
+              disabled={managed}
               required
             />
           </div>
@@ -142,6 +147,7 @@ export function PersonEditModal({ open, profile, teams, onClose }: PersonEditMod
             value={draft.email}
             onChange={(event) => setDraft((current) => ({ ...current, email: event.target.value }))}
             autoComplete="email"
+            disabled={managed}
             required
           />
         </div>
@@ -149,25 +155,45 @@ export function PersonEditModal({ open, profile, teams, onClose }: PersonEditMod
         <div className={styles.gridTwo}>
           <div className={styles.field}>
             <label className={styles.label}>Stato</label>
-            <SingleSelect
-              options={STATUS_OPTIONS}
-              selected={draft.status}
-              onChange={(value) => setDraft((current) => ({ ...current, status: (value ?? 'active') as PersonStatus }))}
-            />
+            {managed ? (
+              <p className={styles.readOnlyValue}>
+                {STATUS_OPTIONS.find((option) => option.value === draft.status)?.label ?? draft.status}
+              </p>
+            ) : (
+              <SingleSelect
+                options={STATUS_OPTIONS}
+                selected={draft.status}
+                onChange={(value) => setDraft((current) => ({ ...current, status: (value ?? 'active') as PersonStatus }))}
+              />
+            )}
           </div>
           <div className={styles.field}>
             <label className={styles.label}>Team</label>
-            <SingleSelect
-              options={teamOptions}
-              selected={draft.teamId}
-              onChange={(value) => setDraft((current) => ({ ...current, teamId: value ? String(value) : null }))}
-              placeholder="Senza team"
-              allowClear
-              clearLabel="Senza team"
-              searchable
-            />
+            {managed ? (
+              <p className={styles.readOnlyValue}>
+                {managedTeams.length > 0
+                  ? managedTeams.map((team) => (team.lead ? `${team.name} (lead)` : team.name)).join(', ')
+                  : 'Senza team'}
+              </p>
+            ) : (
+              <SingleSelect
+                options={teamOptions}
+                selected={draft.teamId}
+                onChange={(value) => setDraft((current) => ({ ...current, teamId: value ? String(value) : null }))}
+                placeholder="Senza team"
+                allowClear
+                clearLabel="Senza team"
+                searchable
+              />
+            )}
           </div>
         </div>
+
+        {managed && (
+          <p className={styles.managedNote}>
+            Nome, email, stato e team sono gestiti dalla directory esterna: qui si modificano solo le note.
+          </p>
+        )}
 
         <div className={styles.field}>
           <label htmlFor="person-notes" className={styles.label}>Note</label>

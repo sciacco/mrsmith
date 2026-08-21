@@ -275,12 +275,20 @@ type PersonFlags struct {
 	SenzaFormazioneAttiva bool `json:"senza_formazione_attiva"`
 }
 
+type PersonTeamRef struct {
+	ID   string `json:"id"`
+	Code string `json:"code"`
+	Name string `json:"name"`
+	Lead bool   `json:"lead,omitempty"`
+}
+
 type PersonSummary struct {
 	ID                     string              `json:"id"`
 	Name                   string              `json:"name"`
 	Email                  string              `json:"email"`
 	TeamCode               string              `json:"team_code"`
 	TeamName               string              `json:"team_name,omitempty"`
+	Teams                  []PersonTeamRef     `json:"teams"`
 	Flags                  PersonFlags         `json:"flags"`
 	ActiveEnrollmentsCount int                 `json:"active_enrollments_count"`
 	NextDeadline           *PersonNextDeadline `json:"next_deadline,omitempty"`
@@ -327,16 +335,19 @@ type BulkAssignResponse struct {
 }
 
 type PersonIdentityMin struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	Email     string `json:"email"`
-	Status    string `json:"status"`
-	TeamID    string `json:"team_id,omitempty"`
-	TeamName  string `json:"team_name,omitempty"`
-	TeamCode  string `json:"team_code"`
-	Notes     string `json:"notes,omitempty"`
+	ID        string          `json:"id"`
+	Name      string          `json:"name"`
+	FirstName string          `json:"first_name"`
+	LastName  string          `json:"last_name"`
+	Email     string          `json:"email"`
+	Status    string          `json:"status"`
+	TeamID    string          `json:"team_id,omitempty"`
+	TeamName  string          `json:"team_name,omitempty"`
+	TeamCode  string          `json:"team_code"`
+	Teams     []PersonTeamRef `json:"teams"`
+	// ManagedByDirectory: anagrafica e team arrivano dalla directory esterna.
+	ManagedByDirectory bool   `json:"managed_by_directory"`
+	Notes              string `json:"notes,omitempty"`
 }
 
 type PersonComplianceMandatoryRule struct {

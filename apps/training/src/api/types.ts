@@ -265,12 +265,20 @@ export interface PersonNextDeadline {
   label: string;
 }
 
+export interface PersonTeamRef {
+  id: string;
+  code: string;
+  name: string;
+  lead?: boolean;
+}
+
 export interface PersonSummary {
   id: string;
   name: string;
   email: string;
   team_code: string;
   team_name?: string;
+  teams?: PersonTeamRef[];
   flags: PersonFlags;
   active_enrollments_count: number;
   next_deadline: PersonNextDeadline | null;
@@ -373,6 +381,8 @@ export interface PersonProfile {
     team_id?: string;
     team_name?: string;
     team_code: string;
+    teams?: PersonTeamRef[];
+    managed_by_directory?: boolean;
     notes?: string;
   };
   compliance: PersonComplianceSection;

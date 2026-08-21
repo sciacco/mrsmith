@@ -38,6 +38,8 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/brave"
 	"github.com/sciacco/mrsmith/internal/platform/config"
 	"github.com/sciacco/mrsmith/internal/platform/database"
+	"github.com/sciacco/mrsmith/internal/platform/directory"
+	"github.com/sciacco/mrsmith/internal/platform/directory/factorialdir"
 	"github.com/sciacco/mrsmith/internal/platform/email"
 	"github.com/sciacco/mrsmith/internal/platform/emailledger"
 	"github.com/sciacco/mrsmith/internal/platform/googledrive"
@@ -641,6 +643,10 @@ func main() {
 	} else {
 		logger.Info("factorial client disabled without FACTORIAL_API_KEY", "component", "training")
 	}
+	var directoryProvider directory.Provider
+	if factorialCli != nil {
+		directoryProvider = factorialdir.New(factorialCli)
+	}
 	training.RegisterRoutes(api, training.Deps{
 		DB:              anisettaDB,
 		Notifier:        notificationNotifier,
@@ -651,6 +657,7 @@ func main() {
 		TrainingAppURL:  cfg.TrainingAppURL,
 		StaticDir:       cfg.StaticDir,
 		Factorial:       factorialCli,
+		Directory:       directoryProvider,
 	})
 	panoramica.RegisterRoutes(api, mistraDB, grappaDB, anisettaDB)
 	quotes.RegisterRoutes(api, quotes.Deps{
@@ -788,7 +795,7 @@ func main() {
 			notificationNotifier,
 			logger,
 			cfg.TrainingAppURL,
-		)
+		).WithDirectorySync(directoryProvider, cfg.TrainingDirectorySyncEnabled)
 		workerWG.Add(1)
 		go func() {
 			defer workerWG.Done()

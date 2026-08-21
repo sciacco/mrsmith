@@ -157,7 +157,10 @@ type Config struct {
 	TrainingStorageDir      string
 	TrainingStorageMaxBytes int64
 	TrainingJobsEnabled     bool
-	TrainingJobsInterval    time.Duration
+	// TrainingDirectorySyncEnabled abilita la sincronizzazione anagrafica
+	// periodica dalla directory esterna (il manuale da console resta attivo).
+	TrainingDirectorySyncEnabled bool
+	TrainingJobsInterval         time.Duration
 
 	// Factorial HR API
 	FactorialAPIKey  string
@@ -295,11 +298,12 @@ func Load() Config {
 			"DIAGNOSTIC_EVENTS_RETENTION_DAYS",
 			90,
 		),
-		DiagnosticEventsQueueSize: positiveIntEnvOr("DIAGNOSTIC_EVENTS_QUEUE_SIZE", 1000),
-		TrainingStorageDir:        envOr("TRAINING_STORAGE_DIR", ""),
-		TrainingStorageMaxBytes:   int64(positiveIntEnvOr("TRAINING_STORAGE_MAX_BYTES", 20*1024*1024)),
-		TrainingJobsEnabled:       boolEnvOr("TRAINING_JOBS_ENABLED", false),
-		TrainingJobsInterval:      durationEnvOr("TRAINING_JOBS_INTERVAL", 6*time.Hour),
+		DiagnosticEventsQueueSize:    positiveIntEnvOr("DIAGNOSTIC_EVENTS_QUEUE_SIZE", 1000),
+		TrainingStorageDir:           envOr("TRAINING_STORAGE_DIR", ""),
+		TrainingStorageMaxBytes:      int64(positiveIntEnvOr("TRAINING_STORAGE_MAX_BYTES", 20*1024*1024)),
+		TrainingJobsEnabled:          boolEnvOr("TRAINING_JOBS_ENABLED", false),
+		TrainingDirectorySyncEnabled: boolEnvOr("TRAINING_DIRECTORY_SYNC_ENABLED", false),
+		TrainingJobsInterval:         durationEnvOr("TRAINING_JOBS_INTERVAL", 6*time.Hour),
 
 		FactorialAPIKey:  envOr("FACTORIAL_API_KEY", ""),
 		FactorialBaseURL: envOr("FACTORIAL_BASE_URL", ""),

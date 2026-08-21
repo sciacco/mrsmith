@@ -301,12 +301,13 @@ func (s *SQLStore) upsertImportEmployee(ctx context.Context, tx *sql.Tx, row Emp
 		firstName string
 		lastName  string
 		status    string
+		managed   bool
 	}
 	err := tx.QueryRowContext(ctx, `
-SELECT id::text, first_name, last_name, status::text
+SELECT id::text, first_name, last_name, status::text, COALESCE(external_id, '') <> ''
 FROM training.employee
 WHERE email = $1
-LIMIT 1`, row.Email).Scan(&existing.id, &existing.firstName, &existing.lastName, &existing.status)
+LIMIT 1`, row.Email).Scan(&existing.id, &existing.firstName, &existing.lastName, &existing.status, &existing.managed)
 	if errors.Is(err, sql.ErrNoRows) {
 		_, err := tx.ExecContext(ctx, `
 INSERT INTO training.employee (first_name, last_name, email, status)
@@ -322,6 +323,12 @@ VALUES ($1, $2, $3, 'active')`, row.FirstName, row.LastName, row.Email)
 
 	if existing.firstName == row.FirstName && existing.lastName == row.LastName && existing.status == "active" {
 		return "unchanged", nil
+	}
+	if existing.managed {
+		return "", validationError(
+			"person_managed_by_directory",
+			"anagrafica gestita dalla directory esterna: import non applicabile a "+row.Email,
+		)
 	}
 
 	_, err = tx.ExecContext(ctx, `

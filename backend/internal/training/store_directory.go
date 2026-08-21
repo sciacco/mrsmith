@@ -3,6 +3,7 @@ package training
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -28,14 +29,26 @@ WITH active_emp AS (
     e.id,
     e.first_name,
     e.last_name,
-    e.email::text AS email,
-    tm.team_id
+    e.email::text AS email
   FROM training.employee e
-  LEFT JOIN training.team_membership tm
-    ON tm.employee_id = e.id
-    AND tm.start_date <= now()
-    AND (tm.end_date IS NULL OR tm.end_date >= now())
   WHERE e.status = 'active'
+),
+emp_teams AS (
+  SELECT
+    tm.employee_id,
+    (array_agg(t.code ORDER BY t.name))[1] AS primary_code,
+    (array_agg(t.name ORDER BY t.name))[1] AS primary_name,
+    json_agg(json_build_object(
+      'id', t.id::text,
+      'code', t.code,
+      'name', t.name,
+      'lead', tm.role = 'lead'
+    ) ORDER BY t.name)::text AS teams
+  FROM training.team_membership tm
+  JOIN training.team t ON t.id = tm.team_id
+  WHERE tm.start_date <= now()
+    AND (tm.end_date IS NULL OR tm.end_date >= now())
+  GROUP BY tm.employee_id
 ),
 year_plan AS (
   SELECT id
@@ -168,8 +181,9 @@ SELECT
   ae.id::text,
   ae.last_name || ' ' || ae.first_name AS name,
   ae.email,
-  COALESCE(t.code, '') AS team_code,
-  COALESCE(t.name, '') AS team_name,
+  COALESCE(et.primary_code, '') AS team_code,
+  COALESCE(et.primary_name, '') AS team_name,
+  COALESCE(et.teams, '[]') AS teams,
   COALESCE(g.gap_count, 0) AS gaps_open,
   COALESCE(ac.active_count, 0) AS active_enrollments_count,
   COALESCE(ex.exp_count, 0) AS expiring_certs_count,
@@ -183,14 +197,22 @@ SELECT
   nd.deadline_date,
   nd.deadline_label
 FROM active_emp ae
-LEFT JOIN training.team t ON t.id = ae.team_id
+LEFT JOIN emp_teams et ON et.employee_id = ae.id
 LEFT JOIN active_enrollments ac ON ac.employee_id = ae.id
 LEFT JOIN history h ON h.employee_id = ae.id
 LEFT JOIN gap_summary g ON g.employee_id = ae.id
 LEFT JOIN expiring ex ON ex.employee_id = ae.id
 LEFT JOIN failed f ON f.employee_id = ae.id
 LEFT JOIN next_deadline nd ON nd.employee_id = ae.id
-WHERE ($2 = '' OR t.code = $2)
+WHERE ($2 = '' OR EXISTS (
+    SELECT 1
+    FROM training.team_membership team_filter
+    JOIN training.team team_filter_team ON team_filter_team.id = team_filter.team_id
+    WHERE team_filter.employee_id = ae.id
+      AND team_filter.start_date <= now()
+      AND (team_filter.end_date IS NULL OR team_filter.end_date >= now())
+      AND team_filter_team.code = $2
+  ))
   AND ($3 = '' OR ae.last_name || ' ' || ae.first_name ILIKE '%' || $3 || '%' OR ae.email::text ILIKE '%' || $3 || '%')
   AND ($4 = '' OR EXISTS (
     SELECT 1
@@ -211,6 +233,7 @@ LIMIT 500`
 	for rows.Next() {
 		var (
 			summary       PersonSummary
+			teams         string
 			deadlineType  sql.NullString
 			deadlineDate  sql.NullString
 			deadlineLabel sql.NullString
@@ -221,6 +244,7 @@ LIMIT 500`
 			&summary.Email,
 			&summary.TeamCode,
 			&summary.TeamName,
+			&teams,
 			&summary.GapsOpen,
 			&summary.ActiveEnrollmentsCount,
 			&summary.ExpiringCertsCount,
@@ -235,6 +259,9 @@ LIMIT 500`
 			&deadlineLabel,
 		); err != nil {
 			return nil, fmt.Errorf("scan training person summary: %w", err)
+		}
+		if err := json.Unmarshal([]byte(teams), &summary.Teams); err != nil {
+			return nil, fmt.Errorf("decode training person teams: %w", err)
 		}
 		summary.NextDeadline = personNextDeadline(deadlineType, deadlineDate, deadlineLabel)
 		summary.PriorityScore = computePersonPriorityScore(summary)
