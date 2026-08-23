@@ -150,6 +150,8 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	mux.Handle("GET /training/v1/factorial/teams", protect(peopleProtect(http.HandlerFunc(h.handleFactorialTeams))))
 	mux.Handle("GET /training/v1/factorial/trainings", protect(peopleProtect(http.HandlerFunc(h.handleFactorialTrainings))))
 	mux.Handle("GET /training/v1/factorial/trainings/{id}/memberships", protect(peopleProtect(http.HandlerFunc(h.handleFactorialTrainingMemberships))))
+	mux.Handle("GET /training/v1/factorial/trainings/{id}/structure", protect(peopleProtect(http.HandlerFunc(h.handleFactorialTrainingStructure))))
+	mux.Handle("GET /training/v1/factorial/sessions/{id}/participants", protect(peopleProtect(http.HandlerFunc(h.handleFactorialSessionParticipants))))
 }
 
 func (h *handler) requireStore(next http.Handler) http.Handler {

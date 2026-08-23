@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { formatInstant, formatLocalDate } from '@mrsmith/format';
+import { formatCurrency, formatInstant, formatLocalDate } from '@mrsmith/format';
 import { Button, Drawer, Modal, Skeleton, StatusBadge, useToast } from '@mrsmith/ui';
 import {
   useDirectorySyncRuns,
@@ -9,11 +9,15 @@ import {
 } from '../api/directorySync';
 import {
   useFactorialEmployees,
+  useFactorialSessionParticipants,
   useFactorialStatus,
   useFactorialTeams,
   useFactorialTrainingMemberships,
+  useFactorialTrainingStructure,
   useFactorialTrainings,
   type FactorialEmployee,
+  type FactorialMembership,
+  type FactorialSession,
   type FactorialTeam,
   type FactorialTraining,
 } from '../api/factorialDiag';
@@ -48,6 +52,57 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 const ACTION_ORDER = Object.keys(ACTION_LABELS);
+
+const ATTENDANCE_STATUS_ORDER = ['pending', 'missing', 'inprogress', 'completed'];
+
+const SCHEDULE_LABELS: Record<string, string> = {
+  scheduled: 'Programmato',
+  selfpaced: 'Autonomo',
+};
+
+const MODALITY_LABELS: Record<string, string> = {
+  online: 'Online',
+  inperson: 'In presenza',
+  mixed: 'Mista',
+};
+
+const ATTENDANCE_LABELS: Record<string, string> = {
+  pending: 'In attesa',
+  missing: 'Assente',
+  inprogress: 'In corso',
+  completed: 'Completata',
+};
+
+function labeled(value: string | undefined, labels: Record<string, string>): string {
+  if (!value) return '—';
+  return labels[value] ?? value;
+}
+
+function formatCost(value: string | undefined, currency: string | undefined): string {
+  if (!value) return '—';
+  const formatted = formatCurrency(Number(value), currency || 'EUR');
+  if (formatted !== null) return formatted;
+  return currency ? `${value} ${currency}` : value;
+}
+
+function personKey(primary: string | undefined, fallback: string | undefined): string | null {
+  const key = (primary ?? '').trim() || (fallback ?? '').trim();
+  return key || null;
+}
+
+function sessionPeriod(session: FactorialSession): string {
+  if (session.startsAt) {
+    const start = formatInstant(session.startsAt);
+    if (start === null) return '—';
+    if (session.endsAt) {
+      const end = formatInstant(session.endsAt);
+      return end !== null ? `${start} – ${end}` : start;
+    }
+    return start;
+  }
+  if (session.dueDate) return formatLocalDate(session.dueDate) ?? '—';
+  return '—';
+}
 
 function formatRunInstant(value: string | undefined): string {
   if (!value) return '—';
@@ -322,12 +377,12 @@ function TrainingsView() {
           </table>
         </div>
       )}
-      <MembershipsDrawer training={selected} onClose={() => setSelected(null)} />
+      <TrainingDetailDrawer training={selected} onClose={() => setSelected(null)} />
     </QueryStates>
   );
 }
 
-function MembershipsDrawer({
+function TrainingDetailDrawer({
   training,
   onClose,
 }: {
@@ -335,43 +390,372 @@ function MembershipsDrawer({
   onClose: () => void;
 }) {
   const memberships = useFactorialTrainingMemberships(training?.id ?? null);
-  const rows = memberships.data ?? [];
+  const structure = useFactorialTrainingStructure(training?.id ?? null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const seenTrainingId = useRef<string | null>(null);
+
+  useEffect(() => {
+    const id = training?.id ?? null;
+    if (id !== seenTrainingId.current) {
+      seenTrainingId.current = id;
+      setSelectedSessionId(null);
+    }
+  }, [training?.id]);
+
+  const classes = structure.data?.classes ?? [];
+  const sessions = structure.data?.sessions ?? [];
+  const classById = new Map(classes.map((c) => [c.id, c]));
+  const selectedSession = sessions.find((s) => s.id === selectedSessionId) ?? null;
+  const membershipRows = memberships.data ?? [];
+
   return (
-    <Drawer open={training !== null} onClose={onClose} title={training?.name ?? ''}>
+    <Drawer open={training !== null} onClose={onClose} title={training?.name ?? ''} size="lg">
       <div className={styles.drawerBody}>
-        <p className={styles.drawerMeta}>Iscrizioni registrate in Factorial per questo corso.</p>
-        {memberships.isLoading ? (
-          <Skeleton rows={5} />
-        ) : memberships.isError ? (
-          <p className={styles.errorNotice}>Lettura delle iscrizioni non riuscita.</p>
-        ) : rows.length === 0 ? (
-          <p className={styles.empty}>Nessuna iscrizione registrata.</p>
-        ) : (
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>ID persona</th>
-                <th>Persona</th>
-                <th>Stato</th>
-                <th>Scadenza</th>
-                <th>Completato</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((m) => (
-                <tr key={`${m.employeeId}`}>
-                  <td className={styles.idCell}>{m.employeeId}</td>
-                  <td>{m.employeeName || m.employeeId}</td>
-                  <td>{m.status || '—'}</td>
-                  <td>{m.dueDate ? (formatLocalDate(m.dueDate) ?? '—') : '—'}</td>
-                  <td>{m.completedAt ? (formatLocalDate(m.completedAt) ?? '—') : '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <section className={styles.drawerSection}>
+          <h2 className={styles.sectionTitle}>Iscrizioni al training</h2>
+          <p className={styles.drawerMeta}>Iscrizioni registrate in Factorial per questo corso.</p>
+          {memberships.isLoading ? (
+            <Skeleton rows={4} />
+          ) : memberships.isError ? (
+            <p className={styles.errorNotice}>Lettura delle iscrizioni non riuscita.</p>
+          ) : membershipRows.length === 0 ? (
+            <p className={styles.empty}>Nessuna iscrizione registrata.</p>
+          ) : (
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>ID persona</th>
+                    <th>Persona</th>
+                    <th>Stato</th>
+                    <th>Scadenza</th>
+                    <th>Completato</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {membershipRows.map((m) => (
+                    <tr key={`${m.employeeId}`}>
+                      <td className={styles.idCell}>{m.employeeId}</td>
+                      <td>{m.employeeName || m.employeeId}</td>
+                      <td>{m.status || '—'}</td>
+                      <td>{m.dueDate ? (formatLocalDate(m.dueDate) ?? '—') : '—'}</td>
+                      <td>{m.completedAt ? (formatLocalDate(m.completedAt) ?? '—') : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <section className={styles.drawerSection}>
+          <h2 className={styles.sectionTitle}>Classi</h2>
+          {structure.isLoading ? (
+            <Skeleton rows={4} />
+          ) : structure.isError ? (
+            <p className={styles.errorNotice}>Lettura della struttura del corso non riuscita.</p>
+          ) : classes.length === 0 ? (
+            <p className={styles.empty}>Nessuna classe registrata.</p>
+          ) : (
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Nome</th>
+                    <th>Periodo</th>
+                    <th className={styles.numCell}>Costo</th>
+                    <th>Pagamento</th>
+                    <th className={styles.numCell}>Attendance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {classes.map((c) => (
+                    <tr key={c.id}>
+                      <td className={styles.idCell}>{c.id}</td>
+                      <td>{c.name || '—'}</td>
+                      <td>
+                        {c.startDate ? (formatLocalDate(c.startDate) ?? '—') : '—'}
+                        {c.endDate ? ` – ${formatLocalDate(c.endDate) ?? ''}` : ''}
+                      </td>
+                      <td className={styles.numCell}>{formatCost(c.cost, c.currency)}</td>
+                      <td>{c.paymentStatus || '—'}</td>
+                      <td className={styles.numCell}>
+                        {c.totalAttendancesCount != null
+                          ? `${c.completedAttendancesCount ?? 0}/${c.totalAttendancesCount}`
+                          : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <section className={styles.drawerSection}>
+          <h2 className={styles.sectionTitle}>Sessioni</h2>
+          {structure.isLoading ? (
+            <Skeleton rows={4} />
+          ) : structure.isError ? (
+            <p className={styles.errorNotice}>Lettura della struttura del corso non riuscita.</p>
+          ) : sessions.length === 0 ? (
+            <p className={styles.empty}>Nessuna sessione registrata.</p>
+          ) : (
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Nome</th>
+                    <th>Classe</th>
+                    <th>Tipo</th>
+                    <th>Periodo / scadenza</th>
+                    <th className={styles.numCell}>Durata</th>
+                    <th>Modalità</th>
+                    <th>Stato</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sessions.map((s) => {
+                    const cls = s.trainingClassId ? classById.get(s.trainingClassId) : undefined;
+                    return (
+                      <tr key={s.id}>
+                        <td className={styles.idCell}>{s.id}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className={styles.rowButton}
+                            aria-pressed={s.id === selectedSessionId}
+                            onClick={() =>
+                              setSelectedSessionId(s.id === selectedSessionId ? null : s.id)
+                            }
+                          >
+                            {s.name || s.id}
+                          </button>
+                        </td>
+                        <td>
+                          {cls?.name || <span className={styles.mutedCell}>Senza classe</span>}
+                        </td>
+                        <td>{labeled(s.schedule, SCHEDULE_LABELS)}</td>
+                        <td>{sessionPeriod(s)}</td>
+                        <td className={styles.numCell}>{s.duration || '—'}</td>
+                        <td>{labeled(s.modality, MODALITY_LABELS)}</td>
+                        <td>{s.status || '—'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        {selectedSession && (
+          <SessionParticipantsSection session={selectedSession} memberships={membershipRows} />
         )}
       </div>
     </Drawer>
+  );
+}
+
+function SessionParticipantsSection({
+  session,
+  memberships,
+}: {
+  session: FactorialSession;
+  memberships: FactorialMembership[];
+}) {
+  const participants = useFactorialSessionParticipants(session.id);
+  const rows = participants.data?.participants ?? [];
+  const unmatched = participants.data?.unmatchedAttendances ?? [];
+
+  const statusCounts = new Map<string, number>();
+  for (const p of rows) {
+    for (const a of p.attendances) {
+      const status = a.status || '—';
+      statusCounts.set(status, (statusCounts.get(status) ?? 0) + 1);
+    }
+  }
+
+  const membershipKeys = new Set<string>();
+  let membershipsUnkeyed = 0;
+  for (const m of memberships) {
+    const key = personKey(m.employeeId, m.accessId);
+    if (key) membershipKeys.add(key);
+    else membershipsUnkeyed += 1;
+  }
+  const participantKeys = new Set<string>();
+  let participantsUnkeyed = 0;
+  for (const p of rows) {
+    const key = personKey(p.employeeId, p.accessId);
+    if (key) participantKeys.add(key);
+    else participantsUnkeyed += 1;
+  }
+  const membershipNotAssigned = [...membershipKeys].filter((k) => !participantKeys.has(k)).length;
+  const assignmentsWithoutMembership = [...participantKeys].filter((k) => !membershipKeys.has(k)).length;
+
+  const membershipDups = memberships.length - membershipKeys.size - membershipsUnkeyed;
+  const participantDups = rows.length - participantKeys.size - participantsUnkeyed;
+  const dupParts: string[] = [];
+  if (membershipDups > 0) dupParts.push(`${membershipDups} membership duplicate`);
+  if (participantDups > 0) dupParts.push(`${participantDups} assegnazioni duplicate`);
+
+  return (
+    <section className={styles.drawerSection}>
+      <h2 className={styles.sectionTitle}>Partecipazione alla sessione</h2>
+      <div className={styles.facts}>
+        <span className={styles.fact}>
+          sessione
+          <span className={styles.factValue}>{session.name || session.id}</span>
+        </span>
+        <span className={styles.fact}>
+          ID sessione
+          <span className={styles.factValue}>{session.id}</span>
+        </span>
+        <span className={styles.fact}>
+          tipo
+          <span className={styles.factValue}>{labeled(session.schedule, SCHEDULE_LABELS)}</span>
+        </span>
+        <span className={styles.fact}>
+          stato
+          <span className={styles.factValue}>{session.status || '—'}</span>
+        </span>
+      </div>
+
+      {participants.isLoading ? (
+        <Skeleton rows={4} />
+      ) : participants.isError ? (
+        <p className={styles.errorNotice}>Lettura delle partecipazioni non riuscita.</p>
+      ) : (
+        <>
+          <div className={styles.compareRow} role="group" aria-label="Confronto membership e assegnazioni">
+            <span className={styles.compareTitle}>Confronto</span>
+            <span className={styles.fact}>
+              membership complessive
+              <span className={styles.factValue}>{membershipKeys.size}</span>
+            </span>
+            <span className={styles.fact}>
+              assegnati alla sessione
+              <span className={styles.factValue}>{participantKeys.size}</span>
+            </span>
+            <span className={styles.fact}>
+              membership non assegnate
+              <span className={styles.factValue}>{membershipNotAssigned}</span>
+            </span>
+            <span className={styles.fact}>
+              assegnazioni senza membership
+              <span className={styles.factValue}>{assignmentsWithoutMembership}</span>
+            </span>
+            <span className={styles.fact}>
+              non confrontabili
+              <span className={styles.factValue}>{membershipsUnkeyed + participantsUnkeyed}</span>
+            </span>
+          </div>
+          {dupParts.length > 0 && (
+            <p className={styles.drawerMeta}>Duplicati osservati: {dupParts.join(', ')}.</p>
+          )}
+
+          {statusCounts.size === 0 ? (
+            <p className={styles.empty}>Nessuna attendance registrata per questa sessione.</p>
+          ) : (
+            <div className={styles.facts}>
+              {[...statusCounts.entries()]
+                .sort(
+                  (a, b) =>
+                    (ATTENDANCE_STATUS_ORDER.indexOf(a[0]) + 1 || 99) -
+                    (ATTENDANCE_STATUS_ORDER.indexOf(b[0]) + 1 || 99),
+                )
+                .map(([status, count]) => (
+                  <span key={status} className={styles.fact}>
+                    {labeled(status, ATTENDANCE_LABELS)}
+                    <span className={styles.factValue}>{count}</span>
+                  </span>
+                ))}
+            </div>
+          )}
+
+          {rows.length === 0 ? (
+            <p className={styles.empty}>Nessun partecipante assegnato a questa sessione.</p>
+          ) : (
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>Persona</th>
+                    <th>Employee / access ID</th>
+                    <th>Attendance</th>
+                    <th className={styles.numCell}>Durata completata</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((p) => (
+                    <tr key={p.sessionAccessMembershipId}>
+                      <td>
+                        {[p.firstName, p.lastName].filter(Boolean).join(' ') ||
+                          p.employeeId ||
+                          p.accessId ||
+                          '—'}
+                      </td>
+                      <td className={styles.idCell}>
+                        {p.employeeId || '—'}
+                        {p.accessId ? ` / ${p.accessId}` : ''}
+                      </td>
+                      <td>
+                        {p.attendances.length > 0
+                          ? p.attendances.map((a) => labeled(a.status, ATTENDANCE_LABELS)).join(', ')
+                          : '—'}
+                      </td>
+                      <td className={styles.numCell}>
+                        {p.attendances.map((a) => a.completedDuration).filter(Boolean).join(', ') ||
+                          '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {unmatched.length > 0 && (
+            <div className={styles.unmatchedBlock}>
+              <h3 className={styles.sectionSubtitle}>Attendance non collegate</h3>
+              <p className={styles.drawerMeta}>
+                {unmatched.length}{' '}
+                {unmatched.length === 1
+                  ? 'attendance non collegata a una membership della sessione.'
+                  : 'attendance non collegate a una membership della sessione.'}
+              </p>
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Employee / access ID</th>
+                      <th>Stato</th>
+                      <th className={styles.numCell}>Durata</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {unmatched.map((a) => (
+                      <tr key={a.id}>
+                        <td className={styles.idCell}>{a.id}</td>
+                        <td className={styles.idCell}>
+                          {a.employeeId || '—'}
+                          {a.accessId ? ` / ${a.accessId}` : ''}
+                        </td>
+                        <td>{labeled(a.status, ATTENDANCE_LABELS)}</td>
+                        <td className={styles.numCell}>{a.completedDuration || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </section>
   );
 }
 
