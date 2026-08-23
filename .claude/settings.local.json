@@ -20,5 +20,6 @@
       "Bash(gh api *)"
     ]
   },
-  "spinnerTipsEnabled": false
+  "spinnerTipsEnabled": false,
+  "outputStyle": "Concise"
 }
