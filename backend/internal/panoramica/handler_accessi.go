@@ -163,10 +163,10 @@ ORDER BY tipo_conn, fl.fornitore, provincia, comune, p.tipo, p.profilo_commercia
 	for rows.Next() {
 		var a accessLine
 		var (
-			fornitore, provincia, comune, tipo, profComm     sql.NullString
-			intestatario, ordine, fattFinoAl                 sql.NullString
-			statoRiga, statoOrdine, codiceOrdine, serialnum  sql.NullString
-			idAnagrafica                                     sql.NullInt64
+			fornitore, provincia, comune, tipo, profComm    sql.NullString
+			intestatario, ordine, fattFinoAl                sql.NullString
+			statoRiga, statoOrdine, codiceOrdine, serialnum sql.NullString
+			idAnagrafica                                    sql.NullInt64
 		)
 
 		if err := rows.Scan(

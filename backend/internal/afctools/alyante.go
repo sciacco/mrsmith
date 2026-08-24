@@ -10,18 +10,18 @@ import (
 // DdtCespitoRow represents one row from the Alyante MSSQL view
 // Tsmi_DDT_Verifica_Cespiti with its fixed schema.
 type DdtCespitoRow struct {
-	CodiceDocUscita string     `json:"Codice_doc_uscita"`
-	TipoDocUscita   *string    `json:"Tipo_doc_uscita"`
-	NumDocUscita    *string    `json:"Num_doc_uscita"`
-	DataDocUscita   time.Time  `json:"Data_doc_uscita"`
-	Quantita        float64    `json:"Quantita"`
-	CodiceArticolo  *string    `json:"Codice_articolo"`
-	Descrizione     *string    `json:"Descrizione"`
-	ImportoUnitario float64    `json:"Importo_unitario"`
-	ImportoTotale   *float64   `json:"Importo_totale"`
-	Seriali         *string    `json:"Seriali"`
-	NumDocIngresso  *string    `json:"Num_doc_ingresso"`
-	DataDocIngresso *string    `json:"Data_doc_ingresso"`
+	CodiceDocUscita string    `json:"Codice_doc_uscita"`
+	TipoDocUscita   *string   `json:"Tipo_doc_uscita"`
+	NumDocUscita    *string   `json:"Num_doc_uscita"`
+	DataDocUscita   time.Time `json:"Data_doc_uscita"`
+	Quantita        float64   `json:"Quantita"`
+	CodiceArticolo  *string   `json:"Codice_articolo"`
+	Descrizione     *string   `json:"Descrizione"`
+	ImportoUnitario float64   `json:"Importo_unitario"`
+	ImportoTotale   *float64  `json:"Importo_totale"`
+	Seriali         *string   `json:"Seriali"`
+	NumDocIngresso  *string   `json:"Num_doc_ingresso"`
+	DataDocIngresso *string   `json:"Data_doc_ingresso"`
 }
 
 func (h *Handler) listDdtCespiti(r *http.Request) ([]DdtCespitoRow, error) {

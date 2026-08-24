@@ -67,14 +67,14 @@ func TestRoundMoneyFields(t *testing.T) {
 		roundMoneyFields(v)
 
 		want := map[string]string{
-			"limit":                       "100000.00",
-			"current":                     "0.00",
-			"cc[0].limit":                 "50000.00",
-			"cc[0].current":               "1234.57",
-			"cc[1].limit":                 "20000.00",
-			"cc[1].current":               "0.00",
-			"ub[0].limit":                 "10000.00",
-			"ub[0].current":               "0.00",
+			"limit":         "100000.00",
+			"current":       "0.00",
+			"cc[0].limit":   "50000.00",
+			"cc[0].current": "1234.57",
+			"cc[1].limit":   "20000.00",
+			"cc[1].current": "0.00",
+			"ub[0].limit":   "10000.00",
+			"ub[0].current": "0.00",
 		}
 		ccbs := v["cost_center_budgets"].([]any)
 		ubs := v["user_budgets"].([]any)
@@ -97,9 +97,9 @@ func TestRoundMoneyFields(t *testing.T) {
 
 	t.Run("paginated list items", func(t *testing.T) {
 		v := map[string]any{
-			"total_number":  float64(2),
-			"current_page":  float64(1),
-			"total_pages":   float64(1),
+			"total_number": float64(2),
+			"current_page": float64(1),
+			"total_pages":  float64(1),
 			"items": []any{
 				map[string]any{"id": float64(1), "limit": "1000.000", "current": "0.000"},
 				map[string]any{"id": float64(2), "limit": "2000.000", "current": "500.250"},
@@ -120,12 +120,12 @@ func TestRoundMoneyFields(t *testing.T) {
 		// distinct key, and percentage-like fields must not be touched.
 		// Guards against naive prefix/substring matching.
 		v := map[string]any{
-			"percentage":      "23.734",
-			"current_page":    float64(1),
-			"total_pages":     float64(3),
-			"some_limit_max":  "99.999",
-			"limit":           "100.000",
-			"current":         "50.000",
+			"percentage":     "23.734",
+			"current_page":   float64(1),
+			"total_pages":    float64(3),
+			"some_limit_max": "99.999",
+			"limit":          "100.000",
+			"current":        "50.000",
 		}
 		roundMoneyFields(v)
 		// Untouched

@@ -149,8 +149,8 @@ func (h *Handler) handleListCharges(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	type seriesPoint struct {
-		Bucket        string  `json:"bucket"`
-		TotalImporto  float64 `json:"total_importo"`
+		Bucket       string  `json:"bucket"`
+		TotalImporto float64 `json:"total_importo"`
 	}
 
 	var result []seriesPoint

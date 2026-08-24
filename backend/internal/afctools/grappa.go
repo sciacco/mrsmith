@@ -10,46 +10,46 @@ import (
 
 // EnergiaColoPivotRow: one row per customer, twelve monthly sums split by unit (ampere and kw).
 type EnergiaColoPivotRow struct {
-	Customer     *string  `json:"customer"`
-	GennaioA     *float64 `json:"gennaio_a"`
-	GennaioKw    *float64 `json:"gennaio_kw"`
-	FebbraioA    *float64 `json:"febbraio_a"`
-	FebbraioKw   *float64 `json:"febbraio_kw"`
-	MarzoA       *float64 `json:"marzo_a"`
-	MarzoKw      *float64 `json:"marzo_kw"`
-	AprileA      *float64 `json:"aprile_a"`
-	AprileKw     *float64 `json:"aprile_kw"`
-	MaggioA      *float64 `json:"maggio_a"`
-	MaggioKw     *float64 `json:"maggio_kw"`
-	GiugnoA      *float64 `json:"giugno_a"`
-	GiugnoKw     *float64 `json:"giugno_kw"`
-	LuglioA      *float64 `json:"luglio_a"`
-	LuglioKw     *float64 `json:"luglio_kw"`
-	AgostoA      *float64 `json:"agosto_a"`
-	AgostoKw     *float64 `json:"agosto_kw"`
-	SettembreA   *float64 `json:"settembre_a"`
-	SettembreKw  *float64 `json:"settembre_kw"`
-	OttobreA     *float64 `json:"ottobre_a"`
-	OttobreKw    *float64 `json:"ottobre_kw"`
-	NovembreA    *float64 `json:"novembre_a"`
-	NovembreKw   *float64 `json:"novembre_kw"`
-	DicembreA    *float64 `json:"dicembre_a"`
-	DicembreKw   *float64 `json:"dicembre_kw"`
+	Customer    *string  `json:"customer"`
+	GennaioA    *float64 `json:"gennaio_a"`
+	GennaioKw   *float64 `json:"gennaio_kw"`
+	FebbraioA   *float64 `json:"febbraio_a"`
+	FebbraioKw  *float64 `json:"febbraio_kw"`
+	MarzoA      *float64 `json:"marzo_a"`
+	MarzoKw     *float64 `json:"marzo_kw"`
+	AprileA     *float64 `json:"aprile_a"`
+	AprileKw    *float64 `json:"aprile_kw"`
+	MaggioA     *float64 `json:"maggio_a"`
+	MaggioKw    *float64 `json:"maggio_kw"`
+	GiugnoA     *float64 `json:"giugno_a"`
+	GiugnoKw    *float64 `json:"giugno_kw"`
+	LuglioA     *float64 `json:"luglio_a"`
+	LuglioKw    *float64 `json:"luglio_kw"`
+	AgostoA     *float64 `json:"agosto_a"`
+	AgostoKw    *float64 `json:"agosto_kw"`
+	SettembreA  *float64 `json:"settembre_a"`
+	SettembreKw *float64 `json:"settembre_kw"`
+	OttobreA    *float64 `json:"ottobre_a"`
+	OttobreKw   *float64 `json:"ottobre_kw"`
+	NovembreA   *float64 `json:"novembre_a"`
+	NovembreKw  *float64 `json:"novembre_kw"`
+	DicembreA   *float64 `json:"dicembre_a"`
+	DicembreKw  *float64 `json:"dicembre_kw"`
 }
 
 // EnergiaColoDetailRow mirrors Q_select_consumi_colo output verbatim.
 type EnergiaColoDetailRow struct {
-	Customer        *string    `json:"customer"`
-	StartPeriod     *time.Time `json:"start_period"`
-	EndPeriod       *time.Time `json:"end_period"`
-	Consumo         *float64   `json:"consumo"`
-	Amount          *float64   `json:"amount"`
-	Pun             *float64   `json:"pun"`
-	Coefficiente    *float64   `json:"coefficiente"`
-	FissoCU         *float64   `json:"fisso_cu"`
-	Eccedenti       *float64   `json:"eccedenti"`
-	ImportoEccedenti *float64  `json:"importo_eccedenti"`
-	TipoVariabile   *string    `json:"tipo_variabile"`
+	Customer         *string    `json:"customer"`
+	StartPeriod      *time.Time `json:"start_period"`
+	EndPeriod        *time.Time `json:"end_period"`
+	Consumo          *float64   `json:"consumo"`
+	Amount           *float64   `json:"amount"`
+	Pun              *float64   `json:"pun"`
+	Coefficiente     *float64   `json:"coefficiente"`
+	FissoCU          *float64   `json:"fisso_cu"`
+	Eccedenti        *float64   `json:"eccedenti"`
+	ImportoEccedenti *float64   `json:"importo_eccedenti"`
+	TipoVariabile    *string    `json:"tipo_variabile"`
 }
 
 func parseYear(s string) (int, bool) {

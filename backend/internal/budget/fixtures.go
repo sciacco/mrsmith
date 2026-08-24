@@ -450,7 +450,7 @@ var db = &store{
 			{BudgetID: 12, CostCenter: "Data Center", Current: "4430.00", Enabled: true, Limit: "20000.00"},
 		}},
 	},
-	budgetOrder:  []int64{11, 16, 6, 24, 17, 3, 5, 10, 18, 8, 22, 21, 4, 23, 15, 7, 14, 13, 20, 25, 9, 19, 12},
+	budgetOrder:    []int64{11, 16, 6, 24, 17, 3, 5, 10, 18, 8, 22, 21, 4, 23, 15, 7, 14, 13, 20, 25, 9, 19, 12},
 	nextBudgetID:   26,
 	userRules:      map[int64]*userApprovalRule{},
 	userRuleOrder:  []int64{},

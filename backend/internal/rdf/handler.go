@@ -19,8 +19,8 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 	"github.com/sciacco/mrsmith/internal/platform/keycloak"
-	"github.com/sciacco/mrsmith/internal/platform/logging"
 	"github.com/sciacco/mrsmith/internal/platform/llm"
+	"github.com/sciacco/mrsmith/internal/platform/logging"
 )
 
 const (

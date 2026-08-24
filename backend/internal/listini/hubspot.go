@@ -69,7 +69,7 @@ func (s *HubSpotService) CreateNote(ctx context.Context, companyID int64, body s
 		},
 		"associations": []map[string]any{
 			{
-				"to":   map[string]any{"id": companyID},
+				"to":    map[string]any{"id": companyID},
 				"types": []map[string]any{{"associationCategory": "HUBSPOT_DEFINED", "associationTypeId": 190}},
 			},
 		},
@@ -89,7 +89,7 @@ func (s *HubSpotService) CreateTask(ctx context.Context, companyID int64, subjec
 		},
 		"associations": []map[string]any{
 			{
-				"to":   map[string]any{"id": companyID},
+				"to":    map[string]any{"id": companyID},
 				"types": []map[string]any{{"associationCategory": "HUBSPOT_DEFINED", "associationTypeId": 192}},
 			},
 		},

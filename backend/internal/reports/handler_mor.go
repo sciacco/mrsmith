@@ -34,33 +34,33 @@ where periodo_inizio = (select periodo_inizio from importi_telefonici order by i
 	defer grappaRows.Close()
 
 	type billingRecord struct {
-		Conto                 *string  `json:"conto"`
-		Lastname              *string  `json:"lastname"`
-		Firstname             *string  `json:"firstname"`
-		IsDaFatturare         *bool    `json:"is_da_fatturare"`
-		CodiceOrdine          *string  `json:"codice_ordine"`
-		Serialnumber          *string  `json:"serialnumber"`
-		PeriodoInizio         *string  `json:"periodo_inizio"`
-		Importo               *float64 `json:"importo"`
-		Stato                 *string  `json:"stato"`
-		Tipologia             *string  `json:"tipologia"`
-		IDCliente             *int     `json:"id_cliente"`
-		Intestazione          *string  `json:"intestazione"`
-		OrdinePresente        string   `json:"ordine_presente"`
-		NumeroOrdineCorretto  string   `json:"numero_ordine_corretto"`
+		Conto                *string  `json:"conto"`
+		Lastname             *string  `json:"lastname"`
+		Firstname            *string  `json:"firstname"`
+		IsDaFatturare        *bool    `json:"is_da_fatturare"`
+		CodiceOrdine         *string  `json:"codice_ordine"`
+		Serialnumber         *string  `json:"serialnumber"`
+		PeriodoInizio        *string  `json:"periodo_inizio"`
+		Importo              *float64 `json:"importo"`
+		Stato                *string  `json:"stato"`
+		Tipologia            *string  `json:"tipologia"`
+		IDCliente            *int     `json:"id_cliente"`
+		Intestazione         *string  `json:"intestazione"`
+		OrdinePresente       string   `json:"ordine_presente"`
+		NumeroOrdineCorretto string   `json:"numero_ordine_corretto"`
 	}
 
 	var billingRecords []billingRecord
 	for grappaRows.Next() {
 		var rec billingRecord
 		var (
-			conto, lastname, firstname    sql.NullString
-			codiceOrdine, serialnumber    sql.NullString
-			periodoInizio, stato, tipol   sql.NullString
-			intestazione                  sql.NullString
-			isDaFatturare                 sql.NullBool
-			importo                       sql.NullFloat64
-			idCliente                     sql.NullInt64
+			conto, lastname, firstname  sql.NullString
+			codiceOrdine, serialnumber  sql.NullString
+			periodoInizio, stato, tipol sql.NullString
+			intestazione                sql.NullString
+			isDaFatturare               sql.NullBool
+			importo                     sql.NullFloat64
+			idCliente                   sql.NullInt64
 		)
 
 		if err := grappaRows.Scan(

@@ -40,14 +40,14 @@ func (h *Handler) handleListCustomerRacks(w http.ResponseWriter, r *http.Request
 	defer rows.Close()
 
 	type rack struct {
-		IDRack   int      `json:"id_rack"`
-		Name     string   `json:"name"`
-		Building string   `json:"building"`
-		Room     string   `json:"room"`
-		Floor    *int     `json:"floor"`
-		Island   *int     `json:"island"`
-		Type     *string  `json:"type"`
-		Sconto   float64  `json:"sconto"`
+		IDRack   int     `json:"id_rack"`
+		Name     string  `json:"name"`
+		Building string  `json:"building"`
+		Room     string  `json:"room"`
+		Floor    *int    `json:"floor"`
+		Island   *int    `json:"island"`
+		Type     *string `json:"type"`
+		Sconto   float64 `json:"sconto"`
 	}
 
 	var result []rack

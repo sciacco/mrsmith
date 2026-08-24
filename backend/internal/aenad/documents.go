@@ -60,37 +60,37 @@ type documentListResponse struct {
 }
 
 type documentRow struct {
-	IDDoc               int     `json:"IDDoc"`
-	TipoDoc             *string `json:"TipoDoc"`
-	IDAnagr             *int    `json:"IDAnagr"`
-	AnagrNome           *string `json:"Anagr_Nome"`
-	CodDestIDAnagr      *int    `json:"CodDest_IDAnagr"`
-	CodDest             *string `json:"CodDest"`
-	Data                *string `json:"Data"`
-	Num                 *int    `json:"Num"`
-	DataDoc             *string `json:"DataDoc"`
-	NumDoc              *string `json:"NumDoc"`
-	DescDoc             *string `json:"DescDoc"`
-	TotNetto            *string `json:"TotNetto"`
-	TotDoc              *string `json:"TotDoc"`
-	TotPrezzoAcquisto   *string `json:"TotPrezzoAcquisto"`
-	TotGuadagno         *string `json:"TotGuadagno"`
-	Pagamento           *string `json:"Pagamento"`
-	PagamCoordBancarie  *string `json:"Pagam_CoordBancarie"`
-	NoteInterne         *string `json:"NoteInterne"`
-	AnagrIndirizzo      *string `json:"Anagr_Indirizzo"`
-	AnagrCap            *string `json:"Anagr_Cap"`
-	AnagrCitta          *string `json:"Anagr_Citta"`
-	AnagrProv           *string `json:"Anagr_Prov"`
-	AnagrNazione        *string `json:"Anagr_Nazione"`
-	AnagrCodiceFiscale  *string `json:"Anagr_CodiceFiscale"`
-	AnagrPartitaIva     *string `json:"Anagr_PartitaIva"`
-	AnagrDestNome       *string `json:"Anagr_DestNome"`
-	AnagrDestIndirizzo  *string `json:"Anagr_DestIndirizzo"`
-	AnagrDestCap        *string `json:"Anagr_DestCap"`
-	AnagrDestCitta      *string `json:"Anagr_DestCitta"`
-	AnagrDestProv       *string `json:"Anagr_DestProv"`
-	AnagrDestNazione    *string `json:"Anagr_DestNazione"`
+	IDDoc              int     `json:"IDDoc"`
+	TipoDoc            *string `json:"TipoDoc"`
+	IDAnagr            *int    `json:"IDAnagr"`
+	AnagrNome          *string `json:"Anagr_Nome"`
+	CodDestIDAnagr     *int    `json:"CodDest_IDAnagr"`
+	CodDest            *string `json:"CodDest"`
+	Data               *string `json:"Data"`
+	Num                *int    `json:"Num"`
+	DataDoc            *string `json:"DataDoc"`
+	NumDoc             *string `json:"NumDoc"`
+	DescDoc            *string `json:"DescDoc"`
+	TotNetto           *string `json:"TotNetto"`
+	TotDoc             *string `json:"TotDoc"`
+	TotPrezzoAcquisto  *string `json:"TotPrezzoAcquisto"`
+	TotGuadagno        *string `json:"TotGuadagno"`
+	Pagamento          *string `json:"Pagamento"`
+	PagamCoordBancarie *string `json:"Pagam_CoordBancarie"`
+	NoteInterne        *string `json:"NoteInterne"`
+	AnagrIndirizzo     *string `json:"Anagr_Indirizzo"`
+	AnagrCap           *string `json:"Anagr_Cap"`
+	AnagrCitta         *string `json:"Anagr_Citta"`
+	AnagrProv          *string `json:"Anagr_Prov"`
+	AnagrNazione       *string `json:"Anagr_Nazione"`
+	AnagrCodiceFiscale *string `json:"Anagr_CodiceFiscale"`
+	AnagrPartitaIva    *string `json:"Anagr_PartitaIva"`
+	AnagrDestNome      *string `json:"Anagr_DestNome"`
+	AnagrDestIndirizzo *string `json:"Anagr_DestIndirizzo"`
+	AnagrDestCap       *string `json:"Anagr_DestCap"`
+	AnagrDestCitta     *string `json:"Anagr_DestCitta"`
+	AnagrDestProv      *string `json:"Anagr_DestProv"`
+	AnagrDestNazione   *string `json:"Anagr_DestNazione"`
 }
 
 func (h *Handler) handleDocumentTypes(w http.ResponseWriter, r *http.Request) {
@@ -150,7 +150,7 @@ func (h *Handler) handleDocuments(w http.ResponseWriter, r *http.Request) {
 		WHERE d."TipoDoc" = $1
 		  AND d."Data" >= $2::date
 		  AND d."Data" <= $3::date`
-	
+
 	countArgs := []any{filters.TipoDoc, filters.DateFrom, filters.DateTo}
 	if filters.IDAnagr != nil {
 		countQuery += ` AND d."IDAnagr" = $4`
@@ -208,7 +208,7 @@ func (h *Handler) handleDocuments(w http.ResponseWriter, r *http.Request) {
 		args = append(args, *filters.IDAnagr)
 		paramIdx++
 	}
-	
+
 	query += ` ORDER BY d."Data" DESC, d."IDDoc" DESC
 		LIMIT $` + strconv.Itoa(paramIdx) + ` OFFSET $` + strconv.Itoa(paramIdx+1)
 	args = append(args, filters.PageSize, filters.Offset)
@@ -610,27 +610,27 @@ func (h *Handler) handleDocumentRows(w http.ResponseWriter, r *http.Request) {
 }
 
 type updateDocumentRequest struct {
-	AnagrNome           *string                 `json:"Anagr_Nome"`
-	AnagrIndirizzo      *string                 `json:"Anagr_Indirizzo"`
-	AnagrCap            *string                 `json:"Anagr_Cap"`
-	AnagrCitta          *string                 `json:"Anagr_Citta"`
-	AnagrProv           *string                 `json:"Anagr_Prov"`
-	AnagrNazione        *string                 `json:"Anagr_Nazione"`
-	AnagrCodiceFiscale  *string                 `json:"Anagr_CodiceFiscale"`
-	AnagrPartitaIva     *string                 `json:"Anagr_PartitaIva"`
-	AnagrDestNome       *string                 `json:"Anagr_DestNome"`
-	AnagrDestIndirizzo  *string                 `json:"Anagr_DestIndirizzo"`
-	AnagrDestCap        *string                 `json:"Anagr_DestCap"`
-	AnagrDestCitta      *string                 `json:"Anagr_DestCitta"`
-	AnagrDestProv       *string                 `json:"Anagr_DestProv"`
-	AnagrDestNazione    *string                 `json:"Anagr_DestNazione"`
-	Pagamento           *string                 `json:"Pagamento"`
-	PagamCoordBancarie  *string                 `json:"Pagam_CoordBancarie"`
-	NoteInterne         *string                 `json:"NoteInterne"`
-	DescDoc             *string                 `json:"DescDoc"`
-	DataDoc             *string                 `json:"DataDoc"`
-	NumDoc              *string                 `json:"NumDoc"`
-	Rows                []updateDocumentRowItem `json:"Rows"`
+	AnagrNome          *string                 `json:"Anagr_Nome"`
+	AnagrIndirizzo     *string                 `json:"Anagr_Indirizzo"`
+	AnagrCap           *string                 `json:"Anagr_Cap"`
+	AnagrCitta         *string                 `json:"Anagr_Citta"`
+	AnagrProv          *string                 `json:"Anagr_Prov"`
+	AnagrNazione       *string                 `json:"Anagr_Nazione"`
+	AnagrCodiceFiscale *string                 `json:"Anagr_CodiceFiscale"`
+	AnagrPartitaIva    *string                 `json:"Anagr_PartitaIva"`
+	AnagrDestNome      *string                 `json:"Anagr_DestNome"`
+	AnagrDestIndirizzo *string                 `json:"Anagr_DestIndirizzo"`
+	AnagrDestCap       *string                 `json:"Anagr_DestCap"`
+	AnagrDestCitta     *string                 `json:"Anagr_DestCitta"`
+	AnagrDestProv      *string                 `json:"Anagr_DestProv"`
+	AnagrDestNazione   *string                 `json:"Anagr_DestNazione"`
+	Pagamento          *string                 `json:"Pagamento"`
+	PagamCoordBancarie *string                 `json:"Pagam_CoordBancarie"`
+	NoteInterne        *string                 `json:"NoteInterne"`
+	DescDoc            *string                 `json:"DescDoc"`
+	DataDoc            *string                 `json:"DataDoc"`
+	NumDoc             *string                 `json:"NumDoc"`
+	Rows               []updateDocumentRowItem `json:"Rows"`
 }
 
 type updateDocumentRowItem struct {

@@ -2,7 +2,7 @@ package training
 
 type CatalogCourseWithCounts struct {
 	CatalogCourse
-	EnrollmentsCurrentYear        int `json:"enrollments_current_year"`
+	EnrollmentsCurrentYear         int `json:"enrollments_current_year"`
 	EnrollmentsCompletedHistorical int `json:"enrollments_completed_historical"`
 }
 

@@ -6,7 +6,7 @@ import (
 )
 
 var billingTranslations = map[string]string{
-	"All'ordine":                               "After order confirmation",
+	"All'ordine": "After order confirmation",
 	"All'attivazione della Soluzione/Consegna": "Payment on delivery",
 	"Mensile":              "Monthly",
 	"Bimestrale":           "Bimonthly",

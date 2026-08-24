@@ -84,7 +84,6 @@ func TestDevAdminCanSetSkipQualification(t *testing.T) {
 		gotPath = r.URL.Path
 		gotBody = string(body)
 	})
-	
 
 	client := arak.New(arak.Config{
 		BaseURL:      "http://arak.local",
@@ -124,7 +123,6 @@ func TestProviderDraftCreateUsesDraftEndpoint(t *testing.T) {
 		gotPath = r.URL.Path
 		gotBody = string(body)
 	})
-	
 
 	client := arak.New(arak.Config{
 		BaseURL:      "http://arak.local",

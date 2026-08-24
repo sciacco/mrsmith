@@ -182,9 +182,9 @@ LIMIT 3`
 	result := make([]OverviewException, 0)
 	for rows.Next() {
 		var (
-			id    string
-			name  string
-			gaps  int
+			id   string
+			name string
+			gaps int
 		)
 		if err := rows.Scan(&id, &name, &gaps); err != nil {
 			return nil, fmt.Errorf("scan overview compliance exc: %w", err)

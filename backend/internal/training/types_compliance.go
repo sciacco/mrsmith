@@ -10,10 +10,10 @@ type ComplianceExpiringRow struct {
 }
 
 type ComplianceRuleGap struct {
-	EmployeeID    string `json:"employee_id"`
-	EmployeeName  string `json:"employee_name"`
-	Status        string `json:"status"` // never_covered | expired | expiring_soon
-	Detail        string `json:"detail,omitempty"`
+	EmployeeID   string `json:"employee_id"`
+	EmployeeName string `json:"employee_name"`
+	Status       string `json:"status"` // never_covered | expired | expiring_soon
+	Detail       string `json:"detail,omitempty"`
 }
 
 type ComplianceRule struct {
@@ -30,9 +30,9 @@ type ComplianceRule struct {
 }
 
 type ComplianceOverviewResponse struct {
-	Year               int                    `json:"year"`
-	TeamScope          string                 `json:"team_scope"`
-	DeadlineDays       int                    `json:"deadline_days"`
-	ExpiringDeadlines  []ComplianceExpiringRow `json:"expiring_deadlines"`
-	Rules              []ComplianceRule       `json:"rules"`
+	Year              int                     `json:"year"`
+	TeamScope         string                  `json:"team_scope"`
+	DeadlineDays      int                     `json:"deadline_days"`
+	ExpiringDeadlines []ComplianceExpiringRow `json:"expiring_deadlines"`
+	Rules             []ComplianceRule        `json:"rules"`
 }
