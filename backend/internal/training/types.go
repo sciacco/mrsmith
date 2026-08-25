@@ -106,11 +106,14 @@ type TeamInput struct {
 }
 
 type SkillAreaInput struct {
-	Code        string `json:"code"`
-	Name        string `json:"name"`
-	ParentID    string `json:"parentId,omitempty"`
-	Description string `json:"description,omitempty"`
-	Active      *bool  `json:"active,omitempty"`
+	Code     string `json:"code"`
+	Name     string `json:"name"`
+	ParentID string `json:"parentId,omitempty"`
+	// CustomGroupID: gruppo locale che raccoglie gli appartenenti all'area;
+	// e la platea delle regole con kind skill_area (migrazione 131).
+	CustomGroupID string `json:"customGroupId,omitempty"`
+	Description   string `json:"description,omitempty"`
+	Active        *bool  `json:"active,omitempty"`
 }
 
 type CertificationInput struct {

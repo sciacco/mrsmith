@@ -694,13 +694,42 @@ func (s *SQLStore) UpsertSkillArea(ctx context.Context, principal Principal, id 
 	if strings.TrimSpace(input.Code) == "" || strings.TrimSpace(input.Name) == "" {
 		return ActionResponse{}, validationError("code_name_required", "codice e nome obbligatori")
 	}
+	if err := s.ensureCustomGroupSelectable(ctx, s.db, input.CustomGroupID); err != nil {
+		return ActionResponse{}, err
+	}
 	return s.upsertSimple(ctx, principal, "skill_area", id, []upsertField{
 		field("code", strings.TrimSpace(input.Code)),
 		field("name", strings.TrimSpace(input.Name)),
 		typedField("parent_id", nullableUUID(input.ParentID), "::uuid"),
+		typedField("custom_group_id", nullableUUID(input.CustomGroupID), "::uuid"),
 		field("description", nullableText(input.Description)),
 		field("is_active", boolValue(input.Active, true)),
 	})
+}
+
+// ensureCustomGroupSelectable: il gruppo locale collegato a un'area di
+// competenza deve esistere ed essere attivo quando valorizzato
+// (collegamento area -> gruppo della migrazione 131).
+func (s *SQLStore) ensureCustomGroupSelectable(ctx context.Context, q sqlRunner, groupID string) error {
+	groupID = strings.TrimSpace(groupID)
+	if groupID == "" {
+		return nil
+	}
+	var active bool
+	err := q.QueryRowContext(ctx, `
+SELECT is_active
+FROM training.custom_groups
+WHERE id = $1::uuid`, groupID).Scan(&active)
+	if errors.Is(err, sql.ErrNoRows) {
+		return validationError("custom_group_not_found", "gruppo locale non trovato")
+	}
+	if err != nil {
+		return fmt.Errorf("check training custom group: %w", err)
+	}
+	if !active {
+		return validationError("custom_group_inactive", "gruppo locale non attivo")
+	}
+	return nil
 }
 
 func (s *SQLStore) UpsertCertification(ctx context.Context, principal Principal, id string, input CertificationInput) (ActionResponse, error) {

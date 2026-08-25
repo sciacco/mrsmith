@@ -135,6 +135,12 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	mux.Handle("GET /training/v1/factorial/trainings/{id}/memberships", protect(http.HandlerFunc(h.handleFactorialTrainingMemberships)))
 	mux.Handle("GET /training/v1/factorial/trainings/{id}/structure", protect(http.HandlerFunc(h.handleFactorialTrainingStructure)))
 	mux.Handle("GET /training/v1/factorial/sessions/{id}/participants", protect(http.HandlerFunc(h.handleFactorialSessionParticipants)))
+
+	// Regole formative, richieste e code operative derivate (#140):
+	// registrazione delegata ai file dedicati.
+	h.registerRuleRoutes(mux, protect)
+	h.registerRequestRoutes(mux, protect)
+	h.registerQueueRoutes(mux, protect)
 }
 
 func (h *handler) requireStore(next http.Handler) http.Handler {

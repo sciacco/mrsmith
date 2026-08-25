@@ -74,12 +74,16 @@ func (s *SQLStore) UpdateEvent(ctx context.Context, principal Principal, id stri
 
 	var response ActionResponse
 	err := s.withTx(ctx, func(tx *sql.Tx) error {
-		var currentCourseID string
+		var (
+			currentCourseID string
+			origin          string
+			hasSource       bool
+		)
 		err := tx.QueryRowContext(ctx, `
-SELECT course_id::text
+SELECT course_id::text, origin, (source_rule_id IS NOT NULL OR source_request_id IS NOT NULL)
 FROM training.training_event
 WHERE id = $1::uuid
-FOR UPDATE`, id).Scan(&currentCourseID)
+FOR UPDATE`, id).Scan(&currentCourseID, &origin, &hasSource)
 		if errors.Is(err, sql.ErrNoRows) {
 			return notFoundError("event_not_found", "evento non trovato")
 		}
@@ -93,6 +97,14 @@ FOR UPDATE`, id).Scan(&currentCourseID)
 
 		newCourseID := strings.TrimSpace(input.CourseID)
 		if newCourseID != currentCourseID {
+			// Il corso di un evento nato da una regola o da una richiesta
+			// accolta e un invariante (D7/D8): la tornata porta il corso
+			// della regola, l'evento dell'accoglimento il corso accettato.
+			// Senza questo blocco la copertura della regola e la coerenza
+			// della richiesta chiusa si corromperebbero con un solo PUT.
+			if origin == "rule" || hasSource {
+				return conflictError("event_course_bound_to_source", "il corso non si puo cambiare: l'evento nasce da una regola o da una richiesta accolta")
+			}
 			// Il corso dell'evento e modificabile finche l'evento non ha
 			// sessioni e nessuna iscrizione e in stato terminale di
 			// erogazione; le cancelled non bloccano.
