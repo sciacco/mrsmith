@@ -155,7 +155,7 @@ func TestPDFExportDownloadRegeneratesFromSavedRenderPayload(t *testing.T) {
 func TestPDFExportMissingTemplateReturnsServiceUnavailable(t *testing.T) {
 	t.Run("create", func(t *testing.T) {
 		state := readyPDFQuoteState()
-		mux := pdfExportMux(t, state, &raenadTestState{config: map[string][]byte{}}, &recordingPDFRenderer{})
+		mux := pdfExportMux(t, state, &raenadTestState{raenadTestStateData: raenadTestStateData{config: map[string][]byte{}}}, &recordingPDFRenderer{})
 
 		rec := serveRaenadJSON(mux, http.MethodPost, "/aenad/v1/quotes/101/pdf-exports", nil)
 		if rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), "raenad_pdf_not_configured") {
@@ -175,7 +175,7 @@ func TestPDFExportMissingTemplateReturnsServiceUnavailable(t *testing.T) {
 			t.Fatalf("expected 201, got %d body=%q", rec.Code, rec.Body.String())
 		}
 
-		mux = pdfExportMux(t, state, &raenadTestState{config: map[string][]byte{}}, renderer)
+		mux = pdfExportMux(t, state, &raenadTestState{raenadTestStateData: raenadTestStateData{config: map[string][]byte{}}}, renderer)
 		download := serveRaenadJSON(mux, http.MethodGet, "/aenad/v1/quotes/101/pdf-exports/501/download", nil)
 		if download.Code != http.StatusServiceUnavailable || !strings.Contains(download.Body.String(), "raenad_pdf_not_configured") {
 			t.Fatalf("expected missing template 503, got %d body=%q", download.Code, download.Body.String())
@@ -321,11 +321,11 @@ func readyPDFQuoteState() *raenadTestState {
 }
 
 func pdfTemplateConfigState() *raenadTestState {
-	return &raenadTestState{
+	return &raenadTestState{raenadTestStateData: raenadTestStateData{
 		config: map[string][]byte{
 			"raenad.carbone_quote_template": []byte(`{"template_id":"tmpl-raenad"}`),
 		},
-	}
+	}}
 }
 
 func storedPDFExport(id, quoteID int64) raenadTestPDFExport {

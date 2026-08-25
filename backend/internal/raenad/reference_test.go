@@ -9,7 +9,7 @@ import (
 )
 
 func TestQuoteCustomersDefaultExcludesCompaniesWithoutNumeroAzienda(t *testing.T) {
-	state := &raenadTestState{
+	state := &raenadTestState{raenadTestStateData: raenadTestStateData{
 		companies: []raenadTestCompany{
 			{
 				ID:            1001,
@@ -30,7 +30,7 @@ func TestQuoteCustomersDefaultExcludesCompaniesWithoutNumeroAzienda(t *testing.T
 			{ID: 1002, Name: ptr("Prospect Null"), NumeroAzienda: nil},
 			{ID: 1003, Name: ptr("Prospect Blank"), NumeroAzienda: ptr("  ")},
 		},
-	}
+	}}
 	mux := http.NewServeMux()
 	RegisterRoutes(mux, Deps{Mistra: openRaenadTestDBWithState(t, state)})
 
@@ -56,13 +56,13 @@ func TestQuoteCustomersDefaultExcludesCompaniesWithoutNumeroAzienda(t *testing.T
 }
 
 func TestQuoteCustomersIncludeToggleIncludesProspects(t *testing.T) {
-	state := &raenadTestState{
+	state := &raenadTestState{raenadTestStateData: raenadTestStateData{
 		companies: []raenadTestCompany{
 			{ID: 1001, Name: ptr("ERP Customer"), NumeroAzienda: ptr("12345")},
 			{ID: 1002, Name: ptr("Prospect Null"), NumeroAzienda: nil},
 			{ID: 1003, Name: ptr("Prospect Blank"), NumeroAzienda: ptr("  ")},
 		},
-	}
+	}}
 	mux := http.NewServeMux()
 	RegisterRoutes(mux, Deps{Mistra: openRaenadTestDBWithState(t, state)})
 
@@ -94,12 +94,12 @@ func TestQuoteCustomersSearchMatchesRequiredFields(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			state := &raenadTestState{
+			state := &raenadTestState{raenadTestStateData: raenadTestStateData{
 				companies: []raenadTestCompany{
 					{ID: 77, Name: ptr("Acme SpA"), VAT: ptr("VAT-77"), NumeroAzienda: ptr("ERP-77"), Domain: ptr("acme.example")},
 					{ID: 88, Name: ptr("Other SpA"), VAT: ptr("VAT-88"), NumeroAzienda: ptr("ERP-88"), Domain: ptr("other.example")},
 				},
-			}
+			}}
 			mux := http.NewServeMux()
 			RegisterRoutes(mux, Deps{Mistra: openRaenadTestDBWithState(t, state)})
 
@@ -133,13 +133,13 @@ func TestParseReferenceLimitDefaultsAndCaps(t *testing.T) {
 }
 
 func TestQuotePaymentMethodsReturnsAllAndTrimsCode(t *testing.T) {
-	state := &raenadTestState{
+	state := &raenadTestState{raenadTestStateData: raenadTestStateData{
 		paymentMethods: []raenadTestPaymentMethod{
 			{Code: "999   ", Description: "Hidden", Selectable: false},
 			{Code: "030   ", Description: "Carta", Selectable: true},
 			{Code: "010   ", Description: "Bonifico", Selectable: true},
 		},
-	}
+	}}
 	mux := http.NewServeMux()
 	RegisterRoutes(mux, Deps{Mistra: openRaenadTestDBWithState(t, state)})
 
@@ -160,18 +160,18 @@ func TestQuotePaymentMethodsReturnsAllAndTrimsCode(t *testing.T) {
 }
 
 func TestQuoteStagesUsesConfiguredPipelineAndOrdering(t *testing.T) {
-	mistraState := &raenadTestState{
+	mistraState := &raenadTestState{raenadTestStateData: raenadTestStateData{
 		stages: []raenadTestStage{
 			{ID: "s2", Label: ptr("Second"), Pipeline: "p1", DisplayOrder: intPtr(2), PipelineLabel: ptr("Aenad Pipeline")},
 			{ID: "other", Label: ptr("Other"), Pipeline: "p2", DisplayOrder: intPtr(1), PipelineLabel: ptr("Other Pipeline")},
 			{ID: "s1", Label: ptr("First"), Pipeline: "p1", DisplayOrder: intPtr(1), PipelineLabel: ptr("Aenad Pipeline")},
 		},
-	}
-	configState := &raenadTestState{
+	}}
+	configState := &raenadTestState{raenadTestStateData: raenadTestStateData{
 		config: map[string][]byte{
 			"raenad.hubspot_deal_pipeline": []byte(`{"pipeline_id":"p1","initial_dealstage_id":"s2"}`),
 		},
-	}
+	}}
 	mux := http.NewServeMux()
 	RegisterRoutes(mux, Deps{
 		Mistra:   openRaenadTestDBWithState(t, mistraState),
@@ -198,11 +198,11 @@ func TestQuoteStagesUsesConfiguredPipelineAndOrdering(t *testing.T) {
 }
 
 func TestQuoteDefaultsReturnsConfiguredLineDefaults(t *testing.T) {
-	configState := &raenadTestState{
+	configState := &raenadTestState{raenadTestStateData: raenadTestStateData{
 		config: map[string][]byte{
 			"aenad.quote_defaults": []byte(`{"cod_iva":"22"}`),
 		},
-	}
+	}}
 	mux := http.NewServeMux()
 	RegisterRoutes(mux, Deps{ConfigDB: openRaenadTestDBWithState(t, configState)})
 
@@ -219,7 +219,7 @@ func TestQuoteDefaultsReturnsConfiguredLineDefaults(t *testing.T) {
 }
 
 func TestQuoteArticlesQueriesAlyanteDirectlyAndMapsLineDefaults(t *testing.T) {
-	alyanteState := &raenadTestState{
+	alyanteState := &raenadTestState{raenadTestStateData: raenadTestStateData{
 		articles: []raenadTestArticle{
 			{
 				Code:        " ROUTER-1 ",
@@ -234,7 +234,7 @@ func TestQuoteArticlesQueriesAlyanteDirectlyAndMapsLineDefaults(t *testing.T) {
 			},
 			{Code: "OTHER-1", DescITA: ptr("Other"), UOM: ptr("NR"), Price: ptr("9.0000")},
 		},
-	}
+	}}
 	configState := quoteDefaultsTestState("22")
 	mux := http.NewServeMux()
 	RegisterRoutes(mux, Deps{
@@ -403,7 +403,7 @@ func TestQuoteArticlesLanguageSelectionAndFallback(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			alyanteState := &raenadTestState{articles: []raenadTestArticle{tc.article}}
+			alyanteState := &raenadTestState{raenadTestStateData: raenadTestStateData{articles: []raenadTestArticle{tc.article}}}
 			mux := http.NewServeMux()
 			RegisterRoutes(mux, Deps{
 				Alyante:  openRaenadTestDBWithState(t, alyanteState),
@@ -457,9 +457,9 @@ func TestQuoteArticlesConfigAndAlyanteErrorsAreStable(t *testing.T) {
 			name: "invalid quote defaults",
 			deps: Deps{
 				Alyante: openRaenadTestDBWithState(t, &raenadTestState{}),
-				ConfigDB: openRaenadTestDBWithState(t, &raenadTestState{
+				ConfigDB: openRaenadTestDBWithState(t, &raenadTestState{raenadTestStateData: raenadTestStateData{
 					config: map[string][]byte{"aenad.quote_defaults": []byte(`{"cod_iva":" "}`)},
-				}),
+				}}),
 			},
 			want: "raenad_config_not_configured",
 		},
@@ -500,9 +500,9 @@ func TestReferenceConfigErrorsAreStable(t *testing.T) {
 			path: "/aenad/v1/quotes/stages",
 			deps: Deps{
 				Mistra: openRaenadTestDBWithState(t, &raenadTestState{}),
-				ConfigDB: openRaenadTestDBWithState(t, &raenadTestState{
+				ConfigDB: openRaenadTestDBWithState(t, &raenadTestState{raenadTestStateData: raenadTestStateData{
 					config: map[string][]byte{"raenad.hubspot_deal_pipeline": []byte(`{"pipeline_id":""}`)},
-				}),
+				}}),
 			},
 		},
 		{
@@ -513,9 +513,9 @@ func TestReferenceConfigErrorsAreStable(t *testing.T) {
 		{
 			name: "defaults invalid runtime config",
 			path: "/aenad/v1/quotes/defaults",
-			deps: Deps{ConfigDB: openRaenadTestDBWithState(t, &raenadTestState{
+			deps: Deps{ConfigDB: openRaenadTestDBWithState(t, &raenadTestState{raenadTestStateData: raenadTestStateData{
 				config: map[string][]byte{"aenad.quote_defaults": []byte(`{"cod_iva":" "}`)},
-			})},
+			}})},
 		},
 	}
 
@@ -595,11 +595,11 @@ func assertNamedArg(t *testing.T, query raenadTestQuery, index int, want any) {
 }
 
 func quoteDefaultsTestState(codIVA string) *raenadTestState {
-	return &raenadTestState{
+	return &raenadTestState{raenadTestStateData: raenadTestStateData{
 		config: map[string][]byte{
 			"aenad.quote_defaults": []byte(`{"cod_iva":"` + codIVA + `"}`),
 		},
-	}
+	}}
 }
 
 func intPtr(value int) *int {

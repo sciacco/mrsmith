@@ -491,7 +491,11 @@ func (tx *raenadTestTx) Rollback() error {
 	return nil
 }
 
-type raenadTestState struct {
+// raenadTestStateData holds the domain data of the fake DB, deliberately
+// separated from raenadTestState so that the value copy in clone() (and any
+// future struct copy) never carries the sync.Mutex — keeping go vet's
+// copylocks check happy by construction.
+type raenadTestStateData struct {
 	companies            []raenadTestCompany
 	paymentMethods       []raenadTestPaymentMethod
 	stages               []raenadTestStage
@@ -512,7 +516,10 @@ type raenadTestState struct {
 	nextHubSpotRequestID int64
 	failLineInsert       bool
 	failHubSpotEnqueue   bool
+}
 
+type raenadTestState struct {
+	raenadTestStateData
 	mu        sync.Mutex
 	queries   []raenadTestQuery
 	begins    int
@@ -680,9 +687,7 @@ type raenadTestHubSpotAttempt struct {
 }
 
 func (s *raenadTestState) clone() *raenadTestState {
-	cp := *s
-	cp.mu = sync.Mutex{}
-	cp.queries = nil
+	cp := raenadTestState{raenadTestStateData: s.raenadTestStateData}
 	cp.quotes = append([]raenadTestQuote(nil), s.quotes...)
 	cp.lines = cloneLineMap(s.lines)
 	cp.pdfExports = append([]raenadTestPDFExport(nil), s.pdfExports...)

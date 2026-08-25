@@ -517,7 +517,7 @@ func validSavePayload(overrides map[string]any) map[string]any {
 }
 
 func lifecycleMistraState() *raenadTestState {
-	return &raenadTestState{
+	return &raenadTestState{raenadTestStateData: raenadTestStateData{
 		paymentMethods: []raenadTestPaymentMethod{
 			{Code: "030", Description: "Bonifico DB", Selectable: true},
 			{Code: "999", Description: "Hidden", Selectable: false},
@@ -529,15 +529,15 @@ func lifecycleMistraState() *raenadTestState {
 		events:        map[int64][]raenadTestQuoteEvent{},
 		validVATCodes: map[string]string{"22": "22.0000"},
 		nextQuoteID:   100,
-	}
+	}}
 }
 
 func lifecycleConfigState() *raenadTestState {
-	return &raenadTestState{
+	return &raenadTestState{raenadTestStateData: raenadTestStateData{
 		config: map[string][]byte{
 			"raenad.hubspot_deal_pipeline": []byte(`{"pipeline_id":"pipeline-1","initial_dealstage_id":"stage-1"}`),
 		},
-	}
+	}}
 }
 
 func seedQuote(state *raenadTestState, status string, paymentCode *string, lines []raenadTestQuoteLine) {
