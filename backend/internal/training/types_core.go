@@ -3,7 +3,8 @@ package training
 // ── Evento ──
 
 // EventInput copre creazione e modifica: alla creazione basta il corso,
-// il resto si aggiunge progressivamente. I campi sorgente riservati
+// il resto si aggiunge progressivamente. L'update (PUT) e una sostituzione
+// completa: il campo vuoto o omesso azzera. I campi sorgente riservati
 // (origin, source_rule_id, source_request_id, rule_deadline, factorial_*)
 // non sono mai scrivibili dal client.
 type EventInput struct {
@@ -20,6 +21,9 @@ type ReasonInput struct {
 
 // ── Sessione ──
 
+// SessionInput copre creazione e modifica. L'update (PUT) e una sostituzione
+// completa: il campo vuoto o omesso azzera, capienza compresa (omettere
+// maxCapacity rimuove il limite).
 type SessionInput struct {
 	// ScheduleType e obbligatorio per People (scheduled|self_paced); il NULL
 	// nello schema resta riservato all'import Factorial.

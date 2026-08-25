@@ -35,7 +35,7 @@ JOIN training.course c ON c.id = ev.course_id
 LEFT JOIN training.vendor v ON v.id = ev.vendor_id
 JOIN training.v_event_operational_condition cond ON cond.event_id = ev.id
 ORDER BY ev.created_at DESC, ev.id
-LIMIT 500`
+LIMIT 5000`
 	rows, err := s.db.QueryContext(ctx, q)
 	if err != nil {
 		return nil, fmt.Errorf("list training events: %w", err)

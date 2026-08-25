@@ -386,7 +386,7 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 		{
 			ID:            TrainingAppID,
 			Name:          "Formazione",
-			Description:   "Piano formativo, richieste, certificazioni e attestati.",
+			Description:   "Eventi formativi, iscrizioni, presenze e certificazioni.",
 			Icon:          "clipboard",
 			Href:          TrainingAppHref,
 			Status:        "test",
