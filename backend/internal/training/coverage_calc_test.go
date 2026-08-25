@@ -75,6 +75,22 @@ func TestComputeNextRoundDeadline(t *testing.T) {
 			want:      testDate(2027, time.February, 15),
 			wantOK:    true,
 		},
+		{
+			name:      "calendario: il 31 si ferma all'ultimo giorno del mese corto",
+			months:    intPtr(1),
+			anchor:    anchorCalendar,
+			lastRound: testDatePtr(2026, time.January, 31),
+			want:      testDate(2026, time.February, 28),
+			wantOK:    true,
+		},
+		{
+			name:      "calendario: il giorno ridotto non torna a fine mese",
+			months:    intPtr(1),
+			anchor:    anchorCalendar,
+			lastRound: testDatePtr(2026, time.February, 28),
+			want:      testDate(2026, time.March, 28),
+			wantOK:    true,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -118,6 +134,20 @@ func TestRoundWindow(t *testing.T) {
 			wantFrom: testDate(2026, time.June, 30),
 			wantTo:   testDate(2026, time.September, 30),
 		},
+		{
+			name:     "sottrazione dal 31 verso febbraio non bisestile",
+			deadline: testDate(2026, time.March, 31),
+			months:   1,
+			wantFrom: testDate(2026, time.February, 28),
+			wantTo:   testDate(2026, time.March, 31),
+		},
+		{
+			name:     "sottrazione dal 31 verso febbraio bisestile",
+			deadline: testDate(2024, time.March, 31),
+			months:   1,
+			wantFrom: testDate(2024, time.February, 29),
+			wantTo:   testDate(2024, time.March, 31),
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -156,6 +186,24 @@ func TestPersonalDeadline(t *testing.T) {
 			lastCompletion: testDatePtr(2026, time.March, 1),
 			months:         12,
 			want:           testDate(2027, time.March, 1),
+		},
+		{
+			name:           "il 29 si ferma all'ultimo giorno di febbraio",
+			lastCompletion: testDatePtr(2025, time.January, 29),
+			months:         1,
+			want:           testDate(2025, time.February, 28),
+		},
+		{
+			name:           "il 30 si ferma all'ultimo giorno di febbraio",
+			lastCompletion: testDatePtr(2025, time.January, 30),
+			months:         1,
+			want:           testDate(2025, time.February, 28),
+		},
+		{
+			name:           "il 31 si ferma al 29 in un anno bisestile",
+			lastCompletion: testDatePtr(2024, time.January, 31),
+			months:         1,
+			want:           testDate(2024, time.February, 29),
 		},
 	}
 	for _, tc := range cases {

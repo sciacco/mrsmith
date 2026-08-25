@@ -422,6 +422,17 @@ func (s *SQLStore) SetRuleActive(ctx context.Context, principal Principal, id st
 		if err != nil {
 			return err
 		}
+		if active {
+			facts, err := s.loadRuleFacts(ctx, tx, id)
+			if err != nil {
+				return err
+			}
+			if facts.Target != nil && facts.Target.Kind == populationKindSkillArea {
+				if _, err := s.skillAreaGroupID(ctx, tx, facts.Target.ID); err != nil {
+					return err
+				}
+			}
+		}
 		if err := tx.QueryRowContext(ctx, `
 UPDATE training.training_rule
 SET is_active = $2,
@@ -664,12 +675,33 @@ FOR UPDATE`, eventID).Scan(&origin, &sourceRuleID, &ruleDeadline, &cancelled)
 		if cancelled {
 			return conflictError("event_cancelled", "un evento annullato non accetta nuove iscrizioni")
 		}
+		var lockedRuleID string
+		if err := tx.QueryRowContext(ctx, `
+SELECT id::text
+FROM training.training_rule
+WHERE id = $1::uuid
+FOR UPDATE`, sourceRuleID.String).Scan(&lockedRuleID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return notFoundError("rule_not_found", "regola non trovata")
+			}
+			return fmt.Errorf("lock training rule for feed: %w", err)
+		}
 		facts, err := s.loadRuleFacts(ctx, tx, sourceRuleID.String)
 		if err != nil {
 			return err
 		}
+		if !facts.IsActive {
+			return conflictError("rule_inactive", "la regola e disattivata: non si possono aggiungere persone")
+		}
 		if facts.Target == nil {
 			return conflictError("rule_without_population", "la regola e a posizioni: l'alimentazione riguarda solo le regole a platea")
+		}
+		current, err := s.currentRound(ctx, tx, facts.ID)
+		if err != nil {
+			return err
+		}
+		if current == nil || current.EventID != eventID {
+			return conflictError("event_not_current_round", "si possono aggiungere persone solo all'evento piu recente non annullato della regola")
 		}
 		var roundDeadline *time.Time
 		if ruleDeadline.Valid {

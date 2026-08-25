@@ -697,6 +697,9 @@ func (s *SQLStore) UpsertSkillArea(ctx context.Context, principal Principal, id 
 	if err := s.ensureCustomGroupSelectable(ctx, s.db, input.CustomGroupID); err != nil {
 		return ActionResponse{}, err
 	}
+	if err := s.ensureSkillAreaGroupCanBeRemoved(ctx, s.db, id, input.CustomGroupID); err != nil {
+		return ActionResponse{}, err
+	}
 	return s.upsertSimple(ctx, principal, "skill_area", id, []upsertField{
 		field("code", strings.TrimSpace(input.Code)),
 		field("name", strings.TrimSpace(input.Name)),
@@ -705,6 +708,31 @@ func (s *SQLStore) UpsertSkillArea(ctx context.Context, principal Principal, id 
 		field("description", nullableText(input.Description)),
 		field("is_active", boolValue(input.Active, true)),
 	})
+}
+
+// ensureSkillAreaGroupCanBeRemoved impedisce che una regola attiva perda la
+// platea necessaria al calcolo delle coperture. Creazione e sostituzione del
+// gruppo restano consentite; il controllo riguarda solo lo scollegamento.
+func (s *SQLStore) ensureSkillAreaGroupCanBeRemoved(ctx context.Context, q sqlRunner, skillAreaID, groupID string) error {
+	skillAreaID = strings.TrimSpace(skillAreaID)
+	if skillAreaID == "" || strings.TrimSpace(groupID) != "" {
+		return nil
+	}
+	var usedByActiveRule bool
+	if err := q.QueryRowContext(ctx, `
+SELECT EXISTS (
+  SELECT 1
+  FROM training.training_rule r
+  WHERE r.is_active
+    AND r.population_target->>'kind' = 'skill_area'
+    AND (r.population_target->>'id')::uuid = $1::uuid
+)`, skillAreaID).Scan(&usedByActiveRule); err != nil {
+		return fmt.Errorf("check active training rules for skill area: %w", err)
+	}
+	if usedByActiveRule {
+		return conflictError("skill_area_group_required_by_active_rule", "il gruppo non si puo rimuovere: l'area e usata da una regola attiva")
+	}
+	return nil
 }
 
 // ensureCustomGroupSelectable: il gruppo locale collegato a un'area di

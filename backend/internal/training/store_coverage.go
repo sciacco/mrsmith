@@ -546,14 +546,14 @@ func computeNextRoundDeadline(ruleDeadline time.Time, months *int, anchor string
 	if months == nil || anchor != anchorCalendar {
 		return time.Time{}, false
 	}
-	return lastRoundDeadline.AddDate(0, *months, 0), true
+	return addMonthsClamped(*lastRoundDeadline, *months), true
 }
 
 // roundWindow calcola la finestra di copertura di una tornata con ancora di
 // calendario: (scadenza - mesi, scadenza], estremo inferiore escluso e
 // superiore incluso.
 func roundWindow(roundDeadline time.Time, months int) (from, to time.Time) {
-	return roundDeadline.AddDate(0, -months, 0), roundDeadline
+	return addMonthsClamped(roundDeadline, -months), roundDeadline
 }
 
 // personalDeadline calcola la scadenza personale con ancora completion:
@@ -563,7 +563,21 @@ func personalDeadline(lastCompletion *time.Time, months int, ruleDeadline time.T
 	if lastCompletion == nil {
 		return ruleDeadline
 	}
-	return lastCompletion.AddDate(0, months, 0)
+	return addMonthsClamped(*lastCompletion, months)
+}
+
+// addMonthsClamped aggiunge o sottrae mesi fermandosi all'ultimo giorno del
+// mese di destinazione quando il giorno originale non esiste. Ogni calcolo
+// parte dalla data ricevuta: 31 gennaio -> 28 febbraio -> 28 marzo.
+func addMonthsClamped(value time.Time, months int) time.Time {
+	value = dateOnly(value)
+	targetMonth := time.Date(value.Year(), value.Month()+time.Month(months), 1, 0, 0, 0, 0, time.UTC)
+	lastDay := time.Date(targetMonth.Year(), targetMonth.Month()+1, 0, 0, 0, 0, 0, time.UTC).Day()
+	day := value.Day()
+	if day > lastDay {
+		day = lastDay
+	}
+	return time.Date(targetMonth.Year(), targetMonth.Month(), day, 0, 0, 0, 0, time.UTC)
 }
 
 // withinHorizon dice se una scadenza merita attenzione entro l'orizzonte,
