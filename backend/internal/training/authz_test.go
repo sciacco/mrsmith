@@ -16,12 +16,3 @@ func TestPrincipalCanAccessEmployee(t *testing.T) {
 		t.Fatal("missing principal email should not access employee rows")
 	}
 }
-
-func TestActorForPrincipal(t *testing.T) {
-	if got := actorForPrincipal(Principal{}); got != ActorEmployee {
-		t.Fatalf("actorForPrincipal employee = %q", got)
-	}
-	if got := actorForPrincipal(Principal{IsPeopleAdmin: true}); got != ActorPeopleAdmin {
-		t.Fatalf("actorForPrincipal people = %q", got)
-	}
-}

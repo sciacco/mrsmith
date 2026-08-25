@@ -74,84 +74,67 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 		directory:       deps.Directory,
 	}
 
-	protect := acl.RequireRole(applaunch.TrainingAppAccessRoles()...)
-	peopleProtect := acl.RequireRole(applaunch.TrainingPeopleAdminRoles()...)
+	// Ruolo unico: tutte le route Training, letture comprese, richiedono
+	// app_training_people_admin.
+	protect := acl.RequireRole(applaunch.TrainingPeopleAdminRoles()...)
 
 	mux.Handle("GET /training/v1/health", protect(http.HandlerFunc(h.handleHealth)))
 	mux.Handle("GET /training/v1/me", protect(h.requireStore(http.HandlerFunc(h.handleMe))))
-	mux.Handle("GET /training/v1/workspace", protect(h.requireStore(http.HandlerFunc(h.handleWorkspace))))
 	mux.Handle("GET /training/v1/lookups", protect(h.requireStore(http.HandlerFunc(h.handleLookups))))
 	mux.Handle("GET /training/v1/exports/{kind}", protect(h.requireStore(http.HandlerFunc(h.handleExport))))
-	mux.Handle("POST /training/v1/requests", protect(h.requireStore(http.HandlerFunc(h.handleCreateRequest))))
-	mux.Handle("POST /training/v1/requests/{id}/transition", protect(h.requireStore(http.HandlerFunc(h.handleTransitionRequest))))
+
+	// Nucleo operativo: eventi, sessioni, iscrizioni e partecipazioni.
+	mux.Handle("GET /training/v1/events", protect(h.requireStore(http.HandlerFunc(h.handleListEvents))))
+	mux.Handle("POST /training/v1/events", protect(h.requireStore(http.HandlerFunc(h.handleCreateEvent))))
+	mux.Handle("GET /training/v1/events/{id}", protect(h.requireStore(http.HandlerFunc(h.handleGetEvent))))
+	mux.Handle("PATCH /training/v1/events/{id}", protect(h.requireStore(http.HandlerFunc(h.handleUpdateEvent))))
+	mux.Handle("POST /training/v1/events/{id}/cancel", protect(h.requireStore(http.HandlerFunc(h.handleCancelEvent))))
+	mux.Handle("POST /training/v1/events/{id}/sessions", protect(h.requireStore(http.HandlerFunc(h.handleCreateSession))))
+	mux.Handle("PATCH /training/v1/sessions/{id}", protect(h.requireStore(http.HandlerFunc(h.handleUpdateSession))))
+	mux.Handle("DELETE /training/v1/sessions/{id}", protect(h.requireStore(http.HandlerFunc(h.handleDeleteSession))))
+	mux.Handle("POST /training/v1/events/{id}/enrollments", protect(h.requireStore(http.HandlerFunc(h.handleCreateEventEnrollment))))
+	mux.Handle("PUT /training/v1/enrollments/{id}", protect(h.requireStore(http.HandlerFunc(h.handleUpdateEnrollmentFacts))))
+	mux.Handle("POST /training/v1/enrollments/{id}/cancel", protect(h.requireStore(http.HandlerFunc(h.handleCancelEnrollment))))
+	mux.Handle("POST /training/v1/enrollments/{id}/complete-historical", protect(h.requireStore(http.HandlerFunc(h.handleCompleteEnrollmentHistorical))))
+	mux.Handle("POST /training/v1/enrollments/{id}/reopen", protect(h.requireStore(http.HandlerFunc(h.handleReopenEnrollment))))
+	mux.Handle("POST /training/v1/enrollments/{id}/sessions/{sessionId}", protect(h.requireStore(http.HandlerFunc(h.handleAssignEnrollmentSession))))
+	mux.Handle("DELETE /training/v1/enrollments/{id}/sessions/{sessionId}", protect(h.requireStore(http.HandlerFunc(h.handleRemoveEnrollmentSession))))
+	mux.Handle("PATCH /training/v1/enrollments/{id}/sessions/{sessionId}", protect(h.requireStore(http.HandlerFunc(h.handleUpdateParticipation))))
+
+	// Certificazioni, documenti e anagrafiche superstiti: conservano i path
+	// attuali e si riallineeranno nei task che le riscrivono.
 	mux.Handle("POST /training/v1/awards", protect(h.requireStore(http.HandlerFunc(h.handleCreateAward))))
 	mux.Handle("POST /training/v1/enrollments/{id}/documents", protect(h.requireStore(http.HandlerFunc(h.handleUploadEnrollmentDocument))))
 	mux.Handle("POST /training/v1/awards/{id}/documents", protect(h.requireStore(http.HandlerFunc(h.handleUploadAwardDocument))))
 	mux.Handle("GET /training/v1/documents/{id}/download", protect(h.requireStore(http.HandlerFunc(h.handleDownloadDocument))))
-	mux.Handle(
-		"GET /training/v1/people/workspace",
-		protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleWorkspace)))),
-	)
-	mux.Handle("POST /training/v1/people/enrollments", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleCreateEnrollment)))))
-	mux.Handle("PUT /training/v1/people/enrollments/{id}", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpdateEnrollment)))))
-	mux.Handle("POST /training/v1/people/enrollments/{id}/transition", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleTransitionEnrollment)))))
-	mux.Handle("POST /training/v1/people/enrollments/bulk-transition", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleBulkTransitionEnrollment)))))
-	mux.Handle("POST /training/v1/people/enrollments/bulk-assign", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleBulkAssignEnrollment)))))
-	mux.Handle("GET /training/v1/people/directory", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handlePeopleDirectory)))))
-	mux.Handle("POST /training/v1/people", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleCreatePerson)))))
-	mux.Handle("PATCH /training/v1/people/{id}", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpdatePerson)))))
-	mux.Handle("GET /training/v1/people/{id}/profile", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handlePersonProfile)))))
-	mux.Handle("GET /training/v1/people/overview", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleOverview)))))
-	mux.Handle("POST /training/v1/people/documents/{id}/validate", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleValidateDocument)))))
-	mux.Handle("POST /training/v1/people/jobs/run", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleRunJobs)))))
-	mux.Handle("PUT /training/v1/people/awards/{id}", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpdateAward)))))
-	mux.Handle("POST /training/v1/people/vendors", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpsertVendor)))))
-	mux.Handle("PUT /training/v1/people/vendors/{id}", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpsertVendor)))))
-	mux.Handle("POST /training/v1/people/teams", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpsertTeam)))))
-	mux.Handle("PUT /training/v1/people/teams/{id}", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpsertTeam)))))
-	mux.Handle("POST /training/v1/people/skill-areas", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpsertSkillArea)))))
-	mux.Handle("PUT /training/v1/people/skill-areas/{id}", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpsertSkillArea)))))
-	mux.Handle("POST /training/v1/people/certifications", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpsertCertification)))))
-	mux.Handle("PUT /training/v1/people/certifications/{id}", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpsertCertification)))))
-	mux.Handle("POST /training/v1/people/courses", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpsertCourse)))))
-	mux.Handle("PUT /training/v1/people/courses/{id}", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpsertCourse)))))
-	mux.Handle("POST /training/v1/people/plans", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleCreatePlan)))))
-	mux.Handle("PUT /training/v1/people/plans/{id}", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpsertPlan)))))
-	mux.Handle("POST /training/v1/people/plans/{id}/transition", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleTransitionPlan)))))
-	mux.Handle("GET /training/v1/people/planning/suggestions", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handlePlanningSuggestions)))))
-	mux.Handle("POST /training/v1/people/planning/suggestions/{id}/dismiss", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleDismissSuggestion)))))
-	mux.Handle("POST /training/v1/people/enrollments/bulk-plan-from-suggestion", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleBulkPlanFromSuggestion)))))
-	mux.Handle("POST /training/v1/people/enrollments/bulk-review", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleBulkReviewEmployeeRequests)))))
-	mux.Handle("GET /training/v1/people/compliance", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleComplianceOverview)))))
-	mux.Handle("GET /training/v1/compliance/rules", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleListMandatoryRules)))))
-	mux.Handle("POST /training/v1/compliance/rules", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleCreateMandatoryRuleV2)))))
-	mux.Handle("PATCH /training/v1/compliance/rules/{id}", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpdateMandatoryRuleV2)))))
-	mux.Handle("DELETE /training/v1/compliance/rules/{id}", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleDeleteMandatoryRuleV2)))))
-	mux.Handle("POST /training/v1/compliance/rules/{id}/preview-impact", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handlePreviewMandatoryRuleImpact)))))
-	mux.Handle("GET /training/v1/people/groups", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleListCustomGroups)))))
-	mux.Handle("POST /training/v1/people/groups", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleCreateCustomGroup)))))
-	mux.Handle("PATCH /training/v1/people/groups/{id}", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpdateCustomGroup)))))
-	mux.Handle("DELETE /training/v1/people/groups/{id}", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleDeleteCustomGroup)))))
-	mux.Handle("GET /training/v1/courses", protect(h.requireStore(http.HandlerFunc(h.handleListCatalogCourses))))
-	mux.Handle("POST /training/v1/people/courses/{id}/archive", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleArchiveCourse)))))
-	mux.Handle("POST /training/v1/people/mandatory-rules", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpsertMandatoryRule)))))
-	mux.Handle("PUT /training/v1/people/mandatory-rules/{id}", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpsertMandatoryRule)))))
-	mux.Handle("GET /training/v1/people/plans", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleListPlans)))))
-	mux.Handle("PATCH /training/v1/people/plans/{id}", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleUpdatePlan)))))
-	mux.Handle("DELETE /training/v1/people/plans/{id}", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleDeletePlan)))))
-	mux.Handle("GET /training/v1/people/plans/{id}/audit", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handlePlanAudit)))))
+	mux.Handle("POST /training/v1/people", protect(h.requireStore(http.HandlerFunc(h.handleCreatePerson))))
+	mux.Handle("PATCH /training/v1/people/{id}", protect(h.requireStore(http.HandlerFunc(h.handleUpdatePerson))))
+	mux.Handle("POST /training/v1/people/documents/{id}/validate", protect(h.requireStore(http.HandlerFunc(h.handleValidateDocument))))
+	mux.Handle("POST /training/v1/people/jobs/run", protect(h.requireStore(http.HandlerFunc(h.handleRunJobs))))
+	mux.Handle("PUT /training/v1/people/awards/{id}", protect(h.requireStore(http.HandlerFunc(h.handleUpdateAward))))
+	mux.Handle("POST /training/v1/people/vendors", protect(h.requireStore(http.HandlerFunc(h.handleUpsertVendor))))
+	mux.Handle("PUT /training/v1/people/vendors/{id}", protect(h.requireStore(http.HandlerFunc(h.handleUpsertVendor))))
+	mux.Handle("POST /training/v1/people/teams", protect(h.requireStore(http.HandlerFunc(h.handleUpsertTeam))))
+	mux.Handle("PUT /training/v1/people/teams/{id}", protect(h.requireStore(http.HandlerFunc(h.handleUpsertTeam))))
+	mux.Handle("POST /training/v1/people/skill-areas", protect(h.requireStore(http.HandlerFunc(h.handleUpsertSkillArea))))
+	mux.Handle("PUT /training/v1/people/skill-areas/{id}", protect(h.requireStore(http.HandlerFunc(h.handleUpsertSkillArea))))
+	mux.Handle("POST /training/v1/people/certifications", protect(h.requireStore(http.HandlerFunc(h.handleUpsertCertification))))
+	mux.Handle("PUT /training/v1/people/certifications/{id}", protect(h.requireStore(http.HandlerFunc(h.handleUpsertCertification))))
+	mux.Handle("POST /training/v1/people/courses", protect(h.requireStore(http.HandlerFunc(h.handleUpsertCourse))))
+	mux.Handle("PUT /training/v1/people/courses/{id}", protect(h.requireStore(http.HandlerFunc(h.handleUpsertCourse))))
+	mux.Handle("POST /training/v1/people/courses/{id}/archive", protect(h.requireStore(http.HandlerFunc(h.handleArchiveCourse))))
 
-	mux.Handle("GET /training/v1/directory/sync/runs", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleListDirectorySyncRuns)))))
-	mux.Handle("POST /training/v1/directory/sync", protect(peopleProtect(h.requireStore(http.HandlerFunc(h.handleRunDirectorySync)))))
+	mux.Handle("GET /training/v1/directory/sync/runs", protect(h.requireStore(http.HandlerFunc(h.handleListDirectorySyncRuns))))
+	mux.Handle("POST /training/v1/directory/sync", protect(h.requireStore(http.HandlerFunc(h.handleRunDirectorySync))))
 
 	// Factorial: interrogazione diagnostica read-only.
-	mux.Handle("GET /training/v1/factorial/status", protect(peopleProtect(http.HandlerFunc(h.handleFactorialStatus))))
-	mux.Handle("GET /training/v1/factorial/employees", protect(peopleProtect(http.HandlerFunc(h.handleFactorialEmployees))))
-	mux.Handle("GET /training/v1/factorial/teams", protect(peopleProtect(http.HandlerFunc(h.handleFactorialTeams))))
-	mux.Handle("GET /training/v1/factorial/trainings", protect(peopleProtect(http.HandlerFunc(h.handleFactorialTrainings))))
-	mux.Handle("GET /training/v1/factorial/trainings/{id}/memberships", protect(peopleProtect(http.HandlerFunc(h.handleFactorialTrainingMemberships))))
-	mux.Handle("GET /training/v1/factorial/trainings/{id}/structure", protect(peopleProtect(http.HandlerFunc(h.handleFactorialTrainingStructure))))
-	mux.Handle("GET /training/v1/factorial/sessions/{id}/participants", protect(peopleProtect(http.HandlerFunc(h.handleFactorialSessionParticipants))))
+	mux.Handle("GET /training/v1/factorial/status", protect(http.HandlerFunc(h.handleFactorialStatus)))
+	mux.Handle("GET /training/v1/factorial/employees", protect(http.HandlerFunc(h.handleFactorialEmployees)))
+	mux.Handle("GET /training/v1/factorial/teams", protect(http.HandlerFunc(h.handleFactorialTeams)))
+	mux.Handle("GET /training/v1/factorial/trainings", protect(http.HandlerFunc(h.handleFactorialTrainings)))
+	mux.Handle("GET /training/v1/factorial/trainings/{id}/memberships", protect(http.HandlerFunc(h.handleFactorialTrainingMemberships)))
+	mux.Handle("GET /training/v1/factorial/trainings/{id}/structure", protect(http.HandlerFunc(h.handleFactorialTrainingStructure)))
+	mux.Handle("GET /training/v1/factorial/sessions/{id}/participants", protect(http.HandlerFunc(h.handleFactorialSessionParticipants)))
 }
 
 func (h *handler) requireStore(next http.Handler) http.Handler {
@@ -196,20 +179,6 @@ func (h *handler) handleMe(w http.ResponseWriter, r *http.Request) {
 		Employee:          employee,
 		OnboardingPending: employee == nil,
 	})
-}
-
-func (h *handler) handleWorkspace(w http.ResponseWriter, r *http.Request) {
-	principal, ok := principalFromRequest(r)
-	if !ok {
-		httputil.Error(w, http.StatusUnauthorized, "missing_auth_claims")
-		return
-	}
-	workspace, err := h.store.Workspace(r.Context(), principal)
-	if err != nil {
-		httputil.InternalError(w, r, err, "load training workspace", "operation", "training.workspace")
-		return
-	}
-	httputil.JSON(w, http.StatusOK, workspace)
 }
 
 func (h *handler) handleLookups(w http.ResponseWriter, r *http.Request) {

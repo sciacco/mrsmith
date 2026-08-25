@@ -99,7 +99,6 @@ var (
 	manutenzioniManagerRoles         = []string{"app_manutenzioni_manager"}
 	manutenzioniOperatorRoles        = []string{"app_manutenzioni_operator"}
 	manutenzioniApproverRoles        = []string{"app_manutenzioni_approver"}
-	trainingAccessRoles              = []string{"app_training_access"}
 	trainingPeopleAdminRoles         = []string{"app_training_people_admin"}
 	panoramicaAccessRoles            = []string{"app_panoramica_access"}
 	quotesAccessRoles                = []string{"app_quotes_access"}
@@ -393,7 +392,7 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 			Status:        "test",
 			CategoryID:    "smart-apps",
 			CategoryTitle: "SMART APPS",
-			AccessRoles:   TrainingAppAccessRoles(),
+			AccessRoles:   TrainingPeopleAdminRoles(),
 		},
 		{
 			ID:            CPBackofficeAppID,
@@ -586,17 +585,8 @@ func ManutenzioniApproverRoles() []string {
 	return slices.Clone(manutenzioniApproverRoles)
 }
 
-func TrainingAccessRoles() []string {
-	return slices.Clone(trainingAccessRoles)
-}
-
 func TrainingPeopleAdminRoles() []string {
 	return slices.Clone(trainingPeopleAdminRoles)
-}
-
-func TrainingAppAccessRoles() []string {
-	roles := slices.Clone(trainingAccessRoles)
-	return append(roles, trainingPeopleAdminRoles...)
 }
 
 func PanoramicaAccessRoles() []string {
@@ -672,7 +662,6 @@ func AllRoles() []string {
 		manutenzioniManagerRoles,
 		manutenzioniOperatorRoles,
 		manutenzioniApproverRoles,
-		trainingAccessRoles,
 		trainingPeopleAdminRoles,
 		panoramicaAccessRoles,
 		quotesAccessRoles,

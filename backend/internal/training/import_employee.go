@@ -10,6 +10,7 @@ import (
 	"net/mail"
 	"path/filepath"
 	"strings"
+	"unicode"
 )
 
 type EmployeeImportResponse struct {
@@ -185,6 +186,46 @@ func csvValue(record []string, index int) string {
 		return ""
 	}
 	return strings.Join(strings.Fields(strings.TrimSpace(record[index])), " ")
+}
+
+func normalizeImportHeader(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	value = strings.ReplaceAll(value, "\n", " ")
+	value = strings.Join(strings.Fields(value), " ")
+	return value
+}
+
+func cleanImportLabel(value string) string {
+	value = strings.Join(strings.Fields(strings.TrimSpace(value)), " ")
+	if value == "/" {
+		return ""
+	}
+	return value
+}
+
+func importCodeFromName(name string, fallback string) string {
+	name = cleanImportLabel(name)
+	if name == "" {
+		return fallback
+	}
+	parts := []rune{}
+	lastUnderscore := false
+	for _, r := range strings.ToUpper(name) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			parts = append(parts, r)
+			lastUnderscore = false
+			continue
+		}
+		if !lastUnderscore {
+			parts = append(parts, '_')
+			lastUnderscore = true
+		}
+	}
+	code := strings.Trim(string(parts), "_")
+	if code == "" {
+		return fallback
+	}
+	return code
 }
 
 func validImportEmail(value string) bool {

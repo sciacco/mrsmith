@@ -16,14 +16,12 @@ import (
 )
 
 type importReport struct {
-	OK            bool                                        `json:"ok"`
-	DryRun        bool                                        `json:"dryRun"`
-	StartedAt     string                                      `json:"startedAt"`
-	FinishedAt    string                                      `json:"finishedAt"`
-	Error         string                                      `json:"error,omitempty"`
-	Employees     *training.EmployeeImportResponse            `json:"employees,omitempty"`
-	Training      *training.ImportDryRunResponse              `json:"training,omitempty"`
-	Normalization *training.TrainingImportNormalizationReport `json:"normalization,omitempty"`
+	OK         bool                             `json:"ok"`
+	DryRun     bool                             `json:"dryRun"`
+	StartedAt  string                           `json:"startedAt"`
+	FinishedAt string                           `json:"finishedAt"`
+	Error      string                           `json:"error,omitempty"`
+	Employees  *training.EmployeeImportResponse `json:"employees,omitempty"`
 }
 
 func main() {
@@ -36,7 +34,6 @@ func main() {
 func run() error {
 	var (
 		employeesCSV = flag.String("employees-csv", "", "CSV dipendenti con colonne Nome,Cognome,Email")
-		trainingXLSX = flag.String("training-xlsx", "", "workbook Excel del piano formazione")
 		dsn          = flag.String("dsn", os.Getenv("ANISETTA_DSN"), "DSN PostgreSQL Anisetta; default da ANISETTA_DSN")
 		operator     = flag.String("operator", "training-import@localhost", "email operatore usata per autorizzazione/audit applicativo")
 		reportPath   = flag.String("report", "", "percorso report JSON opzionale")
@@ -48,8 +45,8 @@ func run() error {
 	if *commit && *dryRunFlag {
 		return errors.New("usare --commit oppure --dry-run, non entrambi")
 	}
-	if *employeesCSV == "" && *trainingXLSX == "" {
-		return errors.New("specificare almeno --employees-csv o --training-xlsx")
+	if *employeesCSV == "" {
+		return errors.New("specificare --employees-csv")
 	}
 	if *commit && *dsn == "" {
 		return errors.New("ANISETTA_DSN o --dsn e' obbligatorio con --commit")
@@ -84,69 +81,20 @@ func run() error {
 		StartedAt: time.Now().Format(time.RFC3339),
 	}
 
-	if *employeesCSV != "" {
-		file, err := os.Open(*employeesCSV)
-		if err != nil {
-			return fmt.Errorf("open employees csv: %w", err)
-		}
-		result, err := training.ParseEmployeeCSVImport(ctx, *employeesCSV, file, *commit, store, principal)
-		closeErr := file.Close()
-		if err != nil {
-			return err
-		}
-		if closeErr != nil {
-			return fmt.Errorf("close employees csv: %w", closeErr)
-		}
-		report.Employees = &result
-		printEmployeeSummary(result)
+	file, err := os.Open(*employeesCSV)
+	if err != nil {
+		return fmt.Errorf("open employees csv: %w", err)
 	}
-
-	if *trainingXLSX != "" {
-		file, err := os.Open(*trainingXLSX)
-		if err != nil {
-			return fmt.Errorf("open training xlsx: %w", err)
-		}
-		result, err := training.ParseTrainingImport(ctx, *trainingXLSX, file, false, store, principal)
-		closeErr := file.Close()
-		if err != nil {
-			return err
-		}
-		if closeErr != nil {
-			return fmt.Errorf("close training xlsx: %w", closeErr)
-		}
-		report.Training = &result
-		normalizationEmployees := []training.EmployeeImportRow(nil)
-		if report.Employees != nil {
-			normalizationEmployees = report.Employees.Rows
-		} else if store != nil {
-			loadedEmployees, err := store.ListImportEmployees(ctx, principal)
-			if err != nil {
-				return failWithReport(*reportPath, &report, err)
-			}
-			normalizationEmployees = loadedEmployees
-		}
-		if len(normalizationEmployees) > 0 {
-			normalization := training.ResolveTrainingImportEmployees(&result, normalizationEmployees)
-			report.Normalization = &normalization
-			printNormalizationSummary(normalization)
-			if *commit {
-				if normalization.UnmatchedRows > 0 || normalization.AmbiguousRows > 0 {
-					return failWithReport(*reportPath, &report, fmt.Errorf("training import has %d unmatched and %d ambiguous employee rows after normalization", normalization.UnmatchedRows, normalization.AmbiguousRows))
-				}
-				summary, err := store.ImportTrainingRowsDetailed(ctx, principal, result.Rows)
-				if err != nil {
-					return failWithReport(*reportPath, &report, err)
-				}
-				result.DryRun = false
-				result.Summary.CreatedEnrollments = summary.CreatedEnrollments
-				result.Summary.UpdatedEnrollments = summary.UpdatedEnrollments
-				result.Summary.UnchangedEnrollments = summary.UnchangedEnrollments
-			}
-		} else if *commit {
-			return failWithReport(*reportPath, &report, errors.New("training import commit requires --employees-csv or existing training.employee rows for normalization"))
-		}
-		printTrainingSummary(result)
+	result, err := training.ParseEmployeeCSVImport(ctx, *employeesCSV, file, *commit, store, principal)
+	closeErr := file.Close()
+	if err != nil {
+		return err
 	}
+	if closeErr != nil {
+		return fmt.Errorf("close employees csv: %w", closeErr)
+	}
+	report.Employees = &result
+	printEmployeeSummary(result)
 
 	report.FinishedAt = time.Now().Format(time.RFC3339)
 	if *reportPath != "" {
@@ -156,20 +104,6 @@ func run() error {
 		fmt.Fprintf(os.Stdout, "report: %s\n", *reportPath)
 	}
 	return nil
-}
-
-func failWithReport(path string, report *importReport, err error) error {
-	report.OK = false
-	report.Error = err.Error()
-	report.FinishedAt = time.Now().Format(time.RFC3339)
-	if path == "" {
-		return err
-	}
-	if writeErr := writeReport(path, *report); writeErr != nil {
-		return fmt.Errorf("%w; additionally failed to write report: %v", err, writeErr)
-	}
-	fmt.Fprintf(os.Stdout, "report: %s\n", path)
-	return err
 }
 
 func printEmployeeSummary(result training.EmployeeImportResponse) {
@@ -203,51 +137,6 @@ func printEmployeeSummary(result training.EmployeeImportResponse) {
 
 func employeeWriteCounts(summary training.EmployeeImportSummary) int {
 	return summary.CreatedEmployees + summary.UpdatedEmployees + summary.UnchangedEmployees
-}
-
-func printNormalizationSummary(result training.TrainingImportNormalizationReport) {
-	fmt.Fprintf(
-		os.Stdout,
-		"normalization: %d matched, %d surname, %d split sources, %d expanded, %d skipped non-person, %d skipped courses, %d deduplicated, %d already with email, %d unmatched, %d ambiguous\n",
-		result.MatchedRows,
-		result.SurnameMatchedRows,
-		result.SplitSourceRows,
-		result.ExpandedRows,
-		result.SkippedNonPersonRows,
-		result.SkippedCourseRows,
-		result.DeduplicatedRows,
-		result.AlreadyEmail,
-		result.UnmatchedRows,
-		result.AmbiguousRows,
-	)
-}
-
-func printTrainingSummary(result training.ImportDryRunResponse) {
-	mode := "dry-run"
-	if !result.DryRun {
-		mode = "commit"
-	}
-	fmt.Fprintf(
-		os.Stdout,
-		"training %s: %d candidate, %d skipped, %d ambiguous",
-		mode,
-		result.Summary.CandidateRows,
-		result.Summary.SkippedRows,
-		result.Summary.AmbiguousRows,
-	)
-	if !result.DryRun {
-		fmt.Fprintf(
-			os.Stdout,
-			", %d created, %d updated, %d unchanged",
-			result.Summary.CreatedEnrollments,
-			result.Summary.UpdatedEnrollments,
-			result.Summary.UnchangedEnrollments,
-		)
-	}
-	fmt.Fprintln(os.Stdout)
-	if len(result.Warnings) > 0 {
-		fmt.Fprintf(os.Stdout, "training warnings: %d\n", len(result.Warnings))
-	}
 }
 
 func writeReport(path string, report importReport) error {

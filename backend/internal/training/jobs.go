@@ -49,14 +49,6 @@ func (r *JobRunner) RunOnce(ctx context.Context) (JobRunResponse, error) {
 	if r == nil || r.store == nil {
 		return JobRunResponse{}, serviceUnavailableError("training_database_not_configured", "database Training non configurato")
 	}
-	expired, err := r.store.ExpireClosedPlanEnrollments(ctx)
-	if err != nil {
-		return JobRunResponse{}, err
-	}
-	compliance, err := r.notifyComplianceGaps(ctx)
-	if err != nil {
-		r.logger.Warn("training compliance notification job failed", "error", err)
-	}
 	certifications, err := r.notifyExpiringCertifications(ctx)
 	if err != nil {
 		r.logger.Warn("training certification notification job failed", "error", err)
@@ -68,8 +60,6 @@ func (r *JobRunner) RunOnce(ctx context.Context) (JobRunResponse, error) {
 	}
 	return JobRunResponse{
 		OK:                         true,
-		ExpiredEnrollments:         expired,
-		ComplianceNotifications:    compliance,
 		CertificationNotifications: certifications,
 	}, nil
 }
@@ -90,42 +80,6 @@ func (r *JobRunner) Run(ctx context.Context, interval time.Duration) {
 		case <-ticker.C:
 		}
 	}
-}
-
-func (r *JobRunner) notifyComplianceGaps(ctx context.Context) (int, error) {
-	if r.notifier == nil {
-		return 0, nil
-	}
-	gaps, err := r.store.NotificationComplianceGaps(ctx)
-	if err != nil {
-		return 0, err
-	}
-	count := 0
-	for _, gap := range gaps {
-		_, err := r.notifier.Notify(ctx, notifications.NotifyInput{
-			TypeKey:    "training.compliance_gap",
-			Title:      "Formazione obbligatoria da pianificare",
-			Body:       fmt.Sprintf("%s richiede una pianificazione o un aggiornamento.", gap.CourseTitle),
-			EntityType: "training_compliance_gap",
-			EntityID:   gap.EmployeeID + ":" + gap.CourseID,
-			DedupeKey:  fmt.Sprintf("training:compliance_gap:%s:%s", gap.EmployeeID, gap.CourseID),
-			DeepLink:   r.deepLink("/report"),
-			Metadata: map[string]any{
-				"employee_id": gap.EmployeeID,
-				"course_id":   gap.CourseID,
-				"course":      gap.CourseTitle,
-				"status":      gap.ComplianceStatus,
-			},
-			Recipients: []notifications.Recipient{{
-				Email: gap.EmployeeEmail,
-				Name:  gap.EmployeeName,
-			}},
-		})
-		if err == nil {
-			count++
-		}
-	}
-	return count, nil
 }
 
 func (r *JobRunner) notifyExpiringCertifications(ctx context.Context) (int, error) {
@@ -175,15 +129,6 @@ func (r *JobRunner) deepLink(path string) string {
 	return base + path
 }
 
-type notificationGap struct {
-	EmployeeID       string
-	EmployeeName     string
-	EmployeeEmail    string
-	CourseID         string
-	CourseTitle      string
-	ComplianceStatus string
-}
-
 type notificationCertification struct {
 	AwardID           string
 	EmployeeName      string
@@ -192,79 +137,6 @@ type notificationCertification struct {
 	CertificationName string
 	ExpiresOn         string
 	DaysToExpiry      int
-}
-
-func (s *SQLStore) ExpireClosedPlanEnrollments(ctx context.Context) (int, error) {
-	const stmt = `
-WITH candidates AS (
-  SELECT en.*
-  FROM training.enrollment en
-  JOIN training.training_plan tp ON tp.id = en.training_plan_id
-  WHERE tp.status = 'closed'
-    AND en.status IN ('proposed', 'approved')
-), updated AS (
-  UPDATE training.enrollment en
-  SET status = 'expired'::training.enrollment_status
-  FROM candidates c
-  WHERE en.id = c.id
-  RETURNING en.*
-)
-INSERT INTO training.audit_log (
-  entity_type,
-  entity_id,
-  action,
-  before_state,
-  after_state,
-  correlation_id
-)
-SELECT
-  'enrollment',
-  c.id,
-  'transition:expire',
-  to_jsonb(c),
-  to_jsonb(u),
-  gen_random_uuid()
-FROM candidates c
-JOIN updated u ON u.id = c.id`
-	result, err := s.db.ExecContext(ctx, stmt)
-	if err != nil {
-		return 0, fmt.Errorf("expire training enrollments: %w", err)
-	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return 0, err
-	}
-	return int(affected), nil
-}
-
-func (s *SQLStore) NotificationComplianceGaps(ctx context.Context) ([]notificationGap, error) {
-	const q = `
-SELECT
-  g.employee_id::text,
-  concat(g.last_name, ' ', g.first_name),
-  e.email::text,
-  g.course_id::text,
-  g.course_title,
-  g.compliance_status
-FROM training.v_mandatory_compliance_gap g
-JOIN training.employee e ON e.id = g.employee_id
-WHERE g.compliance_status <> 'compliant'
-  AND e.status = 'active'
-LIMIT 500`
-	rows, err := s.db.QueryContext(ctx, q)
-	if err != nil {
-		return nil, fmt.Errorf("list training compliance notifications: %w", err)
-	}
-	defer rows.Close()
-	result := []notificationGap{}
-	for rows.Next() {
-		var row notificationGap
-		if err := rows.Scan(&row.EmployeeID, &row.EmployeeName, &row.EmployeeEmail, &row.CourseID, &row.CourseTitle, &row.ComplianceStatus); err != nil {
-			return nil, err
-		}
-		result = append(result, row)
-	}
-	return result, rows.Err()
 }
 
 func (s *SQLStore) NotificationExpiringCertifications(ctx context.Context, windows []int) ([]notificationCertification, error) {

@@ -15,14 +15,6 @@ import (
 )
 
 func (h *handler) writeActionError(w http.ResponseWriter, r *http.Request, err error, operation string) {
-	if openErr, ok := asAnotherPlanOpenError(err); ok {
-		httputil.JSON(w, http.StatusConflict, map[string]any{
-			"error":         "another_plan_open",
-			"message":       openErr.Error(),
-			"existing_plan": openErr.existing,
-		})
-		return
-	}
 	if appErr, ok := asAppError(err); ok {
 		httputil.JSON(w, appErr.status, map[string]string{
 			"error":   appErr.code,
@@ -50,202 +42,6 @@ func (h *handler) principalOrUnauthorized(w http.ResponseWriter, r *http.Request
 		return Principal{}, false
 	}
 	return principal, true
-}
-
-func (h *handler) handleCreateEnrollment(w http.ResponseWriter, r *http.Request) {
-	principal, ok := h.principalOrUnauthorized(w, r)
-	if !ok {
-		return
-	}
-	input, ok := decodeJSONBody[EnrollmentInput](w, r)
-	if !ok {
-		return
-	}
-	response, err := h.store.CreateEnrollment(r.Context(), principal, input)
-	if err != nil {
-		h.writeActionError(w, r, err, "training.create_enrollment")
-		return
-	}
-	httputil.JSON(w, http.StatusCreated, response)
-}
-
-func (h *handler) handleUpdateEnrollment(w http.ResponseWriter, r *http.Request) {
-	principal, ok := h.principalOrUnauthorized(w, r)
-	if !ok {
-		return
-	}
-	input, ok := decodeJSONBody[EnrollmentInput](w, r)
-	if !ok {
-		return
-	}
-	response, err := h.store.UpdateEnrollment(r.Context(), principal, r.PathValue("id"), input)
-	if err != nil {
-		h.writeActionError(w, r, err, "training.update_enrollment")
-		return
-	}
-	httputil.JSON(w, http.StatusOK, response)
-}
-
-func (h *handler) handleTransitionEnrollment(w http.ResponseWriter, r *http.Request) {
-	principal, ok := h.principalOrUnauthorized(w, r)
-	if !ok {
-		return
-	}
-	input, ok := decodeJSONBody[EnrollmentTransitionInput](w, r)
-	if !ok {
-		return
-	}
-	response, err := h.store.TransitionEnrollment(r.Context(), principal, r.PathValue("id"), input)
-	if err != nil {
-		h.writeActionError(w, r, err, "training.transition_enrollment")
-		return
-	}
-	httputil.JSON(w, http.StatusOK, response)
-}
-
-func (h *handler) handleBulkTransitionEnrollment(w http.ResponseWriter, r *http.Request) {
-	principal, ok := h.principalOrUnauthorized(w, r)
-	if !ok {
-		return
-	}
-	input, ok := decodeJSONBody[BulkEnrollmentTransitionInput](w, r)
-	if !ok {
-		return
-	}
-	if len(input.EnrollmentIDs) == 0 {
-		h.writeActionError(w, r, validationError("missing_enrollment_ids", "indica almeno una iscrizione"), "training.bulk_transition_enrollment")
-		return
-	}
-	transition, err := bulkTargetStateToTransition(input.TargetState)
-	if err != nil {
-		h.writeActionError(w, r, err, "training.bulk_transition_enrollment")
-		return
-	}
-	response := BulkEnrollmentTransitionResponse{Failures: []BulkEnrollmentTransitionFailure{}}
-	for _, id := range input.EnrollmentIDs {
-		_, err := h.store.TransitionEnrollment(r.Context(), principal, strings.TrimSpace(id), EnrollmentTransitionInput{
-			Transition: transition,
-			Reason:     input.Motivation,
-		})
-		if err != nil {
-			failure := BulkEnrollmentTransitionFailure{EnrollmentID: id, Message: err.Error()}
-			if appErr, ok := asAppError(err); ok {
-				failure.Code = appErr.code
-				failure.Message = appErr.message
-			}
-			response.Failures = append(response.Failures, failure)
-			response.Failed++
-			continue
-		}
-		response.Succeeded++
-	}
-	httputil.JSON(w, http.StatusOK, response)
-}
-
-func (h *handler) handleBulkAssignEnrollment(w http.ResponseWriter, r *http.Request) {
-	principal, ok := h.principalOrUnauthorized(w, r)
-	if !ok {
-		return
-	}
-	input, ok := decodeJSONBody[BulkAssignInput](w, r)
-	if !ok {
-		return
-	}
-	if len(input.EmployeeIDs) == 0 && strings.TrimSpace(input.SourceCustomGroupID) != "" {
-		ids, err := h.store.CustomGroupMemberIDs(r.Context(), h.store.db, input.SourceCustomGroupID)
-		if err != nil {
-			h.writeActionError(w, r, err, "training.bulk_assign")
-			return
-		}
-		input.EmployeeIDs = ids
-	}
-	if len(input.EmployeeIDs) == 0 {
-		h.writeActionError(w, r, validationError("missing_employee_ids", "indica almeno una persona"), "training.bulk_assign")
-		return
-	}
-	if strings.TrimSpace(input.CourseID) == "" {
-		h.writeActionError(w, r, validationError("missing_course_id", "corso obbligatorio"), "training.bulk_assign")
-		return
-	}
-	if input.PlanParams.Year == 0 {
-		h.writeActionError(w, r, validationError("missing_year", "anno piano obbligatorio"), "training.bulk_assign")
-		return
-	}
-	planID, err := h.store.TrainingPlanIDByYear(r.Context(), input.PlanParams.Year)
-	if err != nil {
-		h.writeActionError(w, r, err, "training.bulk_assign")
-		return
-	}
-	response := BulkAssignResponse{Failures: []BulkAssignFailure{}}
-	for _, employeeID := range input.EmployeeIDs {
-		_, err := h.store.CreateEnrollment(r.Context(), principal, EnrollmentInput{
-			EmployeeID:          strings.TrimSpace(employeeID),
-			CourseID:            input.CourseID,
-			TrainingPlanID:      planID,
-			PlannedStart:        input.PlanParams.PlannedStart,
-			PlannedEnd:          input.PlanParams.PlannedEnd,
-			HoursPlanned:        input.PlanParams.HoursPlanned,
-			CostPlanned:         input.PlanParams.CostPlanned,
-			MandatoryRuleID:     input.MandatoryRuleID,
-			SourceCustomGroupID: input.SourceCustomGroupID,
-		})
-		if err != nil {
-			failure := BulkAssignFailure{EmployeeID: employeeID, Message: err.Error()}
-			if appErr, ok := asAppError(err); ok {
-				failure.Code = appErr.code
-				failure.Message = appErr.message
-			}
-			response.Failures = append(response.Failures, failure)
-			response.Failed++
-			continue
-		}
-		response.Created++
-	}
-	httputil.JSON(w, http.StatusOK, response)
-}
-
-func (h *handler) handleOverview(w http.ResponseWriter, r *http.Request) {
-	_, ok := h.principalOrUnauthorized(w, r)
-	if !ok {
-		return
-	}
-	year := time.Now().Year()
-	if yearStr := strings.TrimSpace(r.URL.Query().Get("year")); yearStr != "" {
-		if parsed, err := strconvAtoi(yearStr); err == nil {
-			year = parsed
-		}
-	}
-	team := strings.TrimSpace(r.URL.Query().Get("team"))
-	overview, err := h.store.Overview(r.Context(), year, team)
-	if err != nil {
-		h.writeActionError(w, r, err, "training.overview")
-		return
-	}
-	httputil.JSON(w, http.StatusOK, overview)
-}
-
-func (h *handler) handlePersonProfile(w http.ResponseWriter, r *http.Request) {
-	_, ok := h.principalOrUnauthorized(w, r)
-	if !ok {
-		return
-	}
-	id := r.PathValue("id")
-	if strings.TrimSpace(id) == "" {
-		h.writeActionError(w, r, validationError("missing_id", "id persona obbligatorio"), "training.person_profile")
-		return
-	}
-	year := time.Now().Year()
-	if yearStr := strings.TrimSpace(r.URL.Query().Get("year")); yearStr != "" {
-		if parsed, err := strconvAtoi(yearStr); err == nil {
-			year = parsed
-		}
-	}
-	profile, err := h.store.GetPersonProfile(r.Context(), id, year)
-	if err != nil {
-		h.writeActionError(w, r, err, "training.person_profile")
-		return
-	}
-	httputil.JSON(w, http.StatusOK, profile)
 }
 
 func (h *handler) handleUpdatePerson(w http.ResponseWriter, r *http.Request) {
@@ -285,90 +81,6 @@ func (h *handler) handleCreatePerson(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httputil.JSON(w, http.StatusCreated, response)
-}
-
-func (h *handler) handlePeopleDirectory(w http.ResponseWriter, r *http.Request) {
-	_, ok := h.principalOrUnauthorized(w, r)
-	if !ok {
-		return
-	}
-	filters := PeopleDirectoryFilters{
-		Team:   strings.TrimSpace(r.URL.Query().Get("team")),
-		Group:  strings.TrimSpace(r.URL.Query().Get("group")),
-		Filter: strings.TrimSpace(r.URL.Query().Get("filter")),
-		Search: strings.TrimSpace(r.URL.Query().Get("q")),
-	}
-	if yearStr := strings.TrimSpace(r.URL.Query().Get("year")); yearStr != "" {
-		if year, err := strconvAtoi(yearStr); err == nil {
-			filters.Year = year
-		}
-	}
-	directory, err := h.store.ListPeopleDirectory(r.Context(), Principal{IsPeopleAdmin: true}, filters)
-	if err != nil {
-		h.writeActionError(w, r, err, "training.people_directory")
-		return
-	}
-	httputil.JSON(w, http.StatusOK, directory)
-}
-
-func strconvAtoi(s string) (int, error) {
-	var n int
-	for _, ch := range s {
-		if ch < '0' || ch > '9' {
-			return 0, fmt.Errorf("invalid integer")
-		}
-		n = n*10 + int(ch-'0')
-	}
-	return n, nil
-}
-
-func bulkTargetStateToTransition(targetState string) (string, error) {
-	switch strings.TrimSpace(targetState) {
-	case "approved":
-		return "approve", nil
-	case "in_progress":
-		return "start", nil
-	case "completed":
-		return "complete", nil
-	case "cancelled":
-		return "cancel", nil
-	default:
-		return "", validationError("invalid_target_state", "stato di destinazione non supportato")
-	}
-}
-
-func (h *handler) handleCreateRequest(w http.ResponseWriter, r *http.Request) {
-	principal, ok := h.principalOrUnauthorized(w, r)
-	if !ok {
-		return
-	}
-	input, ok := decodeJSONBody[TrainingRequestInput](w, r)
-	if !ok {
-		return
-	}
-	response, err := h.store.CreateTrainingRequest(r.Context(), principal, input)
-	if err != nil {
-		h.writeActionError(w, r, err, "training.create_request")
-		return
-	}
-	httputil.JSON(w, http.StatusCreated, response)
-}
-
-func (h *handler) handleTransitionRequest(w http.ResponseWriter, r *http.Request) {
-	principal, ok := h.principalOrUnauthorized(w, r)
-	if !ok {
-		return
-	}
-	input, ok := decodeJSONBody[TrainingRequestTransitionInput](w, r)
-	if !ok {
-		return
-	}
-	response, err := h.store.TransitionTrainingRequest(r.Context(), principal, r.PathValue("id"), input)
-	if err != nil {
-		h.writeActionError(w, r, err, "training.transition_request")
-		return
-	}
-	httputil.JSON(w, http.StatusOK, response)
 }
 
 func (h *handler) handleCreateAward(w http.ResponseWriter, r *http.Request) {
@@ -455,24 +167,17 @@ func (h *handler) handleUpsertCourse(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *handler) handleUpsertPlan(w http.ResponseWriter, r *http.Request) {
-	h.handleUpsert(w, r, func(principal Principal, id string) (ActionResponse, error) {
-		input, ok := decodeJSONBody[TrainingPlanInput](w, r)
-		if !ok {
-			return ActionResponse{}, nil
-		}
-		return h.store.UpsertTrainingPlan(r.Context(), principal, id, input)
-	})
-}
-
-func (h *handler) handleUpsertMandatoryRule(w http.ResponseWriter, r *http.Request) {
-	h.handleUpsert(w, r, func(principal Principal, id string) (ActionResponse, error) {
-		input, ok := decodeJSONBody[MandatoryRuleInput](w, r)
-		if !ok {
-			return ActionResponse{}, nil
-		}
-		return h.store.UpsertMandatoryRule(r.Context(), principal, id, input)
-	})
+func (h *handler) handleArchiveCourse(w http.ResponseWriter, r *http.Request) {
+	principal, ok := h.principalOrUnauthorized(w, r)
+	if !ok {
+		return
+	}
+	resp, err := h.store.ArchiveCourse(r.Context(), principal, r.PathValue("id"))
+	if err != nil {
+		h.writeActionError(w, r, err, "training.archive_course")
+		return
+	}
+	httputil.JSON(w, http.StatusOK, resp)
 }
 
 func (h *handler) handleUpsert(w http.ResponseWriter, r *http.Request, fn func(Principal, string) (ActionResponse, error)) {
@@ -655,36 +360,6 @@ func (h *handler) handleExport(w http.ResponseWriter, r *http.Request) {
 	var headers []string
 	var rows [][]string
 	switch kind {
-	case "plan":
-		items, err := h.store.ListPlanEnrollments(r.Context(), principal)
-		if err != nil {
-			h.writeActionError(w, r, err, "training.export_plan")
-			return
-		}
-		headers = []string{"Persona", "Email", "Team", "Corso", "Fornitore", "Area", "Stato", "Anno", "Inizio", "Fine", "Ore", "Costo", "Obbligatoria", "Framework compliance", "Documento", "Validato"}
-		for _, item := range filterPlanRows(items, query) {
-			rows = append(rows, []string{item.EmployeeName, item.EmployeeEmail, item.TeamCode, item.CourseTitle, item.VendorName, item.SkillAreaName, item.Status, fmt.Sprint(item.Year), item.PlannedStart, item.PlannedEnd, intString(item.HoursPlanned), floatString(item.CostPlanned), fmt.Sprint(item.RequiredByRule), item.ComplianceFramework, item.DocumentFilename, fmt.Sprint(item.DocumentValidated)})
-		}
-	case "requests":
-		items, err := h.store.ListRequests(r.Context(), principal)
-		if err != nil {
-			h.writeActionError(w, r, err, "training.export_requests")
-			return
-		}
-		headers = []string{"Persona", "Email", "Corso", "Titolo libero", "Area", "Motivazione", "Anno", "Stato", "Creata"}
-		for _, item := range filterRequestRows(items, query) {
-			rows = append(rows, []string{item.EmployeeName, item.EmployeeEmail, item.CourseTitle, item.FreeTextTitle, item.SkillAreaName, item.Motivation, intString(item.DesiredYear), item.Status, item.CreatedAt})
-		}
-	case "catalog":
-		items, err := h.store.ListCatalogCourses(r.Context())
-		if err != nil {
-			h.writeActionError(w, r, err, "training.export_catalog")
-			return
-		}
-		headers = []string{"Corso", "Fornitore", "Area", "Certificazione", "Modalita", "Origine", "Ore", "Costo", "URL", "Descrizione", "Compliance", "Ricorrenza mesi", "Framework", "Attiva"}
-		for _, item := range filterCatalogRows(items, query) {
-			rows = append(rows, []string{item.Title, item.VendorName, item.SkillAreaName, item.CertificationName, item.DeliveryMode, item.ProviderKind, intString(item.DefaultHours), floatString(item.DefaultCost), item.CourseURL, item.Description, fmt.Sprint(item.ComplianceRelated), intString(item.RecurrenceMonths), item.ComplianceFramework, fmt.Sprint(item.Active)})
-		}
 	case "certifications":
 		items, err := h.store.ListCertifications(r.Context(), principal)
 		if err != nil {
@@ -695,20 +370,6 @@ func (h *handler) handleExport(w http.ResponseWriter, r *http.Request) {
 		for _, item := range filterCertificationRows(items, query) {
 			rows = append(rows, []string{item.EmployeeName, item.EmployeeEmail, item.CertificationCode, item.CertificationName, item.Outcome, item.AwardedOn, item.ExpiresOn, item.CurrentStatus, item.ValidationSource, item.DocumentFilename, fmt.Sprint(item.DocumentValidated)})
 		}
-	case "plan-budget":
-		if !principal.IsPeopleAdmin {
-			h.writeActionError(w, r, forbiddenError("people_role_required", "azione riservata a People"), "training.export_plan_budget")
-			return
-		}
-		items, err := h.store.ListPlanBudget(r.Context())
-		if err != nil {
-			h.writeActionError(w, r, err, "training.export_plan_budget")
-			return
-		}
-		headers = []string{"Anno", "Team", "Iscrizioni", "Costo", "Ore"}
-		for _, item := range items {
-			rows = append(rows, []string{fmt.Sprint(item.Year), item.TeamCode, fmt.Sprint(item.EnrollmentsCount), floatString(item.CostTotal), floatString(item.HoursTotal)})
-		}
 	case "expiring-certifications":
 		items, err := h.store.ListExpiringCertifications(r.Context(), principal)
 		if err != nil {
@@ -718,16 +379,6 @@ func (h *handler) handleExport(w http.ResponseWriter, r *http.Request) {
 		headers = []string{"Persona", "Email", "Codice", "Certificazione", "Scadenza", "Giorni"}
 		for _, item := range items {
 			rows = append(rows, []string{item.EmployeeName, item.EmployeeEmail, item.CertificationCode, item.CertificationName, item.ExpiresOn, fmt.Sprint(item.DaysToExpiry)})
-		}
-	case "compliance-gaps":
-		items, err := h.store.ListComplianceGaps(r.Context(), principal)
-		if err != nil {
-			h.writeActionError(w, r, err, "training.export_gaps")
-			return
-		}
-		headers = []string{"Persona", "Corso", "Ambito", "Ultimo superamento", "Stato"}
-		for _, item := range items {
-			rows = append(rows, []string{item.EmployeeName, item.CourseTitle, item.ComplianceFramework, item.LastValidAwardedOn, item.ComplianceStatus})
 		}
 	default:
 		httputil.JSON(w, http.StatusNotFound, map[string]string{"error": "export_not_found"})
