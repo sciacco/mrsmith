@@ -635,7 +635,11 @@ func main() {
 	})
 	var factorialCli *factorial.Client
 	if cfg.FactorialAPIKey != "" {
-		factorialOpts := []factorial.Option{factorial.WithAPIKey(cfg.FactorialAPIKey)}
+		factorialOpts := []factorial.Option{
+			factorial.WithAPIKey(cfg.FactorialAPIKey),
+			// Timeout per richiesta, nessuna deadline sull'intera run (#141).
+			factorial.WithHTTPClient(&http.Client{Timeout: 30 * time.Second}),
+		}
 		if cfg.FactorialBaseURL != "" {
 			factorialOpts = append(factorialOpts, factorial.WithBaseURL(cfg.FactorialBaseURL))
 		}
@@ -796,7 +800,8 @@ func main() {
 			notificationNotifier,
 			logger,
 			cfg.TrainingAppURL,
-		).WithDirectorySync(directoryProvider, cfg.TrainingDirectorySyncEnabled)
+		).WithDirectorySync(directoryProvider, cfg.TrainingDirectorySyncEnabled).
+			WithFactorialSync(factorialCli, cfg.FactorialTrainingAuthorEmployeeID, cfg.TrainingFactorialSyncEnabled)
 		workerWG.Add(1)
 		go func() {
 			defer workerWG.Done()

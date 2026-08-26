@@ -40,7 +40,7 @@ type technicalEmployee struct {
 type outboundIssue struct {
 	Kind  string
 	Ref   string
-	Err   error
+	Err   error `json:"-"`
 	Count int
 }
 

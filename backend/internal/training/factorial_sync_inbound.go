@@ -398,10 +398,12 @@ type inboundSyncResult struct {
 
 // applyInboundSync applica il grafo Factorial perimetrato al dominio
 // locale: per ogni Training, legge lo stato locale, calcola il diff puro e
-// lo applica in una transazione breve. Un errore DB abortisce l'intera run;
-// gli errori sui singoli dati sono gia' isolati dal diff (conflitti/warning)
-// e non raggiungono mai una scrittura.
-func (s *SQLStore) applyInboundSync(ctx context.Context, graph factorialTrainingGraph) (inboundSyncResult, error) {
+// lo applica in una transazione breve. In dry-run il diff resta puro: si
+// accumulano conflitti/warning ma non si apre alcuna transazione ne' si
+// chiama applyTrainingDiff (#141, slice 7). Un errore DB abortisce l'intera
+// run; gli errori sui singoli dati sono gia' isolati dal diff
+// (conflitti/warning) e non raggiungono mai una scrittura.
+func (s *SQLStore) applyInboundSync(ctx context.Context, graph factorialTrainingGraph, dryRun bool) (inboundSyncResult, error) {
 	if s == nil || s.db == nil {
 		return inboundSyncResult{}, errors.New("training database not configured")
 	}
@@ -421,6 +423,9 @@ func (s *SQLStore) applyInboundSync(ctx context.Context, graph factorialTraining
 		diff := computeTrainingDiff(training, sub, local)
 		result.Conflicts = append(result.Conflicts, diff.Conflicts...)
 		result.Warnings = append(result.Warnings, diff.Warnings...)
+		if dryRun {
+			continue
+		}
 		if err := s.withTx(ctx, func(tx *sql.Tx) error {
 			rdaIssues, err := s.applyTrainingDiff(ctx, tx, principal, *training.ID, sub, local, diff)
 			if err != nil {
