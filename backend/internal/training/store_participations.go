@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -98,7 +99,7 @@ VALUES ($1::uuid, $2::uuid, $3::uuid)`, enrollmentID, sessionID, nullableUUIDPtr
 		if err := s.audit(ctx, tx, principal, "enrollment_session", enrollmentID, "assign", nil, after); err != nil {
 			return err
 		}
-		status, err := s.reconcileDeliveryStatus(ctx, tx, principal, enrollmentID)
+		status, err := s.reconcileDeliveryStatus(ctx, tx, principal, enrollmentID, nil)
 		if err != nil {
 			return err
 		}
@@ -146,7 +147,7 @@ WHERE enrollment_id = $1::uuid AND session_id = $2::uuid`, enrollmentID, session
 		if err := s.audit(ctx, tx, principal, "enrollment_session", enrollmentID, "remove", before, nil); err != nil {
 			return err
 		}
-		status, err := s.reconcileDeliveryStatus(ctx, tx, principal, enrollmentID)
+		status, err := s.reconcileDeliveryStatus(ctx, tx, principal, enrollmentID, nil)
 		if err != nil {
 			return err
 		}
@@ -159,7 +160,7 @@ WHERE enrollment_id = $1::uuid AND session_id = $2::uuid`, enrollmentID, session
 // UpdateParticipationStatus corregge liberamente la presenza, anche
 // all'indietro e tra stati terminali, senza motivazione obbligatoria.
 // Ogni modifica e auditata e fa ricalcolare lo stato dell'iscrizione.
-func (s *SQLStore) UpdateParticipationStatus(ctx context.Context, principal Principal, enrollmentID, sessionID string, input ParticipationInput) (ActionResponse, error) {
+func (s *SQLStore) UpdateParticipationStatus(ctx context.Context, principal Principal, enrollmentID, sessionID string, input ParticipationInput, startGate enrollmentStartGate) (ActionResponse, error) {
 	if !principal.IsPeopleAdmin {
 		return ActionResponse{}, forbiddenError("people_role_required", "azione riservata a People")
 	}
@@ -172,9 +173,31 @@ func (s *SQLStore) UpdateParticipationStatus(ctx context.Context, principal Prin
 	if !validParticipationStatus(newStatus) {
 		return ActionResponse{}, validationError("invalid_participation_status", "stato di presenza non valido")
 	}
+	if startGate == nil {
+		return ActionResponse{}, fmt.Errorf("update participation status requires enrollment start gate")
+	}
 
 	var response ActionResponse
 	err := s.withTx(ctx, func(tx *sql.Tx) error {
+		// Serialize the start gate with every event-expense mutation before
+		// taking the enrollment lock. The preliminary read deliberately does
+		// not lock the enrollment: the event row is this operation's aggregate
+		// lock and establishes the common lock order.
+		var eventID string
+		err := tx.QueryRowContext(ctx, `
+SELECT event_id::text
+FROM training.enrollment
+WHERE id = $1::uuid`, enrollmentID).Scan(&eventID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return notFoundError("enrollment_not_found", "iscrizione non trovata")
+		}
+		if err != nil {
+			return fmt.Errorf("load training enrollment event for participation update: %w", err)
+		}
+		if err := ensureEventExists(ctx, tx, eventID); err != nil {
+			return err
+		}
+
 		deliveryStatus, err := s.lockEnrollmentDeliveryStatus(ctx, tx, enrollmentID)
 		if err != nil {
 			return err
@@ -200,7 +223,7 @@ WHERE enrollment_id = $1::uuid AND session_id = $2::uuid`, enrollmentID, session
 		if err := s.audit(ctx, tx, principal, "enrollment_session", enrollmentID, "update_participation", before, after); err != nil {
 			return err
 		}
-		status, err := s.reconcileDeliveryStatus(ctx, tx, principal, enrollmentID)
+		status, err := s.reconcileDeliveryStatus(ctx, tx, principal, enrollmentID, startGate)
 		if err != nil {
 			return err
 		}
@@ -210,10 +233,14 @@ WHERE enrollment_id = $1::uuid AND session_id = $2::uuid`, enrollmentID, session
 	return response, err
 }
 
+// enrollmentStartGate verifies the live economic coverage only for the PATCH
+// participation path. Assign/remove callers deliberately pass nil.
+type enrollmentStartGate func(ctx context.Context, purchaseOrderIDs []int64) error
+
 // reconcileDeliveryStatus rilegge le partecipazioni dell'iscrizione e salva
 // lo stato calcolato nella stessa transazione della modifica. La riga
 // dell'iscrizione deve essere gia bloccata (FOR UPDATE) dal chiamante.
-func (s *SQLStore) reconcileDeliveryStatus(ctx context.Context, tx *sql.Tx, principal Principal, enrollmentID string) (string, error) {
+func (s *SQLStore) reconcileDeliveryStatus(ctx context.Context, tx *sql.Tx, principal Principal, enrollmentID string, startGate enrollmentStartGate) (string, error) {
 	var current string
 	if err := tx.QueryRowContext(ctx, `
 SELECT delivery_status
@@ -234,6 +261,15 @@ WHERE id = $1::uuid`, enrollmentID).Scan(&current); err != nil {
 	if computed == current {
 		return current, nil
 	}
+	if startGate != nil && requiresEnrollmentStartGate(current, computed) {
+		purchaseOrderIDs, err := s.enrollmentPurchaseOrderIDs(ctx, tx, enrollmentID)
+		if err != nil {
+			return "", err
+		}
+		if err := startGate(ctx, purchaseOrderIDs); err != nil {
+			return "", err
+		}
+	}
 	if _, err := tx.ExecContext(ctx, `
 UPDATE training.enrollment
 SET delivery_status = $2,
@@ -253,6 +289,50 @@ WHERE id = $1::uuid`, enrollmentID, computed); err != nil {
 		return "", err
 	}
 	return computed, nil
+}
+
+// requiresEnrollmentStartGate limits economic validation to a real first
+// delivery start. In particular, corrections and direct terminal transitions
+// remain historical operations and must not revalidate a PO.
+func requiresEnrollmentStartGate(current, computed string) bool {
+	return current == deliveryPlanned && computed == deliveryInProgress
+}
+
+// enrollmentPurchaseOrderIDs returns the distinct POs explicitly covering an
+// enrollment. It locks the corresponding expense rows until the caller
+// transaction ends, so the gate's validated coverage cannot change before its
+// enrollment start commits. DISTINCT cannot be combined with FOR UPDATE in
+// PostgreSQL, therefore duplicates are removed below.
+func (s *SQLStore) enrollmentPurchaseOrderIDs(ctx context.Context, tx *sql.Tx, enrollmentID string) ([]int64, error) {
+	rows, err := tx.QueryContext(ctx, `
+SELECT ee.rda_id
+FROM training.event_expense_enrollment eee
+JOIN training.event_expense ee ON ee.id = eee.expense_id
+WHERE eee.enrollment_id = $1::uuid
+ORDER BY ee.rda_id
+FOR UPDATE OF ee`, enrollmentID)
+	if err != nil {
+		return nil, fmt.Errorf("list training enrollment purchase orders: %w", err)
+	}
+	defer rows.Close()
+
+	ids := make([]int64, 0)
+	seen := make(map[int64]struct{})
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan training enrollment purchase order: %w", err)
+		}
+		if _, exists := seen[id]; !exists {
+			seen[id] = struct{}{}
+			ids = append(ids, id)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate training enrollment purchase orders: %w", err)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	return ids, nil
 }
 
 func (s *SQLStore) participationStatuses(ctx context.Context, q sqlRunner, enrollmentID string) ([]string, error) {

@@ -833,3 +833,51 @@ func (s *SQLStore) QueueRoundsWithoutEvent(ctx context.Context, withinDaysRaw st
 	})
 	return response, nil
 }
+
+// QueueUnapprovedEventExpenses lists every local event expense candidate.
+// Callers must hydrate and classify its PO live before exposing the queue.
+func (s *SQLStore) QueueUnapprovedEventExpenses(ctx context.Context) ([]unapprovedEventExpenseLocal, error) {
+	const query = `
+SELECT
+  ee.id::text,
+  ee.event_id::text,
+  ee.rda_id,
+  ee.created_at::text,
+  ee.updated_at::text,
+  ev.course_id::text,
+  c.title,
+  COUNT(eee.enrollment_id)
+FROM training.event_expense ee
+JOIN training.training_event ev ON ev.id = ee.event_id
+JOIN training.course c ON c.id = ev.course_id
+LEFT JOIN training.event_expense_enrollment eee ON eee.expense_id = ee.id
+GROUP BY ee.id, ev.id, c.id
+ORDER BY ee.created_at, ee.id`
+	rows, err := s.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("list training unapproved event expense candidates: %w", err)
+	}
+	defer rows.Close()
+
+	result := make([]unapprovedEventExpenseLocal, 0)
+	for rows.Next() {
+		var row unapprovedEventExpenseLocal
+		if err := rows.Scan(
+			&row.Expense.ID,
+			&row.Expense.EventID,
+			&row.Expense.POID,
+			&row.Expense.CreatedAt,
+			&row.Expense.UpdatedAt,
+			&row.CourseID,
+			&row.CourseTitle,
+			&row.EnrollmentCount,
+		); err != nil {
+			return nil, fmt.Errorf("scan training unapproved event expense candidate: %w", err)
+		}
+		result = append(result, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}

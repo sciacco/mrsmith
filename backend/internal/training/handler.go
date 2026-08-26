@@ -12,6 +12,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/authz"
 	"github.com/sciacco/mrsmith/internal/notifications"
 	"github.com/sciacco/mrsmith/internal/platform/applaunch"
+	"github.com/sciacco/mrsmith/internal/platform/arak"
 	"github.com/sciacco/mrsmith/internal/platform/directory"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 	"github.com/sciacco/mrsmith/internal/platform/keycloak"
@@ -33,6 +34,7 @@ type Deps struct {
 	StaticDir       string
 	Factorial       *factorial.Client
 	Directory       directory.Provider
+	Arak            *arak.Client
 }
 
 type handler struct {
@@ -46,6 +48,7 @@ type handler struct {
 	staticDir       string
 	factorial       *factorial.Client
 	directory       directory.Provider
+	arak            *arak.Client
 }
 
 func RegisterRoutes(mux *http.ServeMux, deps Deps) {
@@ -72,6 +75,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 		staticDir:       deps.StaticDir,
 		factorial:       deps.Factorial,
 		directory:       deps.Directory,
+		arak:            deps.Arak,
 	}
 
 	// Ruolo unico: tutte le route Training, letture comprese, richiedono
@@ -100,6 +104,10 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	mux.Handle("POST /training/v1/enrollments/{id}/sessions/{sessionId}", protect(h.requireStore(http.HandlerFunc(h.handleAssignEnrollmentSession))))
 	mux.Handle("DELETE /training/v1/enrollments/{id}/sessions/{sessionId}", protect(h.requireStore(http.HandlerFunc(h.handleRemoveEnrollmentSession))))
 	mux.Handle("PATCH /training/v1/enrollments/{id}/sessions/{sessionId}", protect(h.requireStore(http.HandlerFunc(h.handleUpdateParticipation))))
+	mux.Handle("POST /training/v1/events/{id}/expenses", protect(h.requireStore(http.HandlerFunc(h.handleCreateEventExpense))))
+	mux.Handle("PUT /training/v1/expenses/{id}", protect(h.requireStore(http.HandlerFunc(h.handleReplaceEventExpensePO))))
+	mux.Handle("PUT /training/v1/expenses/{id}/enrollments", protect(h.requireStore(http.HandlerFunc(h.handleReplaceEventExpenseEnrollments))))
+	mux.Handle("DELETE /training/v1/expenses/{id}", protect(h.requireStore(http.HandlerFunc(h.handleDeleteEventExpense))))
 
 	// Certificazioni, documenti e anagrafiche superstiti: conservano i path
 	// attuali e si riallineeranno nei task che le riscrivono.

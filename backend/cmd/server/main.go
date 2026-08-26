@@ -658,6 +658,7 @@ func main() {
 		StaticDir:       cfg.StaticDir,
 		Factorial:       factorialCli,
 		Directory:       directoryProvider,
+		Arak:            arakCli,
 	})
 	panoramica.RegisterRoutes(api, mistraDB, grappaDB, anisettaDB)
 	quotes.RegisterRoutes(api, quotes.Deps{

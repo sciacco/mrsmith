@@ -169,3 +169,31 @@ type RoundsWithoutEventResponse struct {
 	WithinDays int                    `json:"withinDays"`
 	Rules      []RoundWithoutEventRow `json:"rules"`
 }
+
+// UnapprovedEventExpenseRow is a local event expense whose current Arak PO is
+// not economically approved. Economic fields are hydrated at request time.
+type UnapprovedEventExpenseRow struct {
+	EventID         string             `json:"eventId"`
+	CourseID        string             `json:"courseId"`
+	CourseTitle     string             `json:"courseTitle"`
+	ExpenseID       string             `json:"expenseId"`
+	POID            int64              `json:"poId"`
+	POCode          string             `json:"poCode"`
+	RawState        string             `json:"rawState"`
+	EconomicState   EconomicState      `json:"economicState"`
+	TotalPrice      string             `json:"totalPrice"`
+	Currency        string             `json:"currency"`
+	Budget          EventExpenseBudget `json:"budget"`
+	EnrollmentCount int                `json:"enrollmentCount"`
+}
+
+type UnapprovedEventExpensesResponse struct {
+	Expenses []UnapprovedEventExpenseRow `json:"expenses"`
+}
+
+type unapprovedEventExpenseLocal struct {
+	Expense         eventExpenseLocal
+	CourseID        string
+	CourseTitle     string
+	EnrollmentCount int
+}

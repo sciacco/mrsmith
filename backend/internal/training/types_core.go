@@ -149,6 +149,7 @@ type EventDetail struct {
 	Sessions           []SessionDetail    `json:"sessions"`
 	Enrollments        []EnrollmentDetail `json:"enrollments"`
 	Participations     []ParticipationRow `json:"participations"`
+	Expenses           []EventExpense     `json:"expenses"`
 	CreatedAt          string             `json:"createdAt"`
 	UpdatedAt          string             `json:"updatedAt"`
 }

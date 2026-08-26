@@ -16,6 +16,7 @@ func (h *handler) registerQueueRoutes(mux *http.ServeMux, protect func(http.Hand
 	mux.Handle("GET /training/v1/queues/expiring-coverage", protect(h.requireStore(http.HandlerFunc(h.handleQueueExpiringCoverage))))
 	mux.Handle("GET /training/v1/queues/unfed-population", protect(h.requireStore(http.HandlerFunc(h.handleQueueUnfedPopulation))))
 	mux.Handle("GET /training/v1/queues/rounds-without-event", protect(h.requireStore(http.HandlerFunc(h.handleQueueRoundsWithoutEvent))))
+	mux.Handle("GET /training/v1/queues/unapproved-event-expenses", protect(h.requireStore(http.HandlerFunc(h.handleQueueUnapprovedEventExpenses))))
 }
 
 func (h *handler) handleQueueRequestsWithoutTLOpinion(w http.ResponseWriter, r *http.Request) {
@@ -76,6 +77,49 @@ func (h *handler) handleQueueUnfedPopulation(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	httputil.JSON(w, http.StatusOK, UnfedPopulationResponse{Rules: rules})
+}
+
+func (h *handler) handleQueueUnapprovedEventExpenses(w http.ResponseWriter, r *http.Request) {
+	principal, ok := h.principalOrUnauthorized(w, r)
+	if !ok {
+		return
+	}
+	locals, err := h.store.QueueUnapprovedEventExpenses(r.Context())
+	if err != nil {
+		h.writeActionError(w, r, err, "training.queue_unapproved_event_expenses")
+		return
+	}
+	expenseLocals := make([]eventExpenseLocal, 0, len(locals))
+	for _, local := range locals {
+		expenseLocals = append(expenseLocals, local.Expense)
+	}
+	hydrated, err := h.hydrateEventExpenses(r.Context(), principal.Email, expenseLocals)
+	if err != nil {
+		h.writeActionError(w, r, err, "training.hydrate_unapproved_event_expenses")
+		return
+	}
+	response := UnapprovedEventExpensesResponse{Expenses: make([]UnapprovedEventExpenseRow, 0, len(locals))}
+	for index, expense := range hydrated {
+		if expense.EconomicState == EconomicStateApproved {
+			continue
+		}
+		local := locals[index]
+		response.Expenses = append(response.Expenses, UnapprovedEventExpenseRow{
+			EventID:         local.Expense.EventID,
+			CourseID:        local.CourseID,
+			CourseTitle:     local.CourseTitle,
+			ExpenseID:       expense.ID,
+			POID:            expense.POID,
+			POCode:          expense.POCode,
+			RawState:        expense.RawState,
+			EconomicState:   expense.EconomicState,
+			TotalPrice:      expense.TotalPrice,
+			Currency:        expense.Currency,
+			Budget:          expense.Budget,
+			EnrollmentCount: local.EnrollmentCount,
+		})
+	}
+	httputil.JSON(w, http.StatusOK, response)
 }
 
 func (h *handler) handleQueueRoundsWithoutEvent(w http.ResponseWriter, r *http.Request) {

@@ -72,12 +72,23 @@ func (h *handler) handleListEvents(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handler) handleGetEvent(w http.ResponseWriter, r *http.Request) {
-	if _, ok := h.principalOrUnauthorized(w, r); !ok {
+	principal, ok := h.principalOrUnauthorized(w, r)
+	if !ok {
 		return
 	}
 	detail, err := h.store.GetEventDetail(r.Context(), r.PathValue("id"))
 	if err != nil {
 		h.writeActionError(w, r, err, "training.get_event")
+		return
+	}
+	locals, err := h.store.EventExpenses(r.Context(), detail.ID)
+	if err != nil {
+		h.writeActionError(w, r, err, "training.get_event_expenses")
+		return
+	}
+	detail.Expenses, err = h.hydrateEventExpenses(r.Context(), principal.Email, locals)
+	if err != nil {
+		h.writeActionError(w, r, err, "training.hydrate_event_expenses")
 		return
 	}
 	httputil.JSON(w, http.StatusOK, detail)
@@ -252,7 +263,7 @@ func (h *handler) handleUpdateParticipation(w http.ResponseWriter, r *http.Reque
 	if !ok {
 		return
 	}
-	response, err := h.store.UpdateParticipationStatus(r.Context(), principal, r.PathValue("id"), r.PathValue("sessionId"), input)
+	response, err := h.store.UpdateParticipationStatus(r.Context(), principal, r.PathValue("id"), r.PathValue("sessionId"), input, h.enrollmentStartGate(principal.Email))
 	if err != nil {
 		h.writeActionError(w, r, err, "training.update_participation")
 		return
