@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/sciacco/mrsmith/internal/platform/directory"
 )
@@ -140,6 +141,39 @@ func directoryTeamCode(name string, used map[string]bool) string {
 		code = fmt.Sprintf("%s_%d", base, suffix)
 	}
 	used[code] = true
+	return code
+}
+
+func cleanImportLabel(value string) string {
+	value = strings.Join(strings.Fields(strings.TrimSpace(value)), " ")
+	if value == "/" {
+		return ""
+	}
+	return value
+}
+
+func importCodeFromName(name string, fallback string) string {
+	name = cleanImportLabel(name)
+	if name == "" {
+		return fallback
+	}
+	parts := []rune{}
+	lastUnderscore := false
+	for _, r := range strings.ToUpper(name) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			parts = append(parts, r)
+			lastUnderscore = false
+			continue
+		}
+		if !lastUnderscore {
+			parts = append(parts, '_')
+			lastUnderscore = true
+		}
+	}
+	code := strings.Trim(string(parts), "_")
+	if code == "" {
+		return fallback
+	}
 	return code
 }
 

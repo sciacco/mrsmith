@@ -1,8 +1,9 @@
 // Command training-factorial-sync esegue da riga di comando la run completa
-// di sincronizzazione Factorial (#141, slice 7/8 = #149): stesso pattern di
-// cmd/training-import (dry-run default, --commit esplicito, exit code non
-// zero su run fallita, report JSON opzionale). Config da env di processo,
-// mai da backend/.env. Nessun retry: il retry operativo e' la run successiva.
+// di sincronizzazione Factorial (#141, slice 7/8 = #149): stesso pattern del
+// vecchio comando CSV di bootstrap, rimosso (dry-run default, --commit
+// esplicito, exit code non zero su run fallita, report JSON opzionale).
+// Config da env di processo, mai da backend/.env. Nessun retry: il retry
+// operativo e' la run successiva.
 package main
 
 import (

@@ -50,7 +50,7 @@ Queste decisioni sono state validate e sono **input** dello sviluppo, non più d
 - **Q7** (migrazione): dipende dalla data di go-live decisa dal business. Lo schema regge entrambi gli scenari (import 1:1 vs anno zero pulito). Quando si deciderà:
   - se go-live entro Q3 2026 → import 1:1 del piano 2026 in corso + storico certificazioni;
   - se go-live Q4 2026 o successivo → solo storico certificazioni, piano 2027 nato pulito nel tool.
-  La migrazione passa da CLI Go one-shot (`backend/cmd/training-import`), con dry-run di default, report JSON e commit esplicito.
+  Il vecchio comando CSV di bootstrap one-shot è stato rimosso con #141: il canale anagrafico/formativo ora è directory sync + sync formativo Factorial (dettagli in `docs/knowledge/training.md`).
 
 ---
 
@@ -252,9 +252,9 @@ Training usa `training.employee` come anagrafica locale. La mini-app non impleme
 
 Nel dominio Training, `employee` indica una persona da includere in pianificazione, attestati e report formazione. Non coincide necessariamente con il perimetro legale dei soli dipendenti diretti: consulenti/somministrati full-time possono essere inclusi se People li considera in scope.
 
-**Responsabilità esterna**: connettori/sync fuori scope popolano e aggiornano `training.employee` dopo il go-live. Per il cutover iniziale è ammesso bootstrap da CSV tramite CLI one-shot. Training legge questa tabella per ownership, viste People e report; l'import Excel resta confinato alla CLI di migrazione e non ha endpoint o UI applicativa.
+**Responsabilità esterna**: connettori/sync fuori scope popolano e aggiornano `training.employee` dopo il go-live. Per il cutover iniziale era ammesso un bootstrap da CSV tramite CLI one-shot (rimossa con #141, dettagli in `docs/knowledge/training.md`); l'import Excel restava confinato a quella CLI e non aveva endpoint o UI applicativa. Training legge questa tabella per ownership, viste People e report.
 
-**Regole applicative**: login e workflow UI non creano dipendenti. La sola eccezione è la CLI di migrazione iniziale, che crea/aggiorna employee da CSV usando `email` come chiave idempotente. Se una persona manca o è ambigua nel piano Excel, il report segnala il problema e attende correzione dell'anagrafica o del file sorgente.
+**Regole applicative**: login e workflow UI non creano dipendenti. L'unica eccezione era la CLI di migrazione iniziale (rimossa con #141), che creava/aggiornava employee da CSV usando `email` come chiave idempotente e segnalava in report le persone mancanti o ambigue nel piano Excel per correzione manuale.
 
 **Identità**: `email` resta UNIQUE e viene usata per il matching SSO. `external_id` è opzionale e riservato ai connettori esterni.
 
@@ -262,28 +262,9 @@ Nel dominio Training, `employee` indica una persona da includere in pianificazio
 
 ## 13. Migrazione storica (Q7 — TBD)
 
-La migrazione è un tool di cutover, non una feature operativa della mini-app. La CLI iniziale è in `backend/cmd/training-import`:
+La migrazione era pensata come tool di cutover, non una feature operativa della mini-app. Il vecchio comando CSV di bootstrap one-shot è stato rimosso con #141: il canale anagrafico/formativo ora è directory sync + sync formativo Factorial (dettagli in `docs/knowledge/training.md`).
 
-```bash
-ANISETTA_DSN=... go run ./cmd/training-import \
-  --employees-csv ../apps/training/dist/dipendenti_cdlan.csv \
-  --training-xlsx ../PROPOSTA_FORMAZIONE_2026.xlsx \
-  --dry-run \
-  --report /tmp/training-import-report.json
-```
-
-Il commit richiede flag esplicito:
-
-```bash
-ANISETTA_DSN=... go run ./cmd/training-import \
-  --employees-csv ../apps/training/dist/dipendenti_cdlan.csv \
-  --training-xlsx ../PROPOSTA_FORMAZIONE_2026.xlsx \
-  --commit \
-  --operator people@example.com \
-  --report /tmp/training-import-report.json
-```
-
-Regole implementate:
+Regole implementate (riferimento storico, dal comando rimosso):
 
 1. bootstrap employee da CSV `Nome,Cognome,Email`, con `email` come chiave idempotente;
 2. nessuna scrittura senza `--commit`;
@@ -347,7 +328,7 @@ Casi noti da gestire nei dati legacy (osservati nel foglio):
 Il prodotto si considera in go-live quando:
 
 - [ ] Schema deployato su ambiente di produzione MrSmith.
-- [ ] Anagrafica `training.employee` popolata da bootstrap CLI iniziale e/o connettori esterni.
+- [ ] Anagrafica `training.employee` popolata da directory sync e/o connettori esterni (il bootstrap CLI iniziale è stato rimosso con #141).
 - [ ] Auth SSO M365 integrato.
 - [ ] CRUD completi per: team, vendor, skill_area, course, certification, training_plan.
 - [ ] Lifecycle completo di `enrollment` (tutte le transizioni, audit log popolato).

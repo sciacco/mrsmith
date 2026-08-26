@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/mail"
 	"strings"
 	"time"
 )
@@ -206,6 +207,14 @@ func normalizePersonUpdateInput(input PersonUpdateInput) (normalizedPersonUpdate
 		return normalized, validationError("person_status_invalid", "stato persona non supportato")
 	}
 	return normalized, nil
+}
+
+func validImportEmail(value string) bool {
+	if value == "" || strings.ContainsAny(value, " \t\r\n") {
+		return false
+	}
+	address, err := mail.ParseAddress(value)
+	return err == nil && strings.EqualFold(address.Address, value)
 }
 
 func normalizePersonCreateInput(input PersonCreateInput) (normalizedPersonUpdate, error) {

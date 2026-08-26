@@ -165,6 +165,7 @@ Use this format for new knowledge entries:
 - [Training Rule Populations Stay Training-Side](knowledge/training.md#training-rule-populations-stay-training-side)
 - [Training Compliance Courses Become Mandatory Through Rules](knowledge/training.md#training-compliance-courses-become-mandatory-through-rules)
 - [Training People Admin Can Create Local Employees](knowledge/training.md#training-people-admin-can-create-local-employees)
+- [Training-Factorial Sync Correlates Objects By Embedded Tokens, Not Foreign Keys](knowledge/training.md#training-factorial-sync-correlates-objects-by-embedded-tokens-not-foreign-keys)
 
 ### Reports — [`knowledge/reports.md`](knowledge/reports.md)
 
