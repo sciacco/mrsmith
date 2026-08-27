@@ -19,7 +19,9 @@ import type {
   CourseDetail,
   CourseInput,
   CourseListResponse,
+  DeliveredReportResponse,
   DocumentMetadata,
+  EconomicReportResponse,
   EnrollmentFactsInput,
   EventDetail,
   EventExpense,
@@ -317,6 +319,28 @@ export function useExpiringCertifications(withinDays: number) {
       api.get<ExpiringCertificationsResponse>(
         `${TRAINING_PREFIX}/queues/expiring-certifications${withDaysParam('withinDays', withinDays)}`,
       ),
+  });
+}
+
+// ── Report: consuntivo economico ed erogato (#163) ──
+
+export function useEconomicReport() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['training', 'reports', 'economic'],
+    queryFn: async () => (await api.get<EconomicReportResponse>(`${TRAINING_PREFIX}/reports/economic`)).rows,
+  });
+}
+
+export function useDeliveredReport(from: string, to: string) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['training', 'reports', 'delivered', from, to],
+    queryFn: () =>
+      api.get<DeliveredReportResponse>(
+        `${TRAINING_PREFIX}/reports/delivered?${new URLSearchParams({ from, to }).toString()}`,
+      ),
+    enabled: from !== '' && to !== '',
   });
 }
 

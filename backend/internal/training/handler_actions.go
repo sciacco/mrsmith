@@ -380,6 +380,27 @@ func (h *handler) handleExport(w http.ResponseWriter, r *http.Request) {
 		for _, item := range items {
 			rows = append(rows, []string{item.EmployeeName, item.EmployeeEmail, item.CertificationCode, item.CertificationName, item.ExpiresOn, fmt.Sprint(item.DaysToExpiry)})
 		}
+	case "economic":
+		items, err := h.economicReportRows(r.Context(), principal)
+		if err != nil {
+			h.writeActionError(w, r, err, "training.export_economic")
+			return
+		}
+		headers = []string{"Corso", "Evento annullato", "Creata il", "Iscrizioni coperte", "Codice PO", "Importo", "Valuta", "Stato economico", "Budget", "Anno budget", "Errore PO"}
+		rows = economicReportXLSXRows(filterEconomicReportRows(items, query["year"]))
+	case "delivered":
+		from, to, err := parseReportPeriod(r.URL.Query().Get("from"), r.URL.Query().Get("to"))
+		if err != nil {
+			h.writeActionError(w, r, err, "training.export_delivered")
+			return
+		}
+		items, err := h.store.DeliveredReportRows(r.Context(), from, to)
+		if err != nil {
+			h.writeActionError(w, r, err, "training.export_delivered")
+			return
+		}
+		headers = []string{"Persona", "Team", "Corso", "Area", "Stato", "Esito", "Data riferimento", "Ore"}
+		rows = deliveredReportXLSXRows(items)
 	default:
 		httputil.JSON(w, http.StatusNotFound, map[string]string{"error": "export_not_found"})
 		return

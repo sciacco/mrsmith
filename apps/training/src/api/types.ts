@@ -1227,3 +1227,47 @@ export interface ExpiringCertificationsResponse {
   withinDays: number;
   certifications: ExpiringCertificationQueueRow[];
 }
+
+// ── Report: consuntivo economico ed erogato (#163, specchio di types_reports.go) ──
+
+export interface EconomicReportRow {
+  expenseId: string;
+  eventId: string;
+  courseTitle: string;
+  eventCancelled: boolean;
+  createdAt: string;
+  coveredEnrollments: number;
+  poId: number;
+  poCode?: string;
+  amount?: string;
+  currency?: string;
+  economicState?: EconomicState;
+  budgetName?: string;
+  budgetYear?: number;
+  poError?: string;
+}
+
+export interface EconomicReportResponse {
+  rows: EconomicReportRow[];
+}
+
+export interface DeliveredReportRow {
+  enrollmentId: string;
+  employeeId: string;
+  employeeName: string;
+  teams: PersonTeamRef[];
+  courseId: string;
+  courseTitle: string;
+  skillAreaName?: string;
+  eventId: string;
+  deliveryStatus: DeliveryStatus;
+  learningOutcome?: LearningOutcome | '';
+  referenceDate: string;
+  hours?: number;
+}
+
+export interface DeliveredReportResponse {
+  from: string;
+  to: string;
+  rows: DeliveredReportRow[];
+}

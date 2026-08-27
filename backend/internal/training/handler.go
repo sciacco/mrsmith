@@ -169,6 +169,10 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	// task 7): registrazione delegata ai file dedicati.
 	h.registerPathRoutes(mux, protect)
 	h.registerAssessmentRoutes(mux, protect)
+
+	// Report: consuntivo economico ed erogato (#163, slice 4 del task 7):
+	// registrazione delegata al file dedicato.
+	h.registerReportRoutes(mux, protect)
 }
 
 func (h *handler) requireStore(next http.Handler) http.Handler {

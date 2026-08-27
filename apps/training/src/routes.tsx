@@ -8,6 +8,7 @@ import { RulesPage } from './pages/RulesPage/RulesPage';
 import { PeoplePage } from './pages/PeoplePage/PeoplePage';
 import { PersonPage } from './pages/PersonPage/PersonPage';
 import { CatalogPage } from './pages/CatalogPage/CatalogPage';
+import { ReportPage } from './pages/ReportPage/ReportPage';
 
 export const routes: RouteObject[] = [
   { index: true, element: <WorkQueuePage /> },
@@ -18,6 +19,7 @@ export const routes: RouteObject[] = [
   { path: 'persone', element: <PeoplePage /> },
   { path: 'persone/:id', element: <PersonPage /> },
   { path: 'catalogo', element: <CatalogPage /> },
+  { path: 'report', element: <ReportPage /> },
   { path: 'factorial', element: <FactorialPage /> },
   { path: '*', element: <Navigate to="/" replace /> },
 ];
