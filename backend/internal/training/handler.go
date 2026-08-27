@@ -154,6 +154,10 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	// registrazione delegata ai file dedicati.
 	h.registerDomainReadRoutes(mux, protect)
 	h.registerGroupRoutes(mux, protect)
+
+	// Operazioni massive del workspace (#153, slice 2 del task 6):
+	// registrazione delegata al file dedicato.
+	h.registerBulkRoutes(mux, protect)
 }
 
 func (h *handler) requireStore(next http.Handler) http.Handler {
