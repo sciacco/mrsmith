@@ -40,6 +40,7 @@ import {
   canEditBozzaHeader,
   canEditReferents,
   canRevertConversion,
+  canSendToErp,
   canShowArxivarFilePicker,
 } from '../lib/permissions';
 import styles from './OrderDetailPage.module.css';
@@ -73,7 +74,7 @@ export function OrderDetailPage() {
   const order = useOrder(Number.isFinite(id) ? id : null);
   const rows = useOrderRows(Number.isFinite(id) ? id : null);
   const technicalRows = useTechnicalRows(Number.isFinite(id) ? id : null);
-  const canEditHeader = canEditBozzaHeader(order.data, roles);
+  const canEditHeader = canEditBozzaHeader(order.data);
   const customers = useCustomers(canEditHeader);
   const patchHeader = usePatchOrderHeader(id);
   const patchReferents = usePatchReferents(id);
@@ -113,8 +114,9 @@ export function OrderDetailPage() {
   }
 
   const detail = order.data;
-  const canEditRefs = canEditReferents(detail, roles);
-  const canRevert = canRevertConversion(detail, roles);
+  const canEditRefs = canEditReferents(detail);
+  const canRevert = canRevertConversion(detail);
+  const canSend = canSendToErp(detail, roles);
 
   async function saveHeader(payload: UpdateHeaderPayload) {
     try {
@@ -263,6 +265,7 @@ export function OrderDetailPage() {
               customers={customers.data ?? []}
               customersLoading={customers.isLoading}
               canEdit={canEditHeader}
+              canSend={canSend}
               canUploadPdf={canShowArxivarFilePicker(detail, roles)}
               saving={patchHeader.isPending}
               sending={sendToERP.isPending}

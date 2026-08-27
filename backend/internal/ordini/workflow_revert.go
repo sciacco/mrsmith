@@ -31,7 +31,7 @@ WHERE ANNO_DOCUMENTO = @p1
 
 func (h *Handler) handleRevertConversion(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
-	if !h.requireCustomerRelations(w, r) || !h.requireVodka(w) || !h.requireMistra(w) || !h.requireAlyante(w) {
+	if !h.requireVodka(w) || !h.requireMistra(w) || !h.requireAlyante(w) {
 		return
 	}
 	orderID, ok := h.parseOrderID(w, r)

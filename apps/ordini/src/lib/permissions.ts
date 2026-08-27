@@ -11,16 +11,16 @@ function state(order: OrderDetail | null | undefined): OrderState | null {
   return order?.cdlan_stato ?? null;
 }
 
-export function canEditBozzaHeader(order: OrderDetail | null | undefined, roles: readonly string[] | undefined): boolean {
-  return state(order) === 'BOZZA' && hasCustomerRelations(roles);
+export function canEditBozzaHeader(order: OrderDetail | null | undefined): boolean {
+  return state(order) === 'BOZZA';
 }
 
-export function canSendToErp(order: OrderDetail | null | undefined, roles: readonly string[] | undefined, fileSelected: boolean): boolean {
-  return canEditBozzaHeader(order, roles) && Boolean(order?.cdlan_dataconferma) && Boolean(order?.cdlan_cliente) && fileSelected;
+export function canSendToErp(order: OrderDetail | null | undefined, roles: readonly string[] | undefined): boolean {
+  return canEditBozzaHeader(order) && hasCustomerRelations(roles);
 }
 
-export function canEditReferents(order: OrderDetail | null | undefined, roles: readonly string[] | undefined): boolean {
-  return (state(order) === 'BOZZA' || state(order) === 'INVIATO') && hasCustomerRelations(roles);
+export function canEditReferents(order: OrderDetail | null | undefined): boolean {
+  return state(order) === 'BOZZA' || state(order) === 'INVIATO';
 }
 
 export function canEditSerialNumber(order: OrderDetail | null | undefined): boolean {
@@ -53,6 +53,6 @@ export function canDownloadSignedPdf(order: OrderDetail | null | undefined): boo
   return Boolean(order?.arx_doc_number);
 }
 
-export function canRevertConversion(order: OrderDetail | null | undefined, roles: readonly string[] | undefined): boolean {
-  return state(order) === 'BOZZA' && hasCustomerRelations(roles) && Boolean(order?.origin) && !order?.arx_doc_number;
+export function canRevertConversion(order: OrderDetail | null | undefined): boolean {
+  return state(order) === 'BOZZA' && Boolean(order?.origin) && !order?.arx_doc_number;
 }

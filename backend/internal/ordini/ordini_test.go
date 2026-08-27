@@ -130,7 +130,7 @@ func TestPatchOrderHeaderDualWritesCustomerAndValidatesDate(t *testing.T) {
 	db := openOrdiniTestDB(t, state)
 	mux := http.NewServeMux()
 	RegisterRoutes(mux, Deps{Vodka: db, Alyante: db, Logger: logging.NewWithWriter(io.Discard, "debug")})
-	req := requestWithRoles(http.MethodPatch, "/ordini/v1/orders/1", strings.NewReader(`{"customer_po":"PO-1","confirmation_date":"2026-05-23","customer_id":42}`), true)
+	req := requestWithRoles(http.MethodPatch, "/ordini/v1/orders/1", strings.NewReader(`{"customer_po":"PO-1","confirmation_date":"2026-05-23","customer_id":42}`), false)
 	rec := httptest.NewRecorder()
 
 	mux.ServeHTTP(rec, req)
@@ -142,7 +142,7 @@ func TestPatchOrderHeaderDualWritesCustomerAndValidatesDate(t *testing.T) {
 		t.Fatalf("exec count = %d, want 1", len(state.execs))
 	}
 
-	req = requestWithRoles(http.MethodPatch, "/ordini/v1/orders/1", strings.NewReader(`{"customer_po":"PO-1","confirmation_date":"2026-05-23T00:00:00Z","customer_id":42}`), true)
+	req = requestWithRoles(http.MethodPatch, "/ordini/v1/orders/1", strings.NewReader(`{"customer_po":"PO-1","confirmation_date":"2026-05-23T00:00:00Z","customer_id":42}`), false)
 	rec = httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 	if rec.Code != http.StatusUnprocessableEntity || errorCode(t, rec.Body.Bytes()) != "invalid_confirmation_date" {
@@ -171,7 +171,7 @@ func TestPatchOrderHeaderCustomerLookupFailureDoesNotWrite(t *testing.T) {
 	mux := http.NewServeMux()
 	RegisterRoutes(mux, Deps{Vodka: db, Alyante: db, Logger: logging.NewWithWriter(io.Discard, "debug")})
 
-	req := requestWithRoles(http.MethodPatch, "/ordini/v1/orders/1", strings.NewReader(`{"customer_po":"PO-1","confirmation_date":"2026-05-23","customer_id":42}`), true)
+	req := requestWithRoles(http.MethodPatch, "/ordini/v1/orders/1", strings.NewReader(`{"customer_po":"PO-1","confirmation_date":"2026-05-23","customer_id":42}`), false)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -203,7 +203,7 @@ func TestPatchOrderHeaderStateGuardStopsCustomerLookup(t *testing.T) {
 	mux := http.NewServeMux()
 	RegisterRoutes(mux, Deps{Vodka: db, Alyante: db, Logger: logging.NewWithWriter(io.Discard, "debug")})
 
-	req := requestWithRoles(http.MethodPatch, "/ordini/v1/orders/1", strings.NewReader(`{"customer_po":"PO-1","confirmation_date":"2026-05-23","customer_id":42}`), true)
+	req := requestWithRoles(http.MethodPatch, "/ordini/v1/orders/1", strings.NewReader(`{"customer_po":"PO-1","confirmation_date":"2026-05-23","customer_id":42}`), false)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -234,7 +234,7 @@ func TestPatchReferentsUsesSQLStateGuard(t *testing.T) {
 	mux := http.NewServeMux()
 	RegisterRoutes(mux, Deps{Vodka: db, Logger: logging.NewWithWriter(io.Discard, "debug")})
 
-	req := requestWithRoles(http.MethodPatch, "/ordini/v1/orders/1/referents", strings.NewReader(`{"technical_name":"","technical_phone":"","technical_email":"","other_technical_name":"","other_technical_phone":"","other_technical_email":"","admin_name":"","admin_phone":"","admin_email":""}`), true)
+	req := requestWithRoles(http.MethodPatch, "/ordini/v1/orders/1/referents", strings.NewReader(`{"technical_name":"","technical_phone":"","technical_email":"","other_technical_name":"","other_technical_phone":"","other_technical_email":"","admin_name":"","admin_phone":"","admin_email":""}`), false)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -512,7 +512,7 @@ func TestRevertConversionBlocksNonQuoteOrigin(t *testing.T) {
 	mux := http.NewServeMux()
 	RegisterRoutes(mux, Deps{Vodka: vodka, Mistra: mistra, Alyante: alyante, Logger: logging.NewWithWriter(io.Discard, "debug")})
 
-	req := requestWithRoles(http.MethodPost, "/ordini/v1/orders/1/revert-conversion", nil, true)
+	req := requestWithRoles(http.MethodPost, "/ordini/v1/orders/1/revert-conversion", nil, false)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -553,7 +553,7 @@ func TestRevertConversionBlocksWrongStateBeforeExternalChecks(t *testing.T) {
 		Logger:  logging.NewWithWriter(io.Discard, "debug"),
 	})
 
-	req := requestWithRoles(http.MethodPost, "/ordini/v1/orders/1/revert-conversion", nil, true)
+	req := requestWithRoles(http.MethodPost, "/ordini/v1/orders/1/revert-conversion", nil, false)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -606,7 +606,7 @@ func TestRevertConversionBlocksWhenAlyanteRowsExist(t *testing.T) {
 		Logger:  logging.NewWithWriter(io.Discard, "debug"),
 	})
 
-	req := requestWithRoles(http.MethodPost, "/ordini/v1/orders/1/revert-conversion", nil, true)
+	req := requestWithRoles(http.MethodPost, "/ordini/v1/orders/1/revert-conversion", nil, false)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -677,7 +677,7 @@ func TestRevertConversionDeletesVodkaOrderAndMistraBridge(t *testing.T) {
 		Logger:  logging.NewWithWriter(io.Discard, "debug"),
 	})
 
-	req := requestWithRoles(http.MethodPost, "/ordini/v1/orders/1/revert-conversion", nil, true)
+	req := requestWithRoles(http.MethodPost, "/ordini/v1/orders/1/revert-conversion", nil, false)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -749,7 +749,7 @@ func TestRevertConversionDeletesTrackedHubSpotArtifacts(t *testing.T) {
 		Logger:  logging.NewWithWriter(io.Discard, "debug"),
 	})
 
-	req := requestWithRoles(http.MethodPost, "/ordini/v1/orders/1/revert-conversion", nil, true)
+	req := requestWithRoles(http.MethodPost, "/ordini/v1/orders/1/revert-conversion", nil, false)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -819,7 +819,7 @@ func TestRevertConversionWarnsWhenTrackedHubSpotCleanupFails(t *testing.T) {
 		Logger:  logging.NewWithWriter(&log, "debug"),
 	})
 
-	req := requestWithRoles(http.MethodPost, "/ordini/v1/orders/1/revert-conversion", nil, true)
+	req := requestWithRoles(http.MethodPost, "/ordini/v1/orders/1/revert-conversion", nil, false)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -1111,10 +1111,7 @@ func TestElevatedHandlersRequireCustomerRelations(t *testing.T) {
 		path   string
 		body   io.Reader
 	}{
-		{name: "header", method: http.MethodPatch, path: "/ordini/v1/orders/1", body: strings.NewReader(`{"customer_po":"","confirmation_date":"","customer_id":1}`)},
-		{name: "referents", method: http.MethodPatch, path: "/ordini/v1/orders/1/referents", body: strings.NewReader(`{"technical_name":"","technical_phone":"","technical_email":"","other_technical_name":"","other_technical_phone":"","other_technical_email":"","admin_name":"","admin_phone":"","admin_email":""}`)},
 		{name: "send", method: http.MethodPost, path: "/ordini/v1/orders/1/send-to-erp"},
-		{name: "revert", method: http.MethodPost, path: "/ordini/v1/orders/1/revert-conversion"},
 		{name: "activate", method: http.MethodPatch, path: "/ordini/v1/orders/1/rows/1/activate", body: strings.NewReader(`{"activation_date":"2026-05-23"}`)},
 		{name: "kickoff", method: http.MethodGet, path: "/ordini/v1/orders/1/kickoff.pdf"},
 		{name: "activation form", method: http.MethodGet, path: "/ordini/v1/orders/1/activation-form.pdf"},
@@ -1141,9 +1138,7 @@ func TestElevatedHandlersCheckRoleBeforeMissingDependencies(t *testing.T) {
 		path   string
 		body   io.Reader
 	}{
-		{name: "header", method: http.MethodPatch, path: "/ordini/v1/orders/1", body: strings.NewReader(`{"customer_po":"","confirmation_date":"","customer_id":1}`)},
 		{name: "send", method: http.MethodPost, path: "/ordini/v1/orders/1/send-to-erp"},
-		{name: "revert", method: http.MethodPost, path: "/ordini/v1/orders/1/revert-conversion"},
 		{name: "activate", method: http.MethodPatch, path: "/ordini/v1/orders/1/rows/1/activate", body: strings.NewReader(`{"activation_date":"2026-05-23"}`)},
 		{name: "kickoff", method: http.MethodGet, path: "/ordini/v1/orders/1/kickoff.pdf"},
 		{name: "activation form", method: http.MethodGet, path: "/ordini/v1/orders/1/activation-form.pdf"},

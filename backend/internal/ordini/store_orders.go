@@ -253,7 +253,7 @@ func (h *Handler) handleGetOrder(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handlePatchOrderHeader(w http.ResponseWriter, r *http.Request) {
-	if !h.requireCustomerRelations(w, r) || !h.requireVodka(w) || !h.requireAlyante(w) {
+	if !h.requireVodka(w) || !h.requireAlyante(w) {
 		return
 	}
 	id, ok := h.parseOrderID(w, r)
@@ -330,7 +330,7 @@ func (h *Handler) writeOrderIfStillInStateOrConflict(w http.ResponseWriter, r *h
 }
 
 func (h *Handler) handlePatchReferents(w http.ResponseWriter, r *http.Request) {
-	if !h.requireCustomerRelations(w, r) || !h.requireVodka(w) {
+	if !h.requireVodka(w) {
 		return
 	}
 	id, ok := h.parseOrderID(w, r)

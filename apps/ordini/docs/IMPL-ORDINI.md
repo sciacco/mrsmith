@@ -351,11 +351,12 @@ Questa scelta consente lettura lista/detail anche in ambienti read-only parziali
 
 | Method | Browser path | Go mux path | Auth + state |
 |---|---|---|---|
-| PATCH | `/api/ordini/v1/orders/:id` | `/ordini/v1/orders/{id}` | `app_customer_relations` + `BOZZA` |
-| PATCH | `/api/ordini/v1/orders/:id/referents` | `/ordini/v1/orders/{id}/referents` | `app_customer_relations` + `BOZZA/INVIATO` |
+| PATCH | `/api/ordini/v1/orders/:id` | `/ordini/v1/orders/{id}` | `app_ordini_access` + `BOZZA` |
+| PATCH | `/api/ordini/v1/orders/:id/referents` | `/ordini/v1/orders/{id}/referents` | `app_ordini_access` + `BOZZA/INVIATO` |
 | POST | `/api/ordini/v1/orders/:id/send-to-erp` | `/ordini/v1/orders/{id}/send-to-erp` | `app_customer_relations` + `BOZZA` + precondizioni |
 | PATCH | `/api/ordini/v1/orders/:id/rows/:rowId/serial-number` | `/ordini/v1/orders/{id}/rows/{rowId}/serial-number` | `app_ordini_access` + `BOZZA` |
 | PATCH | `/api/ordini/v1/orders/:id/rows/:rowId/technical-notes` | `/ordini/v1/orders/{id}/rows/{rowId}/technical-notes` | `app_ordini_access`, any state |
+| POST | `/api/ordini/v1/orders/:id/revert-conversion` | `/ordini/v1/orders/{id}/revert-conversion` | `app_ordini_access` + `BOZZA` + precondizioni (origine proposta, nessun doc Arxivar) |
 | PATCH | `/api/ordini/v1/orders/:id/rows/:rowId/activate` | `/ordini/v1/orders/{id}/rows/{rowId}/activate` | `app_customer_relations` + `INVIATO` |
 
 ---
@@ -561,8 +562,9 @@ AND TIPOLOGIA_AZIENDA <> 'DIPENDENTE'
 | Dettaglio ordine | sì | sì | any |
 | Edit `note_tecnici` | sì | sì | any |
 | Edit `cdlan_serialnumber` | sì | sì | `BOZZA` |
-| Info SALVA | no | sì | `BOZZA` |
-| Referenti SALVA | no | sì | `BOZZA`, `INVIATO` |
+| Info SALVA | sì | sì | `BOZZA` |
+| Referenti SALVA | sì | sì | `BOZZA`, `INVIATO` |
+| Annulla conversione | sì | sì | `BOZZA` + precondizioni (origine proposta, nessun doc Arxivar) |
 | INVIA in ERP | no | sì | `BOZZA` + precondizioni |
 | Per-row activation | no | sì | `INVIATO` |
 | Kickoff PDF | no | sì | `INVIATO` |

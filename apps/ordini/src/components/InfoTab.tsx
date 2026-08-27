@@ -11,6 +11,7 @@ interface InfoTabProps {
   customers: CustomerRef[];
   customersLoading: boolean;
   canEdit: boolean;
+  canSend: boolean;
   canUploadPdf: boolean;
   saving: boolean;
   sending: boolean;
@@ -24,6 +25,7 @@ export function InfoTab({
   customers,
   customersLoading,
   canEdit,
+  canSend,
   canUploadPdf,
   saving,
   sending,
@@ -46,7 +48,7 @@ export function InfoTab({
     () => customers.find((customer) => customer.id === customerID)?.name ?? order.cdlan_cliente,
     [customerID, customers, order.cdlan_cliente],
   );
-  const readyToSend = canEdit && Boolean(confirmationDate) && Boolean(selectedCustomerName) && Boolean(file);
+  const readyToSend = canSend && Boolean(confirmationDate) && Boolean(selectedCustomerName) && Boolean(file);
 
   function saveHeader() {
     if (customerID == null) return;
