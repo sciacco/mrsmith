@@ -389,7 +389,7 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 			Description:   "Eventi formativi, iscrizioni, presenze e certificazioni.",
 			Icon:          "clipboard",
 			Href:          TrainingAppHref,
-			Status:        "test",
+			Status:        "dev",
 			CategoryID:    "smart-apps",
 			CategoryTitle: "SMART APPS",
 			AccessRoles:   TrainingPeopleAdminRoles(),
