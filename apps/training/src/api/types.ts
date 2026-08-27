@@ -1,3 +1,9 @@
+// Vocabolario nuovo del dominio Training (#151/#155): stati di erogazione
+// planned|in_progress|completed|partially_completed|not_attended|cancelled;
+// stati di partecipazione assigned|in_progress|completed|not_attended. Copre
+// solo gli endpoint di questa slice: /me, /lookups, le 8 code operative,
+// /events. Gli altri endpoint arrivano con le slice che li usano.
+
 export interface Principal {
   subject: string;
   email: string;
@@ -20,192 +26,6 @@ export interface MeResponse {
   onboardingPending: boolean;
 }
 
-export interface PlanEnrollment {
-  id: string;
-  employeeName: string;
-  employeeEmail: string;
-  teamCode?: string;
-  teamName?: string;
-  courseTitle: string;
-  vendorName?: string;
-  skillAreaName?: string;
-  status: string;
-  year: number;
-  priority?: number;
-  levelAsIs?: number;
-  levelToBe?: number;
-  plannedStart?: string;
-  plannedEnd?: string;
-  hoursPlanned?: number;
-  costPlanned?: number;
-  motivation?: string;
-  objective?: string;
-  notes?: string;
-  documentId?: string;
-  documentFilename?: string;
-  documentValidated: boolean;
-  complianceRelated: boolean;
-  complianceFramework?: string;
-  requiredByRule: boolean;
-  mandatoryRuleId?: string;
-  mandatoryRuleName?: string;
-}
-
-export interface TrainingRequest {
-  id: string;
-  employeeName: string;
-  employeeEmail: string;
-  courseId?: string;
-  courseTitle?: string;
-  freeTextTitle?: string;
-  skillAreaName?: string;
-  motivation: string;
-  desiredYear?: number;
-  status: string;
-  createdAt: string;
-}
-
-export interface CatalogCourse {
-  id: string;
-  title: string;
-  vendorId?: string;
-  vendorName?: string;
-  skillAreaId?: string;
-  skillAreaName?: string;
-  leadsToCertId?: string;
-  certificationName?: string;
-  deliveryMode: string;
-  providerKind: string;
-  defaultHours?: number;
-  defaultCost?: number;
-  courseUrl?: string;
-  description?: string;
-  complianceRelated: boolean;
-  recurrenceMonths?: number;
-  complianceFramework?: string;
-  active: boolean;
-}
-
-export interface CertificationRow {
-  awardId: string;
-  employeeName: string;
-  employeeEmail?: string;
-  certificationCode: string;
-  certificationName: string;
-  outcome: string;
-  awardedOn: string;
-  expiresOn?: string;
-  currentStatus: string;
-  validationSource: string;
-  documentId?: string;
-  documentFilename?: string;
-  documentValidated: boolean;
-}
-
-export interface PlanBudgetRow {
-  year: number;
-  teamCode?: string;
-  enrollmentsCount: number;
-  costTotal?: number;
-  hoursTotal?: number;
-}
-
-export interface ExpiringCertificationRow {
-  employeeName: string;
-  employeeEmail: string;
-  certificationCode: string;
-  certificationName: string;
-  expiresOn: string;
-  daysToExpiry: number;
-}
-
-export interface ComplianceGapRow {
-  employeeName: string;
-  courseTitle: string;
-  complianceFramework?: string;
-  lastValidAwardedOn?: string;
-  complianceStatus: string;
-}
-
-export interface CatalogMasterData {
-  vendors: VendorRow[];
-  teams: TeamRow[];
-  skillAreas: SkillAreaRow[];
-  certifications: CatalogCertificationRow[];
-  plans: TrainingPlanRow[];
-  mandatoryRules: MandatoryRuleRow[];
-}
-
-export interface VendorRow {
-  id: string;
-  name: string;
-  website?: string;
-  notes?: string;
-  active: boolean;
-}
-
-export interface TeamRow {
-  id: string;
-  code: string;
-  name: string;
-  description?: string;
-  active: boolean;
-}
-
-export interface SkillAreaRow {
-  id: string;
-  code: string;
-  name: string;
-  parentId?: string;
-  parentLabel?: string;
-  description?: string;
-  active: boolean;
-}
-
-export interface CatalogCertificationRow {
-  id: string;
-  code: string;
-  name: string;
-  issuerVendorId?: string;
-  issuerVendorName?: string;
-  skillAreaId?: string;
-  skillAreaLabel?: string;
-  typicalValidityMonths?: number;
-  description?: string;
-  active: boolean;
-}
-
-export interface TrainingPlanRow {
-  id: string;
-  year: number;
-  status: string;
-  budgetTotal?: number;
-  notes?: string;
-}
-
-export interface MandatoryRuleRow {
-  id: string;
-  courseId: string;
-  courseTitle: string;
-  teamId?: string;
-  teamLabel?: string;
-  roleFilter?: string;
-  notes?: string;
-  active: boolean;
-}
-
-export interface WorkspaceResponse {
-  me: MeResponse;
-  plan: PlanEnrollment[];
-  requests: TrainingRequest[];
-  catalog: CatalogCourse[];
-  certifications: CertificationRow[];
-  planBudget: PlanBudgetRow[];
-  expiringCertifications: ExpiringCertificationRow[];
-  mandatoryComplianceGaps: ComplianceGapRow[];
-  masterData?: CatalogMasterData;
-}
-
 export interface LookupItem {
   id: string;
   label: string;
@@ -221,493 +41,246 @@ export interface LookupResponse {
   skillAreas: LookupItem[];
   courses: LookupItem[];
   certifications: LookupItem[];
-  plans: LookupItem[];
 }
 
-export interface ActionResponse {
-  ok: boolean;
-  id?: string;
-  status?: string;
-}
+// ── Code operative (#140, sola lettura) ──
 
-export type BulkTargetState = 'approved' | 'in_progress' | 'completed' | 'cancelled';
-
-export interface BulkTransitionFailure {
-  enrollment_id: string;
-  code?: string;
-  message?: string;
-}
-
-export interface BulkTransitionResponse {
-  succeeded: number;
-  failed: number;
-  failures?: BulkTransitionFailure[];
-}
-
-export type PersonFlagKey =
-  | 'da_pianificare'
-  | 'compliance_gap'
-  | 'scadenze_imminenti'
-  | 'failed_recente'
-  | 'senza_formazione_attiva';
-
-export interface PersonFlags {
-  da_pianificare: boolean;
-  compliance_gap: boolean;
-  scadenze_imminenti: boolean;
-  failed_recente: boolean;
-  senza_formazione_attiva: boolean;
-}
-
-export interface PersonNextDeadline {
-  type: 'cert' | 'course_end' | 'mandatory_due';
-  date: string;
-  label: string;
-}
-
-export interface PersonTeamRef {
-  id: string;
-  code: string;
-  name: string;
-  lead?: boolean;
-}
-
-export interface PersonSummary {
-  id: string;
+export interface QueueLeadRef {
+  employeeId: string;
   name: string;
   email: string;
-  team_code: string;
-  team_name?: string;
-  teams?: PersonTeamRef[];
-  flags: PersonFlags;
-  active_enrollments_count: number;
-  next_deadline: PersonNextDeadline | null;
-  priority_score: number;
-  gaps_open: number;
-  expiring_certs_count: number;
-  historical_enrollments: number;
 }
 
-export interface BulkAssignResponse {
-  created: number;
-  failed: number;
-  failures?: Array<{ employee_id: string; code?: string; message?: string }>;
+export interface RequestWithoutTLOpinionRow {
+  requestId: string;
+  employeeId: string;
+  employeeName: string;
+  selectedTeamId: string;
+  selectedTeamName: string;
+  teamLeads: QueueLeadRef[];
+  courseId?: string;
+  courseTitle?: string;
+  freeTextTitle?: string;
+  ageDays: number;
+  createdAt: string;
 }
 
-export interface PersonComplianceMandatoryRule {
-  course_id: string;
-  course_title: string;
-  compliance_framework?: string;
-  status: string;
-  last_valid_awarded_on?: string;
+export interface RequestsWithoutTLOpinionResponse {
+  requests: RequestWithoutTLOpinionRow[];
 }
 
-export interface PersonComplianceSection {
-  mandatory_rules: PersonComplianceMandatoryRule[];
-  coverage_pct: number;
-  open_gaps: PersonComplianceMandatoryRule[];
-  expiring_certs: ExpiringCertificationRow[];
+export type TLOpinion = 'favorable' | 'unfavorable';
+
+export interface RequestAwaitingDecisionRow {
+  requestId: string;
+  employeeId: string;
+  employeeName: string;
+  selectedTeamId: string;
+  selectedTeamName: string;
+  courseId?: string;
+  courseTitle?: string;
+  freeTextTitle?: string;
+  tlOpinion: TLOpinion;
+  tlOpinionById?: string;
+  tlOpinionByName?: string;
+  tlOpinionAt?: string;
+  tlOpinionReason?: string;
+  ageDays: number;
+  createdAt: string;
 }
 
-export interface PersonHistoryYearRow {
-  year: number;
-  completed_count: number;
-  failed_count: number;
-  hours_total: number;
-  cost_total: number;
+export interface RequestsAwaitingDecisionResponse {
+  requests: RequestAwaitingDecisionRow[];
 }
 
-export interface PersonSkillEvidence {
-  courses_completed: string[];
-  certs: string[];
+export type QueueNeed = 'attendance' | 'certification';
+
+export interface SeatRuleInTrainingRow {
+  enrollmentId: string;
+  employeeId: string;
+  employeeName: string;
+  eventId: string;
+  deliveryStatus: DeliveryStatus;
 }
 
-export interface PersonSkillArea {
-  skill_area_id: string;
+export interface SeatRuleCoverageRow {
+  ruleId: string;
+  ruleName: string;
+  courseId: string;
+  courseTitle: string;
+  need: QueueNeed;
+  certificationId?: string;
+  deadline: string;
+  seatCount: number;
+  covered: number;
+  missing: number;
+  inTraining: SeatRuleInTrainingRow[];
+}
+
+export interface SeatRuleCoverageResponse {
+  rules: SeatRuleCoverageRow[];
+}
+
+export type ExpiringPersonReason =
+  | 'uncovered'
+  | 'never_completed'
+  | 'personal_deadline'
+  | 'award_expiring'
+  | 'award_expired'
+  | 'never_awarded';
+
+export interface ExpiringPersonRow {
+  ruleId: string;
+  ruleName: string;
+  courseId: string;
+  courseTitle: string;
+  need: QueueNeed;
+  employeeId: string;
+  employeeName: string;
+  deadline: string;
+  daysUntil: number;
+  reason: ExpiringPersonReason;
+}
+
+export interface ExpiringSeatRuleRow {
+  ruleId: string;
+  ruleName: string;
+  courseId: string;
+  courseTitle: string;
+  certificationId: string;
+  seatCount: number;
+  validToday: number;
+  validAtHorizon: number;
+}
+
+export interface ExpiringCoverageResponse {
+  withinDays: number;
+  people: ExpiringPersonRow[];
+  seatRules: ExpiringSeatRuleRow[];
+}
+
+export interface QueueMemberRef {
+  employeeId: string;
   name: string;
-  derived_level: string;
-  evidence: PersonSkillEvidence;
 }
 
-export interface PersonGap {
-  type: string;
-  description: string;
+export interface UnfedPopulationRow {
+  ruleId: string;
+  ruleName: string;
+  courseId: string;
+  courseTitle: string;
+  eventId: string;
+  roundDeadline: string;
+  members: QueueMemberRef[];
 }
 
-export interface PersonSuggestion {
-  gap: PersonGap;
-  recommended_courses: CatalogCourse[];
+export interface UnfedPopulationResponse {
+  rules: UnfedPopulationRow[];
 }
 
-export interface OverviewException {
-  id: string;
-  severity: 'critical' | 'warning' | 'info';
-  title: string;
-  drilldown_url: string;
+export interface RoundWithoutEventRow {
+  ruleId: string;
+  ruleName: string;
+  courseId: string;
+  courseTitle: string;
+  need: QueueNeed;
+  recurrenceMonths?: number;
+  recurrenceAnchor?: string;
+  nextRoundDeadline: string;
+  daysUntil: number;
+  firstRound: boolean;
 }
 
-export interface OverviewTrend {
-  vs_previous_year?: string;
-  vs_target?: string | null;
+export interface RoundsWithoutEventResponse {
+  withinDays: number;
+  rules: RoundWithoutEventRow[];
 }
 
-export interface OverviewFamily {
-  value: string;
-  trend: OverviewTrend;
-  exceptions: OverviewException[];
-  spent_pct?: number;
-  calendar_alignment?: 'in_linea' | 'in_ritardo' | 'in_anticipo';
-  min_courses_per_person?: number;
-  max_courses_per_person?: number;
-}
+export type EconomicState = 'approved' | 'pending' | 'rejected';
 
-export interface OverviewResponse {
-  year: number;
-  team_scope: string;
-  esecuzione: OverviewFamily;
-  compliance: OverviewFamily;
-  budget: OverviewFamily;
-  engagement: OverviewFamily;
-}
-
-export interface PersonProfile {
-  identity_min: {
-    id: string;
-    name: string;
-    first_name: string;
-    last_name: string;
-    email: string;
-    status: PersonStatus;
-    team_id?: string;
-    team_name?: string;
-    team_code: string;
-    teams?: PersonTeamRef[];
-    managed_by_directory?: boolean;
-    directory_exempt?: boolean;
-    notes?: string;
-  };
-  compliance: PersonComplianceSection;
-  enrollments_current_year: PlanEnrollment[];
-  certifications: CertificationRow[];
-  history_by_year: PersonHistoryYearRow[];
-  skill_areas: PersonSkillArea[];
-  suggestions: PersonSuggestion[];
-}
-
-export type PersonStatus = 'active' | 'on_leave' | 'terminated';
-
-export interface PersonUpdateInput {
-  firstName: string;
-  lastName: string;
-  email: string;
-  status: PersonStatus;
-  teamId: string | null;
-  notes?: string;
-  directoryExempt?: boolean;
-}
-
-export interface PersonCreateInput {
-  firstName: string;
-  lastName: string;
-  email: string;
-  status: PersonStatus;
-  teamId: string | null;
-  notes?: string;
-}
-
-export interface JobRunResponse {
-  ok: boolean;
-  expiredEnrollments: number;
-  complianceNotifications: number;
-  certificationNotifications: number;
-}
-
-export type SuggestionSeverity = 'critical' | 'warning' | 'info';
-export type SuggestionOrigin = 'compliance' | 'expiring' | 'skill_gap' | 'employee_request';
-
-export interface PlanningSuggestion {
-  id: string;
-  severity: SuggestionSeverity;
-  origin: SuggestionOrigin;
-  title: string;
-  description?: string;
-  affected_count: number;
-  affected_employee_ids: string[];
-  suggested_course_id?: string;
-  suggested_course_name?: string;
-  suggested_course_hours?: number;
-  suggested_course_cost?: number;
-  alternative_course_ids?: string[];
-  estimated_cost: number;
-  dismissed: boolean;
-  rule_id?: string;
-  source_custom_group_id?: string;
-}
-
-export type PlanStatus = 'draft' | 'open' | 'frozen' | 'closed' | 'missing';
-
-export interface PlanningSummary {
-  plan_id: string;
-  year: number;
-  status: PlanStatus;
-  budget_total: number;
-  budget_spent: number;
-  budget_residual: number;
-  budget_pct: number;
-  calendar_alignment: 'in_linea' | 'in_ritardo' | 'in_anticipo';
-  enrollments_planned: number;
-  has_prev_year_plan: boolean;
-  notes?: string;
-}
-
-export interface PlanningResponse {
-  year: number;
-  team_scope: string;
-  plan: PlanningSummary | null;
-  suggestions: PlanningSuggestion[];
-}
-
-export interface CreatePlanInput {
-  year: number;
-  budget_total?: number;
-  duplicate_from?: number;
-}
-
-export interface UpdatePlanInput {
-  budget_total?: number;
-  notes?: string;
-}
-
-export interface UpdatePlanResponse {
-  ok: boolean;
-  plan_id: string;
-  warnings?: string[];
-}
-
-export interface TrainingPlanListRow {
-  id: string;
-  year: number;
-  status: Exclude<PlanStatus, 'missing'>;
-  budget_total: number;
-  created_at: string;
-}
-
-export interface TrainingPlansResponse {
-  plans: TrainingPlanListRow[];
-}
-
-export type PlanTransition = 'open' | 'closed' | 'reopened' | 'frozen';
-
-export interface TransitionPlanResponse {
-  ok: boolean;
-  plan_id: string;
-  status: string;
-  expired_enrollments_count?: number;
-}
-
-export interface BulkPlanFromSuggestionInput {
-  suggestion_id: string | null;
-  employee_ids: string[];
-  course_id: string;
-  plan_params: {
-    year: number;
-    planned_start?: string;
-    planned_end?: string;
-    hours_planned?: number;
-    cost_planned?: number;
-  };
-  mandatory_rule_id?: string;
-  source_custom_group_id?: string;
-}
-
-export interface BulkReviewEmployeeRequestsInput {
-  request_ids: string[];
-  target: 'approved' | 'rejected';
-  motivation?: string;
-  course_id?: string;
-  year?: number;
-}
-
-export interface BulkReviewEmployeeRequestsResponse {
-  succeeded: number;
-  failed: number;
-  failures?: Array<{ employee_id: string; code?: string; message?: string }>;
-}
-
-export interface ComplianceExpiringRow {
-  employee_id: string;
-  employee_name: string;
-  rule_id: string;
-  rule_title: string;
-  expires_in_days: number;
-  severity: 'critical' | 'warning' | 'info';
-}
-
-export interface ComplianceRuleGap {
-  employee_id: string;
-  employee_name: string;
-  status: 'never_covered' | 'expired' | 'expiring_soon';
-  detail?: string;
-}
-
-export interface ComplianceRule {
-  id: string;
-  title: string;
-  cadence_label?: string;
-  population_target?: string;
-  coverage_pct: number;
-  covered_count: number;
-  target_count: number;
-  gaps: ComplianceRuleGap[];
-  severity: 'critical' | 'warning' | 'ok';
-  suggested_course_ids: string[];
-}
-
-export interface ComplianceOverviewResponse {
-  year: number;
-  team_scope: string;
-  deadline_days: number;
-  expiring_deadlines: ComplianceExpiringRow[];
-  rules: ComplianceRule[];
-}
-
-export type PopulationKind = 'all' | 'team' | 'skill_area' | 'custom_group';
-
-export interface PopulationTarget {
-  kind: PopulationKind;
-  id?: string;
-  label?: string;
-  count?: number;
-}
-
-export interface RuleUsage {
-  kind: 'enrollment' | 'rule';
-  id?: string;
-  label: string;
-  count?: number;
-}
-
-export interface RuleImpact {
-  target_count: number;
-  covered_count: number;
-  gap_count: number;
-  coverage_pct: number;
-  severity: 'critical' | 'warning' | 'ok';
-  gaps?: ComplianceRuleGap[];
-}
-
-export interface MandatoryRule {
-  id: string;
-  name: string;
-  course_id: string;
-  course_title: string;
-  compliance_framework?: string;
-  cadence_label?: string;
-  population_target: PopulationTarget;
-  active: boolean;
-  notes?: string;
-  coverage_pct: number;
-  covered_count: number;
-  target_count: number;
-  gap_count: number;
-  gaps?: ComplianceRuleGap[];
-  severity: 'critical' | 'warning' | 'ok';
-  used_by?: RuleUsage[];
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface MandatoryRuleInput {
-  name: string;
-  course_id: string;
-  population_target: PopulationTarget;
-  active?: boolean;
-  notes?: string;
-}
-
-export interface MandatoryRulesResponse {
-  rules: MandatoryRule[];
-}
-
-export interface MandatoryRuleMutationResponse {
-  rule: MandatoryRule;
-  warnings?: string[];
-  impact: RuleImpact;
-}
-
-export interface GroupMember {
-  id: string;
-  name: string;
-  email: string;
-  team_code?: string;
-  team_name?: string;
-}
-
-export interface CustomGroupUsage {
-  kind: 'rule' | 'enrollment';
-  id?: string;
-  label: string;
-  count?: number;
-}
-
-export interface CustomGroup {
-  id: string;
-  name: string;
-  description?: string;
-  active: boolean;
-  member_count: number;
-  members?: GroupMember[];
-  used_by?: CustomGroupUsage[];
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface CustomGroupInput {
-  name: string;
-  description?: string;
-  active?: boolean;
-  member_ids: string[];
-}
-
-export interface CustomGroupsResponse {
-  groups: CustomGroup[];
-}
-
-export interface CatalogCourseWithCounts extends CatalogCourse {
-  enrollments_current_year: number;
-  enrollments_completed_historical: number;
-}
-
-export interface CatalogListResponse {
-  courses: CatalogCourseWithCounts[];
-}
-
-export interface PlanAuditActor {
-  id: string;
-  display_name: string;
-}
-
-export interface PlanAuditEvent {
+export interface EventExpenseBudget {
   id: number;
-  plan_id: string;
-  event_type:
-    | 'plan_created'
-    | 'plan_status_changed'
-    | 'plan_budget_changed'
-    | 'plan_notes_changed'
-    | 'plan_deleted'
-    | 'bulk_plan_applied'
-    | 'suggestion_dismissed'
-    | 'adhoc_created'
-    | 'enrollment_modified'
-    | 'enrollment_cancelled'
-    | 'bulk_review_applied';
-  actor: PlanAuditActor;
-  payload: Record<string, unknown>;
-  created_at: string;
+  name: string;
+  year: number;
+  costCenter: string | null;
+  budgetUserId: number | null;
 }
 
-export interface PlanAuditResponse {
-  events: PlanAuditEvent[];
-  next_cursor?: string;
+export interface UnapprovedEventExpenseRow {
+  eventId: string;
+  courseId: string;
+  courseTitle: string;
+  expenseId: string;
+  poId: number;
+  poCode: string;
+  rawState: string;
+  economicState: EconomicState;
+  totalPrice: string;
+  currency: string;
+  budget: EventExpenseBudget;
+  enrollmentCount: number;
+}
+
+export interface UnapprovedEventExpensesResponse {
+  expenses: UnapprovedEventExpenseRow[];
+}
+
+export interface StaleEnrollmentRow {
+  enrollmentId: string;
+  employeeId: string;
+  employeeName: string;
+  eventId: string;
+  courseTitle: string;
+  ageDays: number;
+  createdAt: string;
+  lastSessionDate: string | null;
+}
+
+export interface StaleEnrollmentsResponse {
+  olderThanDays: number;
+  enrollments: StaleEnrollmentRow[];
+}
+
+// ── Eventi (letture event-centric; #155 usa solo i flag di condizione) ──
+
+export type DeliveryStatus =
+  | 'planned'
+  | 'in_progress'
+  | 'completed'
+  | 'partially_completed'
+  | 'not_attended'
+  | 'cancelled';
+
+export type ParticipationStatus = 'assigned' | 'in_progress' | 'completed' | 'not_attended';
+
+export type LearningOutcome = 'passed' | 'failed' | 'not_taken' | 'not_required';
+
+export interface EventFlags {
+  cancelled: boolean;
+  withoutSessions: boolean;
+  unassignedEnrollments: boolean;
+  inProgress: boolean;
+  needsReconciliation: boolean;
+  concluded: boolean;
+}
+
+export interface EventListRow {
+  id: string;
+  courseId: string;
+  courseTitle: string;
+  vendorId?: string;
+  vendorName?: string;
+  agreedPrice?: number;
+  origin: string;
+  cancelledAt?: string;
+  sessionsCount: number;
+  enrollmentsCount: number;
+  cancelledEnrollmentsCount: number;
+  flags: EventFlags;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EventListResponse {
+  events: EventListRow[];
 }

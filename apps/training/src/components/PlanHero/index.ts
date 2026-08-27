@@ -1,1 +1,0 @@
-export { PlanHero } from './PlanHero';

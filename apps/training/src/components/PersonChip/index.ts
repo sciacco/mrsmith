@@ -1,1 +1,0 @@
-export { PersonChip } from './PersonChip';

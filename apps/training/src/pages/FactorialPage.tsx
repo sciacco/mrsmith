@@ -23,10 +23,6 @@ import {
 } from '../api/factorialDiag';
 import styles from './FactorialPage.module.css';
 
-interface FactorialPageProps {
-  isPeopleAdmin: boolean;
-}
-
 type View = 'persone' | 'team' | 'formazione' | 'sincronizzazione';
 
 const VIEWS: { key: View; label: string }[] = [
@@ -116,22 +112,14 @@ function formatEuro(decimal: string | undefined): string {
   return value.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
 }
 
-export function FactorialPage({ isPeopleAdmin }: FactorialPageProps) {
+export function FactorialPage() {
   const [params, setParams] = useSearchParams();
   const rawView = params.get('vista');
   const view: View =
     rawView === 'team' || rawView === 'formazione' || rawView === 'sincronizzazione' ? rawView : 'persone';
 
-  const status = useFactorialStatus(isPeopleAdmin);
+  const status = useFactorialStatus(true);
   const configured = status.data?.configured === true;
-
-  if (!isPeopleAdmin) {
-    return (
-      <main className={styles.page}>
-        <p className={styles.accessDenied}>Accesso riservato al team People.</p>
-      </main>
-    );
-  }
 
   return (
     <main className={styles.page}>

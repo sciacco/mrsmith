@@ -1,1 +1,0 @@
-export { SuggestionCard } from './SuggestionCard';

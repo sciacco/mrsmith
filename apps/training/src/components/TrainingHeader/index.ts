@@ -1,1 +1,0 @@
-export { TrainingHeader } from './TrainingHeader';
