@@ -129,6 +129,14 @@
   font-size: 0.8125rem;
 }
 
+/* Selettore con tipo per battere .panel (radius-md) a specificita' pari a
+   prescindere dall'ordine di iniezione dei moduli CSS; il padding interno lo
+   alza HistoryPanel stesso via variant="section" (HistoryPanel.module.css
+   .panelSection), non un padding esterno qui. */
+section.historyPanel {
+  border-radius: var(--radius-lg);
+}
+
 /* ── Sezioni ── */
 
 .section {

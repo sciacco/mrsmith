@@ -1,0 +1,155 @@
+/* Pannello storia condiviso (#164): stile autonomo per essere montabile
+   tal quale su pagina piena (EventDetailPage, PersonPage) e dentro un
+   drawer (RuleDetailDrawer, RequestDetailDrawer). */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  overflow: hidden;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.toggle:hover {
+  background: var(--color-surface);
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--color-accent-glow);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.toggleLabel {
+  flex: 1;
+}
+
+.body {
+  padding: 0 var(--space-4) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Variante "section" (#164 fix): per un punto di montaggio i cui fratelli di
+   pagina impaddano a --space-5 invece di --space-4 (EventDetailPage .card/
+   .section). Selettore discendente scoped al modulo: non compete per
+   specificita' con un override della pagina, quindi non dipende dall'ordine
+   di iniezione dei moduli CSS. */
+.panelSection .toggle {
+  padding: var(--space-5);
+}
+
+.panelSection .body {
+  padding: 0 var(--space-5) var(--space-5);
+}
+
+.empty {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.errorNotice {
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-sm);
+  background: var(--color-danger-subtle);
+  color: var(--color-danger-hover);
+  font-size: 0.8125rem;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.rowHead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 0.8125rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rowHead:disabled {
+  cursor: default;
+}
+
+.rowHead:focus-visible {
+  outline: 2px solid var(--color-accent-glow);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.rowWho {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.rowWhen {
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.rowWhat {
+  flex: 1;
+  color: var(--color-text-secondary);
+}
+
+.fields {
+  margin: 0;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border-top: 1px solid var(--color-border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.fieldItem {
+  display: flex;
+  gap: var(--space-2);
+  font-size: 0.75rem;
+}
+
+.fieldItem dt {
+  min-width: 10rem;
+  color: var(--color-text-muted);
+}
+
+.fieldItem dd {
+  margin: 0;
+  color: var(--color-text);
+  word-break: break-word;
+}

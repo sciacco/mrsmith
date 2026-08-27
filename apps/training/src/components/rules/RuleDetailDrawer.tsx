@@ -10,6 +10,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, Drawer, Skeleton, StatusBadge, ToggleSwitch, useToast } from '@mrsmith/ui';
 import { useCreateRuleEvent, useRuleDetail, useSetRuleActive } from '../../api/queries';
+import { HistoryPanel } from '../audit/HistoryPanel';
 import { describeApiError } from '../events/apiErrors';
 import { ErrorPanel } from '../events/ErrorPanel';
 import { formatDateOnly } from '../events/eventFormat';
@@ -209,6 +210,8 @@ export function RuleDetailDrawer({ id, onClose }: RuleDetailDrawerProps) {
                   </div>
                 )}
               </section>
+
+              <HistoryPanel selector={{ kind: 'entity', entityType: 'training_rule', entityId: rule.id }} />
             </>
           )}
         </div>

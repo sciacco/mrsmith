@@ -5,6 +5,7 @@ import type {
   ActionResponse,
   AssessmentInput,
   AssessmentUpdateInput,
+  AuditHistoryResponse,
   AwardInput,
   AwardUpdateInput,
   BulkAssignmentsInput,
@@ -341,6 +342,38 @@ export function useDeliveredReport(from: string, to: string) {
         `${TRAINING_PREFIX}/reports/delivered?${new URLSearchParams({ from, to }).toString()}`,
       ),
     enabled: from !== '' && to !== '',
+  });
+}
+
+// ── Pannello storia: lettura di audit_log (#164) ──
+// Tre selettori mutuamente esclusivi, a specchio delle tre modalita' della
+// route: entita' singola, persona aggregata o evento aggregato. Lettura
+// pigra: il pannello abilita la query solo alla propria apertura (`enabled`).
+
+export type AuditSelector =
+  | { kind: 'entity'; entityType: string; entityId: string }
+  | { kind: 'employee'; employeeId: string }
+  | { kind: 'event'; eventId: string };
+
+export function useAuditHistory(selector: AuditSelector, enabled: boolean) {
+  const api = useApiClient();
+  const params = new URLSearchParams(
+    selector.kind === 'employee'
+      ? { employeeId: selector.employeeId }
+      : selector.kind === 'event'
+        ? { eventId: selector.eventId }
+        : { entityType: selector.entityType, entityId: selector.entityId },
+  );
+  const keyTail =
+    selector.kind === 'employee'
+      ? ['employee', selector.employeeId]
+      : selector.kind === 'event'
+        ? ['event', selector.eventId]
+        : ['entity', selector.entityType, selector.entityId];
+  return useQuery({
+    queryKey: ['training', 'audit', ...keyTail],
+    queryFn: () => api.get<AuditHistoryResponse>(`${TRAINING_PREFIX}/audit?${params.toString()}`),
+    enabled,
   });
 }
 

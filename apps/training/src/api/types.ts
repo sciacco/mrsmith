@@ -1271,3 +1271,22 @@ export interface DeliveredReportResponse {
   to: string;
   rows: DeliveredReportRow[];
 }
+
+// ── Pannello storia: lettura di audit_log (#164, specchio di types_audit.go) ──
+
+export interface AuditEntry {
+  occurredAt: string;
+  actorId?: string;
+  actorName: string;
+  entityType: string;
+  entityId: string;
+  action: string;
+  changedFields: string[];
+  valuesRecorded: boolean;
+  before: Record<string, unknown> | unknown[] | null;
+  after: Record<string, unknown> | unknown[] | null;
+}
+
+export interface AuditHistoryResponse {
+  entries: AuditEntry[];
+}

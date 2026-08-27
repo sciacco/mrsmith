@@ -4,6 +4,7 @@ import { formatCurrency } from '@mrsmith/format';
 import { Button, Icon, Skeleton, useToast } from '@mrsmith/ui';
 import { useCancelEvent, useEventDetail, useFeedEvent, useTrainingLookups, useUpdateEvent } from '../../api/queries';
 import type { EventInput } from '../../api/types';
+import { HistoryPanel } from '../../components/audit/HistoryPanel';
 import { describeApiError } from '../../components/events/apiErrors';
 import { ErrorPanel } from '../../components/events/ErrorPanel';
 import { EventConditionBadges } from '../../components/events/EventConditionBadges';
@@ -197,6 +198,8 @@ export function EventDetailPage() {
         enrollments={event.enrollments}
         highlighted={highlighted === 'expenses'}
       />
+
+      <HistoryPanel selector={{ kind: 'event', eventId: id }} variant="section" className={styles.historyPanel} />
 
       {showEdit && (
         <EventFormModal

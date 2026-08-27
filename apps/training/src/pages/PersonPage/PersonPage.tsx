@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Button, Icon, Skeleton, StatusBadge } from '@mrsmith/ui';
 import { usePersonDetail } from '../../api/queries';
+import { HistoryPanel } from '../../components/audit/HistoryPanel';
 import { formatDateOnly, formatInstantDate } from '../../components/events/eventFormat';
 import { deliveryStatusVariant } from '../../components/events/statusVariants';
 import { AssessmentsSection } from '../../components/people/AssessmentsSection';
@@ -210,6 +211,8 @@ export function PersonPage() {
           </div>
         )}
       </section>
+
+      <HistoryPanel selector={{ kind: 'employee', employeeId: person.id }} />
 
       {showEdit && (
         <PersonEditorModal

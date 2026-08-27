@@ -20,6 +20,7 @@ import {
   useWithdrawRequest,
 } from '../../api/queries';
 import type { RequestAcceptedInput, RequestDetail, TLOpinionValue } from '../../api/types';
+import { HistoryPanel } from '../audit/HistoryPanel';
 import { describeApiError } from '../events/apiErrors';
 import { ErrorPanel } from '../events/ErrorPanel';
 import { formatDateOnly, formatInstantDate } from '../events/eventFormat';
@@ -232,6 +233,8 @@ export function RequestDetailDrawer({ id, onClose }: RequestDetailDrawerProps) {
                   </li>
                 </ul>
               </section>
+
+              <HistoryPanel selector={{ kind: 'entity', entityType: 'training_request', entityId: request.id }} />
             </>
           )}
         </div>
