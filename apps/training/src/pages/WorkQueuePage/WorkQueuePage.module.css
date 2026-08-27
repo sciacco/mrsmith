@@ -147,6 +147,33 @@
   white-space: nowrap;
 }
 
+.linkedRow {
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.linkedRow:hover {
+  background: var(--color-accent-subtle);
+}
+
+.rowLink {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.rowLink:hover,
+.rowLink:focus-visible {
+  color: var(--color-accent);
+  text-decoration: underline;
+}
+
+.rowLink:focus-visible {
+  outline: 2px solid var(--color-accent-glow);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
 .errorNotice {
   margin: 0;
   padding: var(--space-3) var(--space-4);

@@ -284,3 +284,206 @@ export interface EventListRow {
 export interface EventListResponse {
   events: EventListRow[];
 }
+
+// ── Eventi: dettaglio e mutazioni (#156) ──
+
+export interface ActionResponse {
+  ok: boolean;
+  id?: string;
+  status?: string;
+}
+
+export interface EventInput {
+  courseId: string;
+  vendorId?: string;
+  agreedPrice?: number;
+  agreedConditions?: string;
+  notes?: string;
+}
+
+export interface ReasonInput {
+  reason: string;
+}
+
+export type ScheduleType = 'scheduled' | 'self_paced';
+
+// SessionInput copre creazione e modifica: sostituzione completa, il campo
+// omesso azzera (capienza compresa).
+export interface SessionInput {
+  scheduleType: ScheduleType;
+  startsAt?: string;
+  endsAt?: string;
+  dueAt?: string;
+  maxCapacity?: number;
+  notes?: string;
+}
+
+export interface SessionDetail {
+  id: string;
+  scheduleType?: ScheduleType;
+  startsAt?: string;
+  endsAt?: string;
+  dueAt?: string;
+  maxCapacity?: number;
+  occupancy: number;
+  notes?: string;
+  factorialSessionId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// EnrollmentFactsInput e l'update unico dei fatti senza effetti di stato:
+// sostituzione completa, il campo omesso azzera.
+export interface EnrollmentFactsInput {
+  objective?: string;
+  notes?: string;
+  actualStart?: string;
+  actualEnd?: string;
+  hoursActual?: number;
+  learningOutcome?: LearningOutcome | '';
+}
+
+export interface EnrollmentDetail {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  employeeEmail: string;
+  deliveryStatus: DeliveryStatus;
+  learningOutcome?: LearningOutcome;
+  origin: string;
+  objective?: string;
+  notes?: string;
+  actualStart?: string;
+  actualEnd?: string;
+  hoursActual?: number;
+  cancellationReason?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ParticipationInput {
+  participationStatus: ParticipationStatus;
+}
+
+export interface ParticipationRow {
+  enrollmentId: string;
+  sessionId: string;
+  participationStatus: ParticipationStatus;
+  assignedAt: string;
+  updatedAt: string;
+}
+
+export interface EventExpense {
+  id: string;
+  eventId: string;
+  poId: number;
+  poCode: string;
+  totalPrice: string;
+  currency: string;
+  rawState: string;
+  economicState: EconomicState;
+  budget: EventExpenseBudget;
+  enrollmentIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EventExpenseInput {
+  poReference: string;
+  enrollmentIds: string[];
+}
+
+export interface EventExpenseReplaceInput {
+  poReference: string;
+}
+
+export interface EventExpenseEnrollmentsInput {
+  enrollmentIds: string[];
+}
+
+export interface EventDetail {
+  id: string;
+  courseId: string;
+  courseTitle: string;
+  vendorId?: string;
+  vendorName?: string;
+  agreedPrice?: number;
+  agreedConditions?: string;
+  origin: string;
+  sourceRuleId?: string;
+  sourceRequestId?: string;
+  ruleDeadline?: string;
+  factorialClassId?: string;
+  cancelledAt?: string;
+  cancellationReason?: string;
+  notes?: string;
+  flags: EventFlags;
+  sessions: SessionDetail[];
+  enrollments: EnrollmentDetail[];
+  participations: ParticipationRow[];
+  expenses: EventExpense[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FeedAddedRow {
+  enrollmentId: string;
+  employeeId: string;
+  employeeName: string;
+}
+
+export interface FeedEventResponse {
+  ok: boolean;
+  eventId: string;
+  added: FeedAddedRow[];
+}
+
+// ── Gesti massivi del workspace (#153) ──
+
+export type BulkAssignMode = 'all_to_all' | 'distribute' | 'fill_session';
+
+export interface BulkAssignmentsInput {
+  mode: BulkAssignMode;
+  sessionIds?: string[];
+  sessionId?: string;
+}
+
+export interface BulkAssignmentsResponse {
+  ok: boolean;
+  assigned: number;
+  perSession: Record<string, number>;
+}
+
+export interface BulkParticipationInput {
+  participationStatus: ParticipationStatus;
+  enrollmentIds?: string[];
+}
+
+export interface BulkParticipationResponse {
+  ok: boolean;
+  updated: number;
+}
+
+export interface BulkEnrollInput {
+  employeeIds: string[];
+  objective?: string;
+  notes?: string;
+}
+
+export interface BulkEnrollCreatedRow {
+  enrollmentId: string;
+  employeeId: string;
+}
+
+export type BulkEnrollSkipReason = 'already_enrolled' | 'inactive';
+
+export interface BulkEnrollSkippedRow {
+  employeeId: string;
+  reason: BulkEnrollSkipReason;
+}
+
+export interface BulkEnrollResponse {
+  ok: boolean;
+  created: BulkEnrollCreatedRow[];
+  skipped: BulkEnrollSkippedRow[];
+}

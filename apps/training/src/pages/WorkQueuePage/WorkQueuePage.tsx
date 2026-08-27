@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { formatCurrency, formatInstant, formatLocalDate, formatNumber } from '@mrsmith/format';
 import { Icon, Skeleton, StatusBadge, type StatusBadgeVariant } from '@mrsmith/ui';
 import {
@@ -74,6 +74,14 @@ function formatInstantDate(value: string | undefined | null): string {
     }) ?? value
   );
 }
+
+// Sezione della quale l'evento evidenziato apre il dettaglio (#156): la
+// condizione indica dove intervenire per sistemarlo.
+const EVENT_CONDITION_HIGHLIGHT: Record<'needsReconciliation' | 'withoutSessions' | 'unassignedEnrollments', string> = {
+  needsReconciliation: 'participations',
+  withoutSessions: 'sessions',
+  unassignedEnrollments: 'participations',
+};
 
 function ageLabel(value: number): string {
   return `${formatNumber(value) ?? value} gg`;
@@ -151,15 +159,20 @@ interface QueueColumn<T> {
   render: (row: T) => ReactNode;
 }
 
+// linkTo (opzionale): rimando al dettaglio evento (#156). Quando presente,
+// la riga e cliccabile (§13.2) e la prima colonna porta un <a> reale.
 function QueueTable<T>({
   rows,
   columns,
   rowKey,
+  linkTo,
 }: {
   rows: T[];
   columns: QueueColumn<T>[];
   rowKey: (row: T) => string;
+  linkTo?: (row: T) => string;
 }) {
+  const navigate = useNavigate();
   return (
     <div className={styles.tableWrap}>
       <table className={styles.table}>
@@ -173,15 +186,28 @@ function QueueTable<T>({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr key={rowKey(row)}>
-              {columns.map((col) => (
-                <td key={col.header} className={col.align === 'right' ? styles.numCell : undefined}>
-                  {col.render(row)}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {rows.map((row) => {
+            const href = linkTo?.(row);
+            return (
+              <tr
+                key={rowKey(row)}
+                className={href ? styles.linkedRow : undefined}
+                onClick={href ? () => navigate(href) : undefined}
+              >
+                {columns.map((col, index) => (
+                  <td key={col.header} className={col.align === 'right' ? styles.numCell : undefined}>
+                    {href && index === 0 ? (
+                      <Link to={href} className={styles.rowLink} onClick={(e) => e.stopPropagation()}>
+                        {col.render(row)}
+                      </Link>
+                    ) : (
+                      col.render(row)
+                    )}
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -495,6 +521,7 @@ export function WorkQueuePage() {
               <QueueTable<UnapprovedEventExpenseRow>
                 rows={expenses.data ?? []}
                 rowKey={(r) => r.expenseId}
+                linkTo={(r) => `/eventi/${r.eventId}?highlight=expenses`}
                 columns={[
                   { header: 'Corso', render: (r) => r.courseTitle },
                   { header: 'PO', render: (r) => r.poCode || String(r.poId) },
@@ -540,6 +567,7 @@ export function WorkQueuePage() {
               <QueueTable<StaleEnrollmentRow>
                 rows={stale.data?.enrollments ?? []}
                 rowKey={(r) => r.enrollmentId}
+                linkTo={(r) => `/eventi/${r.eventId}?highlight=enrollments`}
                 columns={[
                   { header: 'Persona', render: (r) => r.employeeName },
                   { header: 'Corso', render: (r) => r.courseTitle },
@@ -574,6 +602,7 @@ export function WorkQueuePage() {
                 <QueueTable<EventListRow>
                   rows={rows}
                   rowKey={(r) => r.id}
+                  linkTo={(r) => `/eventi/${r.id}?highlight=${EVENT_CONDITION_HIGHLIGHT[flag]}`}
                   columns={[
                     { header: 'Corso', render: (r) => r.courseTitle },
                     { header: 'Fornitore', render: (r) => r.vendorName || '—' },
