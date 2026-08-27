@@ -144,6 +144,11 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	mux.Handle("GET /training/v1/factorial/trainings/{id}/structure", protect(http.HandlerFunc(h.handleFactorialTrainingStructure)))
 	mux.Handle("GET /training/v1/factorial/sessions/{id}/participants", protect(http.HandlerFunc(h.handleFactorialSessionParticipants)))
 
+	// Sync formativo Factorial: letture delle run persistite (#154, task 6.3
+	// di #151). Nessuna route di avvio qui.
+	mux.Handle("GET /training/v1/factorial/sync/runs", protect(h.requireStore(http.HandlerFunc(h.handleListFactorialSyncRuns))))
+	mux.Handle("GET /training/v1/factorial/sync/runs/{id}", protect(h.requireStore(http.HandlerFunc(h.handleGetFactorialSyncRun))))
+
 	// Regole formative, richieste e code operative derivate (#140):
 	// registrazione delegata ai file dedicati.
 	h.registerRuleRoutes(mux, protect)

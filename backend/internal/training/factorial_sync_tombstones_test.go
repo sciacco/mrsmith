@@ -12,7 +12,7 @@ func TestReduceTombstones(t *testing.T) {
 			{EntityID: "s1", RemoteID: "fs-old"},
 			{EntityID: "s1", RemoteID: "fs-new"},
 		}
-		ids, warnings := reduceTombstones(rows, "warn")
+		ids, warnings := reduceTombstones(rows, "warn", "training_session")
 		if _, ok := ids["fs-new"]; !ok {
 			t.Fatal("fs-new (ultima action) assente dal tombstone")
 		}
@@ -29,7 +29,7 @@ func TestReduceTombstones(t *testing.T) {
 			{EntityID: "s1", RemoteID: "fs-1", RowExists: false},
 			{EntityID: "s1", RemoteID: "fs-1", RowExists: true}, // ricreata dopo la delete
 		}
-		ids, warnings := reduceTombstones(rows, "warn")
+		ids, warnings := reduceTombstones(rows, "warn", "training_session")
 		if len(ids) != 0 {
 			t.Fatalf("ids = %v, want vuoto (riga ricreata invalida il tombstone)", ids)
 		}
@@ -40,7 +40,7 @@ func TestReduceTombstones(t *testing.T) {
 
 	t.Run("before_state senza id remoto: scarto con warning", func(t *testing.T) {
 		rows := []auditDeleteRow{{EntityID: "s1", RemoteID: ""}}
-		ids, warnings := reduceTombstones(rows, "session_tombstone_missing_remote_id")
+		ids, warnings := reduceTombstones(rows, "session_tombstone_missing_remote_id", "training_session")
 		if len(ids) != 0 {
 			t.Fatalf("ids = %v, want vuoto", ids)
 		}
@@ -54,7 +54,7 @@ func TestReduceTombstones(t *testing.T) {
 			{EntityID: "en1", SessionID: "sess-a", RemoteID: "acc-a"},
 			{EntityID: "en1", SessionID: "sess-b", RemoteID: "acc-b"},
 		}
-		ids, _ := reduceTombstones(rows, "warn")
+		ids, _ := reduceTombstones(rows, "warn", "enrollment_session")
 		if _, ok := ids["acc-a"]; !ok {
 			t.Fatal("acc-a assente: due sessioni della stessa iscrizione devono restare distinte")
 		}

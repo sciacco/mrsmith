@@ -131,8 +131,9 @@ ORDER BY al.occurred_at ASC, al.id ASC`)
 // SessionID): vince solo se la riga locale e' ancora assente ora
 // (RowExists=false), cosi' una ricreazione successiva invalida il tombstone.
 // before_state senza l'id remoto scarta la candidatura con un warning invece
-// di entrare nell'insieme.
-func reduceTombstones(rows []auditDeleteRow, warnKind string) (map[string]struct{}, []outboundIssue) {
+// di entrare nell'insieme; localEntity e' il tipo locale di EntityID (gia'
+// noto al chiamante), per la persistenza dei finding (#154).
+func reduceTombstones(rows []auditDeleteRow, warnKind, localEntity string) (map[string]struct{}, []outboundIssue) {
 	type key struct{ entity, session string }
 	last := map[key]auditDeleteRow{}
 	order := make([]key, 0, len(rows))
@@ -151,7 +152,7 @@ func reduceTombstones(rows []auditDeleteRow, warnKind string) (map[string]struct
 			continue
 		}
 		if r.RemoteID == "" {
-			warnings = append(warnings, outboundIssue{Kind: warnKind, Ref: r.EntityID})
+			warnings = append(warnings, outboundIssue{Kind: warnKind, Ref: r.EntityID, LocalEntity: localEntity, LocalID: r.EntityID})
 			continue
 		}
 		ids[r.RemoteID] = struct{}{}
@@ -500,8 +501,8 @@ func (s *SQLStore) applyTombstoneSync(ctx context.Context, cli *factorial.Client
 	if err != nil {
 		return tombstoneResult{}, err
 	}
-	sessionIDs, sessionWarnings := reduceTombstones(sessionRows, "session_tombstone_missing_remote_id")
-	accessIDs, accessWarnings := reduceTombstones(accessRows, "access_tombstone_missing_remote_id")
+	sessionIDs, sessionWarnings := reduceTombstones(sessionRows, "session_tombstone_missing_remote_id", "training_session")
+	accessIDs, accessWarnings := reduceTombstones(accessRows, "access_tombstone_missing_remote_id", "enrollment_session")
 	result := tombstoneResult{TombstonedSessionIDs: sessionIDs, TombstonedAccessIDs: accessIDs}
 	result.Warnings = append(result.Warnings, sessionWarnings...)
 	result.Warnings = append(result.Warnings, accessWarnings...)

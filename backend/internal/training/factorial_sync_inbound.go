@@ -79,9 +79,15 @@ type attendanceChangeItem struct {
 
 // inboundIssue e' una voce di conflitto o warning: Kind un codice stabile,
 // Ref il miglior identificatore disponibile (id Factorial o locale).
+// LocalEntity/LocalID/EmployeeID: riferimento locale gia' disponibile nel
+// punto di generazione (nessuna lookup aggiuntiva), per la persistenza dei
+// finding (#154); vuoti quando non risolvibile li'.
 type inboundIssue struct {
-	Kind string
-	Ref  string
+	Kind        string
+	Ref         string
+	LocalEntity string
+	LocalID     string
+	EmployeeID  string
 }
 
 type trainingDiff struct {
@@ -167,7 +173,11 @@ func computeTrainingDiff(training factorial.TrainingsTraining, sub trainingClass
 	}
 	diff.Course = courseSeed(trainingID, training, course)
 	if diff.Course != nil && diff.Course.TitleMissing {
-		diff.Warnings = append(diff.Warnings, inboundIssue{Kind: "course_title_missing", Ref: trainingID})
+		localCourseID := ""
+		if course != nil {
+			localCourseID = course.ID
+		}
+		diff.Warnings = append(diff.Warnings, inboundIssue{Kind: "course_title_missing", Ref: trainingID, LocalEntity: "course", LocalID: localCourseID})
 	}
 
 	keptClasses := map[string]struct{}{}
@@ -177,7 +187,7 @@ func computeTrainingDiff(training factorial.TrainingsTraining, sub trainingClass
 		}
 		event, found := local.Events[*class.ID]
 		if found && event.Cancelled {
-			diff.Conflicts = append(diff.Conflicts, inboundIssue{Kind: "event_reopen_blocked", Ref: *class.ID})
+			diff.Conflicts = append(diff.Conflicts, inboundIssue{Kind: "event_reopen_blocked", Ref: *class.ID, LocalEntity: "training_event", LocalID: event.ID})
 			continue
 		}
 		keptClasses[*class.ID] = struct{}{}
@@ -195,11 +205,15 @@ func computeTrainingDiff(training factorial.TrainingsTraining, sub trainingClass
 			continue // classe cancellata localmente: gia' in conflitto sopra
 		}
 		sessionClass[*sess.ID] = *sess.TrainingClassID
+		existing, found := local.Sessions[*sess.ID]
 		remote, endsCleared := sanitizeRemoteSession(sess)
 		if endsCleared {
-			diff.Warnings = append(diff.Warnings, inboundIssue{Kind: "session_ends_before_starts", Ref: *sess.ID})
+			issue := inboundIssue{Kind: "session_ends_before_starts", Ref: *sess.ID}
+			if found {
+				issue.LocalEntity, issue.LocalID = "training_session", existing.ID
+			}
+			diff.Warnings = append(diff.Warnings, issue)
 		}
-		existing, found := local.Sessions[*sess.ID]
 		if !found {
 			diff.Sessions = append(diff.Sessions, sessionChangeItem{New: true, FactorialClassID: *sess.TrainingClassID, FactorialSessionID: *sess.ID, Remote: remote})
 			continue
@@ -208,9 +222,9 @@ func computeTrainingDiff(training factorial.TrainingsTraining, sub trainingClass
 		case resolveAdopt:
 			diff.Sessions = append(diff.Sessions, sessionChangeItem{FactorialClassID: *sess.TrainingClassID, FactorialSessionID: *sess.ID, SessionID: existing.ID, Remote: remote})
 		case resolveConflict:
-			diff.Conflicts = append(diff.Conflicts, inboundIssue{Kind: "session_conflict", Ref: *sess.ID})
+			diff.Conflicts = append(diff.Conflicts, inboundIssue{Kind: "session_conflict", Ref: *sess.ID, LocalEntity: "training_session", LocalID: existing.ID})
 		case resolveUnknown:
-			diff.Warnings = append(diff.Warnings, inboundIssue{Kind: "session_provenance_unknown", Ref: *sess.ID})
+			diff.Warnings = append(diff.Warnings, inboundIssue{Kind: "session_provenance_unknown", Ref: *sess.ID, LocalEntity: "training_session", LocalID: existing.ID})
 		}
 	}
 
@@ -244,7 +258,7 @@ func computeTrainingDiff(training factorial.TrainingsTraining, sub trainingClass
 				diff.Enrollments = append(diff.Enrollments, enrollmentSeedItem{FactorialClassID: classID, EmployeeExternalID: employeeExternalID})
 			}
 		} else if enrollment.Cancelled {
-			diff.Conflicts = append(diff.Conflicts, inboundIssue{Kind: "enrollment_reopen_blocked", Ref: enrollment.ID})
+			diff.Conflicts = append(diff.Conflicts, inboundIssue{Kind: "enrollment_reopen_blocked", Ref: enrollment.ID, LocalEntity: "enrollment", LocalID: enrollment.ID, EmployeeID: employeeLocalID})
 			continue
 		}
 		attendanceID := ""
@@ -265,7 +279,7 @@ func computeTrainingDiff(training factorial.TrainingsTraining, sub trainingClass
 		}
 		remoteStatus, err := attendanceLocalFromRemote(*remoteAttendance.Status)
 		if err != nil {
-			diff.Warnings = append(diff.Warnings, inboundIssue{Kind: "attendance_status_unknown", Ref: attendanceID})
+			diff.Warnings = append(diff.Warnings, inboundIssue{Kind: "attendance_status_unknown", Ref: attendanceID, LocalEntity: "enrollment", LocalID: enrollment.ID, EmployeeID: employeeLocalID})
 			continue
 		}
 		localStatus, checkpoint := participationAssigned, (*string)(nil)
@@ -276,7 +290,7 @@ func computeTrainingDiff(training factorial.TrainingsTraining, sub trainingClass
 		case resolveAdopt:
 			diff.Attendances = append(diff.Attendances, attendanceChangeItem{FactorialAccessMembershipID: *acc.ID, NewStatus: remoteStatus})
 		case resolveConflict:
-			diff.Conflicts = append(diff.Conflicts, inboundIssue{Kind: "attendance_conflict", Ref: attendanceID})
+			diff.Conflicts = append(diff.Conflicts, inboundIssue{Kind: "attendance_conflict", Ref: attendanceID, LocalEntity: "enrollment", LocalID: enrollment.ID, EmployeeID: employeeLocalID})
 		}
 	}
 	diff.Memberships = sub.TrainingMemberships
@@ -629,8 +643,8 @@ WHERE enrollment_id = $1::uuid AND session_id = $2::uuid`, enr, sess, item.NewSt
 		if err := s.auditFields(ctx, tx, principal, "enrollment_session", enr, actionFactorialImport, []string{"participation_status"}); err != nil {
 			return nil, err
 		}
-		var before string
-		if err := tx.QueryRowContext(ctx, `SELECT delivery_status FROM training.enrollment WHERE id = $1::uuid FOR UPDATE`, enr).Scan(&before); err != nil {
+		var before, employeeID string
+		if err := tx.QueryRowContext(ctx, `SELECT delivery_status, employee_id::text FROM training.enrollment WHERE id = $1::uuid FOR UPDATE`, enr).Scan(&before, &employeeID); err != nil {
 			return nil, fmt.Errorf("load training enrollment delivery status: %w", err)
 		}
 		// startGate=nil: la scrittura inbound non passa mai dal gate locale
@@ -641,7 +655,7 @@ WHERE enrollment_id = $1::uuid AND session_id = $2::uuid`, enr, sess, item.NewSt
 			return nil, err
 		}
 		if requiresEnrollmentStartGate(before, after) {
-			rdaIssues = append(rdaIssues, inboundIssue{Kind: "rda_exception", Ref: enr})
+			rdaIssues = append(rdaIssues, inboundIssue{Kind: "rda_exception", Ref: enr, LocalEntity: "enrollment", LocalID: enr, EmployeeID: employeeID})
 		}
 	}
 	return rdaIssues, nil

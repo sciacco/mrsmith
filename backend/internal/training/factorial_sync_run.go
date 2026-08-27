@@ -96,6 +96,16 @@ func (s *SQLStore) RunFactorialSync(ctx context.Context, deps FactorialSyncDeps,
 			args = append(args, "error", report.Error)
 		}
 		logger.Log(ctx, level, "training factorial sync run completed", args...)
+		// Persistenza per intero (#154): anche su run fallita, anche in
+		// dry-run (report.DryRun la marca), in una transazione dedicata
+		// separata dalle mutazioni di dominio gia' chiuse sopra. Un errore di
+		// persistenza non maschera l'esito della run: si logga sempre, ma
+		// l'errore restituito al chiamante resta quello della run (mai
+		// sostituito da un errore di persistenza).
+		if persistErr := s.persistFactorialSyncRun(ctx, report); persistErr != nil {
+			logger.Error("training factorial sync run persistence failed",
+				"operation", report.Operation, "run_outcome", report.Outcome, "error", persistErr)
+		}
 		return report, err
 	}
 

@@ -37,11 +37,16 @@ type technicalEmployee struct {
 
 // outboundIssue e' una voce di warning/conflitto/piano (dry-run). Err
 // propaga l'errore Factorial originale (mai perso dietro la classificazione); nil altrimenti.
+// LocalEntity/LocalID: riferimento locale gia' disponibile nel punto di
+// generazione (nessuna lookup aggiuntiva), per la persistenza dei finding
+// (#154); vuoti quando non risolvibile li'.
 type outboundIssue struct {
-	Kind  string
-	Ref   string
-	Err   error `json:"-"`
-	Count int
+	Kind        string
+	Ref         string
+	Err         error `json:"-"`
+	Count       int
+	LocalEntity string
+	LocalID     string
 }
 
 // outboundSyncResult: conflitti/warning accumulati; Planned solo in dry-run, al posto di ogni scrittura.
@@ -702,7 +707,7 @@ func (s *SQLStore) exportCourse(ctx context.Context, cli *factorial.Client, idx 
 	}
 	// Grana intero-corso, non "quel singolo oggetto" (D4, #141): scelta conservativa deliberata, piu' restrittiva della lettera.
 	if companyID != tech.CompanyID {
-		result.Warnings = append(result.Warnings, outboundIssue{Kind: "training_company_mismatch", Ref: trainingID})
+		result.Warnings = append(result.Warnings, outboundIssue{Kind: "training_company_mismatch", Ref: trainingID, LocalEntity: "course", LocalID: course.ID})
 		return nil // isola il corso: nessuna configurazione multi-company (#141)
 	}
 
@@ -737,7 +742,7 @@ func (s *SQLStore) createOrAdoptTraining(ctx context.Context, cli *factorial.Cli
 	outcome, adoptedID := matchChild(idx.allTrainings, course.ID)
 	switch outcome {
 	case matchConflict:
-		result.Conflicts = append(result.Conflicts, outboundIssue{Kind: "training_correlator_conflict", Ref: course.ID})
+		result.Conflicts = append(result.Conflicts, outboundIssue{Kind: "training_correlator_conflict", Ref: course.ID, LocalEntity: "course", LocalID: course.ID})
 		return "", nil
 	case matchAdopt:
 		if dryRun {
@@ -759,6 +764,7 @@ func (s *SQLStore) createOrAdoptTraining(ctx context.Context, cli *factorial.Cli
 			if failErr != nil {
 				return "", failErr
 			}
+			issue.LocalEntity, issue.LocalID = "course", course.ID
 			result.Warnings = append(result.Warnings, issue)
 			return "", nil
 		}
@@ -788,7 +794,7 @@ func (s *SQLStore) maybeUpdateTraining(ctx context.Context, cli *factorial.Clien
 		return nil // gia' allineato
 	}
 	if remote.Year == nil {
-		result.Warnings = append(result.Warnings, outboundIssue{Kind: "training_update_missing_year", Ref: course.ID})
+		result.Warnings = append(result.Warnings, outboundIssue{Kind: "training_update_missing_year", Ref: course.ID, LocalEntity: "course", LocalID: course.ID})
 		return nil // Year e' obbligatorio nel body: mai inviare 0, si salta e si segnala
 	}
 	if dryRun {
@@ -800,6 +806,7 @@ func (s *SQLStore) maybeUpdateTraining(ctx context.Context, cli *factorial.Clien
 		if failErr != nil {
 			return failErr
 		}
+		issue.LocalEntity, issue.LocalID = "course", course.ID
 		result.Warnings = append(result.Warnings, issue)
 	}
 	return nil
@@ -814,18 +821,18 @@ func (s *SQLStore) resolveClass(ctx context.Context, cli *factorial.Client, idx 
 	env := classDateEnvelope(states)
 	if ev.FactorialClassID == "" {
 		if !env.OK {
-			result.Warnings = append(result.Warnings, outboundIssue{Kind: "class_no_dates", Ref: ev.ID})
+			result.Warnings = append(result.Warnings, outboundIssue{Kind: "class_no_dates", Ref: ev.ID, LocalEntity: "training_event", LocalID: ev.ID})
 			return "", nil
 		}
 		if !anySessionExportable(states) {
-			result.Warnings = append(result.Warnings, outboundIssue{Kind: "class_no_exportable_sessions", Ref: ev.ID})
+			result.Warnings = append(result.Warnings, outboundIssue{Kind: "class_no_exportable_sessions", Ref: ev.ID, LocalEntity: "training_event", LocalID: ev.ID})
 			return "", nil // date reali ma nessuna sessione esportabile: niente classe orfana
 		}
 		name := factorialClassName(courseTitle, ev.ID)
 		outcome, adoptedID := matchChild(idx.classesByTraining[trainingID], msToken(ev.ID))
 		switch outcome {
 		case matchConflict:
-			result.Conflicts = append(result.Conflicts, outboundIssue{Kind: "class_correlator_conflict", Ref: ev.ID})
+			result.Conflicts = append(result.Conflicts, outboundIssue{Kind: "class_correlator_conflict", Ref: ev.ID, LocalEntity: "training_event", LocalID: ev.ID})
 			return "", nil
 		case matchAdopt:
 			if dryRun {
@@ -855,6 +862,7 @@ func (s *SQLStore) resolveClass(ctx context.Context, cli *factorial.Client, idx 
 				if failErr != nil {
 					return "", failErr
 				}
+				issue.LocalEntity, issue.LocalID = "training_event", ev.ID
 				result.Warnings = append(result.Warnings, issue)
 				return "", nil
 			}
@@ -888,7 +896,7 @@ func (s *SQLStore) resolveClass(ctx context.Context, cli *factorial.Client, idx 
 	}
 	body, ok := classUpdateBody(remoteClass, *start, *end)
 	if !ok {
-		result.Warnings = append(result.Warnings, outboundIssue{Kind: "class_update_missing_costs", Ref: ev.ID})
+		result.Warnings = append(result.Warnings, outboundIssue{Kind: "class_update_missing_costs", Ref: ev.ID, LocalEntity: "training_event", LocalID: ev.ID})
 		return ev.FactorialClassID, nil
 	}
 	if dryRun {
@@ -900,6 +908,7 @@ func (s *SQLStore) resolveClass(ctx context.Context, cli *factorial.Client, idx 
 		if failErr != nil {
 			return "", failErr
 		}
+		issue.LocalEntity, issue.LocalID = "training_event", ev.ID
 		result.Warnings = append(result.Warnings, issue)
 	}
 	return ev.FactorialClassID, nil
@@ -913,7 +922,7 @@ func (s *SQLStore) resolveClass(ctx context.Context, cli *factorial.Client, idx 
 func (s *SQLStore) resolveSessionOutbound(ctx context.Context, cli *factorial.Client, idx graphIndex, trainingID, classID, courseTitle string, sess outboundSessionRow, dryRun bool, principal Principal, result *outboundSyncResult) (string, error) {
 	local := newSessionSyncStateFromLocal(sess.ScheduleType, sess.StartsAt, sess.EndsAt, sess.DueAt)
 	if reason := sessionExportReason(local); reason != "" {
-		result.Warnings = append(result.Warnings, outboundIssue{Kind: reason, Ref: sess.ID})
+		result.Warnings = append(result.Warnings, outboundIssue{Kind: reason, Ref: sess.ID, LocalEntity: "training_session", LocalID: sess.ID})
 		return sess.FactorialSessionID, nil // "" se non ancora collegata, altrimenti resta collegata cosi' com'e'
 	}
 	if sess.FactorialSessionID == "" {
@@ -921,7 +930,7 @@ func (s *SQLStore) resolveSessionOutbound(ctx context.Context, cli *factorial.Cl
 		outcome, adoptedID := matchChild(idx.sessionsByClass[classID], msToken(sess.ID))
 		switch outcome {
 		case matchConflict:
-			result.Conflicts = append(result.Conflicts, outboundIssue{Kind: "session_correlator_conflict", Ref: sess.ID})
+			result.Conflicts = append(result.Conflicts, outboundIssue{Kind: "session_correlator_conflict", Ref: sess.ID, LocalEntity: "training_session", LocalID: sess.ID})
 			return "", nil
 		case matchAdopt:
 			if dryRun {
@@ -948,6 +957,7 @@ func (s *SQLStore) resolveSessionOutbound(ctx context.Context, cli *factorial.Cl
 				if failErr != nil {
 					return "", failErr
 				}
+				issue.LocalEntity, issue.LocalID = "training_session", sess.ID
 				result.Warnings = append(result.Warnings, issue)
 				return "", nil
 			}
@@ -982,6 +992,7 @@ func (s *SQLStore) resolveSessionOutbound(ctx context.Context, cli *factorial.Cl
 		if failErr != nil {
 			return "", failErr
 		}
+		issue.LocalEntity, issue.LocalID = "training_session", sess.ID
 		result.Warnings = append(result.Warnings, issue)
 		return sess.FactorialSessionID, nil
 	}
@@ -1038,7 +1049,7 @@ func (s *SQLStore) exportMembershipAndAccess(ctx context.Context, cli *factorial
 		}
 	}
 	if inactiveSkips > 0 {
-		result.Warnings = append(result.Warnings, outboundIssue{Kind: "employee_not_active", Ref: course.ID, Count: inactiveSkips})
+		result.Warnings = append(result.Warnings, outboundIssue{Kind: "employee_not_active", Ref: course.ID, Count: inactiveSkips, LocalEntity: "course", LocalID: course.ID})
 	}
 
 	var missingEmployeeIDs []string
@@ -1064,6 +1075,7 @@ func (s *SQLStore) exportMembershipAndAccess(ctx context.Context, cli *factorial
 			if failErr != nil {
 				return failErr
 			}
+			issue.LocalEntity, issue.LocalID = "course", course.ID
 			result.Warnings = append(result.Warnings, issue)
 		} else {
 			for _, m := range created {
@@ -1094,6 +1106,7 @@ func (s *SQLStore) exportMembershipAndAccess(ctx context.Context, cli *factorial
 			if failErr != nil {
 				return failErr
 			}
+			issue.LocalEntity, issue.LocalID = "training_session", needs[0].SessionID
 			result.Warnings = append(result.Warnings, issue)
 			continue
 		}
@@ -1139,6 +1152,9 @@ func (s *SQLStore) rereadAndPersistAttendance(ctx context.Context, cli *factoria
 		if failErr != nil {
 			return failErr
 		}
+		if len(accessLinks) > 0 {
+			issue.LocalEntity, issue.LocalID = "training_session", accessLinks[0].SessionID
+		}
 		result.Warnings = append(result.Warnings, issue)
 		return nil
 	}
@@ -1176,7 +1192,7 @@ WHERE enrollment_id = $1::uuid AND session_id = $2::uuid`, l.EnrollmentID, l.Ses
 	}
 	for _, l := range accessLinks {
 		if !foundForAccess[l.Value] {
-			result.Warnings = append(result.Warnings, outboundIssue{Kind: "attendance_missing_after_access_create", Ref: l.EnrollmentID})
+			result.Warnings = append(result.Warnings, outboundIssue{Kind: "attendance_missing_after_access_create", Ref: l.EnrollmentID, LocalEntity: "enrollment", LocalID: l.EnrollmentID})
 		}
 	}
 	return nil
@@ -1216,6 +1232,7 @@ func (s *SQLStore) exportAttendancePropagation(ctx context.Context, cli *factori
 					if failErr != nil {
 						return failErr
 					}
+					issue.LocalEntity, issue.LocalID = "enrollment", p.EnrollmentID
 					result.Warnings = append(result.Warnings, issue)
 					continue
 				}
