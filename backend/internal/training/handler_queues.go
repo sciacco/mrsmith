@@ -17,6 +17,7 @@ func (h *handler) registerQueueRoutes(mux *http.ServeMux, protect func(http.Hand
 	mux.Handle("GET /training/v1/queues/unfed-population", protect(h.requireStore(http.HandlerFunc(h.handleQueueUnfedPopulation))))
 	mux.Handle("GET /training/v1/queues/rounds-without-event", protect(h.requireStore(http.HandlerFunc(h.handleQueueRoundsWithoutEvent))))
 	mux.Handle("GET /training/v1/queues/unapproved-event-expenses", protect(h.requireStore(http.HandlerFunc(h.handleQueueUnapprovedEventExpenses))))
+	mux.Handle("GET /training/v1/queues/stale-enrollments", protect(h.requireStore(http.HandlerFunc(h.handleQueueStaleEnrollments))))
 }
 
 func (h *handler) handleQueueRequestsWithoutTLOpinion(w http.ResponseWriter, r *http.Request) {
@@ -129,6 +130,18 @@ func (h *handler) handleQueueRoundsWithoutEvent(w http.ResponseWriter, r *http.R
 	response, err := h.store.QueueRoundsWithoutEvent(r.Context(), r.URL.Query().Get("withinDays"))
 	if err != nil {
 		h.writeActionError(w, r, err, "training.queue_rounds_without_event")
+		return
+	}
+	httputil.JSON(w, http.StatusOK, response)
+}
+
+func (h *handler) handleQueueStaleEnrollments(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.principalOrUnauthorized(w, r); !ok {
+		return
+	}
+	response, err := h.store.QueueStaleEnrollments(r.Context(), r.URL.Query().Get("olderThanDays"))
+	if err != nil {
+		h.writeActionError(w, r, err, "training.queue_stale_enrollments")
 		return
 	}
 	httputil.JSON(w, http.StatusOK, response)

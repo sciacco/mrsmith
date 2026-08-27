@@ -881,3 +881,96 @@ ORDER BY ee.created_at, ee.id`
 	}
 	return result, nil
 }
+
+// ── Coda 7: iscrizioni "planned" ferme (#152, slice 1 del task 6) ──
+
+// parseOlderThanDays normalizza il parametro query olderThanDays: assente =
+// default 30; ammessi i valori da 1 al massimo 365 (stesso tetto di D4).
+func parseOlderThanDays(raw string) (int, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 30, nil
+	}
+	days, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, validationError("invalid_older_than_days", "soglia in giorni non valida")
+	}
+	if days < 1 || days > maxHorizonDays {
+		return 0, validationError("invalid_older_than_days", "soglia in giorni non valida: ammessi i valori da 1 a 365")
+	}
+	return days, nil
+}
+
+// QueueStaleEnrollments elenca le iscrizioni pianificate (delivery_status
+// 'planned') su un evento non annullato, create prima della soglia e senza
+// un'assegnazione a una sessione con data futura (starts_at o due_at): le
+// piu vecchie prima.
+func (s *SQLStore) QueueStaleEnrollments(ctx context.Context, olderThanDaysRaw string) (StaleEnrollmentsResponse, error) {
+	days, err := parseOlderThanDays(olderThanDaysRaw)
+	if err != nil {
+		return StaleEnrollmentsResponse{}, err
+	}
+	const query = `
+SELECT
+  en.id::text,
+  e.id::text,
+  concat(e.last_name, ' ', e.first_name),
+  en.event_id::text,
+  c.title,
+  en.created_at::date,
+  en.created_at::text,
+  (
+    SELECT MAX(COALESCE(s.starts_at, s.due_at))::text
+    FROM training.enrollment_session es
+    JOIN training.training_session s ON s.id = es.session_id
+    WHERE es.enrollment_id = en.id
+      AND COALESCE(s.starts_at, s.due_at) <= now()
+  )
+FROM training.enrollment en
+JOIN training.employee e ON e.id = en.employee_id
+JOIN training.training_event ev ON ev.id = en.event_id
+JOIN training.course c ON c.id = ev.course_id
+WHERE en.delivery_status = 'planned'
+  AND ev.cancelled_at IS NULL
+  AND en.created_at < now() - ($1::int * interval '1 day')
+  AND NOT EXISTS (
+    SELECT 1
+    FROM training.enrollment_session es2
+    JOIN training.training_session s2 ON s2.id = es2.session_id
+    WHERE es2.enrollment_id = en.id
+      AND COALESCE(s2.starts_at, s2.due_at) > now()
+  )
+ORDER BY en.created_at ASC, en.id
+LIMIT 500`
+	rows, err := s.db.QueryContext(ctx, query, days)
+	if err != nil {
+		return StaleEnrollmentsResponse{}, fmt.Errorf("list training stale enrollments: %w", err)
+	}
+	defer rows.Close()
+
+	today := dateOnly(time.Now())
+	response := StaleEnrollmentsResponse{
+		OlderThanDays: days,
+		Enrollments:   make([]StaleEnrollmentRow, 0),
+	}
+	for rows.Next() {
+		var (
+			row         StaleEnrollmentRow
+			createdOn   time.Time
+			lastSession sql.NullString
+		)
+		if err := rows.Scan(
+			&row.EnrollmentID, &row.EmployeeID, &row.EmployeeName, &row.EventID, &row.CourseTitle,
+			&createdOn, &row.CreatedAt, &lastSession,
+		); err != nil {
+			return StaleEnrollmentsResponse{}, fmt.Errorf("scan training stale enrollment: %w", err)
+		}
+		row.AgeDays = daysBetween(createdOn, today)
+		if lastSession.Valid {
+			value := lastSession.String
+			row.LastSessionDate = &value
+		}
+		response.Enrollments = append(response.Enrollments, row)
+	}
+	return response, rows.Err()
+}

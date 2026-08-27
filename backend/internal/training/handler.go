@@ -109,8 +109,8 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	mux.Handle("PUT /training/v1/expenses/{id}/enrollments", protect(h.requireStore(http.HandlerFunc(h.handleReplaceEventExpenseEnrollments))))
 	mux.Handle("DELETE /training/v1/expenses/{id}", protect(h.requireStore(http.HandlerFunc(h.handleDeleteEventExpense))))
 
-	// Certificazioni, documenti e anagrafiche superstiti: conservano i path
-	// attuali e si riallineeranno nei task che le riscrivono.
+	// Certificazioni, documenti e anagrafiche: creazione/modifica ai path
+	// piatti (#152, riallineamento dai path /people/* superstiti del POC).
 	mux.Handle("POST /training/v1/awards", protect(h.requireStore(http.HandlerFunc(h.handleCreateAward))))
 	mux.Handle("POST /training/v1/enrollments/{id}/documents", protect(h.requireStore(http.HandlerFunc(h.handleUploadEnrollmentDocument))))
 	mux.Handle("POST /training/v1/awards/{id}/documents", protect(h.requireStore(http.HandlerFunc(h.handleUploadAwardDocument))))
@@ -120,17 +120,17 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	mux.Handle("POST /training/v1/people/documents/{id}/validate", protect(h.requireStore(http.HandlerFunc(h.handleValidateDocument))))
 	mux.Handle("POST /training/v1/people/jobs/run", protect(h.requireStore(http.HandlerFunc(h.handleRunJobs))))
 	mux.Handle("PUT /training/v1/people/awards/{id}", protect(h.requireStore(http.HandlerFunc(h.handleUpdateAward))))
-	mux.Handle("POST /training/v1/people/vendors", protect(h.requireStore(http.HandlerFunc(h.handleUpsertVendor))))
-	mux.Handle("PUT /training/v1/people/vendors/{id}", protect(h.requireStore(http.HandlerFunc(h.handleUpsertVendor))))
-	mux.Handle("POST /training/v1/people/teams", protect(h.requireStore(http.HandlerFunc(h.handleUpsertTeam))))
-	mux.Handle("PUT /training/v1/people/teams/{id}", protect(h.requireStore(http.HandlerFunc(h.handleUpsertTeam))))
-	mux.Handle("POST /training/v1/people/skill-areas", protect(h.requireStore(http.HandlerFunc(h.handleUpsertSkillArea))))
-	mux.Handle("PUT /training/v1/people/skill-areas/{id}", protect(h.requireStore(http.HandlerFunc(h.handleUpsertSkillArea))))
-	mux.Handle("POST /training/v1/people/certifications", protect(h.requireStore(http.HandlerFunc(h.handleUpsertCertification))))
-	mux.Handle("PUT /training/v1/people/certifications/{id}", protect(h.requireStore(http.HandlerFunc(h.handleUpsertCertification))))
-	mux.Handle("POST /training/v1/people/courses", protect(h.requireStore(http.HandlerFunc(h.handleUpsertCourse))))
-	mux.Handle("PUT /training/v1/people/courses/{id}", protect(h.requireStore(http.HandlerFunc(h.handleUpsertCourse))))
-	mux.Handle("POST /training/v1/people/courses/{id}/archive", protect(h.requireStore(http.HandlerFunc(h.handleArchiveCourse))))
+	mux.Handle("POST /training/v1/vendors", protect(h.requireStore(http.HandlerFunc(h.handleUpsertVendor))))
+	mux.Handle("PUT /training/v1/vendors/{id}", protect(h.requireStore(http.HandlerFunc(h.handleUpsertVendor))))
+	mux.Handle("POST /training/v1/teams", protect(h.requireStore(http.HandlerFunc(h.handleUpsertTeam))))
+	mux.Handle("PUT /training/v1/teams/{id}", protect(h.requireStore(http.HandlerFunc(h.handleUpsertTeam))))
+	mux.Handle("POST /training/v1/skill-areas", protect(h.requireStore(http.HandlerFunc(h.handleUpsertSkillArea))))
+	mux.Handle("PUT /training/v1/skill-areas/{id}", protect(h.requireStore(http.HandlerFunc(h.handleUpsertSkillArea))))
+	mux.Handle("POST /training/v1/certifications", protect(h.requireStore(http.HandlerFunc(h.handleUpsertCertification))))
+	mux.Handle("PUT /training/v1/certifications/{id}", protect(h.requireStore(http.HandlerFunc(h.handleUpsertCertification))))
+	mux.Handle("POST /training/v1/courses", protect(h.requireStore(http.HandlerFunc(h.handleUpsertCourse))))
+	mux.Handle("PUT /training/v1/courses/{id}", protect(h.requireStore(http.HandlerFunc(h.handleUpsertCourse))))
+	mux.Handle("POST /training/v1/courses/{id}/archive", protect(h.requireStore(http.HandlerFunc(h.handleArchiveCourse))))
 
 	mux.Handle("GET /training/v1/directory/sync/runs", protect(h.requireStore(http.HandlerFunc(h.handleListDirectorySyncRuns))))
 	mux.Handle("POST /training/v1/directory/sync", protect(h.requireStore(http.HandlerFunc(h.handleRunDirectorySync))))
@@ -149,6 +149,11 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	h.registerRuleRoutes(mux, protect)
 	h.registerRequestRoutes(mux, protect)
 	h.registerQueueRoutes(mux, protect)
+
+	// Letture di dominio e gruppi locali (#152, slice 1 del task 6):
+	// registrazione delegata ai file dedicati.
+	h.registerDomainReadRoutes(mux, protect)
+	h.registerGroupRoutes(mux, protect)
 }
 
 func (h *handler) requireStore(next http.Handler) http.Handler {

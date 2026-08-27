@@ -197,3 +197,23 @@ type unapprovedEventExpenseLocal struct {
 	CourseTitle     string
 	EnrollmentCount int
 }
+
+// StaleEnrollmentRow e un'iscrizione ferma (coda 7, #152): pianificata
+// (delivery_status planned), su un evento non annullato, piu vecchia della
+// soglia e senza un'assegnazione a una sessione con data futura.
+// LastSessionDate e nil quando non esiste alcuna sessione trascorsa.
+type StaleEnrollmentRow struct {
+	EnrollmentID    string  `json:"enrollmentId"`
+	EmployeeID      string  `json:"employeeId"`
+	EmployeeName    string  `json:"employeeName"`
+	EventID         string  `json:"eventId"`
+	CourseTitle     string  `json:"courseTitle"`
+	AgeDays         int     `json:"ageDays"`
+	CreatedAt       string  `json:"createdAt"`
+	LastSessionDate *string `json:"lastSessionDate"`
+}
+
+type StaleEnrollmentsResponse struct {
+	OlderThanDays int                  `json:"olderThanDays"`
+	Enrollments   []StaleEnrollmentRow `json:"enrollments"`
+}
