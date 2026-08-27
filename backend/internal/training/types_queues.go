@@ -217,3 +217,23 @@ type StaleEnrollmentsResponse struct {
 	OlderThanDays int                  `json:"olderThanDays"`
 	Enrollments   []StaleEnrollmentRow `json:"enrollments"`
 }
+
+// ExpiringCertificationQueueRow e un conseguimento passed_exam di una
+// persona attiva la cui scadenza cade entro l'orizzonte (coda 8, #160,
+// slice 1 del task 7): wrapper su training.v_expiring_certifications con
+// l'identificativo del conseguimento.
+type ExpiringCertificationQueueRow struct {
+	AwardID           string `json:"awardId"`
+	EmployeeID        string `json:"employeeId"`
+	EmployeeName      string `json:"employeeName"`
+	EmployeeEmail     string `json:"employeeEmail"`
+	CertificationCode string `json:"certificationCode"`
+	CertificationName string `json:"certificationName"`
+	ExpiresOn         string `json:"expiresOn"`
+	DaysToExpiry      int    `json:"daysToExpiry"`
+}
+
+type ExpiringCertificationsResponse struct {
+	WithinDays     int                             `json:"withinDays"`
+	Certifications []ExpiringCertificationQueueRow `json:"certifications"`
+}

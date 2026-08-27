@@ -18,6 +18,7 @@ func (h *handler) registerDomainReadRoutes(mux *http.ServeMux, protect func(http
 	mux.Handle("GET /training/v1/vendors", protect(h.requireStore(http.HandlerFunc(h.handleListVendors))))
 	mux.Handle("GET /training/v1/skill-areas", protect(h.requireStore(http.HandlerFunc(h.handleListSkillAreas))))
 	mux.Handle("GET /training/v1/certifications", protect(h.requireStore(http.HandlerFunc(h.handleListCertificationCatalog))))
+	mux.Handle("GET /training/v1/certifications/{id}", protect(h.requireStore(http.HandlerFunc(h.handleGetCertification))))
 }
 
 // handleRead e il pendant in lettura di handleUpsert (handler_actions.go):
@@ -85,5 +86,11 @@ func (h *handler) handleListCertificationCatalog(w http.ResponseWriter, r *http.
 	h.handleRead(w, r, "training.list_certification_catalog", func() (any, error) {
 		certifications, err := h.store.ListCertificationCatalog(r.Context())
 		return CertificationCatalogResponse{Certifications: certifications}, err
+	})
+}
+
+func (h *handler) handleGetCertification(w http.ResponseWriter, r *http.Request) {
+	h.handleRead(w, r, "training.get_certification", func() (any, error) {
+		return h.store.GetCertificationDetail(r.Context(), r.PathValue("id"))
 	})
 }

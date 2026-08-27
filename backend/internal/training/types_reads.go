@@ -117,6 +117,7 @@ type PersonDetail struct {
 	Enrollments  []PersonEnrollmentRef   `json:"enrollments"`
 	Requests     []PersonRequestRef      `json:"requests"`
 	RuleCoverage []PersonRuleCoverageRef `json:"ruleCoverage"`
+	Awards       []PersonAwardRef        `json:"awards"`
 }
 
 type TeamLeadRef struct {
@@ -180,4 +181,63 @@ type CertificationCatalogRow struct {
 
 type CertificationCatalogResponse struct {
 	Certifications []CertificationCatalogRow `json:"certifications"`
+}
+
+// CertificationHolderRef e un conseguimento della certificazione (#160,
+// slice 1 del task 7): stesso appiattimento documento della LATERAL di
+// ListCertifications (store.go), ultimo allegato per il conseguimento.
+type CertificationHolderRef struct {
+	AwardID           string `json:"awardId"`
+	EmployeeID        string `json:"employeeId"`
+	EmployeeName      string `json:"employeeName"`
+	Outcome           string `json:"outcome"`
+	AwardedOn         string `json:"awardedOn"`
+	ExpiresOn         string `json:"expiresOn,omitempty"`
+	CurrentStatus     string `json:"currentStatus"`
+	ValidationSource  string `json:"validationSource"`
+	DocumentID        string `json:"documentId,omitempty"`
+	DocumentFilename  string `json:"documentFilename,omitempty"`
+	DocumentValidated bool   `json:"documentValidated"`
+}
+
+// CertificationCourseRef e un corso che rilascia la certificazione
+// (course.leads_to_cert_id).
+type CertificationCourseRef struct {
+	ID     string `json:"id"`
+	Title  string `json:"title"`
+	Active bool   `json:"active"`
+}
+
+// CertificationDetail estende l'anagrafica con i titolari, i corsi che la
+// rilasciano e le regole attive collegate tramite quei corsi.
+type CertificationDetail struct {
+	CertificationCatalogRow
+	Holders []CertificationHolderRef `json:"holders"`
+	Courses []CertificationCourseRef `json:"courses"`
+	Rules   []CourseRuleRef          `json:"rules"`
+}
+
+// PersonAwardDocumentRef e l'ultimo documento allegato al conseguimento;
+// nil quando il conseguimento non ha ancora un allegato.
+type PersonAwardDocumentRef struct {
+	ID          string `json:"id"`
+	Filename    string `json:"filename"`
+	IsValidated bool   `json:"isValidated"`
+}
+
+// PersonAwardRef e un conseguimento della persona nella scheda formativa
+// (#160, slice 1 del task 7): EnrollmentID e nil quando il conseguimento non
+// discende da un'iscrizione (es. importato o inserito a mano).
+type PersonAwardRef struct {
+	AwardID           string                  `json:"awardId"`
+	CertificationID   string                  `json:"certificationId"`
+	CertificationCode string                  `json:"certificationCode"`
+	CertificationName string                  `json:"certificationName"`
+	Outcome           string                  `json:"outcome"`
+	AwardedOn         string                  `json:"awardedOn"`
+	ExpiresOn         string                  `json:"expiresOn,omitempty"`
+	CurrentStatus     string                  `json:"currentStatus"`
+	ValidationSource  string                  `json:"validationSource"`
+	EnrollmentID      *string                 `json:"enrollmentId"`
+	Document          *PersonAwardDocumentRef `json:"document"`
 }

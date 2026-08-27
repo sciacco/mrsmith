@@ -974,3 +974,79 @@ LIMIT 500`
 	}
 	return response, rows.Err()
 }
+
+// ── Coda 8: certificazioni in scadenza ──
+
+// defaultExpiringCertificationsWithinDays e l'orizzonte di default della
+// coda 8 (#160, slice 1 del task 7): diverso dal default di D4
+// (defaultHorizonDays, coda 4), il tetto massimo resta lo stesso (maxHorizonDays).
+const defaultExpiringCertificationsWithinDays = 90
+
+// parseExpiringCertificationsWithinDays normalizza il parametro query
+// withinDays della coda 8: assente = default 90; ammessi i valori da 1 al
+// massimo 365.
+func parseExpiringCertificationsWithinDays(raw string) (int, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return defaultExpiringCertificationsWithinDays, nil
+	}
+	days, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, validationError("invalid_within_days", "orizzonte in giorni non valido")
+	}
+	if days < 1 || days > maxHorizonDays {
+		return 0, validationError("invalid_within_days", "orizzonte in giorni non valido: ammessi i valori da 1 a 365")
+	}
+	return days, nil
+}
+
+// QueueExpiringCertifications elenca i conseguimenti passed_exam di persone
+// attive con scadenza entro l'orizzonte (coda 8, #160): wrapper sulla vista
+// viva v_expiring_certifications, che gia' applica outcome, scadenza e
+// stato persona. award_id non e' nella vista, si recupera unendo
+// certification_award sulla stessa combinazione (persona, certificazione,
+// scadenza) che ha prodotto la riga.
+func (s *SQLStore) QueueExpiringCertifications(ctx context.Context, withinDaysRaw string) (ExpiringCertificationsResponse, error) {
+	days, err := parseExpiringCertificationsWithinDays(withinDaysRaw)
+	if err != nil {
+		return ExpiringCertificationsResponse{}, err
+	}
+	const q = `
+SELECT DISTINCT
+  ca.id::text,
+  v.employee_id::text,
+  concat(v.last_name, ' ', v.first_name),
+  v.email::text,
+  v.cert_code,
+  v.cert_name,
+  v.expires_on::text,
+  v.days_to_expiry::int
+FROM training.v_expiring_certifications v
+JOIN training.certification c ON c.code = v.cert_code
+JOIN training.certification_award ca
+  ON ca.employee_id = v.employee_id
+ AND ca.certification_id = c.id
+ AND ca.expires_on = v.expires_on
+ AND ca.outcome = 'passed_exam'
+WHERE v.days_to_expiry <= $1
+ORDER BY 8, 3
+LIMIT 500`
+	rows, err := s.db.QueryContext(ctx, q, days)
+	if err != nil {
+		return ExpiringCertificationsResponse{}, fmt.Errorf("list expiring certifications queue: %w", err)
+	}
+	defer rows.Close()
+
+	response := ExpiringCertificationsResponse{WithinDays: days, Certifications: make([]ExpiringCertificationQueueRow, 0)}
+	for rows.Next() {
+		var row ExpiringCertificationQueueRow
+		if err := rows.Scan(
+			&row.AwardID, &row.EmployeeID, &row.EmployeeName, &row.EmployeeEmail,
+			&row.CertificationCode, &row.CertificationName, &row.ExpiresOn, &row.DaysToExpiry,
+		); err != nil {
+			return ExpiringCertificationsResponse{}, fmt.Errorf("scan expiring certifications queue: %w", err)
+		}
+		response.Certifications = append(response.Certifications, row)
+	}
+	return response, rows.Err()
+}

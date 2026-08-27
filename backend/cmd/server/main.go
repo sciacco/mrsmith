@@ -797,9 +797,7 @@ func main() {
 	if cfg.TrainingJobsEnabled && anisettaDB != nil {
 		worker := training.NewJobRunner(
 			training.NewSQLStore(anisettaDB),
-			notificationNotifier,
 			logger,
-			cfg.TrainingAppURL,
 		).WithDirectorySync(directoryProvider, cfg.TrainingDirectorySyncEnabled).
 			WithFactorialSync(factorialCli, cfg.FactorialTrainingAuthorEmployeeID, cfg.TrainingFactorialSyncEnabled)
 		workerWG.Add(1)

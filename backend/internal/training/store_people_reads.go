@@ -74,10 +74,43 @@ LIMIT 1000`
 	return result, rows.Err()
 }
 
+// personAwardsJSON aggrega i conseguimenti della persona dalla vista viva
+// v_employee_certifications (#160, slice 1 del task 7): stesso appiattimento
+// documento della LATERAL di ListCertifications (store.go), ma qui il
+// documento resta un oggetto nullable (nessun conseguimento => null) e non
+// campi appiattiti, cosi come enrollmentId, assente quando il conseguimento
+// non discende da un'iscrizione. certification_id non e' nella vista, si
+// recupera unendo certification_award sull'award_id.
+const personAwardsJSON = `
+    COALESCE((
+      SELECT json_agg(json_build_object(
+        'awardId', vc.award_id::text, 'certificationId', ca.certification_id::text,
+        'certificationCode', vc.cert_code, 'certificationName', vc.cert_name,
+        'outcome', vc.outcome::text, 'awardedOn', vc.awarded_on::text,
+        'expiresOn', COALESCE(vc.expires_on::text, ''), 'currentStatus', vc.current_status,
+        'validationSource', vc.validation_source::text,
+        'enrollmentId', ca.enrollment_id::text,
+        'document', CASE WHEN doc.id IS NULL THEN NULL ELSE
+          json_build_object('id', doc.id, 'filename', doc.filename, 'isValidated', doc.is_validated)
+        END
+      ) ORDER BY vc.awarded_on DESC)
+      FROM training.v_employee_certifications vc
+      JOIN training.certification_award ca ON ca.id = vc.award_id
+      LEFT JOIN LATERAL (
+        SELECT d.id::text, d.filename, d.is_validated
+        FROM training.document d
+        WHERE d.certification_award_id = vc.award_id
+        ORDER BY d.uploaded_at DESC
+        LIMIT 1
+      ) doc ON true
+      WHERE vc.employee_id = e.id
+    ), '[]')::text`
+
 // GetPersonDetail e la scheda formativa: dati persona, appartenenze,
 // gruppi, iscrizioni cross-evento (CancelledAt e quello dell'evento,
-// l'iscrizione non ne ha uno proprio), richieste (Outcome nil se aperta) e
-// copertura sulle regole attive la cui platea la include.
+// l'iscrizione non ne ha uno proprio), richieste (Outcome nil se aperta),
+// conseguimenti (data decrescente) e copertura sulle regole attive la cui
+// platea la include.
 func (s *SQLStore) GetPersonDetail(ctx context.Context, id string) (PersonDetail, error) {
 	id = strings.TrimSpace(id)
 	if id == "" {
@@ -107,14 +140,15 @@ SELECT
     FROM training.training_request r
     LEFT JOIN training.course rc ON rc.id = r.course_id
     WHERE r.employee_id = e.id
-  ), '[]')::text
+  ), '[]')::text,` +
+		personAwardsJSON + `
 FROM training.employee e
 WHERE e.id = $1::uuid`
 	var detail PersonDetail
-	var teams, groups, enrollments, requests string
+	var teams, groups, enrollments, requests, awards string
 	err := s.db.QueryRowContext(ctx, q, id).Scan(
 		&detail.ID, &detail.FirstName, &detail.LastName, &detail.Email, &detail.Status, &detail.DirectoryExempt,
-		&teams, &groups, &enrollments, &requests,
+		&teams, &groups, &enrollments, &requests, &awards,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return PersonDetail{}, notFoundError("employee_not_found", "persona non trovata")
@@ -132,6 +166,9 @@ WHERE e.id = $1::uuid`
 		return PersonDetail{}, err
 	}
 	if detail.Requests, err = decodeJSONSlice[PersonRequestRef](requests); err != nil {
+		return PersonDetail{}, err
+	}
+	if detail.Awards, err = decodeJSONSlice[PersonAwardRef](awards); err != nil {
 		return PersonDetail{}, err
 	}
 	if detail.RuleCoverage, err = s.personRuleCoverage(ctx, id); err != nil {

@@ -3,7 +3,9 @@ package training
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"strings"
 )
 
 // Anagrafiche (#152, slice 1 del task 6): team, fornitori, aree di
@@ -106,13 +108,7 @@ LIMIT 500`
 	return result, rows.Err()
 }
 
-// ListCertificationCatalog e l'anagrafica certificazioni (distinta dalla
-// vista per persona di store.go ListCertifications): typicalValidityMonths
-// e derivato dall'interval typical_validity, sempre scritto in mesi interi
-// dall'upsert (monthsInterval).
-func (s *SQLStore) ListCertificationCatalog(ctx context.Context) ([]CertificationCatalogRow, error) {
-	const q = `
-SELECT
+const certificationCatalogColumns = `
   cert.id::text,
   cert.code,
   cert.name,
@@ -122,12 +118,19 @@ SELECT
   COALESCE(v.name, ''),
   COALESCE(cert.skill_area_id::text, ''),
   COALESCE(sa.name, ''),
-  (EXTRACT(YEAR FROM cert.typical_validity) * 12 + EXTRACT(MONTH FROM cert.typical_validity))::int
+  (EXTRACT(YEAR FROM cert.typical_validity) * 12 + EXTRACT(MONTH FROM cert.typical_validity))::int`
+
+const certificationCatalogFrom = `
 FROM training.certification cert
 LEFT JOIN training.vendor v ON v.id = cert.issuer_vendor_id
-LEFT JOIN training.skill_area sa ON sa.id = cert.skill_area_id
-ORDER BY cert.name
-LIMIT 500`
+LEFT JOIN training.skill_area sa ON sa.id = cert.skill_area_id`
+
+// ListCertificationCatalog e l'anagrafica certificazioni (distinta dalla
+// vista per persona di store.go ListCertifications): typicalValidityMonths
+// e derivato dall'interval typical_validity, sempre scritto in mesi interi
+// dall'upsert (monthsInterval).
+func (s *SQLStore) ListCertificationCatalog(ctx context.Context) ([]CertificationCatalogRow, error) {
+	q := "SELECT" + certificationCatalogColumns + certificationCatalogFrom + "\nORDER BY cert.name\nLIMIT 500"
 	rows, err := s.db.QueryContext(ctx, q)
 	if err != nil {
 		return nil, fmt.Errorf("list training certification catalog: %w", err)
@@ -150,4 +153,80 @@ LIMIT 500`
 		result = append(result, row)
 	}
 	return result, rows.Err()
+}
+
+// GetCertificationDetail aggrega titolari, corsi che rilasciano la
+// certificazione e regole attive collegate tramite quei corsi in JSON lato
+// query (#160, slice 1 del task 7): stesso pattern di GetCourseDetail
+// (store_course_reads.go). I titolari si leggono dalla vista viva
+// v_employee_certifications con lo stesso appiattimento documento della
+// LATERAL di ListCertifications (store.go); certification_id non e' nella
+// vista, si recupera unendo certification_award sull'award_id.
+func (s *SQLStore) GetCertificationDetail(ctx context.Context, id string) (CertificationDetail, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return CertificationDetail{}, validationError("missing_id", "id certificazione obbligatorio")
+	}
+	q := "SELECT" + certificationCatalogColumns + `,
+  COALESCE((
+    SELECT json_agg(json_build_object(
+      'awardId', vc.award_id::text, 'employeeId', vc.employee_id::text,
+      'employeeName', concat(vc.last_name, ' ', vc.first_name),
+      'outcome', vc.outcome::text, 'awardedOn', vc.awarded_on::text,
+      'expiresOn', COALESCE(vc.expires_on::text, ''), 'currentStatus', vc.current_status,
+      'validationSource', vc.validation_source::text,
+      'documentId', COALESCE(doc.id, ''), 'documentFilename', COALESCE(doc.filename, ''),
+      'documentValidated', COALESCE(doc.is_validated, false)
+    ) ORDER BY vc.awarded_on DESC, vc.last_name, vc.first_name)
+    FROM training.v_employee_certifications vc
+    JOIN training.certification_award ca ON ca.id = vc.award_id
+    LEFT JOIN LATERAL (
+      SELECT d.id::text, d.filename, d.is_validated
+      FROM training.document d
+      WHERE d.certification_award_id = vc.award_id
+      ORDER BY d.uploaded_at DESC
+      LIMIT 1
+    ) doc ON true
+    WHERE ca.certification_id = cert.id
+  ), '[]')::text,
+  COALESCE((
+    SELECT json_agg(json_build_object('id', c.id::text, 'title', c.title, 'active', c.is_active) ORDER BY c.is_active DESC, c.title)
+    FROM training.course c
+    WHERE c.leads_to_cert_id = cert.id
+  ), '[]')::text,
+  COALESCE((
+    SELECT json_agg(json_build_object('id', r.id::text, 'name', r.name, 'isActive', r.is_active) ORDER BY r.name)
+    FROM training.training_rule r
+    WHERE r.is_active AND r.course_id IN (
+      SELECT c.id FROM training.course c WHERE c.leads_to_cert_id = cert.id
+    )
+  ), '[]')::text` + certificationCatalogFrom + `
+WHERE cert.id = $1::uuid`
+	var (
+		detail                           CertificationDetail
+		months                           sql.NullInt64
+		holdersRaw, coursesRaw, rulesRaw string
+	)
+	err := s.db.QueryRowContext(ctx, q, id).Scan(
+		&detail.ID, &detail.Code, &detail.Name, &detail.Description, &detail.Active,
+		&detail.IssuerVendorID, &detail.IssuerVendorName, &detail.SkillAreaID, &detail.SkillAreaName, &months,
+		&holdersRaw, &coursesRaw, &rulesRaw,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return CertificationDetail{}, notFoundError("certification_not_found", "certificazione non trovata")
+	}
+	if err != nil {
+		return CertificationDetail{}, fmt.Errorf("load training certification detail: %w", err)
+	}
+	detail.TypicalValidityMonths = nullInt(months)
+	if detail.Holders, err = decodeJSONSlice[CertificationHolderRef](holdersRaw); err != nil {
+		return CertificationDetail{}, err
+	}
+	if detail.Courses, err = decodeJSONSlice[CertificationCourseRef](coursesRaw); err != nil {
+		return CertificationDetail{}, err
+	}
+	if detail.Rules, err = decodeJSONSlice[CourseRuleRef](rulesRaw); err != nil {
+		return CertificationDetail{}, err
+	}
+	return detail, nil
 }

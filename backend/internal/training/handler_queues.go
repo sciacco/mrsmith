@@ -18,6 +18,7 @@ func (h *handler) registerQueueRoutes(mux *http.ServeMux, protect func(http.Hand
 	mux.Handle("GET /training/v1/queues/rounds-without-event", protect(h.requireStore(http.HandlerFunc(h.handleQueueRoundsWithoutEvent))))
 	mux.Handle("GET /training/v1/queues/unapproved-event-expenses", protect(h.requireStore(http.HandlerFunc(h.handleQueueUnapprovedEventExpenses))))
 	mux.Handle("GET /training/v1/queues/stale-enrollments", protect(h.requireStore(http.HandlerFunc(h.handleQueueStaleEnrollments))))
+	mux.Handle("GET /training/v1/queues/expiring-certifications", protect(h.requireStore(http.HandlerFunc(h.handleQueueExpiringCertifications))))
 }
 
 func (h *handler) handleQueueRequestsWithoutTLOpinion(w http.ResponseWriter, r *http.Request) {
@@ -142,6 +143,18 @@ func (h *handler) handleQueueStaleEnrollments(w http.ResponseWriter, r *http.Req
 	response, err := h.store.QueueStaleEnrollments(r.Context(), r.URL.Query().Get("olderThanDays"))
 	if err != nil {
 		h.writeActionError(w, r, err, "training.queue_stale_enrollments")
+		return
+	}
+	httputil.JSON(w, http.StatusOK, response)
+}
+
+func (h *handler) handleQueueExpiringCertifications(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.principalOrUnauthorized(w, r); !ok {
+		return
+	}
+	response, err := h.store.QueueExpiringCertifications(r.Context(), r.URL.Query().Get("withinDays"))
+	if err != nil {
+		h.writeActionError(w, r, err, "training.queue_expiring_certifications")
 		return
 	}
 	httputil.JSON(w, http.StatusOK, response)

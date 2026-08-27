@@ -110,16 +110,17 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	mux.Handle("DELETE /training/v1/expenses/{id}", protect(h.requireStore(http.HandlerFunc(h.handleDeleteEventExpense))))
 
 	// Certificazioni, documenti e anagrafiche: creazione/modifica ai path
-	// piatti (#152, riallineamento dai path /people/* superstiti del POC).
+	// piatti (#152, riallineamento dai path /people/* superstiti del POC;
+	// gli ultimi tre superstiti riallineati con #160).
 	mux.Handle("POST /training/v1/awards", protect(h.requireStore(http.HandlerFunc(h.handleCreateAward))))
 	mux.Handle("POST /training/v1/enrollments/{id}/documents", protect(h.requireStore(http.HandlerFunc(h.handleUploadEnrollmentDocument))))
 	mux.Handle("POST /training/v1/awards/{id}/documents", protect(h.requireStore(http.HandlerFunc(h.handleUploadAwardDocument))))
 	mux.Handle("GET /training/v1/documents/{id}/download", protect(h.requireStore(http.HandlerFunc(h.handleDownloadDocument))))
 	mux.Handle("POST /training/v1/people", protect(h.requireStore(http.HandlerFunc(h.handleCreatePerson))))
 	mux.Handle("PATCH /training/v1/people/{id}", protect(h.requireStore(http.HandlerFunc(h.handleUpdatePerson))))
-	mux.Handle("POST /training/v1/people/documents/{id}/validate", protect(h.requireStore(http.HandlerFunc(h.handleValidateDocument))))
-	mux.Handle("POST /training/v1/people/jobs/run", protect(h.requireStore(http.HandlerFunc(h.handleRunJobs))))
-	mux.Handle("PUT /training/v1/people/awards/{id}", protect(h.requireStore(http.HandlerFunc(h.handleUpdateAward))))
+	mux.Handle("POST /training/v1/documents/{id}/validate", protect(h.requireStore(http.HandlerFunc(h.handleValidateDocument))))
+	mux.Handle("POST /training/v1/jobs/run", protect(h.requireStore(http.HandlerFunc(h.handleRunJobs))))
+	mux.Handle("PUT /training/v1/awards/{id}", protect(h.requireStore(http.HandlerFunc(h.handleUpdateAward))))
 	mux.Handle("POST /training/v1/vendors", protect(h.requireStore(http.HandlerFunc(h.handleUpsertVendor))))
 	mux.Handle("PUT /training/v1/vendors/{id}", protect(h.requireStore(http.HandlerFunc(h.handleUpsertVendor))))
 	mux.Handle("POST /training/v1/teams", protect(h.requireStore(http.HandlerFunc(h.handleUpsertTeam))))

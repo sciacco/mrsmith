@@ -178,6 +178,5 @@ type DocumentMetadata struct {
 }
 
 type JobRunResponse struct {
-	OK                         bool `json:"ok"`
-	CertificationNotifications int  `json:"certificationNotifications"`
+	OK bool `json:"ok"`
 }

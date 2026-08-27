@@ -336,7 +336,7 @@ func (h *handler) handleValidateDocument(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *handler) handleRunJobs(w http.ResponseWriter, r *http.Request) {
-	runner := NewJobRunner(h.store, h.notifier, h.logger, h.trainingAppURL)
+	runner := NewJobRunner(h.store, h.logger)
 	response, err := runner.RunOnce(r.Context())
 	if err != nil {
 		h.writeActionError(w, r, err, "training.jobs")
