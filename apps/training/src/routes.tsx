@@ -5,6 +5,9 @@ import { EventsPage } from './pages/EventsPage/EventsPage';
 import { EventDetailPage } from './pages/EventDetailPage/EventDetailPage';
 import { RequestsPage } from './pages/RequestsPage/RequestsPage';
 import { RulesPage } from './pages/RulesPage/RulesPage';
+import { PeoplePage } from './pages/PeoplePage/PeoplePage';
+import { PersonPage } from './pages/PersonPage/PersonPage';
+import { CatalogPage } from './pages/CatalogPage/CatalogPage';
 
 export const routes: RouteObject[] = [
   { index: true, element: <WorkQueuePage /> },
@@ -12,6 +15,9 @@ export const routes: RouteObject[] = [
   { path: 'regole', element: <RulesPage /> },
   { path: 'eventi', element: <EventsPage /> },
   { path: 'eventi/:id', element: <EventDetailPage /> },
+  { path: 'persone', element: <PeoplePage /> },
+  { path: 'persone/:id', element: <PersonPage /> },
+  { path: 'catalogo', element: <CatalogPage /> },
   { path: 'factorial', element: <FactorialPage /> },
   { path: '*', element: <Navigate to="/" replace /> },
 ];

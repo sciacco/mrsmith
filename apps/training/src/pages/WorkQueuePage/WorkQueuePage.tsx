@@ -407,7 +407,7 @@ export function WorkQueuePage() {
                   <QueueTable<ExpiringPersonRow>
                     rows={expiring.data.people}
                     rowKey={(r) => `${r.ruleId}-${r.employeeId}`}
-                    linkTo={(r) => `/regole?id=${r.ruleId}`}
+                    linkTo={(r) => `/persone/${r.employeeId}`}
                     columns={[
                       { header: 'Persona', render: (r) => r.employeeName },
                       { header: 'Regola', render: (r) => r.ruleName },

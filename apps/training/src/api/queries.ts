@@ -9,6 +9,9 @@ import type {
   BulkEnrollResponse,
   BulkParticipationInput,
   BulkParticipationResponse,
+  CertificationCatalogResponse,
+  CertificationInput,
+  CourseDetail,
   CourseInput,
   CourseListResponse,
   EnrollmentFactsInput,
@@ -21,11 +24,16 @@ import type {
   EventListResponse,
   ExpiringCoverageResponse,
   FeedEventResponse,
+  GroupInput,
   GroupListResponse,
+  GroupMembersInput,
   LookupResponse,
   MeResponse,
   ParticipationInput,
+  PersonCreateInput,
+  PersonDetail,
   PersonListResponse,
+  PersonUpdateInput,
   ReasonInput,
   RequestDecisionInput,
   RequestDetail,
@@ -40,12 +48,16 @@ import type {
   RuleListResponse,
   SeatRuleCoverageResponse,
   SessionInput,
+  SkillAreaInput,
   SkillAreaListResponse,
   StaleEnrollmentsResponse,
+  TeamInput,
   TeamListResponse,
   TLOpinionInput,
   UnapprovedEventExpensesResponse,
   UnfedPopulationResponse,
+  VendorInput,
+  VendorListResponse,
 } from './types';
 
 const TRAINING_PREFIX = '/training/v1';
@@ -109,6 +121,41 @@ export function useTrainingGroups() {
   return useQuery({
     queryKey: ['training', 'groups'],
     queryFn: async () => (await api.get<GroupListResponse>(`${TRAINING_PREFIX}/groups`)).groups,
+  });
+}
+
+export function useTrainingVendors() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['training', 'vendors'],
+    queryFn: async () => (await api.get<VendorListResponse>(`${TRAINING_PREFIX}/vendors`)).vendors,
+  });
+}
+
+export function useTrainingCertifications() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['training', 'certifications'],
+    queryFn: async () =>
+      (await api.get<CertificationCatalogResponse>(`${TRAINING_PREFIX}/certifications`)).certifications,
+  });
+}
+
+export function useCourseDetail(id: string | undefined) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['training', 'courses', id],
+    queryFn: () => api.get<CourseDetail>(`${TRAINING_PREFIX}/courses/${id}`),
+    enabled: id !== undefined && id !== '',
+  });
+}
+
+export function usePersonDetail(id: string | undefined) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['training', 'people', 'detail', id],
+    queryFn: () => api.get<PersonDetail>(`${TRAINING_PREFIX}/people/${id}`),
+    enabled: id !== undefined && id !== '',
   });
 }
 
@@ -452,9 +499,78 @@ export function useCreateRuleEvent() {
 }
 
 // Creazione contestuale del corso fuori catalogo dal pannello di
-// accoglimento richiesta (#157): sempre creazione, mai modifica.
+// accoglimento richiesta (#157), riusata dal catalogo (#158) per la
+// creazione integrale.
 export function useCreateCourse() {
   return useTrainingMutation<CourseInput, ActionResponse>((api, input) =>
     api.post(`${TRAINING_PREFIX}/courses`, input),
+  );
+}
+
+// ── Persone, gruppi locali e anagrafiche del catalogo (#158) ──
+
+export function useCreatePerson() {
+  return useTrainingMutation<PersonCreateInput, ActionResponse>((api, input) =>
+    api.post(`${TRAINING_PREFIX}/people`, input),
+  );
+}
+
+export function useUpdatePerson() {
+  return useTrainingMutation<{ id: string; input: PersonUpdateInput }, ActionResponse>((api, { id, input }) =>
+    api.patch(`${TRAINING_PREFIX}/people/${id}`, input),
+  );
+}
+
+export function useUpsertGroup() {
+  return useTrainingMutation<{ id?: string; input: GroupInput }, ActionResponse>((api, { id, input }) =>
+    id ? api.put(`${TRAINING_PREFIX}/groups/${id}`, input) : api.post(`${TRAINING_PREFIX}/groups`, input),
+  );
+}
+
+export function useReplaceGroupMembers() {
+  return useTrainingMutation<{ id: string; input: GroupMembersInput }, ActionResponse>((api, { id, input }) =>
+    api.put(`${TRAINING_PREFIX}/groups/${id}/members`, input),
+  );
+}
+
+export function useDeleteGroup() {
+  return useTrainingMutation<string, ActionResponse>((api, id) => api.delete(`${TRAINING_PREFIX}/groups/${id}`));
+}
+
+export function useUpsertVendor() {
+  return useTrainingMutation<{ id?: string; input: VendorInput }, ActionResponse>((api, { id, input }) =>
+    id ? api.put(`${TRAINING_PREFIX}/vendors/${id}`, input) : api.post(`${TRAINING_PREFIX}/vendors`, input),
+  );
+}
+
+export function useUpsertTeam() {
+  return useTrainingMutation<{ id: string; input: TeamInput }, ActionResponse>((api, { id, input }) =>
+    api.put(`${TRAINING_PREFIX}/teams/${id}`, input),
+  );
+}
+
+export function useUpsertSkillArea() {
+  return useTrainingMutation<{ id?: string; input: SkillAreaInput }, ActionResponse>((api, { id, input }) =>
+    id ? api.put(`${TRAINING_PREFIX}/skill-areas/${id}`, input) : api.post(`${TRAINING_PREFIX}/skill-areas`, input),
+  );
+}
+
+export function useUpsertCertification() {
+  return useTrainingMutation<{ id?: string; input: CertificationInput }, ActionResponse>((api, { id, input }) =>
+    id
+      ? api.put(`${TRAINING_PREFIX}/certifications/${id}`, input)
+      : api.post(`${TRAINING_PREFIX}/certifications`, input),
+  );
+}
+
+export function useUpdateCourse() {
+  return useTrainingMutation<{ id: string; input: CourseInput }, ActionResponse>((api, { id, input }) =>
+    api.put(`${TRAINING_PREFIX}/courses/${id}`, input),
+  );
+}
+
+export function useArchiveCourse() {
+  return useTrainingMutation<string, ActionResponse>((api, id) =>
+    api.post(`${TRAINING_PREFIX}/courses/${id}/archive`),
   );
 }

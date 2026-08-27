@@ -1,0 +1,24 @@
+/* Sottosezioni delle anagrafiche di catalogo (#158): intestazione intermedia
+   (docs/UI-UX.md §5). Stesso vocabolario di components/people/people.module.css. */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+}

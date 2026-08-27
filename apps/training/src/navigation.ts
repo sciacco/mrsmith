@@ -17,5 +17,7 @@ export const trainingNavGroups: TrainingNavGroup[] = [
   { label: 'Richieste', items: [{ label: 'Richieste', path: '/richieste' }] },
   { label: 'Regole', items: [{ label: 'Regole', path: '/regole' }] },
   { label: 'Eventi', items: [{ label: 'Eventi', path: '/eventi' }] },
+  { label: 'Persone', items: [{ label: 'Persone', path: '/persone' }] },
+  { label: 'Catalogo', items: [{ label: 'Catalogo', path: '/catalogo' }] },
   { label: 'Factorial', items: [{ label: 'Factorial', path: '/factorial' }] },
 ];

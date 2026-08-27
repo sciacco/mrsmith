@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { formatCurrency, formatInstant, formatLocalDate } from '@mrsmith/format';
 import { Button, Drawer, Modal, Skeleton, StatusBadge, useToast } from '@mrsmith/ui';
 import {
@@ -7,6 +7,12 @@ import {
   useRunDirectorySync,
   type DirectorySyncRun,
 } from '../api/directorySync';
+import {
+  useFactorialSyncRun,
+  useFactorialSyncRuns,
+  type FactorialSyncFindingRecord,
+  type FactorialSyncRunRecord,
+} from '../api/factorialSync';
 import {
   useFactorialEmployees,
   useFactorialSessionParticipants,
@@ -21,6 +27,14 @@ import {
   type FactorialTeam,
   type FactorialTraining,
 } from '../api/factorialDiag';
+import {
+  FACTORIAL_SYNC_COUNTER_LABELS,
+  FACTORIAL_SYNC_ENTITY_LABELS,
+  FACTORIAL_SYNC_KIND_LABELS,
+  FACTORIAL_SYNC_OUTCOME_LABELS,
+  FACTORIAL_SYNC_PHASE_LABELS,
+  FACTORIAL_SYNC_SEVERITY_LABELS,
+} from '../lib/labels';
 import styles from './FactorialPage.module.css';
 
 type View = 'persone' | 'team' | 'formazione' | 'sincronizzazione';
@@ -824,6 +838,8 @@ function SyncView() {
 
       <RunHistory runs={history} isLoading={runs.isLoading} isError={runs.isError} />
 
+      <TrainingSyncSection />
+
       <Modal
         open={confirmOpen}
         onClose={() => setConfirmOpen(false)}
@@ -953,6 +969,197 @@ function RunHistory({
         </div>
       )}
     </QueryStates>
+  );
+}
+
+// ── Sync formativo (#158, §Factorial 6): sezione accanto al sync anagrafico,
+// sola lettura — nessun bottone di avvio, resta job/CLI (docs/knowledge/
+// training.md). Storico run da GET /factorial/sync/runs, dettaglio con i
+// finding raggruppati per fase e severità.
+
+function formatDurationMs(value: number): string {
+  if (value < 1000) return `${value} ms`;
+  return `${(value / 1000).toFixed(1)} s`;
+}
+
+function outcomeVariant(outcome: string): 'success' | 'danger' | 'neutral' {
+  if (outcome === 'ok') return 'success';
+  if (outcome === 'failed') return 'danger';
+  return 'neutral';
+}
+
+function TrainingSyncSection() {
+  const runs = useFactorialSyncRuns(true);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const history = runs.data ?? [];
+
+  return (
+    <section className={styles.drawerSection}>
+      <h2 className={styles.sectionTitle}>Sync formativo</h2>
+      <p className={styles.drawerMeta}>
+        Storico delle esecuzioni del sync formativo con Factorial: importazione da Factorial, esportazione verso
+        Factorial e pulizia dei cessati. L'avvio resta un'operazione pianificata, non disponibile da qui.
+      </p>
+      {runs.isLoading ? (
+        <Skeleton rows={8} />
+      ) : runs.isError ? (
+        <p className={styles.errorNotice}>Lettura delle esecuzioni non riuscita. Riprovare più tardi.</p>
+      ) : history.length === 0 ? (
+        <p className={styles.empty}>Nessuna esecuzione del sync formativo registrata.</p>
+      ) : (
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Avvio</th>
+                <th>Durata</th>
+                <th>Tipo</th>
+                <th>Esito</th>
+                <th className={styles.numCell}>Segnalazioni</th>
+              </tr>
+            </thead>
+            <tbody>
+              {history.map((run: FactorialSyncRunRecord) => (
+                <tr key={run.id}>
+                  <td>
+                    <button type="button" className={styles.rowButton} onClick={() => setSelectedRunId(run.id)}>
+                      {formatRunInstant(run.startedAt)}
+                    </button>
+                  </td>
+                  <td>{formatDurationMs(run.durationMs)}</td>
+                  <td>{run.dryRun ? 'verifica' : 'applicata'}</td>
+                  <td>
+                    <StatusBadge
+                      value={run.outcome}
+                      label={FACTORIAL_SYNC_OUTCOME_LABELS[run.outcome] ?? run.outcome}
+                      variant={outcomeVariant(run.outcome)}
+                    />
+                  </td>
+                  <td className={styles.numCell}>{run.findingCount}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {selectedRunId && <TrainingSyncRunDrawer id={selectedRunId} onClose={() => setSelectedRunId(null)} />}
+    </section>
+  );
+}
+
+// groupFindings raggruppa per fase poi severità, preservando l'ordine del
+// backend (ORDER BY phase, severity, kind).
+function groupFindings(findings: FactorialSyncFindingRecord[]): Map<string, Map<string, FactorialSyncFindingRecord[]>> {
+  const byPhase = new Map<string, Map<string, FactorialSyncFindingRecord[]>>();
+  for (const finding of findings) {
+    if (!byPhase.has(finding.phase)) byPhase.set(finding.phase, new Map());
+    const bySeverity = byPhase.get(finding.phase)!;
+    if (!bySeverity.has(finding.severity)) bySeverity.set(finding.severity, []);
+    bySeverity.get(finding.severity)!.push(finding);
+  }
+  return byPhase;
+}
+
+function TrainingSyncRunDrawer({ id, onClose }: { id: string; onClose: () => void }) {
+  const detail = useFactorialSyncRun(id);
+  const run = detail.data;
+  const grouped = run ? groupFindings(run.findings) : new Map<string, Map<string, FactorialSyncFindingRecord[]>>();
+
+  return (
+    <Drawer open onClose={onClose} title="Esecuzione del sync formativo" subtitle={run ? formatRunInstant(run.startedAt) : undefined} size="lg">
+      <div className={styles.drawerBody}>
+        {detail.isLoading && <Skeleton rows={6} />}
+        {detail.isError && <p className={styles.errorNotice}>Lettura dell'esecuzione non riuscita.</p>}
+        {run && (
+          <>
+            <div className={styles.facts}>
+              <span className={styles.fact}>
+                tipo
+                <span className={styles.factValue}>{run.dryRun ? 'verifica' : 'applicata'}</span>
+              </span>
+              <span className={styles.fact}>
+                esito
+                <span className={run.outcome === 'failed' ? styles.factValueWarning : styles.factValue}>
+                  {FACTORIAL_SYNC_OUTCOME_LABELS[run.outcome] ?? run.outcome}
+                </span>
+              </span>
+              <span className={styles.fact}>
+                durata
+                <span className={styles.factValue}>{formatDurationMs(run.durationMs)}</span>
+              </span>
+              <span className={styles.fact}>
+                richiesta da
+                <span className={styles.factValue}>{run.actor}</span>
+              </span>
+              {run.sessionsWithoutClass > 0 && (
+                <span className={styles.fact}>
+                  sessioni senza classe
+                  <span className={styles.factValueWarning}>{run.sessionsWithoutClass}</span>
+                </span>
+              )}
+              {Object.entries(run.counters)
+                .filter(([, v]) => v > 0)
+                .map(([key, value]) => (
+                  <span key={key} className={styles.fact}>
+                    {FACTORIAL_SYNC_COUNTER_LABELS[key] ?? key}
+                    <span className={styles.factValue}>{value}</span>
+                  </span>
+                ))}
+            </div>
+            {run.error && <p className={styles.errorNotice}>{run.error}</p>}
+
+            {run.findings.length === 0 ? (
+              <p className={styles.empty}>Nessuna segnalazione: esecuzione senza conflitti né avvisi.</p>
+            ) : (
+              [...grouped.entries()].map(([phase, bySeverity]) => (
+                <section key={phase} className={styles.drawerSection}>
+                  <h2 className={styles.sectionTitle}>{FACTORIAL_SYNC_PHASE_LABELS[phase] ?? phase}</h2>
+                  {[...bySeverity.entries()].map(([severity, rows]) => (
+                    <div key={severity}>
+                      <h3 className={styles.sectionSubtitle}>
+                        {FACTORIAL_SYNC_SEVERITY_LABELS[severity] ?? severity} ({rows.length})
+                      </h3>
+                      <div className={styles.tableWrap}>
+                        <table className={styles.table}>
+                          <thead>
+                            <tr>
+                              <th>Tipo</th>
+                              <th>Persona</th>
+                              <th>Oggetto</th>
+                              <th>Riferimento</th>
+                              <th>Evento</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {rows.map((f) => (
+                              <tr key={f.id}>
+                                <td>{FACTORIAL_SYNC_KIND_LABELS[f.kind] ?? f.kind}</td>
+                                <td>{f.employeeName || f.employeeId || '—'}</td>
+                                <td className={styles.mutedCell}>
+                                  {f.localEntity ? FACTORIAL_SYNC_ENTITY_LABELS[f.localEntity] ?? f.localEntity : '—'}
+                                </td>
+                                <td className={styles.idCell}>{f.ref}</td>
+                                <td>
+                                  {f.localEntity === 'training_event' && f.localId ? (
+                                    <Link to={`/eventi/${f.localId}`}>Apri evento</Link>
+                                  ) : (
+                                    '—'
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </section>
+              ))
+            )}
+          </>
+        )}
+      </div>
+    </Drawer>
   );
 }
 

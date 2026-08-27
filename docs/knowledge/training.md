@@ -3,40 +3,40 @@
 Knowledge entries specific to `apps/training`.
 Part of the Implementation Knowledge Handbook — see [docs/IMPLEMENTATION-KNOWLEDGE.md](../IMPLEMENTATION-KNOWLEDGE.md) for the index, entry format, and placement rules.
 
-### Training Directory Chips Are Action-First
+### Training Directory Shows Facts, Not Synthetic Chips
 
-- Context: `apps/training` People directory (`/persone`) and backend `GET /api/training/v1/people/directory`.
-- Discovery: directory chips are planning/action flags, not passive HR-style person statuses. The directory must not derive chips from dormant employee fields such as hire date, manager hierarchy, or other external HR-ish attributes.
-- Practical rule: expose `PersonSummary.flags` with action-first booleans (`da_pianificare`, `compliance_gap`, `scadenze_imminenti`, `failed_recente`, `senza_formazione_attiva`) and derive them only from Training-domain plans, enrollments, mandatory rules, courses, certifications, and mandatory coverage. Do not reintroduce legacy passive chips such as "a norma", "nuovo assunto", or "senza piano".
-- Evidence: Training M4 directory refactor in `backend/internal/training/store_directory.go`, `backend/internal/training/types.go`, and `apps/training/src/pages/PeoplePage.tsx`.
-- Used by: `apps/training` `/persone` directory and planning bulk assignment flows.
+- Context: `apps/training` People directory (`/persone`) and backend `GET /training/v1/people`.
+- Discovery: the pre-rebuild directory (task 6 of #137 replaced it, migration `129_training_domain_restructure.sql`) exposed synthetic action-flag chips (`da_pianificare`, `compliance_gap`, …) computed from dormant HR-ish state. The rebuilt domain drops that layer entirely: the directory row carries only facts already on `training.employee` and its live joins — `status`, `directoryExempt`, current team memberships (with `role`), custom-group memberships. It does not compute or expose any derived planning flag.
+- Practical rule: keep the directory a facts table. Actionable signals (requests without opinion, uncovered seats, expiring coverage, stale enrollments…) belong to the work queue (`/`, `backend/internal/training/handler_queues.go`) and to the person's rule-coverage list (`GetPersonDetail`), never to a synthetic chip recomputed on the directory row itself.
+- Evidence: `backend/internal/training/store_people_reads.go` (`ListPeople`, `GetPersonDetail`), `backend/internal/training/types_reads.go` (`PersonListRow`, `PersonDetail`), `apps/training/src/pages/PeoplePage/PeoplePage.tsx`, `apps/training/src/pages/PersonPage/PersonPage.tsx`.
+- Used by: `apps/training` `/persone` directory and `/persone/:id` scheda formativa.
 - Open questions: none.
 
 ### Training Rule Populations Stay Training-Side
 
-- Context: `apps/training` compliance rules, custom groups, directory filters, and planning suggestions.
-- Discovery: rule populations are owned by the Training domain and must remain limited to `all`, `team`, `skill_area`, and `custom_group`; custom group membership is resolved live from Training tables.
-- Practical rule: do not add manager, role, hire-date, site, or external HR population predicates to Training mandatory rules. If a population does not fit team, skill area, or all employees, model it as a Training custom group.
-- Evidence: Training M5 rule/group schema in `deploy/migrations/016_training_m5_rules_groups.sql`, population resolver view `training.v_mandatory_rule_population`, and backend handlers under `backend/internal/training`.
-- Used by: `apps/training` `/compliance/regole`, `/persone/gruppi`, `/persone`, and `/pianificazione`.
+- Context: `apps/training` training rules (`/regole`), local groups (`/persone` § gruppi), skill areas (`/catalogo` § anagrafiche).
+- Discovery: rule populations are owned by the Training domain and remain limited to `all`, `team`, `skill_area`, `custom_group`, and `people` (single-person allow-list, added by the rebuild for one-off mandatory assignments); local-group membership is resolved live from `training.custom_group_members`, never cached.
+- Practical rule: do not add manager, role, hire-date, site, or external HR population predicates to `training.training_rule.population_target`. If a population does not fit team, skill area, an explicit person list, or the whole organization, model it as a Training custom group. A `skill_area` population only resolves when the area has a `custom_group_id` link (migration `131_training_skill_area_group.sql`) — an unlinked area fails hard with `422 skill_area_without_group`, both blocking rule activation and failing coverage calculation, not a silent skip.
+- Evidence: `deploy/migrations/129_training_domain_restructure.sql` and `131_training_skill_area_group.sql`; `backend/internal/training/store_coverage.go` (`skillAreaGroupID`), `backend/internal/training/store_rules.go` (`SetRuleActive`, `populationKindPeople` and siblings), `backend/internal/training/store_groups.go`, `backend/internal/training/store_mutations.go` (`ensureCustomGroupSelectable`, `ensureSkillAreaGroupCanBeRemoved`).
+- Used by: `apps/training` `/regole`, `/persone` (gruppi locali), `/catalogo` (collegamento area → gruppo), `/persone/:id` (coperture).
 - Open questions: none.
 
 ### Training Compliance Courses Become Mandatory Through Rules
 
-- Context: `apps/training` catalog course metadata and compliance rule CRUD.
-- Discovery: a Training course can be linked to a compliance framework without being mandatory for anyone. Per-person obbligatorietà exists only when an active `training.mandatory_rules` row applies to that person and course.
-- Practical rule: catalog and course UI should describe `course.is_compliance_course` + `course.compliance_framework` as compliance metadata. Pipeline badges, alert priority, and enrollment exports must use rule-derived `requiredByRule`, not course metadata.
-- Evidence: migration `deploy/migrations/017_training_compliance_course_semantics.sql`, enrollment rule resolution in `backend/internal/training/store.go`, rule validation in `backend/internal/training/store_rules_groups.go`, and frontend badge logic in `apps/training/src/components/PipelineCard/PipelineCard.tsx`.
-- Used by: `apps/training` `/catalogo`, `/compliance/regole`, `/pipeline`, `/persone`, and planning suggestions from mandatory gaps.
+- Context: `apps/training` catalog course metadata (`/catalogo`) and rule CRUD (`/regole`).
+- Discovery: a Training course can be linked to a compliance framework without being mandatory for anyone. Per-person obbligatorietà exists only when an active `training.training_rule` row (`is_mandatory = true`) applies to that person and course; the rebuild kept this separation intact.
+- Practical rule: catalog and course UI describe `course.is_compliance_course` + `course.compliance_framework` as compliance metadata only (`CourseListRow.complianceRelated`/`complianceFramework`). Mandatory status, coverage, and queue alerts must come from the rule (`RuleListRow.isMandatory`, `PersonRuleCoverageRef`), never from course metadata alone.
+- Evidence: `backend/internal/training/types.go` (`CourseInput`, `RuleInput`), `backend/internal/training/store_mutations.go` (`UpsertCourse`), `backend/internal/training/store_rules.go`, `backend/internal/training/store_people_reads.go` (`personRuleCoverage`); frontend in `apps/training/src/components/catalog/CourseEditorModal.tsx` and `apps/training/src/pages/PersonPage/PersonPage.tsx` (sezione coperture).
+- Used by: `apps/training` `/catalogo`, `/regole`, `/persone/:id`, and the work queue's coverage sections.
 - Open questions: none.
 
 ### Training People Admin Can Create Local Employees
 
-- Context: `apps/training` People directory (`/persone`) and backend `POST /api/training/v1/people`.
-- Discovery: `training.employee` remains primarily a local read model, but People admins need a manual escape hatch to add people immediately for training planning.
-- Practical rule: only People-admin flows may create local employee rows. Creation must be audited, enforce unique email and active team selection, and must not be available from login or employee self-service workflows.
-- Evidence: approved Persone page create-person implementation in `backend/internal/training/store_mutations.go`, `backend/internal/training/handler.go`, and `apps/training/src/components/PersonCreateModal/PersonCreateModal.tsx`.
-- Used by: `apps/training` `/persone` manual create flow.
+- Context: `apps/training` People directory (`/persone`) and backend `POST /training/v1/people`.
+- Discovery: `training.employee` remains primarily a directory-synced read model, but People admins need a manual escape hatch to add people immediately for training planning. `directory_exempt` doubles as the same escape hatch on existing directory-managed people: setting it unlocks name/email/status/team editing that the backend otherwise blocks with `person_managed_by_directory`.
+- Practical rule: only People-admin flows may create or edit local employee rows; both are audited. Creation enforces a unique email and, when a team is selected, an active team. Modifying a directory-managed person's identity fields or team without first setting `directoryExempt` is rejected — the UI does not predict this locally, it lets the backend error surface as-is.
+- Evidence: `backend/internal/training/store_mutations.go` (`CreatePerson`, `UpdatePerson`, `directoryManagedPersonState`), `backend/internal/training/handler_actions.go` (`handleCreatePerson`, `handleUpdatePerson`), `apps/training/src/components/people/PersonEditorModal.tsx`.
+- Used by: `apps/training` `/persone` (creazione) and `/persone/:id` (modifica, incluso lo sblocco `directoryExempt`).
 - Open questions: none.
 
 ### Training-Factorial Sync Correlates Objects By Embedded Tokens, Not Foreign Keys
@@ -47,6 +47,7 @@ Part of the Implementation Knowledge Handbook — see [docs/IMPLEMENTATION-KNOWL
 - Evidence: `backend/internal/training/factorial_sync_types.go`, `factorial_sync_fetch.go`, `factorial_sync_project.go`, `factorial_sync_outbound.go`, `factorial_sync_inbound.go`, `factorial_sync_local.go`, `factorial_sync_tombstones.go`, `factorial_sync_perimeter.go`, `factorial_sync_run.go`; `backend/pkg/factorial/types.gen.go` (`TrainingsTraining`, `TrainingsTrainingClass`, `TrainingsSession`, `TrainingsTrainingMembership`, `TrainingsSessionAccessMembership`, `TrainingsSessionAttendance`); #141 and slices #143–#149.
 - Used by: ops running `training-factorial-sync` or the `TRAINING_FACTORIAL_SYNC_ENABLED` worker path; task 6 of #137 (planning/compliance UI once it depends on synced Factorial state, including the due-date UTC-midnight convention below); task 8 of #137 (live cutover smoke).
 - Open questions: none beyond the registered debt and the re-evaluation trigger listed under Operational Notes.
+- Read surface: migration `133_training_factorial_sync_runs.sql` persists every run and its findings (`training.factorial_sync_run`, `training.factorial_sync_finding`); `backend/internal/training/factorial_sync_store.go` writes them at the end of `RunFactorialSync`, `backend/internal/training/handler_factorial_sync.go` exposes `GET /training/v1/factorial/sync/runs` and `/runs/{id}` (read-only, no start route — the CLI/worker remain the only way to run it), and `apps/training/src/api/factorialSync.ts` + the "Sync formativo" section of `apps/training/src/pages/FactorialPage.tsx` render the history and the findings grouped by phase/severity.
 
 #### Entity Mapping
 

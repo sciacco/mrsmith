@@ -1,0 +1,24 @@
+/* Rimando all'elenco persone (#158, §Persone 3): stesso pattern del back
+   link di EventDetailPage — link vero, allineato a sinistra, non un bottone
+   figlio del flex column di listPage.module.css. */
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  align-self: flex-start;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-decoration: none;
+}
+
+.backLink:hover {
+  color: var(--color-accent);
+}
+
+.backLink:focus-visible {
+  outline: 2px solid var(--color-accent-glow);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}

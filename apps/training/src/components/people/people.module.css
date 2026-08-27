@@ -1,0 +1,47 @@
+/* Sezione "Gruppi locali" della directory persone (#158): intestazione
+   intermedia (docs/UI-UX.md §5) e riga di azioni compatte per riga tabella. */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+}
+
+.rowActions {
+  display: inline-flex;
+  gap: var(--space-2);
+}
+
+/* Avviso di perdita di appartenenza multi-team nell'editor persona (#158,
+   QA task 6.7): il backend chiude tutte le appartenenze attive e ne ricrea
+   una sola, quindi l'effetto va dichiarato, non prevenuto localmente. */
+.multiTeamNotice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-subtle);
+}
+
+.multiTeamNoticeTitle {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-warning-strong);
+}
+
+.multiTeamNoticeText {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-warning-strong);
+}

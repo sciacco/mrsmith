@@ -1,0 +1,56 @@
+/* Tabelle compatte del dettaglio corso (#158): stesso vocabolario di
+   components/rules/RuleDetailDrawer.module.css. */
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.ruleList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ruleList li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ruleList a {
+  color: var(--color-accent);
+}
+
+.miniTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.miniTable th {
+  text-align: left;
+  padding: var(--space-2);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.miniTable td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--color-border-subtle);
+  vertical-align: middle;
+}
+
+.miniTable tr:last-child td {
+  border-bottom: none;
+}
+
+.miniTable a {
+  color: var(--color-accent);
+}

@@ -488,38 +488,83 @@ export interface BulkEnrollResponse {
   skipped: BulkEnrollSkippedRow[];
 }
 
-// ── Letture di dominio: catalogo, persone, team, aree, gruppi (#157) ──
-// Campi consumati dalle superfici richieste/regole di questa slice, più i
-// campi catalogo (skillAreaId/vendorId/providerKind su CourseListRow,
-// customGroupId su SkillAreaListRow) attesi dal collegamento in catalogo
-// della slice 6.7: le liste gestionali del backend (#152) portano altri
-// campi non ripresi qui.
+// ── Letture di dominio: catalogo, persone, team, aree, gruppi (#157, #158) ──
+// Le interfacce coprono l'intero payload del backend (#152): le superfici
+// richieste/regole della #157 continuano a leggere solo il sottoinsieme che
+// usavano; persone/catalogo/anagrafiche della #158 usano il resto.
 
 export interface CourseListRow {
   id: string;
   title: string;
   skillAreaId?: string;
+  skillAreaName?: string;
   vendorId?: string;
+  vendorName?: string;
+  deliveryMode: string;
   providerKind: string;
+  defaultHours?: number;
+  defaultCost?: number;
   leadsToCertId?: string;
+  leadsToCertName?: string;
+  complianceRelated: boolean;
+  complianceFramework?: string;
   active: boolean;
+  factorialTrainingId?: string;
+  updatedAt: string;
 }
 
 export interface CourseListResponse {
   courses: CourseListRow[];
 }
 
-// CourseInput copre solo la creazione contestuale del corso fuori catalogo
-// dal pannello di accoglimento (#157): deliveryMode e gli altri campi
-// opzionali del corso restano ai valori di default del backend.
+export interface CourseRuleRef {
+  id: string;
+  name: string;
+  isActive: boolean;
+}
+
+export interface CourseEventRef {
+  id: string;
+  createdAt: string;
+  cancelledAt?: string;
+  enrollmentsCount: number;
+  sessionsCount: number;
+}
+
+export interface CourseDetail extends CourseListRow {
+  description?: string;
+  courseUrl?: string;
+  rules: CourseRuleRef[];
+  events: CourseEventRef[];
+}
+
+// CourseInput copre sia la creazione contestuale del corso fuori catalogo
+// dal pannello di accoglimento (#157) sia l'upsert completo dal catalogo
+// (#158): sostituzione integrale, i campi omessi restano ai default del
+// backend in creazione o si azzerano in modifica.
 export interface CourseInput {
   title: string;
   vendorId?: string;
   skillAreaId?: string;
+  leadsToCertId?: string;
+  deliveryMode?: string;
   providerKind?: 'internal' | 'external';
+  defaultHours?: number;
+  defaultCost?: number;
+  courseUrl?: string;
+  description?: string;
+  complianceRelated?: boolean;
+  complianceFramework?: string;
+  active?: boolean;
 }
 
 export interface PersonTeamRef {
+  id: string;
+  name: string;
+  role?: string;
+}
+
+export interface PersonGroupRef {
   id: string;
   name: string;
 }
@@ -528,12 +573,65 @@ export interface PersonListRow {
   id: string;
   firstName: string;
   lastName: string;
+  email: string;
   status: string;
+  directoryExempt: boolean;
   teams: PersonTeamRef[];
+  groups: PersonGroupRef[];
 }
 
 export interface PersonListResponse {
   people: PersonListRow[];
+}
+
+export interface PersonEnrollmentRef {
+  enrollmentId: string;
+  eventId: string;
+  courseTitle: string;
+  deliveryStatus: DeliveryStatus;
+  learningOutcome?: LearningOutcome;
+  actualStart?: string;
+  actualEnd?: string;
+  cancelledAt?: string;
+  createdAt: string;
+}
+
+export interface PersonRequestRef {
+  id: string;
+  courseTitle?: string;
+  freeTextTitle?: string;
+  outcome: string | null;
+  createdAt: string;
+}
+
+export interface PersonRuleCoverageRef {
+  ruleId: string;
+  ruleName: string;
+  need: QueueNeed;
+  covered: boolean;
+  deadline: string;
+}
+
+export interface PersonDetail extends PersonListRow {
+  enrollments: PersonEnrollmentRef[];
+  requests: PersonRequestRef[];
+  ruleCoverage: PersonRuleCoverageRef[];
+}
+
+// PersonCreateInput/PersonUpdateInput: sostituzione integrale come gli altri
+// input di dominio. directoryExempt esiste solo in modifica — è la valvola
+// che rende modificabile a mano una persona agganciata alla directory.
+export interface PersonCreateInput {
+  firstName: string;
+  lastName: string;
+  email: string;
+  status: string;
+  teamId?: string;
+  notes?: string;
+}
+
+export interface PersonUpdateInput extends PersonCreateInput {
+  directoryExempt?: boolean;
 }
 
 export interface TeamLeadRef {
@@ -543,31 +641,121 @@ export interface TeamLeadRef {
 
 export interface TeamListRow {
   id: string;
+  code: string;
   name: string;
+  active: boolean;
+  managedBySync: boolean;
   leads: TeamLeadRef[];
+  activeMembers: number;
 }
 
 export interface TeamListResponse {
   teams: TeamListRow[];
 }
 
-export interface SkillAreaListRow {
+// TeamInput: rinomina dei soli team non gestiti dalla sync (#158, §Catalogo
+// 5) — il backend rifiuta con team_managed_by_directory ogni altro caso.
+export interface TeamInput {
+  code: string;
+  name: string;
+  description?: string;
+  active?: boolean;
+}
+
+export interface VendorListRow {
   id: string;
   name: string;
+  website?: string;
+  notes?: string;
+  active: boolean;
+}
+
+export interface VendorListResponse {
+  vendors: VendorListRow[];
+}
+
+export interface VendorInput {
+  name: string;
+  website?: string;
+  notes?: string;
+  active?: boolean;
+}
+
+export interface SkillAreaListRow {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  active: boolean;
   customGroupId?: string;
+  customGroupName?: string;
+  parentId?: string;
 }
 
 export interface SkillAreaListResponse {
   skillAreas: SkillAreaListRow[];
 }
 
+export interface SkillAreaInput {
+  code: string;
+  name: string;
+  parentId?: string;
+  customGroupId?: string;
+  description?: string;
+  active?: boolean;
+}
+
+export interface CertificationCatalogRow {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  active: boolean;
+  issuerVendorId?: string;
+  issuerVendorName?: string;
+  skillAreaId?: string;
+  skillAreaName?: string;
+  typicalValidityMonths?: number;
+}
+
+export interface CertificationCatalogResponse {
+  certifications: CertificationCatalogRow[];
+}
+
+export interface CertificationInput {
+  code: string;
+  name: string;
+  issuerVendorId?: string;
+  skillAreaId?: string;
+  typicalValidityMonths?: number;
+  description?: string;
+  active?: boolean;
+}
+
+export interface GroupMemberRef {
+  employeeId: string;
+  name: string;
+  email: string;
+}
+
 export interface GroupListRow {
   id: string;
   name: string;
+  description?: string;
+  members: GroupMemberRef[];
 }
 
 export interface GroupListResponse {
   groups: GroupListRow[];
+}
+
+export interface GroupInput {
+  name: string;
+  description?: string;
+}
+
+export interface GroupMembersInput {
+  employeeIds: string[];
 }
 
 // ── Richieste formative (#140, #157) ──
