@@ -1,0 +1,69 @@
+/* Drawer body intenzionalmente non impaddato dal componente condiviso
+   (docs/UI-UX.md §10): il wrapper locale possiede il padding. Condiviso fra
+   RequestDetailDrawer e RuleDetailDrawer (#157). */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-5) var(--space-6) var(--space-4);
+}
+
+.errorNotice {
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-md);
+  background: var(--color-danger-subtle);
+  color: var(--color-danger-hover);
+  font-size: 0.875rem;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-5);
+  margin: 0;
+}
+
+.item dt {
+  margin: 0 0 var(--space-1);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+}
+
+.item dd {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-text);
+}
+
+.item a {
+  color: var(--color-accent);
+}
+
+.footerActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}

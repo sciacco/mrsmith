@@ -1,0 +1,53 @@
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.miniTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.miniTable th {
+  text-align: left;
+  padding: var(--space-2) var(--space-2);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.miniTable td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--color-border-subtle);
+  vertical-align: middle;
+}
+
+.miniTable tr:last-child td {
+  border-bottom: none;
+}
+
+.miniTable a {
+  color: var(--color-accent);
+}
+
+.createdBanner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-success);
+  border-radius: var(--radius-md);
+  background: var(--color-success-bg);
+  color: var(--color-success-strong);
+  font-size: 0.8125rem;
+}

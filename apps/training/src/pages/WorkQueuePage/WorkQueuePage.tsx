@@ -342,6 +342,7 @@ export function WorkQueuePage() {
               <QueueTable<RequestWithoutTLOpinionRow>
                 rows={withoutOpinion.data ?? []}
                 rowKey={(r) => r.requestId}
+                linkTo={(r) => `/richieste?id=${r.requestId}`}
                 columns={[
                   { header: 'Persona', render: (r) => r.employeeName },
                   { header: 'Corso / titolo', render: (r) => r.courseTitle || r.freeTextTitle || '—' },
@@ -363,6 +364,7 @@ export function WorkQueuePage() {
               <QueueTable<RequestAwaitingDecisionRow>
                 rows={awaitingDecision.data ?? []}
                 rowKey={(r) => r.requestId}
+                linkTo={(r) => `/richieste?id=${r.requestId}`}
                 columns={[
                   { header: 'Persona', render: (r) => r.employeeName },
                   { header: 'Corso / titolo', render: (r) => r.courseTitle || r.freeTextTitle || '—' },
@@ -405,6 +407,7 @@ export function WorkQueuePage() {
                   <QueueTable<ExpiringPersonRow>
                     rows={expiring.data.people}
                     rowKey={(r) => `${r.ruleId}-${r.employeeId}`}
+                    linkTo={(r) => `/regole?id=${r.ruleId}`}
                     columns={[
                       { header: 'Persona', render: (r) => r.employeeName },
                       { header: 'Regola', render: (r) => r.ruleName },
@@ -424,6 +427,7 @@ export function WorkQueuePage() {
                   <QueueTable<ExpiringSeatRuleRow>
                     rows={expiring.data.seatRules}
                     rowKey={(r) => r.ruleId}
+                    linkTo={(r) => `/regole?id=${r.ruleId}`}
                     columns={[
                       { header: 'Regola', render: (r) => r.ruleName },
                       { header: 'Corso', render: (r) => r.courseTitle },
@@ -451,6 +455,7 @@ export function WorkQueuePage() {
               <QueueTable<SeatRuleCoverageRow>
                 rows={seatCoverage.data ?? []}
                 rowKey={(r) => r.ruleId}
+                linkTo={(r) => `/regole?id=${r.ruleId}`}
                 columns={[
                   { header: 'Regola', render: (r) => r.ruleName },
                   { header: 'Corso', render: (r) => r.courseTitle },
@@ -475,6 +480,7 @@ export function WorkQueuePage() {
               <QueueTable<UnfedPopulationRow>
                 rows={unfed.data ?? []}
                 rowKey={(r) => `${r.ruleId}-${r.eventId}`}
+                linkTo={(r) => `/eventi/${r.eventId}?highlight=enrollments`}
                 columns={[
                   { header: 'Regola', render: (r) => r.ruleName },
                   { header: 'Corso', render: (r) => r.courseTitle },
@@ -496,6 +502,7 @@ export function WorkQueuePage() {
               <QueueTable<RoundWithoutEventRow>
                 rows={rounds.data?.rules ?? []}
                 rowKey={(r) => r.ruleId}
+                linkTo={(r) => `/regole?id=${r.ruleId}`}
                 columns={[
                   { header: 'Regola', render: (r) => r.ruleName },
                   { header: 'Corso', render: (r) => r.courseTitle },

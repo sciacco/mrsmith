@@ -1,0 +1,25 @@
+/* Estensioni specifiche delle regole (#157) al foglio condiviso dei form
+   in components/requests/requestShared.module.css (.body, .field, .input,
+   .row, .hint, .toggleGroup, .actions, ecc. — importato anche qui da
+   RuleEditorModal.tsx). Qui restano solo le classi che i form richieste
+   non usano. */
+
+.errorText {
+  font-size: 0.75rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-danger-hover);
+}
+
+.toggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}

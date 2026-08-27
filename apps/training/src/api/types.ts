@@ -487,3 +487,303 @@ export interface BulkEnrollResponse {
   created: BulkEnrollCreatedRow[];
   skipped: BulkEnrollSkippedRow[];
 }
+
+// ── Letture di dominio: catalogo, persone, team, aree, gruppi (#157) ──
+// Campi consumati dalle superfici richieste/regole di questa slice, più i
+// campi catalogo (skillAreaId/vendorId/providerKind su CourseListRow,
+// customGroupId su SkillAreaListRow) attesi dal collegamento in catalogo
+// della slice 6.7: le liste gestionali del backend (#152) portano altri
+// campi non ripresi qui.
+
+export interface CourseListRow {
+  id: string;
+  title: string;
+  skillAreaId?: string;
+  vendorId?: string;
+  providerKind: string;
+  leadsToCertId?: string;
+  active: boolean;
+}
+
+export interface CourseListResponse {
+  courses: CourseListRow[];
+}
+
+// CourseInput copre solo la creazione contestuale del corso fuori catalogo
+// dal pannello di accoglimento (#157): deliveryMode e gli altri campi
+// opzionali del corso restano ai valori di default del backend.
+export interface CourseInput {
+  title: string;
+  vendorId?: string;
+  skillAreaId?: string;
+  providerKind?: 'internal' | 'external';
+}
+
+export interface PersonTeamRef {
+  id: string;
+  name: string;
+}
+
+export interface PersonListRow {
+  id: string;
+  firstName: string;
+  lastName: string;
+  status: string;
+  teams: PersonTeamRef[];
+}
+
+export interface PersonListResponse {
+  people: PersonListRow[];
+}
+
+export interface TeamLeadRef {
+  employeeId: string;
+  name: string;
+}
+
+export interface TeamListRow {
+  id: string;
+  name: string;
+  leads: TeamLeadRef[];
+}
+
+export interface TeamListResponse {
+  teams: TeamListRow[];
+}
+
+export interface SkillAreaListRow {
+  id: string;
+  name: string;
+  customGroupId?: string;
+}
+
+export interface SkillAreaListResponse {
+  skillAreas: SkillAreaListRow[];
+}
+
+export interface GroupListRow {
+  id: string;
+  name: string;
+}
+
+export interface GroupListResponse {
+  groups: GroupListRow[];
+}
+
+// ── Richieste formative (#140, #157) ──
+// Faccia originale (create-only) e faccia accolta separate; parere TL e
+// decisione People sono fatti immutabili. Vedi backend/internal/training
+// types_requests.go per il contratto completo.
+
+export interface RequestInput {
+  employeeId: string;
+  courseId?: string;
+  freeTextTitle?: string;
+  skillAreaId?: string;
+  motivation: string;
+  selectedTeamId: string;
+  desiredStart?: string;
+  desiredEnd?: string;
+}
+
+export type TLOpinionValue = 'favorable' | 'unfavorable';
+
+export interface TLOpinionInput {
+  leadEmployeeId: string;
+  opinion: TLOpinionValue;
+  reason: string;
+}
+
+export interface RequestAcceptedInput {
+  courseId: string;
+  eventId?: string;
+  vendorId?: string;
+  periodStart?: string;
+  periodEnd?: string;
+  notes?: string;
+  existingEnrollmentId?: string;
+}
+
+export type RequestDecisionValue = 'accepted' | 'rejected';
+
+export interface RequestDecisionInput {
+  decision: RequestDecisionValue;
+  reason: string;
+  accepted?: RequestAcceptedInput;
+}
+
+export interface RequestListRow {
+  id: string;
+  employeeName: string;
+  courseTitle?: string;
+  freeTextTitle?: string;
+  selectedTeamName: string;
+  tlOpinion?: TLOpinionValue;
+  peopleDecision?: RequestDecisionValue;
+  outcome?: string;
+  createdAt: string;
+}
+
+export interface RequestListResponse {
+  requests: RequestListRow[];
+}
+
+export interface RequestOriginalData {
+  employeeName: string;
+  courseTitle?: string;
+  freeTextTitle?: string;
+  skillAreaName?: string;
+  motivation: string;
+  selectedTeamId: string;
+  selectedTeamName: string;
+  desiredStart?: string;
+  desiredEnd?: string;
+}
+
+export interface RequestTLOpinionFacts {
+  opinion: TLOpinionValue;
+  byName?: string;
+  at: string;
+  reason?: string;
+}
+
+export interface RequestDecisionFacts {
+  decision: RequestDecisionValue;
+  byName?: string;
+  at: string;
+  reason: string;
+}
+
+export interface RequestAcceptedData {
+  courseTitle: string;
+  eventId?: string;
+  vendorName?: string;
+  periodStart?: string;
+  periodEnd?: string;
+  notes?: string;
+}
+
+export interface RequestCoverageEnrollment {
+  enrollmentId: string;
+  completedOn: string;
+}
+
+export interface RequestCoverageAward {
+  certificationName: string;
+  awardedOn: string;
+  expiresOn?: string;
+}
+
+export interface RequestCoverage {
+  courseId?: string;
+  courseTitle?: string;
+  completedEnrollments: RequestCoverageEnrollment[];
+  validAwards: RequestCoverageAward[];
+}
+
+export interface RequestDetail {
+  id: string;
+  requested: RequestOriginalData;
+  tlOpinion?: RequestTLOpinionFacts;
+  decision?: RequestDecisionFacts;
+  outcome?: string;
+  closedAt?: string;
+  accepted?: RequestAcceptedData;
+  resultingEnrollmentId?: string;
+  existingCoverage: RequestCoverage;
+  createdAt: string;
+}
+
+// ── Regole formative (#140, #157) ──
+
+export type PopulationKind = 'all' | 'team' | 'skill_area' | 'custom_group' | 'people';
+
+export interface RulePopulationInput {
+  kind: PopulationKind;
+  id?: string;
+  personIds?: string[];
+}
+
+export interface RuleInput {
+  name: string;
+  courseId: string;
+  population?: RulePopulationInput;
+  seatCount?: number;
+  isMandatory: boolean;
+  deadline: string;
+  recurrenceMonths?: number;
+  recurrenceAnchor?: 'calendar' | 'completion' | '';
+  notes?: string;
+}
+
+export interface RuleListRow {
+  id: string;
+  name: string;
+  courseTitle: string;
+  need: QueueNeed;
+  populationKind?: PopulationKind;
+  seatCount?: number;
+  populationSize?: number;
+  coveredCount: number;
+  isMandatory: boolean;
+  deadline: string;
+  recurrenceMonths?: number;
+  recurrenceAnchor?: string;
+  nextRoundDeadline?: string;
+  isActive: boolean;
+}
+
+export interface RuleListResponse {
+  rules: RuleListRow[];
+}
+
+export interface RulePopulationMember {
+  employeeId: string;
+  name: string;
+  covered: boolean;
+}
+
+export interface RulePopulationDetail {
+  kind: PopulationKind;
+  targetId?: string;
+  personIds?: string[];
+  size: number;
+  coveredCount: number;
+  members: RulePopulationMember[];
+}
+
+export interface RuleSeatsDetail {
+  requested: number;
+  covered: number;
+}
+
+export interface RuleRoundRow {
+  eventId: string;
+  ruleDeadline?: string;
+  cancelled: boolean;
+  enrollmentsCount: number;
+}
+
+export interface RuleDetail {
+  id: string;
+  name: string;
+  courseId: string;
+  courseTitle: string;
+  need: QueueNeed;
+  isMandatory: boolean;
+  deadline: string;
+  recurrenceMonths?: number;
+  recurrenceAnchor?: string;
+  isActive: boolean;
+  notes?: string;
+  population?: RulePopulationDetail;
+  seats?: RuleSeatsDetail;
+  nextRoundDeadline?: string;
+  rounds: RuleRoundRow[];
+}
+
+export interface RuleEventResponse {
+  ok: boolean;
+  id: string;
+  enrollmentsCreated: number;
+}

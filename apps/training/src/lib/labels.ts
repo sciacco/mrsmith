@@ -88,3 +88,30 @@ export const BULK_ASSIGN_MODE_LABELS: Record<string, string> = {
   distribute: 'Distribuisci automaticamente',
   fill_session: 'Colloca i non assegnati',
 };
+
+// Esito e stato delle richieste formative (#157).
+export const REQUEST_STATE_LABELS: Record<'open' | 'closed' | 'all', string> = {
+  open: 'Aperte',
+  closed: 'Chiuse',
+  all: 'Tutte',
+};
+
+export const REQUEST_OUTCOME_LABELS: Record<string, string> = {
+  accepted: 'Accolta',
+  rejected: 'Respinta',
+  withdrawn: 'Ritirata',
+};
+
+// Platea delle regole formative (#157).
+export const POPULATION_KIND_LABELS: Record<string, string> = {
+  all: 'Organizzazione',
+  team: 'Team',
+  skill_area: 'Area di competenza',
+  custom_group: 'Gruppo locale',
+  people: 'Singole persone',
+};
+
+export const RECURRENCE_ANCHOR_LABELS: Record<string, string> = {
+  calendar: 'Da calendario',
+  completion: 'Da completamento',
+};
