@@ -616,6 +616,9 @@ export interface PersonDetail extends PersonListRow {
   enrollments: PersonEnrollmentRef[];
   requests: PersonRequestRef[];
   ruleCoverage: PersonRuleCoverageRef[];
+  awards: PersonAwardRef[];
+  assessments: PersonAssessmentRef[];
+  paths: PersonPathRef[];
 }
 
 // PersonCreateInput/PersonUpdateInput: sostituzione integrale come gli altri
@@ -974,4 +977,253 @@ export interface RuleEventResponse {
   ok: boolean;
   id: string;
   enrollmentsCreated: number;
+}
+
+// ── Conseguimenti e documenti (#162, slice 3 del task 7): specchio dei tipi
+// Go di backend/internal/training/types.go, types_reads.go — campi verbatim.
+
+export interface PersonAwardDocumentRef {
+  id: string;
+  filename: string;
+  isValidated: boolean;
+}
+
+export interface PersonAwardRef {
+  awardId: string;
+  certificationId: string;
+  certificationCode: string;
+  certificationName: string;
+  outcome: string;
+  awardedOn: string;
+  expiresOn?: string;
+  currentStatus: string;
+  validationSource: string;
+  enrollmentId: string | null;
+  document: PersonAwardDocumentRef | null;
+}
+
+// AwardInput copre sia la creazione da scheda persona (employeeId
+// precompilato) sia, in prospettiva, altri punti di ingresso: employeeId
+// resta nel tipo perche il backend lo accetta sempre in JSON.
+export interface AwardInput {
+  employeeId: string;
+  certificationId: string;
+  enrollmentId?: string;
+  outcome: string;
+  awardedOn: string;
+  expiresOn?: string;
+  validationSource?: string;
+  externalCredentialId?: string;
+  externalCredentialUrl?: string;
+  notes?: string;
+  reason?: string;
+}
+
+// AwardUpdateInput: PUT di correzione. notes e opzionale: se omesso (undefined)
+// il backend (store_documents.go, NULLIF su $6/$7) lascia la nota esistente
+// invariata — il valore esistente non e leggibile qui, quindi il client invia
+// notes solo quando l'operatore scrive qualcosa di nuovo.
+export interface AwardUpdateInput {
+  outcome: string;
+  awardedOn: string;
+  expiresOn?: string;
+  validationSource?: string;
+  notes?: string;
+}
+
+export interface DocumentMetadata {
+  id: string;
+  enrollmentId?: string;
+  certificationAwardId?: string;
+  filename: string;
+  sha256: string;
+  mime: string;
+  sizeBytes: number;
+  uploadedAt: string;
+  validated: boolean;
+}
+
+// ── Valutazioni di competenza (#162, specchio di types_assessments.go) ──
+
+export interface AssessmentInput {
+  skillAreaId: string;
+  level: number;
+  assessedOn?: string;
+  source?: string;
+  notes?: string;
+}
+
+export interface AssessmentUpdateInput {
+  level: number;
+  assessedOn: string;
+  source?: string;
+  notes?: string;
+}
+
+export interface PersonAssessmentRef {
+  id: string;
+  skillAreaId: string;
+  skillAreaName: string;
+  level: number;
+  assessedOn: string;
+  source: string;
+  notes?: string;
+}
+
+// ── Percorsi formativi (#162, specchio di types_paths.go) ──
+
+export interface PathInput {
+  code: string;
+  name: string;
+  skillAreaId?: string;
+  description?: string;
+  active?: boolean;
+}
+
+export interface PathListRow {
+  id: string;
+  code: string;
+  name: string;
+  skillAreaId?: string;
+  skillAreaName?: string;
+  description?: string;
+  active: boolean;
+  stepsCount: number;
+  assigneesCount: number;
+}
+
+export interface PathListResponse {
+  paths: PathListRow[];
+}
+
+export interface PathStepRef {
+  stepId: string;
+  stepOrder: number;
+  courseId?: string;
+  courseTitle?: string;
+  certificationId?: string;
+  certificationName?: string;
+  isRequired: boolean;
+  notes?: string;
+}
+
+export interface PathStepInput {
+  stepOrder: number;
+  courseId?: string;
+  certificationId?: string;
+  isRequired?: boolean;
+  notes?: string;
+}
+
+export interface PathStepsInput {
+  steps: PathStepInput[];
+}
+
+export interface PathStepProgressRef {
+  stepId: string;
+  stepOrder: number;
+  courseId?: string;
+  courseTitle?: string;
+  certificationId?: string;
+  certificationName?: string;
+  isRequired: boolean;
+  covered: boolean;
+  enrollmentId?: string;
+  eventId?: string;
+  awardId?: string;
+}
+
+// PathProgress e condiviso (embedding Go) da PathAssigneeRef e
+// PersonPathRef: stesso progresso calcolato, due punti di vista.
+export interface PathProgress {
+  steps: PathStepProgressRef[];
+  requiredTotal: number;
+  requiredCovered: number;
+  allRequiredCovered: boolean;
+}
+
+export interface PathAssigneeRef extends PathProgress {
+  employeeId: string;
+  employeeName: string;
+  startedOn: string;
+  targetCompletion?: string;
+  completedOn?: string;
+  notes?: string;
+}
+
+export interface PathDetail extends PathListRow {
+  steps: PathStepRef[];
+  assignees: PathAssigneeRef[];
+}
+
+export interface PersonPathRef extends PathProgress {
+  pathId: string;
+  pathName: string;
+  startedOn: string;
+  targetCompletion?: string;
+  completedOn?: string;
+  notes?: string;
+}
+
+export interface PathAssignmentInput {
+  pathId: string;
+  startedOn?: string;
+  targetCompletion?: string;
+  notes?: string;
+}
+
+// PathAssignmentUpdateInput: sostituzione completa (stesso idioma di
+// AwardUpdateInput/EnrollmentFactsInput) — completedOn omesso azzera la
+// conclusione registrata.
+export interface PathAssignmentUpdateInput {
+  startedOn: string;
+  targetCompletion?: string;
+  completedOn?: string;
+  notes?: string;
+}
+
+// ── Certificazioni: dettaglio (#162, specchio di types_reads.go) ──
+
+export interface CertificationHolderRef {
+  awardId: string;
+  employeeId: string;
+  employeeName: string;
+  outcome: string;
+  awardedOn: string;
+  expiresOn?: string;
+  currentStatus: string;
+  validationSource: string;
+  documentId?: string;
+  documentFilename?: string;
+  documentValidated: boolean;
+}
+
+export interface CertificationCourseRef {
+  id: string;
+  title: string;
+  active: boolean;
+}
+
+export interface CertificationDetail extends CertificationCatalogRow {
+  holders: CertificationHolderRef[];
+  courses: CertificationCourseRef[];
+  rules: CourseRuleRef[];
+}
+
+// ── Coda "certificazioni in scadenza" (#162, specchio di types_queues.go) ──
+
+export interface ExpiringCertificationQueueRow {
+  awardId: string;
+  employeeId: string;
+  employeeName: string;
+  employeeEmail: string;
+  certificationCode: string;
+  certificationName: string;
+  expiresOn: string;
+  daysToExpiry: number;
+}
+
+export interface ExpiringCertificationsResponse {
+  withinDays: number;
+  certifications: ExpiringCertificationQueueRow[];
 }

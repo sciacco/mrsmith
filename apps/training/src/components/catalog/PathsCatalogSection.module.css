@@ -1,0 +1,88 @@
+/* Percorsi di catalogo (#162, §Catalogo 5): editor dei passi con
+   riordino per posizione e scelta corso/certificazione esclusiva. La
+   tabella compatta assegnatari riusa CourseDetailDrawer.module.css
+   (tableWrap/miniTable), qui solo il wrapper della sezione e le classi
+   specifiche dei passi. */
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.numCell {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.stepList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.stepRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+}
+
+.stepOrder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding-top: var(--space-1);
+}
+
+.stepOrderNumber {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.stepMoveButtons {
+  display: flex;
+  flex-direction: column;
+}
+
+.stepFields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
+}
+
+.stepFieldsRow {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.stepFieldsRow > * {
+  flex: 1;
+  min-width: 10rem;
+}
+
+.stepToggleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.stepRemove {
+  align-self: flex-start;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}

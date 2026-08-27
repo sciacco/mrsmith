@@ -3,6 +3,10 @@ import type { ApiClient } from '@mrsmith/api-client';
 import { useApiClient } from './client';
 import type {
   ActionResponse,
+  AssessmentInput,
+  AssessmentUpdateInput,
+  AwardInput,
+  AwardUpdateInput,
   BulkAssignmentsInput,
   BulkAssignmentsResponse,
   BulkEnrollInput,
@@ -10,10 +14,12 @@ import type {
   BulkParticipationInput,
   BulkParticipationResponse,
   CertificationCatalogResponse,
+  CertificationDetail,
   CertificationInput,
   CourseDetail,
   CourseInput,
   CourseListResponse,
+  DocumentMetadata,
   EnrollmentFactsInput,
   EventDetail,
   EventExpense,
@@ -22,6 +28,7 @@ import type {
   EventExpenseReplaceInput,
   EventInput,
   EventListResponse,
+  ExpiringCertificationsResponse,
   ExpiringCoverageResponse,
   FeedEventResponse,
   GroupInput,
@@ -30,6 +37,12 @@ import type {
   LookupResponse,
   MeResponse,
   ParticipationInput,
+  PathAssignmentInput,
+  PathAssignmentUpdateInput,
+  PathDetail,
+  PathInput,
+  PathListResponse,
+  PathStepsInput,
   PersonCreateInput,
   PersonDetail,
   PersonListResponse,
@@ -159,6 +172,34 @@ export function usePersonDetail(id: string | undefined) {
   });
 }
 
+export function useCertificationDetail(id: string | undefined) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['training', 'certifications', 'detail', id],
+    queryFn: () => api.get<CertificationDetail>(`${TRAINING_PREFIX}/certifications/${id}`),
+    enabled: id !== undefined && id !== '',
+  });
+}
+
+// ── Percorsi formativi: catalogo (#162) ──
+
+export function useTrainingPaths() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['training', 'paths'],
+    queryFn: async () => (await api.get<PathListResponse>(`${TRAINING_PREFIX}/paths`)).paths,
+  });
+}
+
+export function usePathDetail(id: string | undefined) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['training', 'paths', 'detail', id],
+    queryFn: () => api.get<PathDetail>(`${TRAINING_PREFIX}/paths/${id}`),
+    enabled: id !== undefined && id !== '',
+  });
+}
+
 export function useTrainingEvents() {
   const api = useApiClient();
   return useQuery({
@@ -262,6 +303,19 @@ export function useStaleEnrollments(olderThanDays: number) {
     queryFn: () =>
       api.get<StaleEnrollmentsResponse>(
         `${TRAINING_PREFIX}/queues/stale-enrollments${withDaysParam('olderThanDays', olderThanDays)}`,
+      ),
+  });
+}
+
+// Coda "certificazioni in scadenza" (#162, §Home 6): stesso pattern di
+// soglia in giorni delle code esistenti.
+export function useExpiringCertifications(withinDays: number) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['training', 'queues', 'expiring-certifications', withinDays],
+    queryFn: () =>
+      api.get<ExpiringCertificationsResponse>(
+        `${TRAINING_PREFIX}/queues/expiring-certifications${withDaysParam('withinDays', withinDays)}`,
       ),
   });
 }
@@ -572,5 +626,84 @@ export function useUpdateCourse() {
 export function useArchiveCourse() {
   return useTrainingMutation<string, ActionResponse>((api, id) =>
     api.post(`${TRAINING_PREFIX}/courses/${id}/archive`),
+  );
+}
+
+// ── Conseguimenti, documenti, valutazioni, percorsi (#162, slice 3 del task 7) ──
+
+export function useCreateAward() {
+  return useTrainingMutation<AwardInput, ActionResponse>((api, input) =>
+    api.post(`${TRAINING_PREFIX}/awards`, input),
+  );
+}
+
+export function useUpdateAward() {
+  return useTrainingMutation<{ id: string; input: AwardUpdateInput }, ActionResponse>((api, { id, input }) =>
+    api.put(`${TRAINING_PREFIX}/awards/${id}`, input),
+  );
+}
+
+export function useUploadAwardDocument() {
+  return useTrainingMutation<{ awardId: string; file: File }, DocumentMetadata>((api, { awardId, file }) => {
+    const form = new FormData();
+    form.append('file', file);
+    return api.postFormData(`${TRAINING_PREFIX}/awards/${awardId}/documents`, form);
+  });
+}
+
+export function useValidateDocument() {
+  return useTrainingMutation<string, ActionResponse>((api, documentId) =>
+    api.post(`${TRAINING_PREFIX}/documents/${documentId}/validate`),
+  );
+}
+
+export function useCreateAssessment() {
+  return useTrainingMutation<{ personId: string; input: AssessmentInput }, ActionResponse>(
+    (api, { personId, input }) => api.post(`${TRAINING_PREFIX}/people/${personId}/assessments`, input),
+  );
+}
+
+export function useUpdateAssessment() {
+  return useTrainingMutation<{ id: string; input: AssessmentUpdateInput }, ActionResponse>((api, { id, input }) =>
+    api.put(`${TRAINING_PREFIX}/assessments/${id}`, input),
+  );
+}
+
+export function useDeleteAssessment() {
+  return useTrainingMutation<string, ActionResponse>((api, id) =>
+    api.delete(`${TRAINING_PREFIX}/assessments/${id}`),
+  );
+}
+
+export function useUpsertPath() {
+  return useTrainingMutation<{ id?: string; input: PathInput }, ActionResponse>((api, { id, input }) =>
+    id ? api.put(`${TRAINING_PREFIX}/paths/${id}`, input) : api.post(`${TRAINING_PREFIX}/paths`, input),
+  );
+}
+
+export function useReplacePathSteps() {
+  return useTrainingMutation<{ pathId: string; input: PathStepsInput }, ActionResponse>((api, { pathId, input }) =>
+    api.put(`${TRAINING_PREFIX}/paths/${pathId}/steps`, input),
+  );
+}
+
+export function useAssignPersonPath() {
+  return useTrainingMutation<{ personId: string; input: PathAssignmentInput }, ActionResponse>(
+    (api, { personId, input }) => api.post(`${TRAINING_PREFIX}/people/${personId}/paths`, input),
+  );
+}
+
+export function useUpdatePersonPath() {
+  return useTrainingMutation<
+    { personId: string; pathId: string; input: PathAssignmentUpdateInput },
+    ActionResponse
+  >((api, { personId, pathId, input }) =>
+    api.put(`${TRAINING_PREFIX}/people/${personId}/paths/${pathId}`, input),
+  );
+}
+
+export function useRemovePersonPath() {
+  return useTrainingMutation<{ personId: string; pathId: string }, ActionResponse>((api, { personId, pathId }) =>
+    api.delete(`${TRAINING_PREFIX}/people/${personId}/paths/${pathId}`),
   );
 }

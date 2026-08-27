@@ -11,7 +11,10 @@ import { Button, Icon, Skeleton, StatusBadge } from '@mrsmith/ui';
 import { usePersonDetail } from '../../api/queries';
 import { formatDateOnly, formatInstantDate } from '../../components/events/eventFormat';
 import { deliveryStatusVariant } from '../../components/events/statusVariants';
+import { AssessmentsSection } from '../../components/people/AssessmentsSection';
+import { AwardsSection } from '../../components/people/AwardsSection';
 import { PersonEditorModal } from '../../components/people/PersonEditorModal';
+import { PersonPathsSection } from '../../components/people/PersonPathsSection';
 import { DELIVERY_STATUS_LABELS, LEARNING_OUTCOME_LABELS, NEED_LABELS, PERSON_STATUS_LABELS, REQUEST_OUTCOME_LABELS } from '../../lib/labels';
 import listStyles from '../RequestsPage/listPage.module.css';
 import cardStyles from '../../components/requests/drawerShared.module.css';
@@ -131,6 +134,10 @@ export function PersonPage() {
           </div>
         )}
       </section>
+
+      <AwardsSection personId={person.id} awards={person.awards} enrollments={person.enrollments} />
+      <AssessmentsSection personId={person.id} assessments={person.assessments} />
+      <PersonPathsSection personId={person.id} paths={person.paths} />
 
       <section className={cardStyles.card}>
         <h3 className={cardStyles.cardTitle}>Richieste</h3>

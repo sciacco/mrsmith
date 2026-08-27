@@ -1,0 +1,28 @@
+/* Dettaglio certificazione (#162, §Catalogo 4): tableWrap/miniTable
+   condivisi con CourseDetailDrawer.module.css (import diretto in
+   CertificationDetailDrawer.tsx), qui solo le classi specifiche. */
+
+.refList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.refList li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.refList a {
+  color: var(--color-accent);
+}
+
+.exportRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

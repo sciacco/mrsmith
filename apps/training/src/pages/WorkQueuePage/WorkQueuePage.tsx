@@ -4,6 +4,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { formatCurrency, formatInstant, formatLocalDate, formatNumber } from '@mrsmith/format';
 import { Icon, Skeleton, StatusBadge, type StatusBadgeVariant } from '@mrsmith/ui';
 import {
+  useExpiringCertifications,
   useExpiringCoverage,
   useRequestsAwaitingDecision,
   useRequestsWithoutTLOpinion,
@@ -17,6 +18,7 @@ import {
 import type {
   EconomicState,
   EventListRow,
+  ExpiringCertificationQueueRow,
   ExpiringPersonRow,
   ExpiringSeatRuleRow,
   RequestAwaitingDecisionRow,
@@ -275,6 +277,7 @@ export function WorkQueuePage() {
   const awaitingDecision = useRequestsAwaitingDecision();
   const seatCoverage = useSeatRuleCoverage();
   const expiring = useExpiringCoverage(withinDays);
+  const expiringCertifications = useExpiringCertifications(withinDays);
   const unfed = useUnfedPopulation();
   const rounds = useRoundsWithoutEvent(withinDays);
   const expenses = useUnapprovedEventExpenses();
@@ -285,7 +288,18 @@ export function WorkQueuePage() {
   const withoutSessions = (events.data ?? []).filter((e) => e.flags.withoutSessions);
   const unassignedEnrollments = (events.data ?? []).filter((e) => e.flags.unassignedEnrollments);
 
-  const queries = [withoutOpinion, awaitingDecision, seatCoverage, expiring, unfed, rounds, expenses, stale, events];
+  const queries = [
+    withoutOpinion,
+    awaitingDecision,
+    seatCoverage,
+    expiring,
+    expiringCertifications,
+    unfed,
+    rounds,
+    expenses,
+    stale,
+    events,
+  ];
   const allLoaded = queries.every((q) => !q.isLoading);
   const anyError = queries.some((q) => q.isError);
   const totalCount =
@@ -293,6 +307,7 @@ export function WorkQueuePage() {
     (awaitingDecision.data?.length ?? 0) +
     (seatCoverage.data?.length ?? 0) +
     (expiring.data ? expiring.data.people.length + expiring.data.seatRules.length : 0) +
+    (expiringCertifications.data?.certifications.length ?? 0) +
     (unfed.data?.length ?? 0) +
     (rounds.data?.rules.length ?? 0) +
     (expenses.data?.length ?? 0) +
@@ -510,6 +525,27 @@ export function WorkQueuePage() {
                   { header: 'Prossima scadenza', render: (r) => formatDate(r.nextRoundDeadline) },
                   { header: 'Giorni', align: 'right', render: (r) => ageLabel(r.daysUntil) },
                   { header: 'Prima tornata', render: (r) => (r.firstRound ? 'Sì' : 'No') },
+                ]}
+              />
+            </QueueSection>
+
+            <QueueSection
+              title="Certificazioni in scadenza"
+              count={expiringCertifications.data?.certifications.length}
+              isLoading={expiringCertifications.isLoading}
+              isError={expiringCertifications.isError}
+              isEmpty={(expiringCertifications.data?.certifications.length ?? 0) === 0}
+              emptyMessage="Nessuna certificazione in scadenza entro l'orizzonte impostato."
+            >
+              <QueueTable<ExpiringCertificationQueueRow>
+                rows={expiringCertifications.data?.certifications ?? []}
+                rowKey={(r) => r.awardId}
+                linkTo={(r) => `/persone/${r.employeeId}`}
+                columns={[
+                  { header: 'Persona', render: (r) => r.employeeName },
+                  { header: 'Certificazione', render: (r) => r.certificationName },
+                  { header: 'Scadenza', render: (r) => formatDate(r.expiresOn) },
+                  { header: 'Giorni', align: 'right', render: (r) => ageLabel(r.daysToExpiry) },
                 ]}
               />
             </QueueSection>

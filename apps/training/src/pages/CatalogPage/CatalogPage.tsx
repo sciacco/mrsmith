@@ -9,18 +9,30 @@ import { Button, Icon, Skeleton, StatusBadge, ToggleSwitch } from '@mrsmith/ui';
 import { useTrainingCourses } from '../../api/queries';
 import type { CourseListRow } from '../../api/types';
 import { AnagraficheSection } from '../../components/catalog/AnagraficheSection';
+import { CertificationDetailDrawer } from '../../components/catalog/CertificationDetailDrawer';
+import { CertificationsSection } from '../../components/catalog/CertificationsSection';
 import { CourseDetailDrawer } from '../../components/catalog/CourseDetailDrawer';
 import { CourseEditorModal } from '../../components/catalog/CourseEditorModal';
+import { PathDetailDrawer } from '../../components/catalog/PathDetailDrawer';
+import { PathsCatalogSection } from '../../components/catalog/PathsCatalogSection';
 import { DELIVERY_MODE_LABELS, PROVIDER_KIND_LABELS } from '../../lib/labels';
 import listStyles from '../RequestsPage/listPage.module.css';
 import viewStyles from '../FactorialPage.module.css';
 
-type View = 'corsi' | 'anagrafiche';
+// Percorsi (#162, §Catalogo 5) e Certificazioni (#162, §Catalogo 4) sono
+// nuove sottosezioni allo stesso livello di Corsi/Anagrafiche: la seconda è
+// il punto d'ingresso operativo (titolari, corsi, regole, export) —
+// Anagrafiche resta la gestione anagrafica di base, non duplicata qui.
+type View = 'corsi' | 'anagrafiche' | 'certificazioni' | 'percorsi';
 
 export function CatalogPage() {
   const [params, setParams] = useSearchParams();
-  const view: View = params.get('vista') === 'anagrafiche' ? 'anagrafiche' : 'corsi';
+  const rawView = params.get('vista');
+  const view: View =
+    rawView === 'anagrafiche' || rawView === 'certificazioni' || rawView === 'percorsi' ? rawView : 'corsi';
   const selectedId = params.get('id');
+  const selectedCertId = params.get('certId');
+  const selectedPathId = params.get('pathId');
 
   const [showCreate, setShowCreate] = useState(false);
   const [onlyToCurate, setOnlyToCurate] = useState(false);
@@ -49,12 +61,36 @@ export function CatalogPage() {
     setParams(nextParams, { replace: true });
   }
 
+  function openCertification(id: string) {
+    const nextParams = new URLSearchParams(params);
+    nextParams.set('certId', id);
+    setParams(nextParams, { replace: true });
+  }
+
+  function closeCertification() {
+    const nextParams = new URLSearchParams(params);
+    nextParams.delete('certId');
+    setParams(nextParams, { replace: true });
+  }
+
+  function openPath(id: string) {
+    const nextParams = new URLSearchParams(params);
+    nextParams.set('pathId', id);
+    setParams(nextParams, { replace: true });
+  }
+
+  function closePath() {
+    const nextParams = new URLSearchParams(params);
+    nextParams.delete('pathId');
+    setParams(nextParams, { replace: true });
+  }
+
   return (
     <main className={listStyles.page}>
       <header className={listStyles.header}>
         <div>
           <h1 className={listStyles.title}>Catalogo</h1>
-          <p className={listStyles.subtitle}>Corsi, fornitori, aree di competenza e certificazioni.</p>
+          <p className={listStyles.subtitle}>Corsi, percorsi, fornitori, aree di competenza e certificazioni.</p>
         </div>
         <nav className={viewStyles.viewSwitch} aria-label="Vista catalogo">
           <button
@@ -72,6 +108,22 @@ export function CatalogPage() {
             onClick={() => setView('anagrafiche')}
           >
             Anagrafiche
+          </button>
+          <button
+            type="button"
+            className={view === 'certificazioni' ? viewStyles.viewButtonActive : viewStyles.viewButton}
+            aria-current={view === 'certificazioni' ? 'true' : undefined}
+            onClick={() => setView('certificazioni')}
+          >
+            Certificazioni
+          </button>
+          <button
+            type="button"
+            className={view === 'percorsi' ? viewStyles.viewButtonActive : viewStyles.viewButton}
+            aria-current={view === 'percorsi' ? 'true' : undefined}
+            onClick={() => setView('percorsi')}
+          >
+            Percorsi
           </button>
         </nav>
       </header>
@@ -147,7 +199,22 @@ export function CatalogPage() {
                         {row.defaultHours !== undefined ? `${row.defaultHours} h` : '—'}
                         {row.defaultCost !== undefined ? ` · ${formatCurrency(row.defaultCost) ?? '—'}` : ''}
                       </td>
-                      <td>{row.leadsToCertName || '—'}</td>
+                      <td>
+                        {row.leadsToCertId ? (
+                          <button
+                            type="button"
+                            className={listStyles.rowLink}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openCertification(row.leadsToCertId as string);
+                            }}
+                          >
+                            {row.leadsToCertName}
+                          </button>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
                       <td>
                         {row.complianceRelated ? (
                           <StatusBadge value="compliance" label={row.complianceFramework || 'Sì'} variant="warning" />
@@ -163,8 +230,12 @@ export function CatalogPage() {
             </div>
           )}
         </>
-      ) : (
+      ) : view === 'anagrafiche' ? (
         <AnagraficheSection />
+      ) : view === 'certificazioni' ? (
+        <CertificationsSection onOpen={openCertification} onGoToAnagrafiche={() => setView('anagrafiche')} />
+      ) : (
+        <PathsCatalogSection onOpen={openPath} />
       )}
 
       {showCreate && (
@@ -179,6 +250,8 @@ export function CatalogPage() {
         />
       )}
       {selectedId && <CourseDetailDrawer id={selectedId} onClose={closeDetail} />}
+      {selectedCertId && <CertificationDetailDrawer id={selectedCertId} onClose={closeCertification} />}
+      {selectedPathId && <PathDetailDrawer id={selectedPathId} onClose={closePath} />}
     </main>
   );
 }

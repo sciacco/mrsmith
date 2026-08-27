@@ -1,0 +1,66 @@
+/* Percorsi assegnati nella scheda persona (#162, §Persone 3): una card per
+   assegnazione con il progresso per passo, coerente con le altre card della
+   scheda (components/requests/drawerShared.module.css). */
+
+.pathCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.pathHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.pathName {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.pathMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.pathActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.stepList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.8125rem;
+}
+
+.stepLabel {
+  color: var(--color-text);
+}
+
+.stepRef {
+  color: var(--color-text-muted);
+}

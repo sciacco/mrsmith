@@ -230,6 +230,40 @@ export const FACTORIAL_SYNC_KIND_LABELS: Record<string, string> = {
   attendance_missing_check_failed: 'Verifica presenza remota non riuscita',
 };
 
+// Conseguimenti, valutazioni e percorsi nella scheda persona e nel catalogo
+// (#162). Vocabolario allineato agli enum Postgres di
+// deploy/migrations/012_anisetta_training.sql (award_outcome,
+// validation_source) e alla vista current_status della stessa migrazione.
+export const AWARD_OUTCOME_LABELS: Record<string, string> = {
+  passed_exam: 'Esame superato',
+  attendance_only: 'Attestato di frequenza',
+};
+
+export const VALIDATION_SOURCE_LABELS: Record<string, string> = {
+  document_verified: 'Documento verificato',
+  declared_survey: 'Dichiarata da questionario',
+  declared_verbal: 'Dichiarata a voce',
+  declared_cv: 'Dichiarata da CV',
+  imported_legacy: 'Importata da storico',
+};
+
+export const AWARD_STATUS_LABELS: Record<string, string> = {
+  valid: 'Valida',
+  valid_no_expiry: 'Valida senza scadenza',
+  expired: 'Scaduta',
+};
+
+// Scala descrittiva 0-5 delle valutazioni di competenza: copy presentazionale
+// (nessuna rubrica di dominio dichiarata altrove), scala standard L&D.
+export const ASSESSMENT_LEVEL_LABELS: Record<number, string> = {
+  0: 'Nessuna conoscenza',
+  1: 'Consapevolezza',
+  2: 'Base',
+  3: 'Intermedio',
+  4: 'Avanzato',
+  5: 'Esperto',
+};
+
 // Contatori aggregati della run (factorialSyncCounters, backend), mostrati
 // solo quando positivi.
 export const FACTORIAL_SYNC_COUNTER_LABELS: Record<string, string> = {

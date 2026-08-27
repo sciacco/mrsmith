@@ -1,0 +1,20 @@
+/* Conseguimenti della scheda persona (#162, §Persone 1): colonna attestato
+   con azioni di caricamento/convalida in linea. Stesso vocabolario delle
+   altre sezioni della scheda (components/requests/drawerShared.module.css). */
+
+.hiddenFileInput {
+  display: none;
+}
+
+.docCell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.docName {
+  font-size: 0.8125rem;
+  color: var(--color-text);
+  white-space: normal;
+}
