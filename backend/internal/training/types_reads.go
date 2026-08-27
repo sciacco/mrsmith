@@ -118,6 +118,11 @@ type PersonDetail struct {
 	Requests     []PersonRequestRef      `json:"requests"`
 	RuleCoverage []PersonRuleCoverageRef `json:"ruleCoverage"`
 	Awards       []PersonAwardRef        `json:"awards"`
+	// Assessments e Paths estendono la scheda persona (#161, slice 2 del
+	// task 7): storico valutazioni e percorsi assegnati con progresso
+	// calcolato in lettura.
+	Assessments []PersonAssessmentRef `json:"assessments"`
+	Paths       []PersonPathRef       `json:"paths"`
 }
 
 type TeamLeadRef struct {

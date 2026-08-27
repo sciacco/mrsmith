@@ -106,11 +106,27 @@ const personAwardsJSON = `
       WHERE vc.employee_id = e.id
     ), '[]')::text`
 
+// personAssessmentsJSON aggrega lo storico completo delle valutazioni di
+// competenza della persona (#161, slice 2 del task 7), ordine area/data
+// decrescente come richiesto dalla scheda.
+const personAssessmentsJSON = `
+    COALESCE((
+      SELECT json_agg(json_build_object(
+        'id', asmt.id::text, 'skillAreaId', asmt.skill_area_id::text, 'skillAreaName', sa.name,
+        'level', asmt.level, 'assessedOn', asmt.assessed_on::text, 'source', asmt.source::text,
+        'notes', COALESCE(asmt.notes, '')
+      ) ORDER BY sa.name, asmt.assessed_on DESC)
+      FROM training.skill_assessment asmt
+      JOIN training.skill_area sa ON sa.id = asmt.skill_area_id
+      WHERE asmt.employee_id = e.id
+    ), '[]')::text`
+
 // GetPersonDetail e la scheda formativa: dati persona, appartenenze,
 // gruppi, iscrizioni cross-evento (CancelledAt e quello dell'evento,
 // l'iscrizione non ne ha uno proprio), richieste (Outcome nil se aperta),
-// conseguimenti (data decrescente) e copertura sulle regole attive la cui
-// platea la include.
+// conseguimenti (data decrescente), copertura sulle regole attive la cui
+// platea la include, valutazioni di competenza e percorsi assegnati con
+// progresso calcolato (#161, slice 2 del task 7).
 func (s *SQLStore) GetPersonDetail(ctx context.Context, id string) (PersonDetail, error) {
 	id = strings.TrimSpace(id)
 	if id == "" {
@@ -141,14 +157,14 @@ SELECT
     LEFT JOIN training.course rc ON rc.id = r.course_id
     WHERE r.employee_id = e.id
   ), '[]')::text,` +
-		personAwardsJSON + `
+		personAwardsJSON + "," + personAssessmentsJSON + `
 FROM training.employee e
 WHERE e.id = $1::uuid`
 	var detail PersonDetail
-	var teams, groups, enrollments, requests, awards string
+	var teams, groups, enrollments, requests, awards, assessments string
 	err := s.db.QueryRowContext(ctx, q, id).Scan(
 		&detail.ID, &detail.FirstName, &detail.LastName, &detail.Email, &detail.Status, &detail.DirectoryExempt,
-		&teams, &groups, &enrollments, &requests, &awards,
+		&teams, &groups, &enrollments, &requests, &awards, &assessments,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return PersonDetail{}, notFoundError("employee_not_found", "persona non trovata")
@@ -171,10 +187,58 @@ WHERE e.id = $1::uuid`
 	if detail.Awards, err = decodeJSONSlice[PersonAwardRef](awards); err != nil {
 		return PersonDetail{}, err
 	}
+	if detail.Assessments, err = decodeJSONSlice[PersonAssessmentRef](assessments); err != nil {
+		return PersonDetail{}, err
+	}
 	if detail.RuleCoverage, err = s.personRuleCoverage(ctx, id); err != nil {
 		return PersonDetail{}, err
 	}
+	if detail.Paths, err = s.personPaths(ctx, id); err != nil {
+		return PersonDetail{}, err
+	}
 	return detail, nil
+}
+
+// personPaths carica gli assegnamenti percorso della persona con il
+// progresso calcolato in lettura (#161, decisioni #159 punto 8): nessuna
+// persistenza, un'assegnazione con completedOn valorizzato non si riapre
+// ma il progresso resta informativo.
+func (s *SQLStore) personPaths(ctx context.Context, employeeID string) ([]PersonPathRef, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT elp.path_id::text, lp.name, elp.started_on::text,
+  COALESCE(elp.target_completion::text, ''), COALESCE(elp.completed_on::text, ''), COALESCE(elp.notes, '')
+FROM training.employee_learning_path elp
+JOIN training.learning_path lp ON lp.id = elp.path_id
+WHERE elp.employee_id = $1::uuid
+ORDER BY lp.name`, employeeID)
+	if err != nil {
+		return nil, fmt.Errorf("list training person paths: %w", err)
+	}
+	defer rows.Close()
+
+	result := make([]PersonPathRef, 0)
+	for rows.Next() {
+		var ref PersonPathRef
+		if err := rows.Scan(&ref.PathID, &ref.PathName, &ref.StartedOn, &ref.TargetCompletion, &ref.CompletedOn, &ref.Notes); err != nil {
+			return nil, fmt.Errorf("scan training person path: %w", err)
+		}
+		result = append(result, ref)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for i := range result {
+		steps, err := s.pathSteps(ctx, s.db, result[i].PathID)
+		if err != nil {
+			return nil, err
+		}
+		progress, err := s.assignmentProgress(ctx, s.db, employeeID, result[i].CompletedOn, steps)
+		if err != nil {
+			return nil, err
+		}
+		result[i].PathProgress = progress
+	}
+	return result, nil
 }
 
 // personRuleCoverage riusa il nucleo condiviso di store_coverage.go (D3): per
