@@ -199,6 +199,20 @@ services:
     depends_on:
       - backend
 
+  smart-passive:
+    image: node:20-slim
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm install && pnpm --filter mrsmith-smart-passive dev --host 0.0.0.0"
+    volumes:
+      - .:/app
+      - smart_passive_node_modules:/app/node_modules
+    environment:
+      - VITE_DEV_BACKEND_URL=http://backend:8080
+    ports:
+      - "5197:5197"
+    depends_on:
+      - backend
+
 volumes:
   portal_node_modules:
   budget_node_modules:
@@ -214,3 +228,4 @@ volumes:
   energia_dc_node_modules:
   simulatori_vendita_node_modules:
   afc_tools_node_modules:
+  smart_passive_node_modules:

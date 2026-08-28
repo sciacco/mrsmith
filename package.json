@@ -32,6 +32,7 @@
     "dev:afc-tools": "pnpm --filter @mrsmith/afc-tools dev",
     "dev:cp-backoffice": "pnpm --filter mrsmith-cp-backoffice dev",
     "dev:binocolo": "pnpm --filter mrsmith-binocolo dev",
+    "dev:smart-passive": "pnpm --filter mrsmith-smart-passive dev",
     "build": "pnpm -r --if-present build && cd backend && go build -o bin/server ./cmd/server",
     "build:frontend": "pnpm -r --if-present build",
     "build:backend": "cd backend && go build -o bin/server ./cmd/server",

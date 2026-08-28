@@ -76,6 +76,9 @@ const (
 
 	AFCToolsAppID   = "afc-tools"
 	AFCToolsAppHref = "/apps/afc-tools/"
+
+	SmartPassiveAppID   = "smart-passive"
+	SmartPassiveAppHref = "/apps/smart-passive/"
 )
 
 var (
@@ -111,6 +114,7 @@ var (
 	rdfBackendAccessRoles            = []string{"app_rdf_backend_access"}
 	reportsAccessRoles               = []string{"app_reports_access"}
 	afcToolsAccessRoles              = []string{"app_afctools_access"}
+	smartPassiveAccessRoles          = []string{"app_smartpassive_access"}
 	defaultAccessRoles               = []string{"no-default-roles-cdlan"}
 )
 
@@ -218,6 +222,17 @@ func Catalog(hrefOverrides map[string]string) []Definition {
 		// 	AccessRoles:   defaultRoles,
 		// },
 		// ── MKT&Sales ──
+		{
+			ID:            SmartPassiveAppID,
+			Name:          "Smart Passive",
+			Description:   "Controllo del ciclo passivo: abbinamento fatture, anomalie e consumi.",
+			Icon:          "funnel",
+			Href:          SmartPassiveAppHref,
+			Status:        "dev",
+			CategoryID:    "acquisti",
+			CategoryTitle: "Acquisti",
+			AccessRoles:   SmartPassiveAccessRoles(),
+		},
 		{
 			ID:            KitProductsAppID,
 			Name:          "Kit e Prodotti",
@@ -633,6 +648,10 @@ func AFCToolsAccessRoles() []string {
 	return slices.Clone(afcToolsAccessRoles)
 }
 
+func SmartPassiveAccessRoles() []string {
+	return slices.Clone(smartPassiveAccessRoles)
+}
+
 func DefaultAccessRoles() []string {
 	return slices.Clone(defaultAccessRoles)
 }
@@ -674,6 +693,7 @@ func AllRoles() []string {
 		rdfBackendAccessRoles,
 		reportsAccessRoles,
 		afcToolsAccessRoles,
+		smartPassiveAccessRoles,
 	}
 	seen := map[string]struct{}{}
 	result := make([]string, 0)

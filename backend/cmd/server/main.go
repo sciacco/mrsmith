@@ -517,6 +517,11 @@ func main() {
 	} else if cfg.StaticDir == "" {
 		hrefOverrides[applaunch.AFCToolsAppID] = "http://localhost:5186"
 	}
+	if cfg.SmartPassiveAppURL != "" {
+		hrefOverrides[applaunch.SmartPassiveAppID] = cfg.SmartPassiveAppURL
+	} else if cfg.StaticDir == "" {
+		hrefOverrides[applaunch.SmartPassiveAppID] = "http://localhost:5197"
+	}
 	appCatalog := applaunch.Catalog(hrefOverrides)
 	// Single source of truth for cross-app deep links (dev port / prod /apps path
 	// already resolved via hrefOverrides). Injected into modules that link out.

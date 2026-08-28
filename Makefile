@@ -136,6 +136,10 @@ dev-afc-tools:        ## Solo afc-tools app
 dev-cp-backoffice:    ## Solo cp-backoffice app
 	pnpm --filter mrsmith-cp-backoffice dev
 
+.PHONY: dev-smart-passive
+dev-smart-passive:    ## Solo smart-passive app
+	pnpm --filter mrsmith-smart-passive dev
+
 # Build ────────────────────────────────────────
 
 .PHONY: build

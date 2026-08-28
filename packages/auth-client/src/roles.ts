@@ -38,6 +38,7 @@ export const APP_ACCESS_ROLES = {
   'rdf-backend': ['app_rdf_backend_access'],
   reports: ['app_reports_access'],
   'afc-tools': ['app_afctools_access'],
+  'smart-passive': ['app_smartpassive_access'],
   training: TRAINING_APP_ACCESS_ROLES,
 } as const satisfies Record<string, readonly string[]>;
 
