@@ -110,7 +110,8 @@ export function SingleSelect<V extends string | number = string | number>({
   const showSearch = searchable ?? options.length > 2;
   const activeSearch = showSearch ? search : '';
   const filtered = options.filter((o) =>
-    o.label.toLowerCase().includes(activeSearch.toLowerCase()),
+    o.label.toLowerCase().includes(activeSearch.toLowerCase()) ||
+    (o.secondaryLabel?.toLowerCase().includes(activeSearch.toLowerCase()) ?? false),
   );
 
   const selectedOption = options.find((o) => o.value === selected);

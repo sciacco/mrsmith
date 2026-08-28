@@ -477,13 +477,21 @@ export function KitDetailPage() {
             <span>Internal name</span>
             <input value={kitDraft.internal_name} onChange={(e) => setKitDraft((c) => ({ ...c, internal_name: e.target.value }))} />
           </label>
-          <label className={styles.field}>
+          <div className={styles.field}>
             <span>Main product</span>
-            <select value={kitDraft.main_product_code ?? ''} onChange={(e) => setKitDraft((c) => ({ ...c, main_product_code: e.target.value || null }))}>
-              <option value="">Seleziona</option>
-              {products?.map((p) => <option key={p.code} value={p.code}>{p.code} - {p.internal_name}</option>)}
-            </select>
-          </label>
+            <SingleSelect<string>
+              options={(products ?? []).map((p) => ({
+                value: p.code,
+                label: p.code,
+                secondaryLabel: p.internal_name,
+              }))}
+              selected={kitDraft.main_product_code || null}
+              onChange={(v) => setKitDraft((c) => ({ ...c, main_product_code: v ?? null }))}
+              placeholder="Cerca prodotto..."
+              allowClear
+              clearLabel="Seleziona"
+            />
+          </div>
           <label className={styles.field}>
             <span>Categoria</span>
             <select value={kitDraft.category_id} onChange={(e) => setKitDraft((c) => ({ ...c, category_id: Number(e.target.value) }))}>
@@ -542,7 +550,7 @@ export function KitDetailPage() {
             <input type="number" value={kitDraft.next_subscription_months} onChange={(e) => setKitDraft((c) => ({ ...c, next_subscription_months: Number(e.target.value) }))} />
           </label>
         </div>
-        <label className={styles.field}>
+        <div className={styles.field}>
           <span>Sellable groups</span>
           <MultiSelect<number>
             options={(customerGroups ?? []).map((g) => ({ value: g.id, label: g.name }))}
@@ -550,7 +558,7 @@ export function KitDetailPage() {
             onChange={(values) => setKitDraft((c) => ({ ...c, sellable_group_ids: values }))}
             placeholder="Seleziona gruppi"
           />
-        </label>
+        </div>
       </section>
 
       {/* ── Products ── */}
