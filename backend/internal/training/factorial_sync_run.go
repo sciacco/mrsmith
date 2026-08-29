@@ -88,6 +88,7 @@ func (s *SQLStore) RunFactorialSync(ctx context.Context, deps FactorialSyncDeps,
 			"outbound_conflicts", len(report.Outbound.Conflicts),
 			"outbound_warnings", len(report.Outbound.Warnings),
 			"outbound_planned", len(report.Outbound.Planned),
+			"outbound_writes", len(report.Outbound.Writes),
 			"conflict_samples", factorialSyncConflictSamples(report.Inbound, report.Outbound, factorialSyncSampleSize),
 		}
 		if err != nil {

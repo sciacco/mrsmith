@@ -102,8 +102,8 @@ func printSummary(report training.FactorialSyncRun) {
 	}
 	fmt.Fprintf(os.Stdout, "  inbound: conflicts=%d warnings=%d rda_exceptions=%s\n",
 		len(report.Inbound.Conflicts), len(report.Inbound.Warnings), rdaExceptions)
-	fmt.Fprintf(os.Stdout, "  outbound: conflicts=%d warnings=%d planned=%d\n",
-		len(report.Outbound.Conflicts), len(report.Outbound.Warnings), len(report.Outbound.Planned))
+	fmt.Fprintf(os.Stdout, "  outbound: conflicts=%d warnings=%d planned=%d writes=%d\n",
+		len(report.Outbound.Conflicts), len(report.Outbound.Warnings), len(report.Outbound.Planned), len(report.Outbound.Writes))
 	if report.Error != "" {
 		fmt.Fprintf(os.Stderr, "error: %s\n", report.Error)
 	}

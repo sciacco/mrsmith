@@ -42,6 +42,7 @@ func factorialSyncCounters(report FactorialSyncRun) map[string]int {
 		counters["outboundConflicts"] = len(report.Outbound.Conflicts)
 		counters["outboundWarnings"] = len(report.Outbound.Warnings)
 		counters["outboundPlanned"] = len(report.Outbound.Planned)
+		counters["outboundWrites"] = len(report.Outbound.Writes)
 	}
 	return counters
 }

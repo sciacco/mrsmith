@@ -49,11 +49,14 @@ type outboundIssue struct {
 	LocalID     string
 }
 
-// outboundSyncResult: conflitti/warning accumulati; Planned solo in dry-run, al posto di ogni scrittura.
+// outboundSyncResult: conflitti/warning accumulati; Planned solo in dry-run,
+// al posto di ogni scrittura. Writes registra in commit ogni scrittura remota
+// riuscita: nessuna scrittura verso Factorial deve restare invisibile nel report.
 type outboundSyncResult struct {
 	Conflicts []outboundIssue
 	Warnings  []outboundIssue
 	Planned   []outboundIssue
+	Writes    []outboundIssue
 }
 
 // dateEnvelope e' l'intervallo (YYYY-MM-DD) da classDateEnvelope; OK=false se nessuna sessione contribuisce.
@@ -774,6 +777,7 @@ func (s *SQLStore) createOrAdoptTraining(ctx context.Context, cli *factorial.Cli
 		if err := s.persistFactorialLink(ctx, principal, "course", "factorial_training_id", course.ID, *created.ID, actionFactorialExport); err != nil {
 			return "", err
 		}
+		result.Writes = append(result.Writes, outboundIssue{Kind: "training_create", Ref: *created.ID, LocalEntity: "course", LocalID: course.ID})
 		return *created.ID, nil
 	}
 }
@@ -808,7 +812,9 @@ func (s *SQLStore) maybeUpdateTraining(ctx context.Context, cli *factorial.Clien
 		}
 		issue.LocalEntity, issue.LocalID = "course", course.ID
 		result.Warnings = append(result.Warnings, issue)
+		return nil
 	}
+	result.Writes = append(result.Writes, outboundIssue{Kind: "training_update", Ref: trainingID, LocalEntity: "course", LocalID: course.ID})
 	return nil
 }
 
@@ -872,6 +878,7 @@ func (s *SQLStore) resolveClass(ctx context.Context, cli *factorial.Client, idx 
 			if err := s.persistFactorialLink(ctx, principal, "training_event", "factorial_class_id", ev.ID, *created.ID, actionFactorialExport); err != nil {
 				return "", err
 			}
+			result.Writes = append(result.Writes, outboundIssue{Kind: "class_create", Ref: *created.ID, LocalEntity: "training_event", LocalID: ev.ID})
 			return *created.ID, nil
 		}
 	}
@@ -910,7 +917,9 @@ func (s *SQLStore) resolveClass(ctx context.Context, cli *factorial.Client, idx 
 		}
 		issue.LocalEntity, issue.LocalID = "training_event", ev.ID
 		result.Warnings = append(result.Warnings, issue)
+		return ev.FactorialClassID, nil
 	}
+	result.Writes = append(result.Writes, outboundIssue{Kind: "class_update", Ref: ev.FactorialClassID, LocalEntity: "training_event", LocalID: ev.ID})
 	return ev.FactorialClassID, nil
 }
 
@@ -967,6 +976,7 @@ func (s *SQLStore) resolveSessionOutbound(ctx context.Context, cli *factorial.Cl
 			if err := s.persistSessionLink(ctx, principal, sess.ID, *created.ID, local, actionFactorialExport); err != nil {
 				return "", err
 			}
+			result.Writes = append(result.Writes, outboundIssue{Kind: "session_create", Ref: *created.ID, LocalEntity: "training_session", LocalID: sess.ID})
 			return *created.ID, nil
 		}
 	}
@@ -996,6 +1006,7 @@ func (s *SQLStore) resolveSessionOutbound(ctx context.Context, cli *factorial.Cl
 		result.Warnings = append(result.Warnings, issue)
 		return sess.FactorialSessionID, nil
 	}
+	result.Writes = append(result.Writes, outboundIssue{Kind: "session_update", Ref: sess.FactorialSessionID, LocalEntity: "training_session", LocalID: sess.ID})
 	if err := s.persistSessionLink(ctx, principal, sess.ID, sess.FactorialSessionID, local, actionFactorialExport); err != nil {
 		return "", err
 	}
@@ -1078,6 +1089,7 @@ func (s *SQLStore) exportMembershipAndAccess(ctx context.Context, cli *factorial
 			issue.LocalEntity, issue.LocalID = "course", course.ID
 			result.Warnings = append(result.Warnings, issue)
 		} else {
+			result.Writes = append(result.Writes, outboundIssue{Kind: "membership_bulk_create", Ref: trainingID, Count: len(created), LocalEntity: "course", LocalID: course.ID})
 			for _, m := range created {
 				if m.ID == nil || m.EmployeeID == nil {
 					continue
@@ -1110,6 +1122,7 @@ func (s *SQLStore) exportMembershipAndAccess(ctx context.Context, cli *factorial
 			result.Warnings = append(result.Warnings, issue)
 			continue
 		}
+		result.Writes = append(result.Writes, outboundIssue{Kind: "access_bulk_create", Ref: factorialSessionID, Count: len(createdAccess), LocalEntity: "training_session", LocalID: needs[0].SessionID})
 		accessIDByEmployee := map[string]string{}
 		var newAccessIDs []string
 		for _, a := range createdAccess {
@@ -1236,6 +1249,7 @@ func (s *SQLStore) exportAttendancePropagation(ctx context.Context, cli *factori
 					result.Warnings = append(result.Warnings, issue)
 					continue
 				}
+				result.Writes = append(result.Writes, outboundIssue{Kind: "attendance_update", Ref: p.AttendanceID, LocalEntity: "enrollment", LocalID: p.EnrollmentID})
 				link := enrollmentSessionLink{EnrollmentID: p.EnrollmentID, SessionID: sess.ID, Value: p.Status}
 				if err := s.persistEnrollmentSessionLinks(ctx, principal, "factorial_synced_status", []enrollmentSessionLink{link}); err != nil {
 					return err
