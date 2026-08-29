@@ -661,7 +661,6 @@ func main() {
 		Notifier:        notificationNotifier,
 		Logger:          logger,
 		RoleResolver:    keycloakRoleResolver,
-		StorageDir:      cfg.TrainingStorageDir,
 		StorageMaxBytes: cfg.TrainingStorageMaxBytes,
 		TrainingAppURL:  cfg.TrainingAppURL,
 		StaticDir:       cfg.StaticDir,
@@ -804,7 +803,7 @@ func main() {
 			training.NewSQLStore(anisettaDB),
 			logger,
 		).WithDirectorySync(directoryProvider, cfg.TrainingDirectorySyncEnabled).
-			WithFactorialSync(factorialCli, cfg.FactorialTrainingAuthorEmployeeID, cfg.TrainingFactorialSyncEnabled)
+			WithFactorialSync(factorialCli, cfg.TrainingFactorialSyncEnabled)
 		workerWG.Add(1)
 		go func() {
 			defer workerWG.Done()

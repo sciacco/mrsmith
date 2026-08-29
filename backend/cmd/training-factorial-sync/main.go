@@ -2,8 +2,9 @@
 // di sincronizzazione Factorial (#141, slice 7/8 = #149): stesso pattern del
 // vecchio comando CSV di bootstrap, rimosso (dry-run default, --commit
 // esplicito, exit code non zero su run fallita, report JSON opzionale).
-// Config da env di processo, mai da backend/.env. Nessun retry: il retry
-// operativo e' la run successiva.
+// Config da env di processo, mai da backend/.env; l'author employee id e'
+// configurazione a runtime su mrsmith.runtime_config, letta dalla run.
+// Nessun retry: il retry operativo e' la run successiva.
 package main
 
 import (
@@ -50,11 +51,6 @@ func run() error {
 	if apiKey == "" {
 		return errors.New("FACTORIAL_API_KEY e' obbligatorio")
 	}
-	technicalEmployeeID := os.Getenv("FACTORIAL_TRAINING_AUTHOR_EMPLOYEE_ID")
-	if technicalEmployeeID == "" {
-		return errors.New("FACTORIAL_TRAINING_AUTHOR_EMPLOYEE_ID e' obbligatorio")
-	}
-
 	db, err := database.New(database.Config{Driver: "postgres", DSN: *dsn})
 	if err != nil {
 		return err
@@ -73,9 +69,8 @@ func run() error {
 	directoryProvider := factorialdir.New(factorialCli)
 
 	deps := training.FactorialSyncDeps{
-		Directory:           directoryProvider,
-		Factorial:           factorialCli,
-		TechnicalEmployeeID: technicalEmployeeID,
+		Directory: directoryProvider,
+		Factorial: factorialCli,
 	}
 	report, runErr := store.RunFactorialSync(context.Background(), deps, "cli", !*commit)
 	printSummary(report)

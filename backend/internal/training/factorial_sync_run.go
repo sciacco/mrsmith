@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/sciacco/mrsmith/internal/platform/directory"
@@ -23,10 +22,9 @@ const factorialSyncSampleSize = 20
 // FactorialSyncDeps raggruppa le dipendenze esterne di una run, per non far
 // crescere la firma di RunFactorialSync (stesso pattern di training.Deps).
 type FactorialSyncDeps struct {
-	Directory           directory.Provider
-	Factorial           *factorial.Client
-	TechnicalEmployeeID string
-	Logger              *slog.Logger
+	Directory directory.Provider
+	Factorial *factorial.Client
+	Logger    *slog.Logger
 }
 
 // FactorialSyncRun e' il report di una run, per JobRunner (log strutturato)
@@ -115,15 +113,21 @@ func (s *SQLStore) RunFactorialSync(ctx context.Context, deps FactorialSyncDeps,
 	if deps.Factorial == nil {
 		return finish(fmt.Errorf("factorial client not configured"))
 	}
-	if strings.TrimSpace(deps.TechnicalEmployeeID) == "" {
-		return finish(fmt.Errorf("factorial technical employee not configured"))
+	// L'author delle scritture Factorial e' configurazione a runtime su
+	// mrsmith.runtime_config, letta a ogni run — modificabile senza riavvio.
+	technicalEmployeeID, err := s.factorialAuthorEmployeeID(ctx)
+	if err != nil {
+		return finish(err)
+	}
+	if technicalEmployeeID == "" {
+		return finish(fmt.Errorf("factorial author employee non configurato: inserire la riga mrsmith.runtime_config ('training','factorial_author_employee_id')"))
 	}
 
 	if _, err := s.RunDirectorySync(ctx, deps.Directory, actor+":factorial", dryRun); err != nil {
 		return finish(fmt.Errorf("prerequisite directory sync: %w", err))
 	}
 
-	err := s.withFactorialSyncLock(ctx, func() error {
+	err = s.withFactorialSyncLock(ctx, func() error {
 		snapshot, err := deps.Directory.Snapshot(ctx)
 		if err != nil {
 			return fmt.Errorf("prerequisite active snapshot: %w", err)
@@ -163,7 +167,7 @@ func (s *SQLStore) RunFactorialSync(ctx context.Context, deps FactorialSyncDeps,
 			return fmt.Errorf("apply factorial inbound sync: %w", err)
 		}
 
-		outbound, err := s.applyOutboundSync(ctx, deps.Factorial, deps.TechnicalEmployeeID, filtered, activeIDs, dryRun)
+		outbound, err := s.applyOutboundSync(ctx, deps.Factorial, technicalEmployeeID, filtered, activeIDs, dryRun)
 		*report.Outbound = outbound
 		if err != nil {
 			return fmt.Errorf("apply factorial outbound sync: %w", err)

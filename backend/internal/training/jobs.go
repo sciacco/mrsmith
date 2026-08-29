@@ -3,7 +3,6 @@ package training
 import (
 	"context"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/sciacco/mrsmith/internal/platform/directory"
@@ -41,22 +40,22 @@ func (r *JobRunner) WithDirectorySync(provider directory.Provider, enabled bool)
 }
 
 // WithFactorialSync enables the periodic Factorial training reconciliation.
-// It stays off unless directory sync is enabled and both the Factorial
-// client and the technical (author) employee id are configured: the run
-// depends on a fresh directory reconciliation and cannot export to Factorial
-// without an author identity.
-func (r *JobRunner) WithFactorialSync(client *factorial.Client, technicalEmployeeID string, enabled bool) *JobRunner {
+// It stays off unless directory sync is enabled and the Factorial client is
+// configured: the run depends on a fresh directory reconciliation. The author
+// employee id is runtime configuration (mrsmith.runtime_config) read at
+// every run, so it is not a startup prerequisite: a missing row fails the run
+// with an explicit error.
+func (r *JobRunner) WithFactorialSync(client *factorial.Client, enabled bool) *JobRunner {
 	if r == nil {
 		return r
 	}
-	r.factorial = FactorialSyncDeps{Directory: r.directory, Factorial: client, TechnicalEmployeeID: technicalEmployeeID, Logger: r.logger}
-	ready := r.syncDirectory && client != nil && strings.TrimSpace(technicalEmployeeID) != ""
+	r.factorial = FactorialSyncDeps{Directory: r.directory, Factorial: client, Logger: r.logger}
+	ready := r.syncDirectory && client != nil
 	r.syncFactorial = enabled && ready
 	if enabled && !ready {
 		r.logger.Info("training factorial sync disabled: prerequisites not met",
 			"directory_sync_enabled", r.syncDirectory,
-			"factorial_client_configured", client != nil,
-			"author_employee_id_configured", strings.TrimSpace(technicalEmployeeID) != "")
+			"factorial_client_configured", client != nil)
 	}
 	return r
 }

@@ -76,8 +76,9 @@ Names on the left are Factorial Trainings-API resources (`Trainings*` in `pkg/fa
 
 #### Configuration
 
-- `TRAINING_FACTORIAL_SYNC_ENABLED` (default `false`): gates the worker's periodic run; even when `true`, the run stays disabled unless directory sync is enabled and both the Factorial client and `FACTORIAL_TRAINING_AUTHOR_EMPLOYEE_ID` are configured.
-- `FACTORIAL_TRAINING_AUTHOR_EMPLOYEE_ID`: required technical/author employee id used as the author on Factorial writes. The `training-factorial-sync` CLI fails fast without it; the worker instead logs `training factorial sync disabled: prerequisites not met` and leaves the periodic run disabled (`JobRunner.WithFactorialSync`, `jobs.go:61-68`).
+- `TRAINING_FACTORIAL_SYNC_ENABLED` (default `false`): gates the worker's periodic run; even when `true`, the run stays disabled unless directory sync is enabled and the Factorial client is configured (`JobRunner.WithFactorialSync`).
+- Author employee id for Factorial writes: runtime configuration, not env — `mrsmith.runtime_config` row `('training','factorial_author_employee_id')`, JSON string or number, read at the start of every run (`SQLStore.factorialAuthorEmployeeID`, `runtime_config.go`). Missing/empty row fails the run (CLI and worker alike) with an explicit error recorded in the run history; the value can be changed without a restart.
+- Attestati and document contents live in the database: `training.document_blob` keyed by `training.document.storage_key` (migration 134; `DBStorage` in `storage.go`). No local filesystem; `TRAINING_STORAGE_MAX_BYTES` still caps the per-file size (default 20 MB).
 - Factorial HTTP requests use a 30s timeout, configured identically on the worker's and the CLI's client.
 
 #### Operational Notes (accumulated across #143–#149)

@@ -155,7 +155,6 @@ type Config struct {
 	DiagnosticEventsQueueSize     int
 
 	// Training mini-app runtime.
-	TrainingStorageDir      string
 	TrainingStorageMaxBytes int64
 	TrainingJobsEnabled     bool
 	// TrainingDirectorySyncEnabled abilita la sincronizzazione anagrafica
@@ -165,9 +164,8 @@ type Config struct {
 	TrainingFactorialSyncEnabled bool
 
 	// Factorial HR API
-	FactorialAPIKey                   string
-	FactorialBaseURL                  string
-	FactorialTrainingAuthorEmployeeID string
+	FactorialAPIKey  string
+	FactorialBaseURL string
 
 	// Frontend Keycloak (public client, no secret — served to browser via GET /config)
 	KeycloakFrontendURL      string
@@ -303,16 +301,14 @@ func Load() Config {
 			90,
 		),
 		DiagnosticEventsQueueSize:    positiveIntEnvOr("DIAGNOSTIC_EVENTS_QUEUE_SIZE", 1000),
-		TrainingStorageDir:           envOr("TRAINING_STORAGE_DIR", ""),
 		TrainingStorageMaxBytes:      int64(positiveIntEnvOr("TRAINING_STORAGE_MAX_BYTES", 20*1024*1024)),
 		TrainingJobsEnabled:          boolEnvOr("TRAINING_JOBS_ENABLED", false),
 		TrainingDirectorySyncEnabled: boolEnvOr("TRAINING_DIRECTORY_SYNC_ENABLED", false),
 		TrainingJobsInterval:         durationEnvOr("TRAINING_JOBS_INTERVAL", 6*time.Hour),
 		TrainingFactorialSyncEnabled: boolEnvOr("TRAINING_FACTORIAL_SYNC_ENABLED", false),
 
-		FactorialAPIKey:                   envOr("FACTORIAL_API_KEY", ""),
-		FactorialBaseURL:                  envOr("FACTORIAL_BASE_URL", ""),
-		FactorialTrainingAuthorEmployeeID: envOr("FACTORIAL_TRAINING_AUTHOR_EMPLOYEE_ID", ""),
+		FactorialAPIKey:  envOr("FACTORIAL_API_KEY", ""),
+		FactorialBaseURL: envOr("FACTORIAL_BASE_URL", ""),
 
 		KeycloakFrontendURL:      keycloakFrontendURL,
 		KeycloakFrontendRealm:    keycloakFrontendRealm,

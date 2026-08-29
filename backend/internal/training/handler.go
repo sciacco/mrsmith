@@ -28,7 +28,6 @@ type Deps struct {
 	Notifier        notifications.Notifier
 	Logger          *slog.Logger
 	RoleResolver    RoleUserResolver
-	StorageDir      string
 	StorageMaxBytes int64
 	TrainingAppURL  string
 	StaticDir       string
@@ -56,9 +55,12 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	storage, err := NewLocalStorage(deps.StorageDir)
-	if err != nil {
-		logger.Error("training storage disabled", "component", "training", "error", err)
+	// Storage nel database: configurato se e solo se c'e' il DB.
+	// L'assegnazione condizionata evita il puntatore nil tipizzato dentro
+	// l'interfaccia, che renderebbe storageConfigured sempre true.
+	var storage StorageAdapter
+	if deps.DB != nil {
+		storage = NewDBStorage(deps.DB)
 	}
 	if deps.StorageMaxBytes <= 0 {
 		deps.StorageMaxBytes = defaultStorageMaxBytes
