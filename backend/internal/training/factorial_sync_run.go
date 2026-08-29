@@ -32,8 +32,10 @@ type FactorialSyncDeps struct {
 // Tombstone/Inbound/Outbound espongono solo Kind, Ref (id tecnici) ed
 // eventuale status HTTP (Err e' json:"-", mai serializzato).
 type FactorialSyncRun struct {
-	Operation  string `json:"operation"`
-	DryRun     bool   `json:"dryRun"`
+	Operation string `json:"operation"`
+	DryRun    bool   `json:"dryRun"`
+	// Mode: import_only (nessuna scrittura verso Factorial) o full.
+	Mode       string `json:"mode"`
 	Actor      string `json:"actor"`
 	StartedAt  string `json:"startedAt"`
 	FinishedAt string `json:"finishedAt"`
@@ -75,7 +77,7 @@ func (s *SQLStore) RunFactorialSync(ctx context.Context, deps FactorialSyncDeps,
 			level = slog.LevelWarn
 		}
 		args := []any{
-			"operation", report.Operation, "dry_run", report.DryRun, "actor", actor,
+			"operation", report.Operation, "dry_run", report.DryRun, "mode", report.Mode, "actor", actor,
 			"duration", finished.Sub(started), "outcome", report.Outcome,
 			"sessions_without_class", report.SessionsWithoutClass,
 			"tombstone_access_destroyed", report.Tombstone.AccessDestroyed,
@@ -114,14 +116,27 @@ func (s *SQLStore) RunFactorialSync(ctx context.Context, deps FactorialSyncDeps,
 	if deps.Factorial == nil {
 		return finish(fmt.Errorf("factorial client not configured"))
 	}
-	// L'author delle scritture Factorial e' configurazione a runtime su
-	// mrsmith.runtime_config, letta a ogni run — modificabile senza riavvio.
-	technicalEmployeeID, err := s.factorialAuthorEmployeeID(ctx)
+	// Modo della run da mrsmith.runtime_config, letto a ogni run: import_only
+	// (default a riga assente) sospende ogni scrittura verso Factorial —
+	// propagazione cancellazioni ed export — lasciando letture e import.
+	mode, err := s.factorialSyncMode(ctx)
 	if err != nil {
 		return finish(err)
 	}
-	if technicalEmployeeID == "" {
-		return finish(fmt.Errorf("factorial author employee non configurato: inserire la riga mrsmith.runtime_config ('training','factorial_author_employee_id')"))
+	report.Mode = mode
+	writesEnabled := mode == factorialSyncModeFull
+	// L'author delle scritture Factorial e' configurazione a runtime su
+	// mrsmith.runtime_config, letta a ogni run — modificabile senza riavvio.
+	// Serve solo quando le scritture sono abilitate.
+	technicalEmployeeID := ""
+	if writesEnabled {
+		technicalEmployeeID, err = s.factorialAuthorEmployeeID(ctx)
+		if err != nil {
+			return finish(err)
+		}
+		if technicalEmployeeID == "" {
+			return finish(fmt.Errorf("factorial author employee non configurato: inserire la riga mrsmith.runtime_config ('training','factorial_author_employee_id')"))
+		}
 	}
 
 	if _, err := s.RunDirectorySync(ctx, deps.Directory, actor+":factorial", dryRun); err != nil {
@@ -140,7 +155,7 @@ func (s *SQLStore) RunFactorialSync(ctx context.Context, deps FactorialSyncDeps,
 			return fmt.Errorf("fetch factorial training graph: %w", err)
 		}
 
-		tombstone, err := s.applyTombstoneSync(ctx, deps.Factorial, graph, dryRun)
+		tombstone, err := s.applyTombstoneSync(ctx, deps.Factorial, graph, dryRun, writesEnabled)
 		*report.Tombstone = tombstone
 		if err != nil {
 			return fmt.Errorf("apply factorial tombstone sync: %w", err)
@@ -168,6 +183,9 @@ func (s *SQLStore) RunFactorialSync(ctx context.Context, deps FactorialSyncDeps,
 			return fmt.Errorf("apply factorial inbound sync: %w", err)
 		}
 
+		if !writesEnabled {
+			return nil // import_only: nessun export, nessuna scrittura verso Factorial
+		}
 		outbound, err := s.applyOutboundSync(ctx, deps.Factorial, technicalEmployeeID, filtered, activeIDs, dryRun)
 		*report.Outbound = outbound
 		if err != nil {

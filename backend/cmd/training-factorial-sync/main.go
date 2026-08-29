@@ -92,8 +92,8 @@ func printSummary(report training.FactorialSyncRun) {
 	if !report.DryRun {
 		mode = "commit"
 	}
-	fmt.Fprintf(os.Stdout, "factorial sync %s: outcome=%s duration=%dms sessions_without_class=%d\n",
-		mode, report.Outcome, report.DurationMS, report.SessionsWithoutClass)
+	fmt.Fprintf(os.Stdout, "factorial sync %s (mode=%s): outcome=%s duration=%dms sessions_without_class=%d\n",
+		mode, report.Mode, report.Outcome, report.DurationMS, report.SessionsWithoutClass)
 	fmt.Fprintf(os.Stdout, "  tombstone: access_destroyed=%d sessions_deleted=%d reset=%d warnings=%d\n",
 		report.Tombstone.AccessDestroyed, report.Tombstone.SessionsDeleted, report.Tombstone.ResetCount, len(report.Tombstone.Warnings))
 	rdaExceptions := fmt.Sprintf("%d", report.Inbound.RDAExceptions)

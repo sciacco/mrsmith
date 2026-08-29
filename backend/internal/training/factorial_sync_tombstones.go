@@ -488,7 +488,10 @@ WHERE es.factorial_access_membership_id IS NOT NULL OR es.factorial_attendance_i
 // "missing remoto", non l'esclusione per employee inattivo. Le chiamate
 // Factorial restano fuori da ogni transazione DB; dryRun sospende solo le
 // scritture (BulkDestroy/Delete/reset), mai le letture di conferma.
-func (s *SQLStore) applyTombstoneSync(ctx context.Context, cli *factorial.Client, graph factorialTrainingGraph, dryRun bool) (tombstoneResult, error) {
+// propagate=false (modo import_only) salta la sola propagazione T2 verso
+// Factorial: selezione (T1), filtro reimport (T3) e missing (T4, letture di
+// conferma + scollegamenti locali) restano attivi.
+func (s *SQLStore) applyTombstoneSync(ctx context.Context, cli *factorial.Client, graph factorialTrainingGraph, dryRun bool, propagate bool) (tombstoneResult, error) {
 	if s == nil || s.db == nil {
 		return tombstoneResult{}, errors.New("training database not configured")
 	}
@@ -507,8 +510,10 @@ func (s *SQLStore) applyTombstoneSync(ctx context.Context, cli *factorial.Client
 	result.Warnings = append(result.Warnings, sessionWarnings...)
 	result.Warnings = append(result.Warnings, accessWarnings...)
 
-	if err := applyTombstonePropagation(ctx, cli, sessionIDs, accessIDs, dryRun, &result); err != nil {
-		return result, err
+	if propagate {
+		if err := applyTombstonePropagation(ctx, cli, sessionIDs, accessIDs, dryRun, &result); err != nil {
+			return result, err
+		}
 	}
 
 	linked, err := s.bulkMissingLinked(ctx, s.db, principal)
