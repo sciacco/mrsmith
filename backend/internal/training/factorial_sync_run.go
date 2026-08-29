@@ -166,6 +166,13 @@ func (s *SQLStore) RunFactorialSync(ctx context.Context, deps FactorialSyncDeps,
 				report.SessionsWithoutClass++
 			}
 		}
+		// Classi fantasma (duplicazione di massa lato Factorial): rilevate
+		// sul grafo completo e tolte prima del perimetro, cosi' la gemella
+		// piena uscita dal perimetro (partecipanti tutti cessati) non
+		// nasconde il fantasma. I warning si accodano DOPO l'assegnazione
+		// del risultato inbound, che sovrascriverebbe report.Inbound.
+		ghostIDs, ghostOrdered := ghostDuplicateClasses(filtered)
+		filtered = removeGhostClasses(filtered, ghostIDs)
 
 		local, err := s.loadLocalSyncState(ctx, s.db)
 		if err != nil {
@@ -177,8 +184,22 @@ func (s *SQLStore) RunFactorialSync(ctx context.Context, deps FactorialSyncDeps,
 		}
 		perimeter := computeFactorialPerimeter(filtered, activeIDs, linkedTrainingIDs)
 
+		perimeterTrainingIDs := map[string]struct{}{}
+		for _, t := range perimeter.Trainings {
+			if t.ID != nil {
+				perimeterTrainingIDs[*t.ID] = struct{}{}
+			}
+		}
 		inbound, err := s.applyInboundSync(ctx, perimeter, dryRun)
 		*report.Inbound = inbound
+		// Warning solo per i fantasmi di training nel perimetro: quelli di
+		// corsi mai importati (soli cessati) sono pulizie di casa Factorial,
+		// non segnale per il nostro dominio.
+		for _, ghost := range ghostOrdered {
+			if _, ok := perimeterTrainingIDs[ghost.TrainingID]; ok {
+				report.Inbound.Warnings = append(report.Inbound.Warnings, inboundIssue{Kind: "class_ghost_duplicate", Ref: ghost.ClassID})
+			}
+		}
 		if err != nil {
 			return fmt.Errorf("apply factorial inbound sync: %w", err)
 		}

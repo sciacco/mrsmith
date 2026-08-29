@@ -293,8 +293,130 @@ func computeTrainingDiff(training factorial.TrainingsTraining, sub trainingClass
 			diff.Conflicts = append(diff.Conflicts, inboundIssue{Kind: "attendance_conflict", Ref: attendanceID, LocalEntity: "enrollment", LocalID: enrollment.ID, EmployeeID: employeeLocalID})
 		}
 	}
+	// Iscrizione dalla sola membership: una persona iscritta al corso su
+	// Factorial ma senza alcuna sessione assegnata non deve sparire. Con un
+	// solo evento reale l'aggancio e' univoco (iscritta al corso = iscritta
+	// alla sua unica iniziativa) e nasce senza assegnazioni di sessione,
+	// stato locale gia' valido. Con zero o piu' eventi la collocazione non
+	// e' deducibile dai dati Factorial: warning, mai un aggancio indovinato.
+	// Un'iscrizione locale gia' esistente (anche annullata) vince: nessuna
+	// ricreazione e nessuna riapertura.
+	onlyClass := ""
+	if len(keptClasses) == 1 {
+		for classID := range keptClasses {
+			onlyClass = classID
+		}
+	}
+	for _, m := range sub.TrainingMemberships {
+		if m.ID == nil || m.EmployeeID == nil {
+			continue
+		}
+		employeeLocalID, resolved := local.Employees[*m.EmployeeID]
+		if !resolved {
+			diff.Warnings = append(diff.Warnings, inboundIssue{Kind: "employee_unresolved", Ref: *m.EmployeeID})
+			continue
+		}
+		enrolled := false
+		for classID := range keptClasses {
+			if _, alreadySeeded := seeded[[2]string{classID, *m.EmployeeID}]; alreadySeeded {
+				enrolled = true
+				break
+			}
+			if ev, ok := local.Events[classID]; ok && ev.ID != "" {
+				if _, exists := local.Enrollments[[2]string{employeeLocalID, ev.ID}]; exists {
+					enrolled = true
+					break
+				}
+			}
+		}
+		if enrolled {
+			continue
+		}
+		if onlyClass == "" {
+			diff.Warnings = append(diff.Warnings, inboundIssue{Kind: "membership_without_event", Ref: deref(m.ID), EmployeeID: employeeLocalID})
+			continue
+		}
+		seeded[[2]string{onlyClass, *m.EmployeeID}] = struct{}{}
+		diff.Enrollments = append(diff.Enrollments, enrollmentSeedItem{FactorialClassID: onlyClass, EmployeeExternalID: *m.EmployeeID})
+	}
+
 	diff.Memberships = sub.TrainingMemberships
 	return diff
+}
+
+// ghostDuplicateClasses individua le classi fantasma sull'INTERO grafo
+// fetchato, prima del perimetro attivi: copie esatte (training + nome +
+// data inizio + data fine) senza sessioni di una gemella con sessioni.
+// Impronta della duplicazione di massa osservata sui dati reali Factorial
+// (160 classi su 161 vuote nel perimetro importato, nessuna copia
+// successiva a luglio 2024). Va calcolata sul grafo completo: la gemella
+// piena puo' avere solo partecipanti cessati e quindi sparire dal
+// perimetro, ma il fantasma resta un fantasma. Una classe vuota senza
+// gemella piena resta legittima: fase organizzativa, non fantasma.
+// Ritorna anche l'ordine di apparizione (con il training di appartenenza,
+// per filtrare i warning al solo perimetro) per warning deterministici.
+func ghostDuplicateClasses(graph factorialTrainingGraph) (map[string]struct{}, []ghostClassRef) {
+	sessionCount := map[string]int{}
+	for _, sess := range graph.Sessions {
+		if sess.TrainingClassID != nil {
+			sessionCount[*sess.TrainingClassID]++
+		}
+	}
+	type classKey struct{ training, name, start, end string }
+	dateStr := func(d *factorial.Date) string {
+		if d == nil {
+			return ""
+		}
+		return d.String()
+	}
+	groups := map[classKey][]string{}
+	full := map[classKey]bool{}
+	for _, class := range graph.TrainingClasses {
+		if class.ID == nil || class.TrainingID == nil {
+			continue
+		}
+		key := classKey{*class.TrainingID, deref(class.Name), dateStr(class.StartDate), dateStr(class.EndDate)}
+		groups[key] = append(groups[key], *class.ID)
+		if sessionCount[*class.ID] > 0 {
+			full[key] = true
+		}
+	}
+	ghosts := map[string]struct{}{}
+	for key, ids := range groups {
+		if len(ids) < 2 || !full[key] {
+			continue
+		}
+		for _, id := range ids {
+			if sessionCount[id] == 0 {
+				ghosts[id] = struct{}{}
+			}
+		}
+	}
+	ordered := make([]ghostClassRef, 0, len(ghosts))
+	for _, class := range graph.TrainingClasses {
+		if class.ID == nil || class.TrainingID == nil {
+			continue
+		}
+		if _, ok := ghosts[*class.ID]; ok {
+			ordered = append(ordered, ghostClassRef{ClassID: *class.ID, TrainingID: *class.TrainingID})
+		}
+	}
+	return ghosts, ordered
+}
+
+// ghostClassRef: classe fantasma con il training di appartenenza.
+type ghostClassRef struct {
+	ClassID    string
+	TrainingID string
+}
+
+// removeGhostClasses toglie dal grafo le classi fantasma (che per
+// definizione non hanno sessioni ne' relazioni): il perimetro e l'inbound
+// non le vedono, nessun evento viene creato. Una gia' importata in passato
+// resta locale (l'inbound non cancella mai): si elimina col ripopolamento.
+func removeGhostClasses(graph factorialTrainingGraph, ghosts map[string]struct{}) factorialTrainingGraph {
+	graph.TrainingClasses = excludeByID(graph.TrainingClasses, ghosts, func(c factorial.TrainingsTrainingClass) *string { return c.ID })
+	return graph
 }
 
 // courseSeed decide il seed del corso: nil quando il locale e' gia' attivo,
