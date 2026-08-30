@@ -198,6 +198,7 @@ func selectClassSessions(class factorial.TrainingsTrainingClass, graph factorial
 func computeFactorialPerimeter(graph factorialTrainingGraph, activeIDs, linkedTrainingIDs map[string]struct{}) factorialTrainingGraph {
 	selectedTrainingIDs := selectTrainingIDs(graph, activeIDs, linkedTrainingIDs)
 	var perimeter factorialTrainingGraph
+	perimeter.Categories = graph.Categories // mappa id->nome, non perimetrabile
 	for _, t := range graph.Trainings {
 		if t.ID == nil {
 			continue

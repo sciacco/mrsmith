@@ -4,7 +4,7 @@
 // e unica, altrimenti si sceglie tra quelle della persona.
 
 import { useMemo, useState } from 'react';
-import { Button, Modal, SingleSelect, VisuallyHidden } from '@mrsmith/ui';
+import { Button, Modal, MultiSelect, SingleSelect, VisuallyHidden } from '@mrsmith/ui';
 import { useCreateRequest, useTrainingLookups, useTrainingPeople, useTrainingSkillAreas } from '../../api/queries';
 import { describeApiError } from '../events/apiErrors';
 import { ErrorPanel } from '../events/ErrorPanel';
@@ -27,7 +27,7 @@ export function RequestCreateModal({ open, onClose, onCreated }: RequestCreateMo
   const [courseMode, setCourseMode] = useState<'catalog' | 'freetext'>('catalog');
   const [courseId, setCourseId] = useState('');
   const [freeTextTitle, setFreeTextTitle] = useState('');
-  const [skillAreaId, setSkillAreaId] = useState('');
+  const [skillAreaIds, setSkillAreaIds] = useState<string[]>([]);
   const [motivation, setMotivation] = useState('');
   const [desiredStart, setDesiredStart] = useState('');
   const [desiredEnd, setDesiredEnd] = useState('');
@@ -65,7 +65,7 @@ export function RequestCreateModal({ open, onClose, onCreated }: RequestCreateMo
         selectedTeamId: teamId,
         courseId: courseMode === 'catalog' ? courseId : undefined,
         freeTextTitle: courseMode === 'freetext' ? freeTextTitle.trim() : undefined,
-        skillAreaId: skillAreaId || undefined,
+        skillAreaIds,
         motivation: motivation.trim(),
         desiredStart: desiredStart || undefined,
         desiredEnd: desiredEnd || undefined,
@@ -153,13 +153,12 @@ export function RequestCreateModal({ open, onClose, onCreated }: RequestCreateMo
         )}
 
         <label className={styles.field}>
-          Area di competenza
-          <SingleSelect
+          Aree di competenza
+          <MultiSelect<string>
             options={(skillAreas.data ?? []).map((a) => ({ value: a.id, label: a.name }))}
-            selected={skillAreaId || null}
-            onChange={(v) => setSkillAreaId(v ?? '')}
+            selected={skillAreaIds}
+            onChange={setSkillAreaIds}
             placeholder="Nessuna area"
-            allowClear
           />
         </label>
 

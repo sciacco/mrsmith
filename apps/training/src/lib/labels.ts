@@ -71,6 +71,13 @@ export const SCHEDULE_TYPE_LABELS: Record<string, string> = {
   self_paced: 'Autoapprendimento',
 };
 
+// Valori Factorial osservati sulla modalità di sessione.
+export const MODALITY_LABELS: Record<string, string> = {
+  inperson: 'In presenza',
+  online: 'Online',
+  mixed: 'Mista',
+};
+
 export const ENROLL_SKIP_REASON_LABELS: Record<string, string> = {
   already_enrolled: 'Già iscritta',
   inactive: 'Non attiva',

@@ -5,24 +5,30 @@ package training
 // gli elementi inattivi (flag active); le lookups per i form restano
 // invariate e a soli attivi (store.go).
 
+// SkillAreaRef identifica un'area di competenza agganciata a un corso.
+type SkillAreaRef struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 type CourseListRow struct {
-	ID                  string   `json:"id"`
-	Title               string   `json:"title"`
-	SkillAreaID         string   `json:"skillAreaId,omitempty"`
-	SkillAreaName       string   `json:"skillAreaName,omitempty"`
-	VendorID            string   `json:"vendorId,omitempty"`
-	VendorName          string   `json:"vendorName,omitempty"`
-	DeliveryMode        string   `json:"deliveryMode"`
-	ProviderKind        string   `json:"providerKind"`
-	DefaultHours        *int     `json:"defaultHours,omitempty"`
-	DefaultCost         *float64 `json:"defaultCost,omitempty"`
-	LeadsToCertID       string   `json:"leadsToCertId,omitempty"`
-	LeadsToCertName     string   `json:"leadsToCertName,omitempty"`
-	ComplianceRelated   bool     `json:"complianceRelated"`
-	ComplianceFramework string   `json:"complianceFramework,omitempty"`
-	Active              bool     `json:"active"`
-	FactorialTrainingID string   `json:"factorialTrainingId,omitempty"`
-	UpdatedAt           string   `json:"updatedAt"`
+	ID                  string         `json:"id"`
+	Title               string         `json:"title"`
+	SkillAreas          []SkillAreaRef `json:"skillAreas"`
+	VendorID            string         `json:"vendorId,omitempty"`
+	VendorName          string         `json:"vendorName,omitempty"`
+	DeliveryMode        string         `json:"deliveryMode"`
+	ProviderKind        string         `json:"providerKind"`
+	DefaultHours        *int           `json:"defaultHours,omitempty"`
+	DefaultCost         *float64       `json:"defaultCost,omitempty"`
+	LeadsToCertID       string         `json:"leadsToCertId,omitempty"`
+	LeadsToCertName     string         `json:"leadsToCertName,omitempty"`
+	ComplianceRelated   bool           `json:"complianceRelated"`
+	ComplianceFramework string         `json:"complianceFramework,omitempty"`
+	Active              bool           `json:"active"`
+	FactorialTrainingID string         `json:"factorialTrainingId,omitempty"`
+	Tags                []string       `json:"tags"`
+	UpdatedAt           string         `json:"updatedAt"`
 }
 
 type CourseListResponse struct {

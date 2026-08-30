@@ -816,10 +816,14 @@ func (s *SQLStore) UpsertCourse(ctx context.Context, principal Principal, id str
 	if !complianceRelated {
 		complianceFramework = ""
 	}
+	areaIDs, err := s.normalizeSkillAreaIDs(ctx, input.SkillAreaIDs)
+	if err != nil {
+		return ActionResponse{}, err
+	}
 	return s.upsertSimple(ctx, principal, "course", id, []upsertField{
 		field("title", strings.TrimSpace(input.Title)),
+		typedField("tags", textArrayLiteral(normalizeTags(input.Tags)), "::text[]"),
 		typedField("vendor_id", nullableUUID(input.VendorID), "::uuid"),
-		typedField("skill_area_id", nullableUUID(input.SkillAreaID), "::uuid"),
 		typedField("leads_to_cert_id", nullableUUID(input.LeadsToCertID), "::uuid"),
 		typedField("delivery_mode", deliveryMode, "::training.course_delivery_mode"),
 		typedField("provider_kind", providerKind, "::training.course_provider_kind"),
@@ -830,7 +834,44 @@ func (s *SQLStore) UpsertCourse(ctx context.Context, principal Principal, id str
 		field("is_compliance_course", complianceRelated),
 		field("compliance_framework", nullableText(complianceFramework)),
 		field("is_active", boolValue(input.Active, true)),
+	}, func(ctx context.Context, tx *sql.Tx, courseID string) error {
+		return replaceSkillAreaLinks(ctx, tx, "course_skill_area", "course_id", courseID, areaIDs)
 	})
+}
+
+// normalizeTags ripulisce i tag in ingresso: spazi tolti, vuoti scartati,
+// doppioni (senza distinzione di maiuscole) eliminati preservando l'ordine.
+func normalizeTags(tags []string) []string {
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		tag = strings.TrimSpace(tag)
+		if tag == "" {
+			continue
+		}
+		key := strings.ToLower(tag)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, tag)
+	}
+	return out
+}
+
+// textArrayLiteral costruisce il letterale PostgreSQL per un text[] passato
+// come parametro con cast ::text[] (virgolette e backslash preservati).
+func textArrayLiteral(values []string) string {
+	if len(values) == 0 {
+		return "{}"
+	}
+	parts := make([]string, len(values))
+	for i, v := range values {
+		v = strings.ReplaceAll(v, `\`, `\\`)
+		v = strings.ReplaceAll(v, `"`, `\"`)
+		parts[i] = `"` + v + `"`
+	}
+	return "{" + strings.Join(parts, ",") + "}"
 }
 
 func monthsInterval(months *int) any {
@@ -840,7 +881,7 @@ func monthsInterval(months *int) any {
 	return fmt.Sprintf("%d months", *months)
 }
 
-func (s *SQLStore) upsertSimple(ctx context.Context, principal Principal, table string, id string, fields []upsertField) (ActionResponse, error) {
+func (s *SQLStore) upsertSimple(ctx context.Context, principal Principal, table string, id string, fields []upsertField, after ...func(context.Context, *sql.Tx, string) error) (ActionResponse, error) {
 	var response ActionResponse
 	err := s.withTx(ctx, func(tx *sql.Tx) error {
 		action := "create"
@@ -891,17 +932,80 @@ func (s *SQLStore) upsertSimple(ctx context.Context, principal Principal, table 
 				return fmt.Errorf("update training %s: %w", table, err)
 			}
 		}
-		after, err := entitySnapshot(ctx, tx, table, response.ID)
+		for _, fn := range after {
+			if err := fn(ctx, tx, response.ID); err != nil {
+				return err
+			}
+		}
+		snapshot, err := entitySnapshot(ctx, tx, table, response.ID)
 		if err != nil {
 			return err
 		}
-		if err := s.audit(ctx, tx, principal, table, response.ID, action, before, after); err != nil {
+		if err := s.audit(ctx, tx, principal, table, response.ID, action, before, snapshot); err != nil {
 			return err
 		}
 		response.OK = true
 		return nil
 	})
 	return response, err
+}
+
+// replaceSkillAreaLinks riallinea le righe di una tabella ponte
+// entita' -> area di competenza al set richiesto (sostituzione integrale).
+func replaceSkillAreaLinks(ctx context.Context, tx *sql.Tx, table, ownerColumn, ownerID string, areaIDs []string) error {
+	if _, err := tx.ExecContext(ctx,
+		fmt.Sprintf("DELETE FROM training.%s WHERE %s = $1::uuid", table, ownerColumn), ownerID); err != nil {
+		return fmt.Errorf("clear %s: %w", table, err)
+	}
+	if len(areaIDs) == 0 {
+		return nil
+	}
+	payload, err := json.Marshal(areaIDs)
+	if err != nil {
+		return fmt.Errorf("encode skill area ids: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, fmt.Sprintf(`
+INSERT INTO training.%s (%s, skill_area_id)
+SELECT $1::uuid, t.x::uuid FROM jsonb_array_elements_text($2::jsonb) AS t(x)`, table, ownerColumn),
+		ownerID, string(payload)); err != nil {
+		return fmt.Errorf("insert %s: %w", table, err)
+	}
+	return nil
+}
+
+// normalizeSkillAreaIDs ripulisce gli id area in ingresso (spazi, vuoti,
+// doppioni) e verifica che esistano tutti in anagrafica.
+func (s *SQLStore) normalizeSkillAreaIDs(ctx context.Context, ids []string) ([]string, error) {
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	if len(out) == 0 {
+		return out, nil
+	}
+	payload, err := json.Marshal(out)
+	if err != nil {
+		return nil, fmt.Errorf("encode skill area ids: %w", err)
+	}
+	var count int
+	if err := s.db.QueryRowContext(ctx, `
+SELECT COUNT(*) FROM training.skill_area
+WHERE id IN (SELECT t.x::uuid FROM jsonb_array_elements_text($1::jsonb) AS t(x))`, string(payload)).Scan(&count); err != nil {
+		return nil, fmt.Errorf("check training skill areas: %w", err)
+	}
+	if count != len(out) {
+		return nil, validationError("skill_area_not_found", "area di competenza non trovata")
+	}
+	return out, nil
 }
 
 func parseOptionalDate(raw string) (*time.Time, error) {

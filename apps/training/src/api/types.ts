@@ -328,6 +328,10 @@ export interface SessionDetail {
   occupancy: number;
   notes?: string;
   factorialSessionId?: string;
+  topic?: string;
+  modality?: string;
+  durationHours?: number;
+  location?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -369,6 +373,7 @@ export interface ParticipationRow {
   enrollmentId: string;
   sessionId: string;
   participationStatus: ParticipationStatus;
+  completedHours?: number;
   assignedAt: string;
   updatedAt: string;
 }
@@ -493,11 +498,15 @@ export interface BulkEnrollResponse {
 // richieste/regole della #157 continuano a leggere solo il sottoinsieme che
 // usavano; persone/catalogo/anagrafiche della #158 usano il resto.
 
+export interface SkillAreaRef {
+  id: string;
+  name: string;
+}
+
 export interface CourseListRow {
   id: string;
   title: string;
-  skillAreaId?: string;
-  skillAreaName?: string;
+  skillAreas: SkillAreaRef[];
   vendorId?: string;
   vendorName?: string;
   deliveryMode: string;
@@ -510,6 +519,7 @@ export interface CourseListRow {
   complianceFramework?: string;
   active: boolean;
   factorialTrainingId?: string;
+  tags: string[];
   updatedAt: string;
 }
 
@@ -545,7 +555,7 @@ export interface CourseDetail extends CourseListRow {
 export interface CourseInput {
   title: string;
   vendorId?: string;
-  skillAreaId?: string;
+  skillAreaIds?: string[];
   leadsToCertId?: string;
   deliveryMode?: string;
   providerKind?: 'internal' | 'external';
@@ -555,6 +565,7 @@ export interface CourseInput {
   description?: string;
   complianceRelated?: boolean;
   complianceFramework?: string;
+  tags?: string[];
   active?: boolean;
 }
 
@@ -770,7 +781,7 @@ export interface RequestInput {
   employeeId: string;
   courseId?: string;
   freeTextTitle?: string;
-  skillAreaId?: string;
+  skillAreaIds?: string[];
   motivation: string;
   selectedTeamId: string;
   desiredStart?: string;
@@ -823,7 +834,7 @@ export interface RequestOriginalData {
   employeeName: string;
   courseTitle?: string;
   freeTextTitle?: string;
-  skillAreaName?: string;
+  skillAreas: SkillAreaRef[];
   motivation: string;
   selectedTeamId: string;
   selectedTeamName: string;
@@ -1258,7 +1269,7 @@ export interface DeliveredReportRow {
   teams: PersonTeamRef[];
   courseId: string;
   courseTitle: string;
-  skillAreaName?: string;
+  skillAreaNames: string[];
   eventId: string;
   deliveryStatus: DeliveryStatus;
   learningOutcome?: LearningOutcome | '';

@@ -90,17 +90,21 @@ type EventListRow struct {
 }
 
 type SessionDetail struct {
-	ID                 string `json:"id"`
-	ScheduleType       string `json:"scheduleType,omitempty"`
-	StartsAt           string `json:"startsAt,omitempty"`
-	EndsAt             string `json:"endsAt,omitempty"`
-	DueAt              string `json:"dueAt,omitempty"`
-	MaxCapacity        *int   `json:"maxCapacity,omitempty"`
-	Occupancy          int    `json:"occupancy"`
-	Notes              string `json:"notes,omitempty"`
-	FactorialSessionID string `json:"factorialSessionId,omitempty"`
-	CreatedAt          string `json:"createdAt"`
-	UpdatedAt          string `json:"updatedAt"`
+	ID                 string   `json:"id"`
+	ScheduleType       string   `json:"scheduleType,omitempty"`
+	StartsAt           string   `json:"startsAt,omitempty"`
+	EndsAt             string   `json:"endsAt,omitempty"`
+	DueAt              string   `json:"dueAt,omitempty"`
+	MaxCapacity        *int     `json:"maxCapacity,omitempty"`
+	Occupancy          int      `json:"occupancy"`
+	Notes              string   `json:"notes,omitempty"`
+	FactorialSessionID string   `json:"factorialSessionId,omitempty"`
+	Topic              string   `json:"topic,omitempty"`
+	Modality           string   `json:"modality,omitempty"`
+	DurationHours      *float64 `json:"durationHours,omitempty"`
+	Location           string   `json:"location,omitempty"`
+	CreatedAt          string   `json:"createdAt"`
+	UpdatedAt          string   `json:"updatedAt"`
 }
 
 type EnrollmentDetail struct {
@@ -122,11 +126,12 @@ type EnrollmentDetail struct {
 }
 
 type ParticipationRow struct {
-	EnrollmentID        string `json:"enrollmentId"`
-	SessionID           string `json:"sessionId"`
-	ParticipationStatus string `json:"participationStatus"`
-	AssignedAt          string `json:"assignedAt"`
-	UpdatedAt           string `json:"updatedAt"`
+	EnrollmentID        string   `json:"enrollmentId"`
+	SessionID           string   `json:"sessionId"`
+	ParticipationStatus string   `json:"participationStatus"`
+	CompletedHours      *float64 `json:"completedHours,omitempty"`
+	AssignedAt          string   `json:"assignedAt"`
+	UpdatedAt           string   `json:"updatedAt"`
 }
 
 type EventDetail struct {

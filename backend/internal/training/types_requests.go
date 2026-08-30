@@ -12,14 +12,14 @@ package training
 // (XOR applicato dal backend: il CHECK db ammette entrambi); il team scelto
 // deve essere tra le appartenenze attive della persona.
 type RequestInput struct {
-	EmployeeID     string `json:"employeeId"`
-	CourseID       string `json:"courseId,omitempty"`
-	FreeTextTitle  string `json:"freeTextTitle,omitempty"`
-	SkillAreaID    string `json:"skillAreaId,omitempty"`
-	Motivation     string `json:"motivation"`
-	SelectedTeamID string `json:"selectedTeamId"`
-	DesiredStart   string `json:"desiredStart,omitempty"` // YYYY-MM-DD
-	DesiredEnd     string `json:"desiredEnd,omitempty"`   // YYYY-MM-DD
+	EmployeeID     string   `json:"employeeId"`
+	CourseID       string   `json:"courseId,omitempty"`
+	FreeTextTitle  string   `json:"freeTextTitle,omitempty"`
+	SkillAreaIDs   []string `json:"skillAreaIds,omitempty"`
+	Motivation     string   `json:"motivation"`
+	SelectedTeamID string   `json:"selectedTeamId"`
+	DesiredStart   string   `json:"desiredStart,omitempty"` // YYYY-MM-DD
+	DesiredEnd     string   `json:"desiredEnd,omitempty"`   // YYYY-MM-DD
 }
 
 // TLOpinionInput registra il parere TL come fatto: chi lo esprime deve essere
@@ -59,22 +59,21 @@ type RequestAcceptedInput struct {
 // ── Letture ──
 
 type RequestListRow struct {
-	ID             string `json:"id"`
-	EmployeeID     string `json:"employeeId"`
-	EmployeeName   string `json:"employeeName"`
-	EmployeeEmail  string `json:"employeeEmail"`
-	CourseID       string `json:"courseId,omitempty"`
-	CourseTitle    string `json:"courseTitle,omitempty"`
-	FreeTextTitle  string `json:"freeTextTitle,omitempty"`
-	SkillAreaID    string `json:"skillAreaId,omitempty"`
-	SkillAreaName  string `json:"skillAreaName,omitempty"`
-	SelectedTeamID string `json:"selectedTeamId"`
-	SelectedTeam   string `json:"selectedTeamName"`
-	TLOpinion      string `json:"tlOpinion,omitempty"`
-	PeopleDecision string `json:"peopleDecision,omitempty"`
-	Outcome        string `json:"outcome,omitempty"`
-	ClosedAt       string `json:"closedAt,omitempty"`
-	CreatedAt      string `json:"createdAt"`
+	ID             string         `json:"id"`
+	EmployeeID     string         `json:"employeeId"`
+	EmployeeName   string         `json:"employeeName"`
+	EmployeeEmail  string         `json:"employeeEmail"`
+	CourseID       string         `json:"courseId,omitempty"`
+	CourseTitle    string         `json:"courseTitle,omitempty"`
+	FreeTextTitle  string         `json:"freeTextTitle,omitempty"`
+	SkillAreas     []SkillAreaRef `json:"skillAreas"`
+	SelectedTeamID string         `json:"selectedTeamId"`
+	SelectedTeam   string         `json:"selectedTeamName"`
+	TLOpinion      string         `json:"tlOpinion,omitempty"`
+	PeopleDecision string         `json:"peopleDecision,omitempty"`
+	Outcome        string         `json:"outcome,omitempty"`
+	ClosedAt       string         `json:"closedAt,omitempty"`
+	CreatedAt      string         `json:"createdAt"`
 }
 
 type RequestListResponse struct {
@@ -84,19 +83,18 @@ type RequestListResponse struct {
 // RequestOriginalData e la faccia originale della richiesta, cosi come
 // espressa dalla persona: nessuna API la modifica.
 type RequestOriginalData struct {
-	EmployeeID       string `json:"employeeId"`
-	EmployeeName     string `json:"employeeName"`
-	EmployeeEmail    string `json:"employeeEmail"`
-	CourseID         string `json:"courseId,omitempty"`
-	CourseTitle      string `json:"courseTitle,omitempty"`
-	FreeTextTitle    string `json:"freeTextTitle,omitempty"`
-	SkillAreaID      string `json:"skillAreaId,omitempty"`
-	SkillAreaName    string `json:"skillAreaName,omitempty"`
-	Motivation       string `json:"motivation"`
-	SelectedTeamID   string `json:"selectedTeamId"`
-	SelectedTeamName string `json:"selectedTeamName"`
-	DesiredStart     string `json:"desiredStart,omitempty"`
-	DesiredEnd       string `json:"desiredEnd,omitempty"`
+	EmployeeID       string         `json:"employeeId"`
+	EmployeeName     string         `json:"employeeName"`
+	EmployeeEmail    string         `json:"employeeEmail"`
+	CourseID         string         `json:"courseId,omitempty"`
+	CourseTitle      string         `json:"courseTitle,omitempty"`
+	FreeTextTitle    string         `json:"freeTextTitle,omitempty"`
+	SkillAreas       []SkillAreaRef `json:"skillAreas"`
+	Motivation       string         `json:"motivation"`
+	SelectedTeamID   string         `json:"selectedTeamId"`
+	SelectedTeamName string         `json:"selectedTeamName"`
+	DesiredStart     string         `json:"desiredStart,omitempty"`
+	DesiredEnd       string         `json:"desiredEnd,omitempty"`
 }
 
 // RequestTLOpinionFacts e il fatto immutabile del parere TL.

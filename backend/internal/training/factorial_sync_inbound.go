@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -41,10 +42,38 @@ type courseSeedItem struct {
 	Title               string
 	Description         string
 	TitleMissing        bool
+	// VendorName: fornitore abituale dal testo Factorial ("" = nessuno,
+	// scartata la spazzatura "null"); ProviderKind: erogazione dal flag
+	// external; Tags: categorie Factorial come tag liberi (esclusa
+	// «Formazione interna», ridondante con ProviderKind).
+	VendorName   string
+	ProviderKind string
+	Tags         []string
+	// SkillAreas: competenze del Training risolte in aree (codice+nome,
+	// ordinate per codice) via factorialCompetencyNames.
+	SkillAreas []skillAreaSeed
+}
+
+// skillAreaSeed e' un'area di competenza da agganciare al corso seed:
+// Code e' la chiave del get-or-create in anagrafica, Name il nome alla
+// prima creazione.
+type skillAreaSeed struct {
+	Code string
+	Name string
 }
 
 type eventSeedItem struct {
 	FactorialClassID string
+	// Notes: nome (ed eventuale descrizione) della classe Factorial, unico
+	// posto dove l'edizione resta leggibile nel nostro modello senza nome-evento.
+	Notes string
+}
+
+// eventNoteItem riempie le note di un evento gia' esistente, SOLO se vuote:
+// mai sopra testo scritto da una persona.
+type eventNoteItem struct {
+	EventID string
+	Notes   string
 }
 
 type sessionChangeItem struct {
@@ -53,6 +82,15 @@ type sessionChangeItem struct {
 	FactorialSessionID string
 	SessionID          string // valorizzato quando !New
 	Remote             sessionSyncState
+	Op                 sessionOpState
+}
+
+// sessionOpItem riallinea i soli dati operativi (argomento, modalita',
+// durata, luogo) di una sessione il cui stato schedule/date e' gia' in sync:
+// campi di proprieta' del remoto, nessun conflitto.
+type sessionOpItem struct {
+	SessionID string
+	Op        sessionOpState
 }
 
 type enrollmentSeedItem struct {
@@ -77,6 +115,13 @@ type attendanceChangeItem struct {
 	NewStatus                   string
 }
 
+// attendanceHoursItem riallinea le ore completate di una partecipazione
+// (consuntivo remoto, fuori dal checkpoint 3-way: mai un conflitto).
+type attendanceHoursItem struct {
+	FactorialAccessMembershipID string
+	Hours                       string // forma canonica, "" = NULL
+}
+
 // inboundIssue e' una voce di conflitto o warning: Kind un codice stabile,
 // Ref il miglior identificatore disponibile (id Factorial o locale).
 // LocalEntity/LocalID/EmployeeID: riferimento locale gia' disponibile nel
@@ -93,10 +138,13 @@ type inboundIssue struct {
 type trainingDiff struct {
 	Course      *courseSeedItem
 	Events      []eventSeedItem
+	EventNotes  []eventNoteItem
 	Sessions    []sessionChangeItem
+	SessionOps  []sessionOpItem
 	Enrollments []enrollmentSeedItem
 	Assigns     []accessAssignItem
 	Attendances []attendanceChangeItem
+	Hours       []attendanceHoursItem
 	Memberships []factorial.TrainingsTrainingMembership
 	Conflicts   []inboundIssue
 	Warnings    []inboundIssue
@@ -164,14 +212,21 @@ func trainingSubgraph(trainingID string, graph factorialTrainingGraph) trainingC
 // computeTrainingDiff produce il diff inbound puro di un Training: nessun
 // accesso IO, solo il sotto-grafo (trainingSubgraph) e lo stato locale
 // (loadLocalTrainingState).
-func computeTrainingDiff(training factorial.TrainingsTraining, sub trainingClassPerimeter, local localTrainingState) trainingDiff {
+func computeTrainingDiff(training factorial.TrainingsTraining, sub trainingClassPerimeter, local localTrainingState, categories map[string]string) trainingDiff {
 	var diff trainingDiff
 	trainingID := deref(training.ID)
 	var course *localCourse
 	if c, ok := local.Courses[trainingID]; ok {
 		course = &c
 	}
-	diff.Course = courseSeed(trainingID, training, course)
+	var unresolvedCategories, unresolvedCompetencies []string
+	diff.Course, unresolvedCategories, unresolvedCompetencies = courseSeed(trainingID, training, course, categories)
+	for _, categoryID := range unresolvedCategories {
+		diff.Warnings = append(diff.Warnings, inboundIssue{Kind: "course_category_unresolved", Ref: categoryID})
+	}
+	for _, competencyID := range unresolvedCompetencies {
+		diff.Warnings = append(diff.Warnings, inboundIssue{Kind: "course_competency_unresolved", Ref: competencyID})
+	}
 	if diff.Course != nil && diff.Course.TitleMissing {
 		localCourseID := ""
 		if course != nil {
@@ -191,8 +246,13 @@ func computeTrainingDiff(training factorial.TrainingsTraining, sub trainingClass
 			continue
 		}
 		keptClasses[*class.ID] = struct{}{}
+		notes := classNotes(class)
 		if !found {
-			diff.Events = append(diff.Events, eventSeedItem{FactorialClassID: *class.ID})
+			diff.Events = append(diff.Events, eventSeedItem{FactorialClassID: *class.ID, Notes: notes})
+			continue
+		}
+		if event.NotesEmpty && notes != "" {
+			diff.EventNotes = append(diff.EventNotes, eventNoteItem{EventID: event.ID, Notes: notes})
 		}
 	}
 
@@ -214,13 +274,25 @@ func computeTrainingDiff(training factorial.TrainingsTraining, sub trainingClass
 			}
 			diff.Warnings = append(diff.Warnings, issue)
 		}
+		remoteOp, durationInvalid := newSessionOpStateFromRemote(sess)
+		if durationInvalid {
+			diff.Warnings = append(diff.Warnings, inboundIssue{Kind: "session_duration_invalid", Ref: *sess.ID})
+		}
 		if !found {
-			diff.Sessions = append(diff.Sessions, sessionChangeItem{New: true, FactorialClassID: *sess.TrainingClassID, FactorialSessionID: *sess.ID, Remote: remote})
+			diff.Sessions = append(diff.Sessions, sessionChangeItem{New: true, FactorialClassID: *sess.TrainingClassID, FactorialSessionID: *sess.ID, Remote: remote, Op: remoteOp})
 			continue
 		}
 		switch resolveSession(existing, remote) {
 		case resolveAdopt:
-			diff.Sessions = append(diff.Sessions, sessionChangeItem{FactorialClassID: *sess.TrainingClassID, FactorialSessionID: *sess.ID, SessionID: existing.ID, Remote: remote})
+			diff.Sessions = append(diff.Sessions, sessionChangeItem{FactorialClassID: *sess.TrainingClassID, FactorialSessionID: *sess.ID, SessionID: existing.ID, Remote: remote, Op: remoteOp})
+		case resolveNoop:
+			// Schedule/date gia' allineati: i dati operativi restano di
+			// proprieta' del remoto e si riallineano da soli, senza conflitti.
+			// Solo per sessioni gia' sincronizzate (checkpoint presente): su
+			// una nata locale e mai checkpointata non si scrive nulla.
+			if existing.Checkpoint != nil && existing.Op != remoteOp {
+				diff.SessionOps = append(diff.SessionOps, sessionOpItem{SessionID: existing.ID, Op: remoteOp})
+			}
 		case resolveConflict:
 			diff.Conflicts = append(diff.Conflicts, inboundIssue{Kind: "session_conflict", Ref: *sess.ID, LocalEntity: "training_session", LocalID: existing.ID})
 		case resolveUnknown:
@@ -274,7 +346,26 @@ func computeTrainingDiff(training factorial.TrainingsTraining, sub trainingClass
 			EmployeeExternalID: employeeExternalID, FactorialAccessMembershipID: *acc.ID,
 			FactorialAttendanceID: attendanceID, NeedsWrite: needsWrite,
 		})
-		if attendanceID == "" || remoteAttendance.Status == nil {
+		if attendanceID == "" {
+			continue
+		}
+		// Ore completate: consuntivo di proprieta' del remoto, fuori dal
+		// checkpoint 3-way. "0" equivale ad assente (nessun consuntivo).
+		remoteHours, hoursOK := canonicalHours(deref(remoteAttendance.CompletedDuration))
+		if !hoursOK {
+			diff.Warnings = append(diff.Warnings, inboundIssue{Kind: "attendance_duration_invalid", Ref: attendanceID, LocalEntity: "enrollment", LocalID: enrollment.ID, EmployeeID: employeeLocalID})
+		}
+		if remoteHours == "0" {
+			remoteHours = ""
+		}
+		localHours := ""
+		if hasAssign {
+			localHours = existingAssign.CompletedHours
+		}
+		if hoursOK && remoteHours != localHours {
+			diff.Hours = append(diff.Hours, attendanceHoursItem{FactorialAccessMembershipID: *acc.ID, Hours: remoteHours})
+		}
+		if remoteAttendance.Status == nil {
 			continue
 		}
 		remoteStatus, err := attendanceLocalFromRemote(*remoteAttendance.Status)
@@ -419,13 +510,49 @@ func removeGhostClasses(graph factorialTrainingGraph, ghosts map[string]struct{}
 	return graph
 }
 
-// courseSeed decide il seed del corso: nil quando il locale e' gia' attivo,
-// o quando titolo/descrizione sono gia' allineati col remoto (idempotenza,
-// anche a corso inattivo). Altrimenti titolo/descrizione dal remoto; titolo
+// courseSeed decide il seed del corso: nil quando il locale e' gia' attivo
+// (curato: il sync non lo tocca mai piu'), o quando tutti i campi seminati
+// sono gia' allineati col remoto (idempotenza, anche a corso inattivo).
+// Campi seminati: titolo, descrizione, fornitore abituale (dal testo
+// external_provider, spazzatura "null" scartata), erogazione (dal flag
+// external) e tag (dalle categorie, esclusa «Formazione interna»). Titolo
 // assente -> fallback "Training Factorial <id>" e warning (TitleMissing).
-func courseSeed(trainingID string, training factorial.TrainingsTraining, course *localCourse) *courseSeedItem {
+// Il secondo valore elenca i category id senza nome (warning del chiamante).
+func courseSeed(trainingID string, training factorial.TrainingsTraining, course *localCourse, categories map[string]string) (*courseSeedItem, []string, []string) {
+	providerKind := "internal"
+	if training.External != nil && *training.External {
+		providerKind = "external"
+	}
+	vendorName := strings.TrimSpace(deref(training.ExternalProvider))
+	if strings.EqualFold(vendorName, "null") {
+		vendorName = ""
+	}
+	var tags []string
+	var unresolved []string
+	for _, categoryID := range training.CategoryIDs {
+		name := categories[categoryID]
+		if name == "" {
+			unresolved = append(unresolved, categoryID)
+			continue
+		}
+		if strings.EqualFold(name, "Formazione interna") {
+			continue // erogazione: ha il suo campo dedicato, il flag comanda
+		}
+		tags = append(tags, name)
+	}
+	var areas []skillAreaSeed
+	var unresolvedCompetencies []string
+	for _, competencyID := range training.CompetencyIDs {
+		name := factorialCompetencyNames[competencyID]
+		if name == "" {
+			unresolvedCompetencies = append(unresolvedCompetencies, competencyID)
+			continue
+		}
+		areas = append(areas, skillAreaSeed{Code: skillAreaCode(name), Name: name})
+	}
+	sort.Slice(areas, func(i, j int) bool { return areas[i].Code < areas[j].Code })
 	if course != nil && course.IsActive {
-		return nil
+		return nil, unresolved, unresolvedCompetencies
 	}
 	title := strings.TrimSpace(deref(training.Name))
 	missing := title == ""
@@ -433,16 +560,42 @@ func courseSeed(trainingID string, training factorial.TrainingsTraining, course 
 		title = "Training Factorial " + trainingID
 	}
 	description := deref(training.Description)
-	if course != nil && course.Title == title && course.Description == description {
-		return nil // gia' allineato: nessuna mutazione (idempotenza)
+	areaCodes := make([]string, len(areas))
+	for i, area := range areas {
+		areaCodes[i] = area.Code
 	}
-	item := courseSeedItem{FactorialTrainingID: trainingID, Title: title, Description: description, TitleMissing: missing}
+	if course != nil && course.Title == title && course.Description == description &&
+		strings.EqualFold(course.VendorName, vendorName) && course.ProviderKind == providerKind &&
+		strings.Join(course.Tags, "\x1f") == strings.Join(tags, "\x1f") &&
+		strings.Join(course.SkillAreaCodes, "\x1f") == strings.Join(areaCodes, "\x1f") {
+		return nil, unresolved, unresolvedCompetencies // gia' allineato: nessuna mutazione (idempotenza)
+	}
+	item := courseSeedItem{
+		FactorialTrainingID: trainingID, Title: title, Description: description, TitleMissing: missing,
+		VendorName: vendorName, ProviderKind: providerKind, Tags: tags, SkillAreas: areas,
+	}
 	if course == nil {
 		item.Create = true
 	} else {
 		item.CourseID = course.ID
 	}
-	return &item
+	return &item, unresolved, unresolvedCompetencies
+}
+
+// classNotes compone il testo per le note dell'evento dal nome (sempre
+// presente sui dati reali) e dall'eventuale descrizione della classe
+// Factorial: e' l'unico posto dove l'edizione resta leggibile.
+func classNotes(class factorial.TrainingsTrainingClass) string {
+	name := strings.TrimSpace(deref(class.Name))
+	description := strings.TrimSpace(deref(class.Description))
+	switch {
+	case name == "":
+		return description
+	case description == "":
+		return name
+	default:
+		return name + "\n\n" + description
+	}
 }
 
 // sanitizeRemoteSession proietta una sessione remota e applica la regola
@@ -556,7 +709,7 @@ func (s *SQLStore) applyInboundSync(ctx context.Context, graph factorialTraining
 			continue
 		}
 		sub := trainingSubgraph(*training.ID, graph)
-		diff := computeTrainingDiff(training, sub, local)
+		diff := computeTrainingDiff(training, sub, local, graph.Categories)
 		result.Conflicts = append(result.Conflicts, diff.Conflicts...)
 		result.Warnings = append(result.Warnings, diff.Warnings...)
 		if dryRun {
@@ -612,14 +765,30 @@ func (s *SQLStore) applyTrainingDiff(ctx context.Context, tx *sql.Tx, principal 
 	for _, item := range diff.Events {
 		var id string
 		if err := tx.QueryRowContext(ctx, `
-INSERT INTO training.training_event (course_id, origin, factorial_class_id) VALUES ($1::uuid, 'factorial_import', $2)
-RETURNING id::text`, courseID, item.FactorialClassID).Scan(&id); err != nil {
+INSERT INTO training.training_event (course_id, origin, factorial_class_id, notes) VALUES ($1::uuid, 'factorial_import', $2, NULLIF($3, ''))
+RETURNING id::text`, courseID, item.FactorialClassID, item.Notes).Scan(&id); err != nil {
 			return nil, fmt.Errorf("create training event from factorial sync: %w", err)
 		}
-		if err := s.auditFields(ctx, tx, principal, "training_event", id, actionFactorialImport, []string{"course_id", "factorial_class_id"}); err != nil {
+		if err := s.auditFields(ctx, tx, principal, "training_event", id, actionFactorialImport, []string{"course_id", "factorial_class_id", "notes"}); err != nil {
 			return nil, err
 		}
 		eventID[item.FactorialClassID] = id
+	}
+	// Note di eventi gia' esistenti: solo se ancora vuote (guardia ripetuta
+	// anche nella UPDATE: mai sopra testo scritto da una persona).
+	for _, item := range diff.EventNotes {
+		res, err := tx.ExecContext(ctx, `
+UPDATE training.training_event SET notes = $2, updated_at = now()
+WHERE id = $1::uuid AND COALESCE(notes, '') = ''`, item.EventID, item.Notes)
+		if err != nil {
+			return nil, fmt.Errorf("fill training event notes from factorial sync: %w", err)
+		}
+		if changed, _ := res.RowsAffected(); changed == 0 {
+			continue
+		}
+		if err := s.auditFields(ctx, tx, principal, "training_event", item.EventID, actionFactorialImport, []string{"notes"}); err != nil {
+			return nil, err
+		}
 	}
 
 	sessionID := map[string]string{}
@@ -644,9 +813,12 @@ RETURNING id::text`, courseID, item.FactorialClassID).Scan(&id); err != nil {
 		if item.New {
 			var id string
 			if err := tx.QueryRowContext(ctx, `
-INSERT INTO training.training_session (event_id, schedule_type, starts_at, ends_at, due_at, factorial_session_id, factorial_synced_state)
-VALUES ($1::uuid, NULLIF($2,''), NULLIF($3,'')::timestamptz, NULLIF($4,'')::timestamptz, NULLIF($5,'')::timestamptz, $6, $7::jsonb)
-RETURNING id::text`, ev, item.Remote.ScheduleType, item.Remote.StartsAt, item.Remote.EndsAt, dueAt, item.FactorialSessionID, checkpoint).Scan(&id); err != nil {
+INSERT INTO training.training_session (event_id, schedule_type, starts_at, ends_at, due_at, factorial_session_id, factorial_synced_state,
+  topic, modality, duration_hours, location)
+VALUES ($1::uuid, NULLIF($2,''), NULLIF($3,'')::timestamptz, NULLIF($4,'')::timestamptz, NULLIF($5,'')::timestamptz, $6, $7::jsonb,
+  NULLIF($8,''), NULLIF($9,''), NULLIF($10,'')::numeric, NULLIF($11,''))
+RETURNING id::text`, ev, item.Remote.ScheduleType, item.Remote.StartsAt, item.Remote.EndsAt, dueAt, item.FactorialSessionID, checkpoint,
+				item.Op.Topic, item.Op.Modality, item.Op.DurationHours, item.Op.Location).Scan(&id); err != nil {
 				return nil, fmt.Errorf("create training session from factorial sync: %w", err)
 			}
 			if err := s.auditFields(ctx, tx, principal, "training_session", id, actionFactorialImport, []string{"factorial_session_id"}); err != nil {
@@ -657,14 +829,29 @@ RETURNING id::text`, ev, item.Remote.ScheduleType, item.Remote.StartsAt, item.Re
 			if _, err := tx.ExecContext(ctx, `
 UPDATE training.training_session
 SET schedule_type = NULLIF($2,''), starts_at = NULLIF($3,'')::timestamptz, ends_at = NULLIF($4,'')::timestamptz,
-    due_at = NULLIF($5,'')::timestamptz, factorial_synced_state = $6::jsonb, updated_at = now()
-WHERE id = $1::uuid`, item.SessionID, item.Remote.ScheduleType, item.Remote.StartsAt, item.Remote.EndsAt, dueAt, checkpoint); err != nil {
+    due_at = NULLIF($5,'')::timestamptz, factorial_synced_state = $6::jsonb,
+    topic = NULLIF($7,''), modality = NULLIF($8,''), duration_hours = NULLIF($9,'')::numeric, location = NULLIF($10,''), updated_at = now()
+WHERE id = $1::uuid`, item.SessionID, item.Remote.ScheduleType, item.Remote.StartsAt, item.Remote.EndsAt, dueAt, checkpoint,
+				item.Op.Topic, item.Op.Modality, item.Op.DurationHours, item.Op.Location); err != nil {
 				return nil, fmt.Errorf("update training session from factorial sync: %w", err)
 			}
-			if err := s.auditFields(ctx, tx, principal, "training_session", item.SessionID, actionFactorialImport, []string{"schedule_type", "starts_at", "ends_at", "due_at"}); err != nil {
+			if err := s.auditFields(ctx, tx, principal, "training_session", item.SessionID, actionFactorialImport, []string{"schedule_type", "starts_at", "ends_at", "due_at", "topic", "modality", "duration_hours", "location"}); err != nil {
 				return nil, err
 			}
 			sessionID[item.FactorialSessionID] = item.SessionID
+		}
+	}
+	// Riallineamento dei soli dati operativi: sessioni gia' in sync su
+	// schedule/date il cui argomento/modalita'/durata/luogo remoto e' cambiato.
+	for _, item := range diff.SessionOps {
+		if _, err := tx.ExecContext(ctx, `
+UPDATE training.training_session
+SET topic = NULLIF($2,''), modality = NULLIF($3,''), duration_hours = NULLIF($4,'')::numeric, location = NULLIF($5,''), updated_at = now()
+WHERE id = $1::uuid`, item.SessionID, item.Op.Topic, item.Op.Modality, item.Op.DurationHours, item.Op.Location); err != nil {
+			return nil, fmt.Errorf("update training session operational fields from factorial sync: %w", err)
+		}
+		if err := s.auditFields(ctx, tx, principal, "training_session", item.SessionID, actionFactorialImport, []string{"topic", "modality", "duration_hours", "location"}); err != nil {
+			return nil, err
 		}
 	}
 
@@ -780,31 +967,199 @@ WHERE enrollment_id = $1::uuid AND session_id = $2::uuid`, enr, sess, item.NewSt
 			rdaIssues = append(rdaIssues, inboundIssue{Kind: "rda_exception", Ref: enr, LocalEntity: "enrollment", LocalID: enr, EmployeeID: employeeID})
 		}
 	}
+	for _, item := range diff.Hours {
+		key, ok := assignKey[item.FactorialAccessMembershipID]
+		if !ok {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, `
+UPDATE training.enrollment_session SET completed_hours = NULLIF($3,'')::numeric, updated_at = now()
+WHERE enrollment_id = $1::uuid AND session_id = $2::uuid`, key[0], key[1], item.Hours); err != nil {
+			return nil, fmt.Errorf("update training attendance completed hours from factorial sync: %w", err)
+		}
+		if err := s.auditFields(ctx, tx, principal, "enrollment_session", key[0], actionFactorialImport, []string{"completed_hours"}); err != nil {
+			return nil, err
+		}
+	}
+	if err := s.applyCompletionDates(ctx, tx, principal, diff.Memberships, eventID); err != nil {
+		return nil, err
+	}
 	return rdaIssues, nil
 }
 
+// applyCompletionDates valorizza enrollment.actual_end (fine effettiva) per
+// le iscrizioni completate che ne sono prive, in cascata:
+//  1. data di completamento della membership Factorial (solo se anche lo
+//     stato remoto dice completed: sulle incoerenze data-senza-completamento
+//     lo stato comanda);
+//  2. altrimenti la data dell'ultima sessione completata assegnata alla
+//     persona.
+//
+// Sempre e solo se actual_end e' NULL (una data messa a mano non si tocca) e
+// se i fatti locali dicono completato. Idempotente per costruzione: dopo il
+// primo riempimento le righe non matchano piu'.
+func (s *SQLStore) applyCompletionDates(ctx context.Context, tx *sql.Tx, principal Principal, memberships []factorial.TrainingsTrainingMembership, eventID map[string]string) error {
+	type memberDate struct {
+		MembershipID string `json:"mid"`
+		Date         string `json:"d"`
+	}
+	var explicit []memberDate
+	for _, m := range memberships {
+		if m.ID == nil || m.Status == nil || *m.Status != factorial.TrainingsTrainingMembershipStatusCompleted || m.TrainingCompletedAt == nil {
+			continue
+		}
+		if d := formatDateUTC(&m.TrainingCompletedAt.Time); d != "" {
+			explicit = append(explicit, memberDate{MembershipID: *m.ID, Date: d})
+		}
+	}
+	audit := func(rows *sql.Rows) error {
+		defer rows.Close()
+		var ids []string
+		for rows.Next() {
+			var id string
+			if err := rows.Scan(&id); err != nil {
+				return fmt.Errorf("scan training completion date enrollment: %w", err)
+			}
+			ids = append(ids, id)
+		}
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		for _, id := range ids {
+			if err := s.auditFields(ctx, tx, principal, "enrollment", id, actionFactorialImport, []string{"actual_end"}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	if len(explicit) > 0 {
+		payload, err := json.Marshal(explicit)
+		if err != nil {
+			return fmt.Errorf("encode training completion dates: %w", err)
+		}
+		rows, err := tx.QueryContext(ctx, `
+UPDATE training.enrollment e SET actual_end = v.d, updated_at = now()
+FROM jsonb_to_recordset($1::jsonb) AS v(mid text, d date)
+WHERE e.factorial_training_membership_id = v.mid
+  AND e.actual_end IS NULL AND e.delivery_status = 'completed'
+RETURNING e.id::text`, string(payload))
+		if err != nil {
+			return fmt.Errorf("apply training membership completion dates: %w", err)
+		}
+		if err := audit(rows); err != nil {
+			return err
+		}
+	}
+	if len(eventID) == 0 {
+		return nil
+	}
+	events := make([]string, 0, len(eventID))
+	for _, id := range eventID {
+		events = append(events, id)
+	}
+	eventsJSON, err := json.Marshal(events)
+	if err != nil {
+		return fmt.Errorf("encode training completion events: %w", err)
+	}
+	rows, err := tx.QueryContext(ctx, `
+UPDATE training.enrollment e SET actual_end = d.max_date, updated_at = now()
+FROM (
+  SELECT es.enrollment_id, (MAX(COALESCE(s.ends_at, s.starts_at)) AT TIME ZONE 'UTC')::date AS max_date
+  FROM training.enrollment_session es
+  JOIN training.training_session s ON s.id = es.session_id
+  WHERE es.participation_status = 'completed'
+  GROUP BY es.enrollment_id
+) d
+WHERE e.id = d.enrollment_id AND d.max_date IS NOT NULL
+  AND e.actual_end IS NULL AND e.delivery_status = 'completed'
+  AND e.event_id IN (SELECT jsonb_array_elements_text($1::jsonb)::uuid)
+RETURNING e.id::text`, string(eventsJSON))
+	if err != nil {
+		return fmt.Errorf("apply training session completion dates: %w", err)
+	}
+	return audit(rows)
+}
+
 // applyCourseSeed crea o riaggiorna (solo se ancora inattivo) il corso
-// seed di un Training, e ritorna il suo id.
+// seed di un Training, e ritorna il suo id. Il fornitore abituale viene
+// risolto in anagrafica per nome (get-or-create, confronto senza distinzione
+// di maiuscole via citext); i tag arrivano come array JSON.
 func (s *SQLStore) applyCourseSeed(ctx context.Context, tx *sql.Tx, principal Principal, item courseSeedItem) (string, error) {
-	if item.Create {
-		var id string
+	vendorID := ""
+	if item.VendorName != "" {
+		var created bool
 		if err := tx.QueryRowContext(ctx, `
-INSERT INTO training.course (title, description, is_active, factorial_training_id) VALUES ($1, NULLIF($2, ''), false, $3)
-RETURNING id::text`, item.Title, item.Description, item.FactorialTrainingID).Scan(&id); err != nil {
+WITH ins AS (
+  INSERT INTO training.vendor (name, name_normalized) VALUES ($1::text, $1::text::citext)
+  ON CONFLICT (name_normalized) DO NOTHING
+  RETURNING id::text
+)
+SELECT COALESCE((SELECT id FROM ins), (SELECT id::text FROM training.vendor WHERE name_normalized = $1::text::citext)),
+       EXISTS (SELECT 1 FROM ins)`, item.VendorName).Scan(&vendorID, &created); err != nil {
+			return "", fmt.Errorf("resolve training vendor from factorial sync: %w", err)
+		}
+		if created {
+			if err := s.auditFields(ctx, tx, principal, "vendor", vendorID, actionFactorialImport, []string{"name"}); err != nil {
+				return "", err
+			}
+		}
+	}
+	tags := item.Tags
+	if tags == nil {
+		tags = []string{} // serializza [] e mai null: la UPDATE estrae elementi jsonb
+	}
+	tagsJSON, err := json.Marshal(tags)
+	if err != nil {
+		return "", fmt.Errorf("encode training course tags: %w", err)
+	}
+	courseID := item.CourseID
+	if item.Create {
+		if err := tx.QueryRowContext(ctx, `
+INSERT INTO training.course (title, description, is_active, factorial_training_id, vendor_id, provider_kind, tags)
+VALUES ($1, NULLIF($2, ''), false, $3, NULLIF($4, '')::uuid, $5::training.course_provider_kind,
+  COALESCE((SELECT array_agg(t.x) FROM jsonb_array_elements_text($6::jsonb) AS t(x)), '{}'))
+RETURNING id::text`, item.Title, item.Description, item.FactorialTrainingID, vendorID, item.ProviderKind, string(tagsJSON)).Scan(&courseID); err != nil {
 			return "", fmt.Errorf("create training course from factorial sync: %w", err)
 		}
-		if err := s.auditFields(ctx, tx, principal, "course", id, actionFactorialImport, []string{"title", "description", "factorial_training_id"}); err != nil {
+		if err := s.auditFields(ctx, tx, principal, "course", courseID, actionFactorialImport, []string{"title", "description", "factorial_training_id", "vendor_id", "provider_kind", "tags"}); err != nil {
 			return "", err
 		}
-		return id, nil
+	} else {
+		if _, err := tx.ExecContext(ctx, `
+UPDATE training.course SET title = $2, description = NULLIF($3, ''), vendor_id = NULLIF($4, '')::uuid,
+  provider_kind = $5::training.course_provider_kind,
+  tags = COALESCE((SELECT array_agg(t.x) FROM jsonb_array_elements_text($6::jsonb) AS t(x)), '{}'), updated_at = now()
+WHERE id = $1::uuid`,
+			item.CourseID, item.Title, item.Description, vendorID, item.ProviderKind, string(tagsJSON)); err != nil {
+			return "", fmt.Errorf("reseed training course from factorial sync: %w", err)
+		}
+		if err := s.auditFields(ctx, tx, principal, "course", item.CourseID, actionFactorialImport, []string{"title", "description", "vendor_id", "provider_kind", "tags"}); err != nil {
+			return "", err
+		}
 	}
-	if _, err := tx.ExecContext(ctx, `
-UPDATE training.course SET title = $2, description = NULLIF($3, ''), updated_at = now() WHERE id = $1::uuid`,
-		item.CourseID, item.Title, item.Description); err != nil {
-		return "", fmt.Errorf("reseed training course from factorial sync: %w", err)
+	areaIDs := make([]string, 0, len(item.SkillAreas))
+	for _, area := range item.SkillAreas {
+		var areaID string
+		var created bool
+		if err := tx.QueryRowContext(ctx, `
+WITH ins AS (
+  INSERT INTO training.skill_area (code, name) VALUES ($1::text, $2::text)
+  ON CONFLICT (code) DO NOTHING
+  RETURNING id::text
+)
+SELECT COALESCE((SELECT id FROM ins), (SELECT id::text FROM training.skill_area WHERE code = $1::text)),
+       EXISTS (SELECT 1 FROM ins)`, area.Code, area.Name).Scan(&areaID, &created); err != nil {
+			return "", fmt.Errorf("resolve training skill area from factorial sync: %w", err)
+		}
+		if created {
+			if err := s.auditFields(ctx, tx, principal, "skill_area", areaID, actionFactorialImport, []string{"code", "name"}); err != nil {
+				return "", err
+			}
+		}
+		areaIDs = append(areaIDs, areaID)
 	}
-	if err := s.auditFields(ctx, tx, principal, "course", item.CourseID, actionFactorialImport, []string{"title", "description"}); err != nil {
-		return "", err
+	if err := replaceSkillAreaLinks(ctx, tx, "course_skill_area", "course_id", courseID, areaIDs); err != nil {
+		return "", fmt.Errorf("relink training course skill areas from factorial sync: %w", err)
 	}
-	return item.CourseID, nil
+	return courseID, nil
 }

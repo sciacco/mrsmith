@@ -3,6 +3,7 @@ package training
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -38,6 +39,54 @@ func newSessionSyncStateFromRemote(remote factorial.TrainingsSession) sessionSyn
 		state.DueDate = formatDateUTC(&remote.DueDate.Time)
 	}
 	return state
+}
+
+// newSessionOpStateFromLocal proietta le colonne operative locali di
+// training.training_session (topic, modality, duration_hours, location).
+// duration arriva come testo dalla colonna numeric e viene ricanonizzato.
+func newSessionOpStateFromLocal(topic, modality, duration, location *string) sessionOpState {
+	hours, _ := canonicalHours(deref(duration))
+	return sessionOpState{
+		Topic:         strings.TrimSpace(deref(topic)),
+		Modality:      strings.TrimSpace(deref(modality)),
+		DurationHours: hours,
+		Location:      strings.TrimSpace(deref(location)),
+	}
+}
+
+// newSessionOpStateFromRemote proietta i dati operativi di una sessione
+// Factorial. Il nome tecnico correlato di una sessione esportata da noi
+// (contiene il token [MS:...]) non e' un argomento: si scarta. Il secondo
+// valore segnala una durata remota presente ma non numerica.
+func newSessionOpStateFromRemote(remote factorial.TrainingsSession) (sessionOpState, bool) {
+	state := sessionOpState{
+		Topic:    strings.TrimSpace(deref(remote.Name)),
+		Location: strings.TrimSpace(deref(remote.Location)),
+	}
+	if strings.Contains(state.Topic, "[MS:") {
+		state.Topic = ""
+	}
+	if remote.Modality != nil {
+		state.Modality = string(*remote.Modality)
+	}
+	hours, ok := canonicalHours(deref(remote.Duration))
+	state.DurationHours = hours
+	return state, !ok
+}
+
+// canonicalHours normalizza una durata in ore ("1.0", "0.75", "1.50") nella
+// forma canonica senza zeri finali, per confronti stabili remoto/locale.
+// "" resta "" (ok); testo non numerico torna ("", false).
+func canonicalHours(raw string) (string, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", true
+	}
+	f, err := strconv.ParseFloat(raw, 64)
+	if err != nil || f < 0 {
+		return "", false
+	}
+	return strconv.FormatFloat(f, 'f', -1, 64), true
 }
 
 // formatInstantUTC normalizza un istante in UTC e lo formatta RFC3339; nil o

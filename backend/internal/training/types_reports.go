@@ -54,7 +54,7 @@ type DeliveredReportRow struct {
 	Teams           []PersonTeamRef `json:"teams"`
 	CourseID        string          `json:"courseId"`
 	CourseTitle     string          `json:"courseTitle"`
-	SkillAreaName   string          `json:"skillAreaName,omitempty"`
+	SkillAreaNames  []string        `json:"skillAreaNames"`
 	EventID         string          `json:"eventId"`
 	DeliveryStatus  string          `json:"deliveryStatus"`
 	LearningOutcome string          `json:"learningOutcome,omitempty"`

@@ -65,6 +65,20 @@ func emptyToNil(s string) *string {
 	return &s
 }
 
+// sessionOpState e' la proiezione dei dati operativi di sessione importati
+// da Factorial (argomento, modalita', durata in ore, luogo). Resta FUORI dal
+// checkpoint 3-way (che copre solo schedule e date): finche' l'integrazione
+// e' attiva questi campi sono di proprieta' del remoto — l'inbound li
+// riallinea quando differiscono, senza generare conflitti, e l'outbound non
+// li esporta mai. DurationHours e' in forma canonica (vedi canonicalHours)
+// per confronti stabili tra remoto e colonna numeric locale.
+type sessionOpState struct {
+	Topic         string
+	Modality      string
+	DurationHours string
+	Location      string
+}
+
 // syncDecision e l'esito della decisione 3-way tra locale, remoto e
 // checkpoint per un singolo attributo sincronizzato.
 type syncDecision int

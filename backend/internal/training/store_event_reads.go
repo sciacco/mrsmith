@@ -177,6 +177,10 @@ SELECT
   ),
   COALESCE(s.notes, ''),
   COALESCE(s.factorial_session_id, ''),
+  COALESCE(s.topic, ''),
+  COALESCE(s.modality, ''),
+  COALESCE(s.duration_hours::float8, 0),
+  COALESCE(s.location, ''),
   s.created_at::text,
   s.updated_at::text
 FROM training.training_session s
@@ -192,6 +196,7 @@ ORDER BY s.starts_at NULLS LAST, s.due_at NULLS LAST, s.created_at, s.id`
 	for rows.Next() {
 		var row SessionDetail
 		var capacity sql.NullInt64
+		var durationHours float64
 		if err := rows.Scan(
 			&row.ID,
 			&row.ScheduleType,
@@ -202,10 +207,17 @@ ORDER BY s.starts_at NULLS LAST, s.due_at NULLS LAST, s.created_at, s.id`
 			&row.Occupancy,
 			&row.Notes,
 			&row.FactorialSessionID,
+			&row.Topic,
+			&row.Modality,
+			&durationHours,
+			&row.Location,
 			&row.CreatedAt,
 			&row.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan training event session: %w", err)
+		}
+		if durationHours > 0 {
+			row.DurationHours = &durationHours
 		}
 		row.MaxCapacity = nullInt(capacity)
 		result = append(result, row)
@@ -276,6 +288,7 @@ SELECT
   es.enrollment_id::text,
   es.session_id::text,
   es.participation_status,
+  COALESCE(es.completed_hours::float8, 0),
   es.assigned_at::text,
   es.updated_at::text
 FROM training.enrollment_session es
@@ -291,14 +304,19 @@ ORDER BY es.assigned_at, es.enrollment_id, es.session_id`
 	result := make([]ParticipationRow, 0)
 	for rows.Next() {
 		var row ParticipationRow
+		var completedHours float64
 		if err := rows.Scan(
 			&row.EnrollmentID,
 			&row.SessionID,
 			&row.ParticipationStatus,
+			&completedHours,
 			&row.AssignedAt,
 			&row.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan training event participation: %w", err)
+		}
+		if completedHours > 0 {
+			row.CompletedHours = &completedHours
 		}
 		result = append(result, row)
 	}

@@ -17,7 +17,7 @@ import {
   localDateTimeValueToInstant,
 } from '../../components/events/eventFormat';
 import { ErrorPanel } from '../../components/events/ErrorPanel';
-import { SCHEDULE_TYPE_LABELS } from '../../lib/labels';
+import { MODALITY_LABELS, SCHEDULE_TYPE_LABELS } from '../../lib/labels';
 import styles from './EventDetailPage.module.css';
 
 interface SessionsSectionProps {
@@ -94,9 +94,12 @@ export function SessionsSection({ eventId, sessions, highlighted }: SessionsSect
           <table className={styles.table}>
             <thead>
               <tr>
+                <th>Argomento</th>
                 <th>Tipo</th>
                 <th>Date</th>
                 <th>Scadenza</th>
+                <th>Modalità</th>
+                <th className={styles.numCell}>Ore</th>
                 <th className={styles.numCell}>Capienza</th>
                 <th className={styles.numCell}>Occupazione</th>
                 <th />
@@ -105,12 +108,18 @@ export function SessionsSection({ eventId, sessions, highlighted }: SessionsSect
             <tbody>
               {sessions.map((session) => (
                 <tr key={session.id}>
+                  <td>{session.topic || '—'}</td>
                   <td>{SCHEDULE_TYPE_LABELS[session.scheduleType ?? ''] ?? '—'}</td>
                   <td>
                     {session.startsAt ? formatInstantDateTime(session.startsAt) : '—'}
                     {session.endsAt ? ` – ${formatInstantDateTime(session.endsAt)}` : ''}
                   </td>
                   <td>{session.dueAt ? formatInstantDate(session.dueAt) : '—'}</td>
+                  <td>
+                    {MODALITY_LABELS[session.modality ?? ''] ?? session.modality ?? '—'}
+                    {session.location ? ` · ${session.location}` : ''}
+                  </td>
+                  <td className={styles.numCell}>{session.durationHours !== undefined ? formatNumber(session.durationHours) : '—'}</td>
                   <td className={styles.numCell}>
                     {session.maxCapacity !== undefined ? (formatNumber(session.maxCapacity) ?? '—') : 'Illimitata'}
                   </td>

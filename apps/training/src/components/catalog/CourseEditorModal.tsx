@@ -5,7 +5,7 @@
 // sync (corsi inattivi con factorialTrainingId).
 
 import { useState } from 'react';
-import { Button, Modal, MoneyInput, SingleSelect, ToggleSwitch, VisuallyHidden } from '@mrsmith/ui';
+import { Button, Modal, MoneyInput, MultiSelect, SingleSelect, ToggleSwitch, VisuallyHidden } from '@mrsmith/ui';
 import {
   useCreateCourse,
   useTrainingCertifications,
@@ -42,7 +42,7 @@ export function CourseEditorModal({ mode, courseId, initial, open, onClose, onSa
     (initial?.providerKind as 'internal' | 'external') ?? 'external',
   );
   const [vendorId, setVendorId] = useState(initial?.vendorId ?? '');
-  const [skillAreaId, setSkillAreaId] = useState(initial?.skillAreaId ?? '');
+  const [skillAreaIds, setSkillAreaIds] = useState<string[]>((initial?.skillAreas ?? []).map((a) => a.id));
   const [leadsToCertId, setLeadsToCertId] = useState(initial?.leadsToCertId ?? '');
   const [deliveryMode, setDeliveryMode] = useState(initial?.deliveryMode || 'mixed');
   const [defaultHours, setDefaultHours] = useState(initial?.defaultHours !== undefined ? String(initial.defaultHours) : '');
@@ -51,6 +51,7 @@ export function CourseEditorModal({ mode, courseId, initial, open, onClose, onSa
   const [description, setDescription] = useState(initial?.description ?? '');
   const [complianceRelated, setComplianceRelated] = useState(initial?.complianceRelated ?? false);
   const [complianceFramework, setComplianceFramework] = useState(initial?.complianceFramework ?? '');
+  const [tags, setTags] = useState((initial?.tags ?? []).join(', '));
   const [active, setActive] = useState(initial?.active ?? true);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,7 +70,7 @@ export function CourseEditorModal({ mode, courseId, initial, open, onClose, onSa
       title: title.trim(),
       providerKind,
       vendorId: providerKind === 'external' ? vendorId : undefined,
-      skillAreaId: skillAreaId || undefined,
+      skillAreaIds,
       leadsToCertId: leadsToCertId || undefined,
       deliveryMode,
       defaultHours: defaultHours !== '' ? Number(defaultHours) : undefined,
@@ -78,6 +79,7 @@ export function CourseEditorModal({ mode, courseId, initial, open, onClose, onSa
       description: description.trim() || undefined,
       complianceRelated,
       complianceFramework: complianceRelated ? complianceFramework.trim() : undefined,
+      tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
       active,
     };
     try {
@@ -154,14 +156,12 @@ export function CourseEditorModal({ mode, courseId, initial, open, onClose, onSa
 
         <div className={styles.row}>
           <label className={styles.field}>
-            Area di competenza
-            <SingleSelect
+            Aree di competenza
+            <MultiSelect<string>
               options={(skillAreas.data ?? []).filter((a) => a.active).map((a) => ({ value: a.id, label: a.name }))}
-              selected={skillAreaId || null}
-              onChange={(v) => setSkillAreaId(v ?? '')}
+              selected={skillAreaIds}
+              onChange={setSkillAreaIds}
               placeholder="Nessuna"
-              allowClear
-              searchable
             />
           </label>
           <label className={styles.field}>
@@ -199,6 +199,11 @@ export function CourseEditorModal({ mode, courseId, initial, open, onClose, onSa
         <label className={styles.field}>
           Descrizione
           <textarea className={styles.textarea} value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+        </label>
+
+        <label className={styles.field}>
+          Tag (separati da virgola)
+          <input className={styles.input} value={tags} onChange={(e) => setTags(e.target.value)} />
         </label>
 
         <div className={styles.row}>

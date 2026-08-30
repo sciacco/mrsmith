@@ -3,6 +3,7 @@ package training
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -14,8 +15,12 @@ import (
 const courseListColumns = `
   c.id::text,
   c.title,
-  COALESCE(c.skill_area_id::text, ''),
-  COALESCE(sa.name, ''),
+  COALESCE((
+    SELECT json_agg(json_build_object('id', sa.id::text, 'name', sa.name) ORDER BY sa.name)
+    FROM training.course_skill_area csa
+    JOIN training.skill_area sa ON sa.id = csa.skill_area_id
+    WHERE csa.course_id = c.id
+  ), '[]')::text,
   COALESCE(c.vendor_id::text, ''),
   COALESCE(v.name, ''),
   c.delivery_mode::text,
@@ -28,11 +33,11 @@ const courseListColumns = `
   COALESCE(c.compliance_framework, ''),
   c.is_active,
   COALESCE(c.factorial_training_id, ''),
+  COALESCE(to_json(c.tags)::text, '[]'),
   c.updated_at::text`
 
 const courseListFrom = `
 FROM training.course c
-LEFT JOIN training.skill_area sa ON sa.id = c.skill_area_id
 LEFT JOIN training.vendor v ON v.id = c.vendor_id
 LEFT JOIN training.certification cert ON cert.id = c.leads_to_cert_id`
 
@@ -49,12 +54,19 @@ func (s *SQLStore) ListCourses(ctx context.Context) ([]CourseListRow, error) {
 		var row CourseListRow
 		var hours sql.NullInt64
 		var cost sql.NullFloat64
+		var areasRaw, tagsRaw string
 		if err := rows.Scan(
-			&row.ID, &row.Title, &row.SkillAreaID, &row.SkillAreaName, &row.VendorID, &row.VendorName,
+			&row.ID, &row.Title, &areasRaw, &row.VendorID, &row.VendorName,
 			&row.DeliveryMode, &row.ProviderKind, &hours, &cost, &row.LeadsToCertID, &row.LeadsToCertName,
-			&row.ComplianceRelated, &row.ComplianceFramework, &row.Active, &row.FactorialTrainingID, &row.UpdatedAt,
+			&row.ComplianceRelated, &row.ComplianceFramework, &row.Active, &row.FactorialTrainingID, &tagsRaw, &row.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan training course: %w", err)
+		}
+		if err := json.Unmarshal([]byte(areasRaw), &row.SkillAreas); err != nil {
+			return nil, fmt.Errorf("decode training course skill areas: %w", err)
+		}
+		if err := json.Unmarshal([]byte(tagsRaw), &row.Tags); err != nil {
+			return nil, fmt.Errorf("decode training course tags: %w", err)
 		}
 		row.DefaultHours = nullInt(hours)
 		row.DefaultCost = nullFloat(cost)
@@ -88,15 +100,15 @@ func (s *SQLStore) GetCourseDetail(ctx context.Context, id string) (CourseDetail
   ), '[]')::text` + courseListFrom + `
 WHERE c.id = $1::uuid`
 	var (
-		detail              CourseDetail
-		hours               sql.NullInt64
-		cost                sql.NullFloat64
-		rulesRaw, eventsRaw string
+		detail                                 CourseDetail
+		hours                                  sql.NullInt64
+		cost                                   sql.NullFloat64
+		areasRaw, tagsRaw, rulesRaw, eventsRaw string
 	)
 	err := s.db.QueryRowContext(ctx, q, id).Scan(
-		&detail.ID, &detail.Title, &detail.SkillAreaID, &detail.SkillAreaName, &detail.VendorID, &detail.VendorName,
+		&detail.ID, &detail.Title, &areasRaw, &detail.VendorID, &detail.VendorName,
 		&detail.DeliveryMode, &detail.ProviderKind, &hours, &cost, &detail.LeadsToCertID, &detail.LeadsToCertName,
-		&detail.ComplianceRelated, &detail.ComplianceFramework, &detail.Active, &detail.FactorialTrainingID, &detail.UpdatedAt,
+		&detail.ComplianceRelated, &detail.ComplianceFramework, &detail.Active, &detail.FactorialTrainingID, &tagsRaw, &detail.UpdatedAt,
 		&detail.Description, &detail.CourseURL, &rulesRaw, &eventsRaw,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -104,6 +116,12 @@ WHERE c.id = $1::uuid`
 	}
 	if err != nil {
 		return CourseDetail{}, fmt.Errorf("load training course detail: %w", err)
+	}
+	if err := json.Unmarshal([]byte(areasRaw), &detail.SkillAreas); err != nil {
+		return CourseDetail{}, fmt.Errorf("decode training course skill areas: %w", err)
+	}
+	if err := json.Unmarshal([]byte(tagsRaw), &detail.Tags); err != nil {
+		return CourseDetail{}, fmt.Errorf("decode training course tags: %w", err)
 	}
 	detail.DefaultHours = nullInt(hours)
 	detail.DefaultCost = nullFloat(cost)

@@ -3,6 +3,7 @@ package training
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 )
@@ -73,7 +74,12 @@ WITH base AS (
 		personTeamsJSON + ` AS teams,
     c.id AS course_id,
     c.title AS course_title,
-    COALESCE(sa.name, '') AS skill_area_name,
+    COALESCE((
+      SELECT json_agg(sa.name ORDER BY sa.name)
+      FROM training.course_skill_area csa
+      JOIN training.skill_area sa ON sa.id = csa.skill_area_id
+      WHERE csa.course_id = c.id
+    ), '[]')::text AS skill_area_names,
     en.event_id AS event_id,
     en.delivery_status AS delivery_status,
     COALESCE(en.learning_outcome, '') AS learning_outcome,
@@ -92,13 +98,12 @@ WITH base AS (
   JOIN training.employee e ON e.id = en.employee_id
   JOIN training.training_event ev ON ev.id = en.event_id
   JOIN training.course c ON c.id = ev.course_id
-  LEFT JOIN training.skill_area sa ON sa.id = c.skill_area_id
   WHERE en.delivery_status IN ('completed', 'partially_completed')
     AND ev.cancelled_at IS NULL
 )
 SELECT
   enrollment_id::text, employee_id::text, employee_name, teams,
-  course_id::text, course_title, skill_area_name, event_id::text,
+  course_id::text, course_title, skill_area_names, event_id::text,
   delivery_status, learning_outcome, reference_date::text, hours
 FROM base
 WHERE reference_date BETWEEN $1::date AND $2::date
@@ -113,9 +118,10 @@ LIMIT 5000`
 	result := make([]DeliveredReportRow, 0)
 	for rows.Next() {
 		var (
-			row   DeliveredReportRow
-			teams string
-			hours sql.NullInt64
+			row       DeliveredReportRow
+			teams     string
+			areaNames string
+			hours     sql.NullInt64
 		)
 		if err := rows.Scan(
 			&row.EnrollmentID,
@@ -124,7 +130,7 @@ LIMIT 5000`
 			&teams,
 			&row.CourseID,
 			&row.CourseTitle,
-			&row.SkillAreaName,
+			&areaNames,
 			&row.EventID,
 			&row.DeliveryStatus,
 			&row.LearningOutcome,
@@ -135,6 +141,9 @@ LIMIT 5000`
 		}
 		if row.Teams, err = decodeJSONSlice[PersonTeamRef](teams); err != nil {
 			return nil, err
+		}
+		if err := json.Unmarshal([]byte(areaNames), &row.SkillAreaNames); err != nil {
+			return nil, fmt.Errorf("decode training delivered report skill areas: %w", err)
 		}
 		row.Hours = nullInt(hours)
 		result = append(result, row)

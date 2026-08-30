@@ -45,16 +45,20 @@ type factorialTeamRow struct {
 }
 
 type factorialTrainingRow struct {
-	ID         string   `json:"id"`
-	Name       string   `json:"name"`
-	Code       string   `json:"code,omitempty"`
-	Year       *int64   `json:"year,omitempty"`
-	Status     string   `json:"status,omitempty"`
-	Catalog    bool     `json:"catalog"`
-	External   bool     `json:"external"`
-	Provider   string   `json:"provider,omitempty"`
-	Cost       string   `json:"cost,omitempty"`
-	Categories []string `json:"categories,omitempty"`
+	ID            string   `json:"id"`
+	Name          string   `json:"name"`
+	Code          string   `json:"code,omitempty"`
+	Year          *int64   `json:"year,omitempty"`
+	Status        string   `json:"status,omitempty"`
+	Catalog       bool     `json:"catalog"`
+	External      bool     `json:"external"`
+	Provider      string   `json:"provider,omitempty"`
+	Cost          string   `json:"cost,omitempty"`
+	Categories    []string `json:"categories,omitempty"`
+	Objectives    string   `json:"objectives,omitempty"`
+	ValidFor      *int64   `json:"validFor,omitempty"`
+	IsMandatory   *bool    `json:"isMandatory,omitempty"`
+	CompetencyIDs []string `json:"competencyIds,omitempty"`
 }
 
 type factorialMembershipRow struct {
@@ -100,6 +104,7 @@ type factorialSessionRow struct {
 	Modality        string          `json:"modality,omitempty"`
 	Schedule        string          `json:"schedule,omitempty"`
 	Location        string          `json:"location,omitempty"`
+	Link            string          `json:"link,omitempty"`
 	Status          string          `json:"status,omitempty"`
 	ParentID        string          `json:"parentId,omitempty"`
 }
@@ -278,14 +283,18 @@ func (h *handler) handleFactorialTrainings(w http.ResponseWriter, r *http.Reques
 	rows := make([]factorialTrainingRow, 0, len(trainings))
 	for _, t := range trainings {
 		row := factorialTrainingRow{
-			ID:       deref(t.ID),
-			Name:     deref(t.Name),
-			Code:     deref(t.Code),
-			Year:     t.Year,
-			Catalog:  t.Catalog != nil && *t.Catalog,
-			External: t.External != nil && *t.External,
-			Provider: deref(t.ExternalProvider),
-			Cost:     deref(t.TotalCostDecimal),
+			ID:            deref(t.ID),
+			Name:          deref(t.Name),
+			Code:          deref(t.Code),
+			Year:          t.Year,
+			Catalog:       t.Catalog != nil && *t.Catalog,
+			External:      t.External != nil && *t.External,
+			Provider:      deref(t.ExternalProvider),
+			Cost:          deref(t.TotalCostDecimal),
+			Objectives:    deref(t.Objectives),
+			ValidFor:      t.ValidFor,
+			IsMandatory:   t.IsMandatory,
+			CompetencyIDs: t.CompetencyIDs,
 		}
 		if t.Status != nil {
 			row.Status = string(*t.Status)
@@ -417,6 +426,7 @@ func (h *handler) handleFactorialTrainingStructure(w http.ResponseWriter, r *htt
 			DueDate:         s.DueDate,
 			Duration:        deref(s.Duration),
 			Location:        deref(s.Location),
+			Link:            deref(s.Link),
 			Status:          deref(s.Status),
 			ParentID:        deref(s.ParentID),
 		}

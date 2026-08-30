@@ -2,6 +2,7 @@ package training
 
 import (
 	"context"
+	"strings"
 
 	"github.com/sciacco/mrsmith/pkg/factorial"
 )
@@ -23,6 +24,9 @@ type factorialTrainingGraph struct {
 	TrainingMemberships      []factorial.TrainingsTrainingMembership
 	SessionAccessMemberships []factorial.TrainingsSessionAccessMembership
 	SessionAttendances       []factorial.TrainingsSessionAttendance
+	// Categories: id categoria -> nome, per tradurre i CategoryIDs dei
+	// training nei tag del corso durante l'inbound.
+	Categories map[string]string
 }
 
 // fetchFactorialTrainingGraph legge trainings, classi, sessioni, training
@@ -72,6 +76,16 @@ func fetchFactorialTrainingGraph(ctx context.Context, cli *factorial.Client) (fa
 	if err != nil {
 		return factorialTrainingGraph{}, err
 	}
+	categories, err := cli.Trainings.Categories.All(ctx, &factorial.TrainingsCategoriesListParams{})
+	if err != nil {
+		return factorialTrainingGraph{}, err
+	}
+	categoryNames := make(map[string]string, len(categories))
+	for _, c := range categories {
+		if c.ID != nil {
+			categoryNames[*c.ID] = strings.TrimSpace(deref(c.Name))
+		}
+	}
 	return factorialTrainingGraph{
 		Trainings:                trainings,
 		TrainingClasses:          classes,
@@ -79,5 +93,6 @@ func fetchFactorialTrainingGraph(ctx context.Context, cli *factorial.Client) (fa
 		TrainingMemberships:      memberships,
 		SessionAccessMemberships: access,
 		SessionAttendances:       attendances,
+		Categories:               categoryNames,
 	}, nil
 }

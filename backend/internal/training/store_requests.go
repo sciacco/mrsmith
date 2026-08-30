@@ -3,6 +3,7 @@ package training
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -174,8 +175,12 @@ SELECT
   COALESCE(r.course_id::text, ''),
   COALESCE(c.title, ''),
   COALESCE(r.free_text_title, ''),
-  COALESCE(r.skill_area_id::text, ''),
-  COALESCE(sa.name, ''),
+  COALESCE((
+    SELECT json_agg(json_build_object('id', sa.id::text, 'name', sa.name) ORDER BY sa.name)
+    FROM training.training_request_skill_area rsa
+    JOIN training.skill_area sa ON sa.id = rsa.skill_area_id
+    WHERE rsa.request_id = r.id
+  ), '[]')::text,
   r.selected_team_id::text,
   t.name,
   COALESCE(r.tl_opinion, ''),
@@ -187,7 +192,6 @@ FROM training.training_request r
 JOIN training.employee e ON e.id = r.employee_id
 JOIN training.team t ON t.id = r.selected_team_id
 LEFT JOIN training.course c ON c.id = r.course_id
-LEFT JOIN training.skill_area sa ON sa.id = r.skill_area_id
 WHERE ($1 = 'all')
    OR ($1 = 'open' AND r.outcome IS NULL)
    OR ($1 = 'closed' AND r.outcome IS NOT NULL)
@@ -202,6 +206,7 @@ LIMIT 1000`
 	result := make([]RequestListRow, 0)
 	for rows.Next() {
 		var row RequestListRow
+		var areasRaw string
 		if err := rows.Scan(
 			&row.ID,
 			&row.EmployeeID,
@@ -210,8 +215,7 @@ LIMIT 1000`
 			&row.CourseID,
 			&row.CourseTitle,
 			&row.FreeTextTitle,
-			&row.SkillAreaID,
-			&row.SkillAreaName,
+			&areasRaw,
 			&row.SelectedTeamID,
 			&row.SelectedTeam,
 			&row.TLOpinion,
@@ -221,6 +225,9 @@ LIMIT 1000`
 			&row.CreatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan training request: %w", err)
+		}
+		if err := json.Unmarshal([]byte(areasRaw), &row.SkillAreas); err != nil {
+			return nil, fmt.Errorf("decode training request skill areas: %w", err)
 		}
 		result = append(result, row)
 	}
@@ -241,8 +248,12 @@ SELECT
   COALESCE(r.course_id::text, ''),
   COALESCE(c.title, ''),
   COALESCE(r.free_text_title, ''),
-  COALESCE(r.skill_area_id::text, ''),
-  COALESCE(sa.name, ''),
+  COALESCE((
+    SELECT json_agg(json_build_object('id', sa.id::text, 'name', sa.name) ORDER BY sa.name)
+    FROM training.training_request_skill_area rsa
+    JOIN training.skill_area sa ON sa.id = rsa.skill_area_id
+    WHERE rsa.request_id = r.id
+  ), '[]')::text,
   r.motivation,
   r.selected_team_id::text,
   t.name,
@@ -275,20 +286,20 @@ FROM training.training_request r
 JOIN training.employee e ON e.id = r.employee_id
 JOIN training.team t ON t.id = r.selected_team_id
 LEFT JOIN training.course c ON c.id = r.course_id
-LEFT JOIN training.skill_area sa ON sa.id = r.skill_area_id
 LEFT JOIN training.employee tl ON tl.id = r.tl_opinion_by
 LEFT JOIN training.employee pd ON pd.id = r.people_decision_by
 LEFT JOIN training.course ac ON ac.id = r.accepted_course_id
 LEFT JOIN training.vendor v ON v.id = r.accepted_vendor_id
 WHERE r.id = $1::uuid`
 	var (
-		detail         RequestDetail
-		tlOpinion      RequestTLOpinionFacts
-		decision       RequestDecisionFacts
-		accepted       RequestAcceptedData
-		hasTLOpinion   string
-		hasDecision    string
-		acceptedCourse string
+		detail            RequestDetail
+		tlOpinion         RequestTLOpinionFacts
+		decision          RequestDecisionFacts
+		accepted          RequestAcceptedData
+		hasTLOpinion      string
+		hasDecision       string
+		acceptedCourse    string
+		requestedAreasRaw string
 	)
 	err := s.db.QueryRowContext(ctx, q, id).Scan(
 		&detail.ID,
@@ -298,8 +309,7 @@ WHERE r.id = $1::uuid`
 		&detail.Requested.CourseID,
 		&detail.Requested.CourseTitle,
 		&detail.Requested.FreeTextTitle,
-		&detail.Requested.SkillAreaID,
-		&detail.Requested.SkillAreaName,
+		&requestedAreasRaw,
 		&detail.Requested.Motivation,
 		&detail.Requested.SelectedTeamID,
 		&detail.Requested.SelectedTeamName,
@@ -334,6 +344,9 @@ WHERE r.id = $1::uuid`
 	}
 	if err != nil {
 		return RequestDetail{}, fmt.Errorf("load training request detail: %w", err)
+	}
+	if err := json.Unmarshal([]byte(requestedAreasRaw), &detail.Requested.SkillAreas); err != nil {
+		return RequestDetail{}, fmt.Errorf("decode training request skill areas: %w", err)
 	}
 	if hasTLOpinion != "" {
 		tlOpinion.Opinion = hasTLOpinion
@@ -483,6 +496,10 @@ func (s *SQLStore) CreateRequest(ctx context.Context, principal Principal, input
 	if desiredStart != nil && desiredEnd != nil && desiredEnd.Before(*desiredStart) {
 		return ActionResponse{}, validationError("desired_end_before_start", "la fine desiderata non puo precedere l'inizio")
 	}
+	areaIDs, err := s.normalizeSkillAreaIDs(ctx, input.SkillAreaIDs)
+	if err != nil {
+		return ActionResponse{}, err
+	}
 
 	var response ActionResponse
 	err = s.withTx(ctx, func(tx *sql.Tx) error {
@@ -494,16 +511,6 @@ func (s *SQLStore) CreateRequest(ctx context.Context, principal Principal, input
 				return err
 			}
 		}
-		if skillAreaID := strings.TrimSpace(input.SkillAreaID); skillAreaID != "" {
-			var exists bool
-			if err := tx.QueryRowContext(ctx, `
-SELECT EXISTS (SELECT 1 FROM training.skill_area WHERE id = $1::uuid)`, skillAreaID).Scan(&exists); err != nil {
-				return fmt.Errorf("check training request skill area: %w", err)
-			}
-			if !exists {
-				return validationError("skill_area_not_found", "area di competenza non trovata")
-			}
-		}
 		if err := s.ensureSelectedTeamMembership(ctx, tx, employeeID, teamID); err != nil {
 			return err
 		}
@@ -513,7 +520,6 @@ INSERT INTO training.training_request (
   employee_id,
   course_id,
   free_text_title,
-  skill_area_id,
   motivation,
   selected_team_id,
   desired_start,
@@ -522,11 +528,10 @@ INSERT INTO training.training_request (
   $1::uuid,
   $2::uuid,
   NULLIF($3, ''),
-  $4::uuid,
-  $5,
-  $6::uuid,
-  NULLIF($7, '')::date,
-  NULLIF($8, '')::date
+  $4,
+  $5::uuid,
+  NULLIF($6, '')::date,
+  NULLIF($7, '')::date
 )
 RETURNING id::text`
 		if err := tx.QueryRowContext(
@@ -535,13 +540,15 @@ RETURNING id::text`
 			employeeID,
 			nullableUUID(courseID),
 			freeTextTitle,
-			nullableUUID(input.SkillAreaID),
 			motivation,
 			teamID,
 			strings.TrimSpace(input.DesiredStart),
 			strings.TrimSpace(input.DesiredEnd),
 		).Scan(&response.ID); err != nil {
 			return fmt.Errorf("create training request: %w", err)
+		}
+		if err := replaceSkillAreaLinks(ctx, tx, "training_request_skill_area", "request_id", response.ID, areaIDs); err != nil {
+			return err
 		}
 		after, err := entitySnapshot(ctx, tx, "training_request", response.ID)
 		if err != nil {

@@ -133,7 +133,7 @@ func deliveredReportXLSXRows(rows []DeliveredReportRow) [][]string {
 			row.EmployeeName,
 			strings.Join(teamNames, ", "),
 			row.CourseTitle,
-			row.SkillAreaName,
+			strings.Join(row.SkillAreaNames, ", "),
 			row.DeliveryStatus,
 			row.LearningOutcome,
 			row.ReferenceDate,

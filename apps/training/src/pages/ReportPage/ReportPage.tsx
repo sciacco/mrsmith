@@ -225,7 +225,8 @@ function currentYearRange(): { from: string; to: string } {
 function groupKeysFor(row: DeliveredReportRow, groupBy: GroupBy): { key: string; label: string }[] {
   if (groupBy === 'course') return [{ key: row.courseId, label: row.courseTitle }];
   if (groupBy === 'skillArea') {
-    return [{ key: row.skillAreaName || 'none', label: row.skillAreaName || 'Nessuna area' }];
+    if (row.skillAreaNames.length === 0) return [{ key: 'none', label: 'Nessuna area' }];
+    return row.skillAreaNames.map((name) => ({ key: name, label: name }));
   }
   if (row.teams.length === 0) return [{ key: 'none', label: 'Nessun team' }];
   return row.teams.map((team) => ({ key: team.id, label: team.name }));

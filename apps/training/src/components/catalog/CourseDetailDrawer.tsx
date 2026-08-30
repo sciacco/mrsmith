@@ -69,12 +69,20 @@ export function CourseDetailDrawer({ id, onClose }: { id: string; onClose: () =>
                 <h3 className={styles.cardTitle}>Corso</h3>
                 <dl className={styles.grid}>
                   <div className={styles.item}>
-                    <dt>Area di competenza</dt>
-                    <dd>{course.skillAreaName || '—'}</dd>
+                    <dt>Aree di competenza</dt>
+                    <dd>{course.skillAreas.length > 0 ? course.skillAreas.map((a) => a.name).join(', ') : '—'}</dd>
                   </div>
                   <div className={styles.item}>
                     <dt>Erogazione</dt>
                     <dd>{PROVIDER_KIND_LABELS[course.providerKind] ?? course.providerKind}</dd>
+                  </div>
+                  <div className={styles.item}>
+                    <dt>Fornitore abituale</dt>
+                    <dd>{course.vendorName || '—'}</dd>
+                  </div>
+                  <div className={styles.item}>
+                    <dt>Tag</dt>
+                    <dd>{course.tags.length > 0 ? course.tags.join(', ') : '—'}</dd>
                   </div>
                   <div className={styles.item}>
                     <dt>Modalità</dt>

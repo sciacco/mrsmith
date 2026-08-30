@@ -119,8 +119,8 @@ export function RequestDetailDrawer({ id, onClose }: RequestDetailDrawerProps) {
                     <dd>{request.requested.courseTitle || request.requested.freeTextTitle}</dd>
                   </div>
                   <div className={styles.item}>
-                    <dt>Area di competenza</dt>
-                    <dd>{request.requested.skillAreaName || '—'}</dd>
+                    <dt>Aree di competenza</dt>
+                    <dd>{request.requested.skillAreas.length > 0 ? request.requested.skillAreas.map((a) => a.name).join(', ') : '—'}</dd>
                   </div>
                   <div className={styles.item}>
                     <dt>Periodo desiderato</dt>

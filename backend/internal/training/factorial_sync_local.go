@@ -19,11 +19,24 @@ type localCourse struct {
 	IsActive    bool
 	Title       string
 	Description string
+	// VendorName: nome del fornitore abituale collegato ("" se nessuno);
+	// ProviderKind: erogazione interna/esterna; Tags: tag liberi. Servono al
+	// confronto di idempotenza del seed (courseSeed), come Title/Description.
+	VendorName   string
+	ProviderKind string
+	Tags         []string
+	// SkillAreaCodes: codici delle aree di competenza collegate, ordinati:
+	// base del confronto di idempotenza del seed competenze (per codice, non
+	// per nome: il nome resta rinominabile in app).
+	SkillAreaCodes []string
 }
 
 type localEvent struct {
 	ID        string
 	Cancelled bool
+	// NotesEmpty: le note dell'evento sono vuote — condizione per il
+	// riempimento con il nome della classe Factorial (mai sopra testo umano).
+	NotesEmpty bool
 }
 
 // localSession e' la proiezione locale di una sessione gia' collegata
@@ -37,6 +50,10 @@ type localSession struct {
 	Local      sessionSyncState
 	Checkpoint *sessionSyncState
 	Provenance string
+	// Op: dati operativi locali (argomento, modalita', durata, luogo), fuori
+	// dal checkpoint 3-way: confrontati direttamente col remoto per il
+	// riallineamento senza conflitti.
+	Op sessionOpState
 }
 
 type localEnrollment struct {
@@ -52,6 +69,9 @@ type localAssign struct {
 	Checkpoint                  *string
 	FactorialAccessMembershipID string
 	FactorialAttendanceID       string
+	// CompletedHours: ore completate in forma canonica ("" = NULL), fuori dal
+	// checkpoint 3-way: riallineate dal remoto senza conflitti.
+	CompletedHours string
 }
 
 // localTrainingState e' lo stato locale gia' collegato, per l'intera run:
@@ -99,18 +119,33 @@ func (s *SQLStore) loadLocalSyncState(ctx context.Context, q sqlRunner) (localTr
 
 func (s *SQLStore) bulkCourses(ctx context.Context, q sqlRunner) (map[string]localCourse, error) {
 	rows, err := q.QueryContext(ctx, `
-SELECT factorial_training_id, id::text, is_active, title, COALESCE(description, '')
-FROM training.course WHERE factorial_training_id IS NOT NULL`)
+SELECT c.factorial_training_id, c.id::text, c.is_active, c.title, COALESCE(c.description, ''),
+  COALESCE(v.name, ''), c.provider_kind::text, COALESCE(to_json(c.tags)::text, '[]'),
+  COALESCE((
+    SELECT to_json(array_agg(sa.code ORDER BY sa.code))
+    FROM training.course_skill_area csa
+    JOIN training.skill_area sa ON sa.id = csa.skill_area_id
+    WHERE csa.course_id = c.id
+  ), '[]')::text
+FROM training.course c
+LEFT JOIN training.vendor v ON v.id = c.vendor_id
+WHERE c.factorial_training_id IS NOT NULL`)
 	if err != nil {
 		return nil, fmt.Errorf("list local training courses: %w", err)
 	}
 	defer rows.Close()
 	result := map[string]localCourse{}
 	for rows.Next() {
-		var trainingID string
+		var trainingID, tagsRaw, areaCodesRaw string
 		var c localCourse
-		if err := rows.Scan(&trainingID, &c.ID, &c.IsActive, &c.Title, &c.Description); err != nil {
+		if err := rows.Scan(&trainingID, &c.ID, &c.IsActive, &c.Title, &c.Description, &c.VendorName, &c.ProviderKind, &tagsRaw, &areaCodesRaw); err != nil {
 			return nil, fmt.Errorf("scan local training course: %w", err)
+		}
+		if err := json.Unmarshal([]byte(tagsRaw), &c.Tags); err != nil {
+			return nil, fmt.Errorf("decode local training course tags: %w", err)
+		}
+		if err := json.Unmarshal([]byte(areaCodesRaw), &c.SkillAreaCodes); err != nil {
+			return nil, fmt.Errorf("decode local training course skill areas: %w", err)
 		}
 		result[trainingID] = c
 	}
@@ -128,7 +163,7 @@ type enrollmentJSON struct {
 
 func (s *SQLStore) bulkEventsAndEnrollments(ctx context.Context, q sqlRunner) (map[string]localEvent, map[[2]string]localEnrollment, error) {
 	rows, err := q.QueryContext(ctx, `
-SELECT ev.factorial_class_id, ev.id::text, ev.cancelled_at IS NOT NULL,
+SELECT ev.factorial_class_id, ev.id::text, ev.cancelled_at IS NOT NULL, COALESCE(ev.notes, '') = '',
   COALESCE((SELECT json_agg(json_build_object('id', en.id::text, 'employeeId', en.employee_id::text, 'cancelled', en.delivery_status = 'cancelled'))
     FROM training.enrollment en WHERE en.event_id = ev.id), '[]')::text
 FROM training.training_event ev WHERE ev.factorial_class_id IS NOT NULL`)
@@ -141,7 +176,7 @@ FROM training.training_event ev WHERE ev.factorial_class_id IS NOT NULL`)
 	for rows.Next() {
 		var classID, enrollmentsRaw string
 		var e localEvent
-		if err := rows.Scan(&classID, &e.ID, &e.Cancelled, &enrollmentsRaw); err != nil {
+		if err := rows.Scan(&classID, &e.ID, &e.Cancelled, &e.NotesEmpty, &enrollmentsRaw); err != nil {
 			return nil, nil, fmt.Errorf("scan local training event: %w", err)
 		}
 		events[classID] = e
@@ -160,18 +195,21 @@ FROM training.training_event ev WHERE ev.factorial_class_id IS NOT NULL`)
 // dalla sotto-query di bulkSessionsAndAssigns. Checkpoint resta *string
 // (non COALESCE) per non confondere "mai sincronizzata" con "".
 type assignJSON struct {
-	EnrollmentID string  `json:"enrollmentId"`
-	Status       string  `json:"status"`
-	Checkpoint   *string `json:"checkpoint"`
-	AccessID     string  `json:"accessId"`
-	AttendanceID string  `json:"attendanceId"`
+	EnrollmentID   string  `json:"enrollmentId"`
+	Status         string  `json:"status"`
+	Checkpoint     *string `json:"checkpoint"`
+	AccessID       string  `json:"accessId"`
+	AttendanceID   string  `json:"attendanceId"`
+	CompletedHours string  `json:"completedHours"`
 }
 
 func (s *SQLStore) bulkSessionsAndAssigns(ctx context.Context, q sqlRunner) (map[string]localSession, map[[2]string]localAssign, error) {
 	rows, err := q.QueryContext(ctx, `
 SELECT s.factorial_session_id, s.id::text, s.schedule_type, s.starts_at, s.ends_at, s.due_at, s.factorial_synced_state, COALESCE(fa.action, ''),
+  s.topic, s.modality, s.duration_hours::text, s.location,
   COALESCE((SELECT json_agg(json_build_object('enrollmentId', es.enrollment_id::text, 'status', es.participation_status,
-    'checkpoint', es.factorial_synced_status, 'accessId', COALESCE(es.factorial_access_membership_id, ''), 'attendanceId', COALESCE(es.factorial_attendance_id, '')))
+    'checkpoint', es.factorial_synced_status, 'accessId', COALESCE(es.factorial_access_membership_id, ''), 'attendanceId', COALESCE(es.factorial_attendance_id, ''),
+    'completedHours', COALESCE(es.completed_hours::text, '')))
     FROM training.enrollment_session es WHERE es.session_id = s.id), '[]')::text
 FROM training.training_session s
 LEFT JOIN LATERAL (SELECT action FROM training.audit_log WHERE entity_type = 'training_session' AND entity_id = s.id ORDER BY occurred_at ASC, id ASC LIMIT 1) fa ON true
@@ -184,16 +222,19 @@ WHERE s.factorial_session_id IS NOT NULL`)
 	assigns := map[[2]string]localAssign{}
 	for rows.Next() {
 		var (
-			factorialSessionID, assignsRaw string
-			session                        localSession
-			scheduleType                   sql.NullString
-			startsAt, endsAt, dueAt        sql.NullTime
-			checkpointRaw                  []byte
+			factorialSessionID, assignsRaw   string
+			session                          localSession
+			scheduleType                     sql.NullString
+			startsAt, endsAt, dueAt          sql.NullTime
+			checkpointRaw                    []byte
+			topic, modality, hours, location sql.NullString
 		)
-		if err := rows.Scan(&factorialSessionID, &session.ID, &scheduleType, &startsAt, &endsAt, &dueAt, &checkpointRaw, &session.Provenance, &assignsRaw); err != nil {
+		if err := rows.Scan(&factorialSessionID, &session.ID, &scheduleType, &startsAt, &endsAt, &dueAt, &checkpointRaw, &session.Provenance,
+			&topic, &modality, &hours, &location, &assignsRaw); err != nil {
 			return nil, nil, fmt.Errorf("scan local training session: %w", err)
 		}
 		session.Local = newSessionSyncStateFromLocal(nullStringPtr(scheduleType), nullTimePtr(startsAt), nullTimePtr(endsAt), nullTimePtr(dueAt))
+		session.Op = newSessionOpStateFromLocal(nullStringPtr(topic), nullStringPtr(modality), nullStringPtr(hours), nullStringPtr(location))
 		if len(checkpointRaw) > 0 {
 			var checkpoint sessionSyncState
 			if err := json.Unmarshal(checkpointRaw, &checkpoint); err != nil {
@@ -207,9 +248,11 @@ WHERE s.factorial_session_id IS NOT NULL`)
 			return nil, nil, fmt.Errorf("decode local training enrollment sessions: %w", err)
 		}
 		for _, a := range parsed {
+			hours, _ := canonicalHours(a.CompletedHours)
 			assigns[[2]string{a.EnrollmentID, session.ID}] = localAssign{
 				Status: a.Status, Checkpoint: a.Checkpoint,
 				FactorialAccessMembershipID: a.AccessID, FactorialAttendanceID: a.AttendanceID,
+				CompletedHours: hours,
 			}
 		}
 	}

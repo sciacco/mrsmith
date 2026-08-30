@@ -129,7 +129,7 @@ type CertificationInput struct {
 type CourseInput struct {
 	Title               string   `json:"title"`
 	VendorID            string   `json:"vendorId,omitempty"`
-	SkillAreaID         string   `json:"skillAreaId,omitempty"`
+	SkillAreaIDs        []string `json:"skillAreaIds,omitempty"`
 	LeadsToCertID       string   `json:"leadsToCertId,omitempty"`
 	DeliveryMode        string   `json:"deliveryMode,omitempty"`
 	ProviderKind        string   `json:"providerKind,omitempty"`
@@ -140,6 +140,7 @@ type CourseInput struct {
 	ComplianceRelated   bool     `json:"complianceRelated"`
 	Mandatory           bool     `json:"mandatory"`
 	ComplianceFramework string   `json:"complianceFramework,omitempty"`
+	Tags                []string `json:"tags,omitempty"`
 	Active              *bool    `json:"active,omitempty"`
 }
 

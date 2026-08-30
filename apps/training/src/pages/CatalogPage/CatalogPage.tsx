@@ -192,7 +192,7 @@ export function CatalogPage() {
                           {row.title}
                         </button>
                       </td>
-                      <td>{row.skillAreaName || '—'}</td>
+                      <td>{row.skillAreas.length > 0 ? row.skillAreas.map((a) => a.name).join(', ') : '—'}</td>
                       <td>{row.vendorName || PROVIDER_KIND_LABELS[row.providerKind] || '—'}</td>
                       <td>{DELIVERY_MODE_LABELS[row.deliveryMode] ?? row.deliveryMode}</td>
                       <td>
