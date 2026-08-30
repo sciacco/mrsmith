@@ -22,7 +22,6 @@ type RequestWithoutTLOpinionRow struct {
 	TeamLeads        []QueueLeadRef `json:"teamLeads"`
 	CourseID         string         `json:"courseId,omitempty"`
 	CourseTitle      string         `json:"courseTitle,omitempty"`
-	FreeTextTitle    string         `json:"freeTextTitle,omitempty"`
 	AgeDays          int            `json:"ageDays"`
 	CreatedAt        string         `json:"createdAt"`
 }
@@ -41,7 +40,6 @@ type RequestAwaitingDecisionRow struct {
 	SelectedTeamName string `json:"selectedTeamName"`
 	CourseID         string `json:"courseId,omitempty"`
 	CourseTitle      string `json:"courseTitle,omitempty"`
-	FreeTextTitle    string `json:"freeTextTitle,omitempty"`
 	TLOpinion        string `json:"tlOpinion"`
 	TLOpinionByID    string `json:"tlOpinionById,omitempty"`
 	TLOpinionByName  string `json:"tlOpinionByName,omitempty"`

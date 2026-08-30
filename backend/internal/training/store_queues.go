@@ -187,7 +187,6 @@ SELECT
   t.name,
   COALESCE(r.course_id::text, ''),
   COALESCE(c.title, ''),
-  COALESCE(r.free_text_title, ''),
   r.created_at::date,
   r.created_at::text
 FROM training.training_request r
@@ -219,7 +218,6 @@ LIMIT 500`
 			&row.SelectedTeamName,
 			&row.CourseID,
 			&row.CourseTitle,
-			&row.FreeTextTitle,
 			&createdOn,
 			&row.CreatedAt,
 		); err != nil {
@@ -263,7 +261,6 @@ SELECT
   t.name,
   COALESCE(r.course_id::text, ''),
   COALESCE(c.title, ''),
-  COALESCE(r.free_text_title, ''),
   r.tl_opinion,
   COALESCE(r.tl_opinion_by::text, ''),
   COALESCE(tl.last_name || ' ' || tl.first_name, ''),
@@ -302,7 +299,6 @@ LIMIT 500`
 			&row.SelectedTeamName,
 			&row.CourseID,
 			&row.CourseTitle,
-			&row.FreeTextTitle,
 			&row.TLOpinion,
 			&row.TLOpinionByID,
 			&row.TLOpinionByName,

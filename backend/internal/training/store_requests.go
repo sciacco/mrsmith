@@ -174,7 +174,6 @@ SELECT
   e.email::text,
   COALESCE(r.course_id::text, ''),
   COALESCE(c.title, ''),
-  COALESCE(r.free_text_title, ''),
   COALESCE((
     SELECT json_agg(json_build_object('id', sa.id::text, 'name', sa.name) ORDER BY sa.name)
     FROM training.training_request_skill_area rsa
@@ -214,7 +213,6 @@ LIMIT 1000`
 			&row.EmployeeEmail,
 			&row.CourseID,
 			&row.CourseTitle,
-			&row.FreeTextTitle,
 			&areasRaw,
 			&row.SelectedTeamID,
 			&row.SelectedTeam,
@@ -247,7 +245,6 @@ SELECT
   e.email::text,
   COALESCE(r.course_id::text, ''),
   COALESCE(c.title, ''),
-  COALESCE(r.free_text_title, ''),
   COALESCE((
     SELECT json_agg(json_build_object('id', sa.id::text, 'name', sa.name) ORDER BY sa.name)
     FROM training.training_request_skill_area rsa
@@ -308,7 +305,6 @@ WHERE r.id = $1::uuid`
 		&detail.Requested.EmployeeEmail,
 		&detail.Requested.CourseID,
 		&detail.Requested.CourseTitle,
-		&detail.Requested.FreeTextTitle,
 		&requestedAreasRaw,
 		&detail.Requested.Motivation,
 		&detail.Requested.SelectedTeamID,
@@ -362,7 +358,7 @@ WHERE r.id = $1::uuid`
 	}
 
 	// La copertura esistente si calcola sul corso accettato quando presente,
-	// altrimenti sul corso richiesto; con solo titolo libero resta vuota.
+	// altrimenti sul corso richiesto.
 	coverageCourseID := detail.Requested.CourseID
 	coverageCourseTitle := detail.Requested.CourseTitle
 	if acceptedCourse != "" {
@@ -461,6 +457,39 @@ LIMIT 100`
 
 // ── Mutazioni ──
 
+// resolveOrCreateEmbryoCourse aggancia un titolo a un corso: riusa il corso
+// esistente con lo stesso titolo (confronto case-insensitive), altrimenti
+// crea l'embrione con il solo nome e lo registra nell'audit.
+func (s *SQLStore) resolveOrCreateEmbryoCourse(ctx context.Context, tx *sql.Tx, principal Principal, title string) (string, error) {
+	var id string
+	err := tx.QueryRowContext(ctx, `
+SELECT id::text
+FROM training.course
+WHERE lower(title) = lower($1)
+ORDER BY created_at, id
+LIMIT 1`, title).Scan(&id)
+	if err == nil {
+		return id, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return "", fmt.Errorf("resolve course by title: %w", err)
+	}
+	if err := tx.QueryRowContext(ctx, `
+INSERT INTO training.course (title)
+VALUES ($1)
+RETURNING id::text`, title).Scan(&id); err != nil {
+		return "", fmt.Errorf("create embryo course: %w", err)
+	}
+	after, err := entitySnapshot(ctx, tx, "course", id)
+	if err != nil {
+		return "", err
+	}
+	if err := s.audit(ctx, tx, principal, "course", id, "create", nil, after); err != nil {
+		return "", err
+	}
+	return id, nil
+}
+
 func (s *SQLStore) CreateRequest(ctx context.Context, principal Principal, input RequestInput) (ActionResponse, error) {
 	if !principal.IsPeopleAdmin {
 		return ActionResponse{}, forbiddenError("people_role_required", "azione riservata a People")
@@ -470,12 +499,12 @@ func (s *SQLStore) CreateRequest(ctx context.Context, principal Principal, input
 		return ActionResponse{}, validationError("employee_required", "persona obbligatoria")
 	}
 	courseID := strings.TrimSpace(input.CourseID)
-	freeTextTitle := strings.TrimSpace(input.FreeTextTitle)
-	if courseID == "" && freeTextTitle == "" {
-		return ActionResponse{}, validationError("course_or_title_required", "indicare il corso a catalogo oppure il titolo libero")
+	newCourseTitle := strings.TrimSpace(input.NewCourseTitle)
+	if courseID == "" && newCourseTitle == "" {
+		return ActionResponse{}, validationError("course_or_title_required", "indicare il corso a catalogo oppure il titolo del corso da creare")
 	}
-	if courseID != "" && freeTextTitle != "" {
-		return ActionResponse{}, validationError("course_xor_title", "corso a catalogo e titolo libero sono alternativi")
+	if courseID != "" && newCourseTitle != "" {
+		return ActionResponse{}, validationError("course_xor_title", "corso a catalogo e titolo nuovo sono alternativi")
 	}
 	motivation := strings.TrimSpace(input.Motivation)
 	if motivation == "" {
@@ -510,6 +539,15 @@ func (s *SQLStore) CreateRequest(ctx context.Context, principal Principal, input
 			if err := s.ensureCourseExists(ctx, tx, courseID); err != nil {
 				return err
 			}
+		} else {
+			// Un titolo e l'embrione di un corso: si riusa il corso con lo
+			// stesso titolo se esiste, altrimenti nasce l'embrione (solo nome;
+			// la completezza della scheda arriva con la maturazione).
+			id, err := s.resolveOrCreateEmbryoCourse(ctx, tx, principal, newCourseTitle)
+			if err != nil {
+				return err
+			}
+			courseID = id
 		}
 		if err := s.ensureSelectedTeamMembership(ctx, tx, employeeID, teamID); err != nil {
 			return err
@@ -519,7 +557,6 @@ func (s *SQLStore) CreateRequest(ctx context.Context, principal Principal, input
 INSERT INTO training.training_request (
   employee_id,
   course_id,
-  free_text_title,
   motivation,
   selected_team_id,
   desired_start,
@@ -527,19 +564,17 @@ INSERT INTO training.training_request (
 ) VALUES (
   $1::uuid,
   $2::uuid,
-  NULLIF($3, ''),
-  $4,
-  $5::uuid,
-  NULLIF($6, '')::date,
-  NULLIF($7, '')::date
+  $3,
+  $4::uuid,
+  NULLIF($5, '')::date,
+  NULLIF($6, '')::date
 )
 RETURNING id::text`
 		if err := tx.QueryRowContext(
 			ctx,
 			stmt,
 			employeeID,
-			nullableUUID(courseID),
-			freeTextTitle,
+			courseID,
 			motivation,
 			teamID,
 			strings.TrimSpace(input.DesiredStart),

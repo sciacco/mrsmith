@@ -24,9 +24,9 @@ export function RequestCreateModal({ open, onClose, onCreated }: RequestCreateMo
 
   const [employeeId, setEmployeeId] = useState('');
   const [teamId, setTeamId] = useState('');
-  const [courseMode, setCourseMode] = useState<'catalog' | 'freetext'>('catalog');
+  const [courseMode, setCourseMode] = useState<'catalog' | 'new'>('catalog');
   const [courseId, setCourseId] = useState('');
-  const [freeTextTitle, setFreeTextTitle] = useState('');
+  const [newCourseTitle, setNewCourseTitle] = useState('');
   const [skillAreaIds, setSkillAreaIds] = useState<string[]>([]);
   const [motivation, setMotivation] = useState('');
   const [desiredStart, setDesiredStart] = useState('');
@@ -46,7 +46,7 @@ export function RequestCreateModal({ open, onClose, onCreated }: RequestCreateMo
     employeeId !== '' &&
     teamId !== '' &&
     motivation.trim() !== '' &&
-    (courseMode === 'catalog' ? courseId !== '' : freeTextTitle.trim() !== '');
+    (courseMode === 'catalog' ? courseId !== '' : newCourseTitle.trim() !== '');
 
   const employeeOptions = useMemo(
     () =>
@@ -64,7 +64,7 @@ export function RequestCreateModal({ open, onClose, onCreated }: RequestCreateMo
         employeeId,
         selectedTeamId: teamId,
         courseId: courseMode === 'catalog' ? courseId : undefined,
-        freeTextTitle: courseMode === 'freetext' ? freeTextTitle.trim() : undefined,
+        newCourseTitle: courseMode === 'new' ? newCourseTitle.trim() : undefined,
         skillAreaIds,
         motivation: motivation.trim(),
         desiredStart: desiredStart || undefined,
@@ -122,11 +122,11 @@ export function RequestCreateModal({ open, onClose, onCreated }: RequestCreateMo
           </Button>
           <Button
             type="button"
-            variant={courseMode === 'freetext' ? 'primary' : 'secondary'}
+            variant={courseMode === 'new' ? 'primary' : 'secondary'}
             size="sm"
-            onClick={() => setCourseMode('freetext')}
+            onClick={() => setCourseMode('new')}
           >
-            Titolo libero
+            Nuovo corso
           </Button>
         </div>
         {courseMode === 'catalog' ? (
@@ -145,10 +145,13 @@ export function RequestCreateModal({ open, onClose, onCreated }: RequestCreateMo
             Titolo
             <input
               className={styles.input}
-              value={freeTextTitle}
-              onChange={(e) => setFreeTextTitle(e.target.value)}
+              value={newCourseTitle}
+              onChange={(e) => setNewCourseTitle(e.target.value)}
               placeholder="Titolo della formazione desiderata"
             />
+            <span className={styles.hint}>
+              Il titolo entra a catalogo come corso da completare; se esiste già un corso con lo stesso nome, la richiesta si aggancia a quello.
+            </span>
           </label>
         )}
 

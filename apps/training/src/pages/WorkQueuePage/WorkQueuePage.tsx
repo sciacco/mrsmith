@@ -360,7 +360,7 @@ export function WorkQueuePage() {
                 linkTo={(r) => `/richieste?id=${r.requestId}`}
                 columns={[
                   { header: 'Persona', render: (r) => r.employeeName },
-                  { header: 'Corso / titolo', render: (r) => r.courseTitle || r.freeTextTitle || '—' },
+                  { header: 'Corso', render: (r) => r.courseTitle || '—' },
                   { header: 'Team', render: (r) => r.selectedTeamName },
                   { header: 'Lead abilitati', render: (r) => names(r.teamLeads) },
                   { header: 'Età', align: 'right', render: (r) => ageLabel(r.ageDays) },
@@ -382,7 +382,7 @@ export function WorkQueuePage() {
                 linkTo={(r) => `/richieste?id=${r.requestId}`}
                 columns={[
                   { header: 'Persona', render: (r) => r.employeeName },
-                  { header: 'Corso / titolo', render: (r) => r.courseTitle || r.freeTextTitle || '—' },
+                  { header: 'Corso', render: (r) => r.courseTitle || '—' },
                   { header: 'Team', render: (r) => r.selectedTeamName },
                   {
                     header: 'Parere',

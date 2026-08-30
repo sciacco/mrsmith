@@ -60,7 +60,6 @@ export interface RequestWithoutTLOpinionRow {
   teamLeads: QueueLeadRef[];
   courseId?: string;
   courseTitle?: string;
-  freeTextTitle?: string;
   ageDays: number;
   createdAt: string;
 }
@@ -79,7 +78,6 @@ export interface RequestAwaitingDecisionRow {
   selectedTeamName: string;
   courseId?: string;
   courseTitle?: string;
-  freeTextTitle?: string;
   tlOpinion: TLOpinion;
   tlOpinionById?: string;
   tlOpinionByName?: string;
@@ -610,7 +608,6 @@ export interface PersonEnrollmentRef {
 export interface PersonRequestRef {
   id: string;
   courseTitle?: string;
-  freeTextTitle?: string;
   outcome: string | null;
   createdAt: string;
 }
@@ -780,7 +777,7 @@ export interface GroupMembersInput {
 export interface RequestInput {
   employeeId: string;
   courseId?: string;
-  freeTextTitle?: string;
+  newCourseTitle?: string;
   skillAreaIds?: string[];
   motivation: string;
   selectedTeamId: string;
@@ -818,7 +815,6 @@ export interface RequestListRow {
   id: string;
   employeeName: string;
   courseTitle?: string;
-  freeTextTitle?: string;
   selectedTeamName: string;
   tlOpinion?: TLOpinionValue;
   peopleDecision?: RequestDecisionValue;
@@ -833,7 +829,6 @@ export interface RequestListResponse {
 export interface RequestOriginalData {
   employeeName: string;
   courseTitle?: string;
-  freeTextTitle?: string;
   skillAreas: SkillAreaRef[];
   motivation: string;
   selectedTeamId: string;

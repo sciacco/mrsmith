@@ -8,13 +8,15 @@ package training
 // il ritiro e un esito distinto.
 
 // RequestInput sono i dati originali della richiesta, registrati da People
-// per conto della persona. Corso a catalogo e titolo libero sono alternativi
-// (XOR applicato dal backend: il CHECK db ammette entrambi); il team scelto
-// deve essere tra le appartenenze attive della persona.
+// per conto della persona. Corso a catalogo e titolo nuovo sono alternativi:
+// un titolo e l'embrione di un corso, quindi il backend riusa il corso
+// esistente con lo stesso nome oppure lo crea (solo nome) nella stessa
+// transazione — ogni richiesta aggancia sempre un corso. Il team scelto deve
+// essere tra le appartenenze attive della persona.
 type RequestInput struct {
 	EmployeeID     string   `json:"employeeId"`
 	CourseID       string   `json:"courseId,omitempty"`
-	FreeTextTitle  string   `json:"freeTextTitle,omitempty"`
+	NewCourseTitle string   `json:"newCourseTitle,omitempty"`
 	SkillAreaIDs   []string `json:"skillAreaIds,omitempty"`
 	Motivation     string   `json:"motivation"`
 	SelectedTeamID string   `json:"selectedTeamId"`
@@ -65,7 +67,6 @@ type RequestListRow struct {
 	EmployeeEmail  string         `json:"employeeEmail"`
 	CourseID       string         `json:"courseId,omitempty"`
 	CourseTitle    string         `json:"courseTitle,omitempty"`
-	FreeTextTitle  string         `json:"freeTextTitle,omitempty"`
 	SkillAreas     []SkillAreaRef `json:"skillAreas"`
 	SelectedTeamID string         `json:"selectedTeamId"`
 	SelectedTeam   string         `json:"selectedTeamName"`
@@ -88,7 +89,6 @@ type RequestOriginalData struct {
 	EmployeeEmail    string         `json:"employeeEmail"`
 	CourseID         string         `json:"courseId,omitempty"`
 	CourseTitle      string         `json:"courseTitle,omitempty"`
-	FreeTextTitle    string         `json:"freeTextTitle,omitempty"`
 	SkillAreas       []SkillAreaRef `json:"skillAreas"`
 	Motivation       string         `json:"motivation"`
 	SelectedTeamID   string         `json:"selectedTeamId"`

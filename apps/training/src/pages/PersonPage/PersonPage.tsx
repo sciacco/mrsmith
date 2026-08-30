@@ -158,7 +158,7 @@ export function PersonPage() {
               <tbody>
                 {person.requests.map((r) => (
                   <tr key={r.id}>
-                    <td>{r.courseTitle || r.freeTextTitle || '—'}</td>
+                    <td>{r.courseTitle || '—'}</td>
                     <td>{r.outcome ? (REQUEST_OUTCOME_LABELS[r.outcome] ?? r.outcome) : 'Aperta'}</td>
                     <td>{formatInstantDate(r.createdAt)}</td>
                     <td>

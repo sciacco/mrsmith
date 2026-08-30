@@ -101,11 +101,10 @@ type PersonEnrollmentRef struct {
 // PersonRequestRef e una richiesta formativa della persona; Outcome e nil
 // quando la richiesta e ancora aperta.
 type PersonRequestRef struct {
-	ID            string  `json:"id"`
-	CourseTitle   string  `json:"courseTitle,omitempty"`
-	FreeTextTitle string  `json:"freeTextTitle,omitempty"`
-	Outcome       *string `json:"outcome"`
-	CreatedAt     string  `json:"createdAt"`
+	ID          string  `json:"id"`
+	CourseTitle string  `json:"courseTitle,omitempty"`
+	Outcome     *string `json:"outcome"`
+	CreatedAt   string  `json:"createdAt"`
 }
 
 // PersonRuleCoverageRef e la copertura della persona su una regola attiva a

@@ -54,7 +54,7 @@ export function RequestsPage() {
     const rows = requests.data ?? [];
     if (!query) return rows;
     return rows.filter((r) =>
-      [r.employeeName, r.courseTitle, r.freeTextTitle, r.selectedTeamName]
+      [r.employeeName, r.courseTitle, r.selectedTeamName]
         .filter((v): v is string => Boolean(v))
         .some((v) => v.toLowerCase().includes(query)),
     );
@@ -142,7 +142,7 @@ export function RequestsPage() {
                       {row.employeeName}
                     </button>
                   </td>
-                  <td>{row.courseTitle || row.freeTextTitle || '—'}</td>
+                  <td>{row.courseTitle || '—'}</td>
                   <td>{row.selectedTeamName}</td>
                   <td>
                     {row.tlOpinion ? (

@@ -72,7 +72,7 @@ export function RequestDetailDrawer({ id, onClose }: RequestDetailDrawerProps) {
         open
         onClose={onClose}
         title={request?.requested.employeeName ?? 'Richiesta'}
-        subtitle={request ? request.requested.courseTitle || request.requested.freeTextTitle : undefined}
+        subtitle={request ? request.requested.courseTitle : undefined}
         size="lg"
         footer={
           isOpen ? (
@@ -116,7 +116,7 @@ export function RequestDetailDrawer({ id, onClose }: RequestDetailDrawerProps) {
                   </div>
                   <div className={styles.item}>
                     <dt>Corso o titolo</dt>
-                    <dd>{request.requested.courseTitle || request.requested.freeTextTitle}</dd>
+                    <dd>{request.requested.courseTitle}</dd>
                   </div>
                   <div className={styles.item}>
                     <dt>Aree di competenza</dt>
