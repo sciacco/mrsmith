@@ -171,6 +171,21 @@
   color: var(--color-text-muted);
 }
 
+/* Candidati di un aggancio corso ambiguo (#172): id corsi omonimi senza
+   correlatore, uno per riga sotto il riferimento del finding. */
+.candidateList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  margin-top: 0.25rem;
+  white-space: normal;
+  word-break: break-all;
+}
+
+.candidateList span {
+  color: var(--color-text-muted);
+}
+
 .personList {
   margin: 0;
   padding: 0;

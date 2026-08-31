@@ -73,13 +73,22 @@ func factorialSyncFindingRows(report FactorialSyncRun) ([]factorialSyncFindingRo
 		}
 		return nil
 	}
-	appendInbound := func(phase, severity string, issues []inboundIssue) {
+	appendInbound := func(phase, severity string, issues []inboundIssue) error {
 		for _, issue := range issues {
-			rows = append(rows, factorialSyncFindingRow{
+			row := factorialSyncFindingRow{
 				phase: phase, severity: severity, kind: issue.Kind, ref: issue.Ref,
 				localEntity: issue.LocalEntity, localID: issue.LocalID, employeeID: issue.EmployeeID,
-			})
+			}
+			if len(issue.Detail) > 0 {
+				detail, err := json.Marshal(issue.Detail)
+				if err != nil {
+					return fmt.Errorf("marshal factorial sync finding detail: %w", err)
+				}
+				row.detail = detail
+			}
+			rows = append(rows, row)
 		}
+		return nil
 	}
 	if report.Tombstone != nil {
 		if err := appendOutbound("tombstone", "warning", report.Tombstone.Warnings); err != nil {
@@ -87,8 +96,12 @@ func factorialSyncFindingRows(report FactorialSyncRun) ([]factorialSyncFindingRo
 		}
 	}
 	if report.Inbound != nil {
-		appendInbound("inbound", "conflict", report.Inbound.Conflicts)
-		appendInbound("inbound", "warning", report.Inbound.Warnings)
+		if err := appendInbound("inbound", "conflict", report.Inbound.Conflicts); err != nil {
+			return nil, err
+		}
+		if err := appendInbound("inbound", "warning", report.Inbound.Warnings); err != nil {
+			return nil, err
+		}
 	}
 	if report.Outbound != nil {
 		if err := appendOutbound("outbound", "conflict", report.Outbound.Conflicts); err != nil {

@@ -178,6 +178,8 @@ export const FACTORIAL_SYNC_ENTITY_LABELS: Record<string, string> = {
 export const FACTORIAL_SYNC_KIND_LABELS: Record<string, string> = {
   // inbound
   course_title_missing: 'Titolo corso mancante',
+  course_adopted_by_title: 'Corso agganciato per titolo',
+  course_adopt_ambiguous: 'Aggancio corso ambiguo',
   event_reopen_blocked: 'Riapertura evento bloccata',
   session_ends_before_starts: "Sessione con fine prima dell'inizio",
   session_conflict: 'Conflitto sessione',

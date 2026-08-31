@@ -1047,6 +1047,14 @@ function TrainingSyncSection() {
   );
 }
 
+// candidateIds estrae dal detail del finding l'elenco dei candidati di un
+// aggancio ambiguo per titolo (#172): stringhe id corso, nessuno se assente.
+function candidateIds(detail?: Record<string, unknown>): string[] {
+  const candidates = detail?.candidates;
+  if (!Array.isArray(candidates)) return [];
+  return candidates.filter((id): id is string => typeof id === 'string');
+}
+
 // groupFindings raggruppa per fase poi severità, preservando l'ordine del
 // backend (ORDER BY phase, severity, kind).
 function groupFindings(findings: FactorialSyncFindingRecord[]): Map<string, Map<string, FactorialSyncFindingRecord[]>> {
@@ -1138,7 +1146,16 @@ function TrainingSyncRunDrawer({ id, onClose }: { id: string; onClose: () => voi
                                 <td className={styles.mutedCell}>
                                   {f.localEntity ? FACTORIAL_SYNC_ENTITY_LABELS[f.localEntity] ?? f.localEntity : '—'}
                                 </td>
-                                <td className={styles.idCell}>{f.ref}</td>
+                                <td className={styles.idCell}>
+                                  {f.ref}
+                                  {candidateIds(f.detail).length > 0 && (
+                                    <span className={styles.candidateList}>
+                                      {candidateIds(f.detail).map((id) => (
+                                        <span key={id}>{id}</span>
+                                      ))}
+                                    </span>
+                                  )}
+                                </td>
                                 <td>
                                   {f.localEntity === 'training_event' && f.localId ? (
                                     <Link to={`/eventi/${f.localId}`}>Apri evento</Link>

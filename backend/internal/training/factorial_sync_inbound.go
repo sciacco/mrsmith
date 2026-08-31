@@ -42,6 +42,13 @@ type courseSeedItem struct {
 	Title               string
 	Description         string
 	TitleMissing        bool
+	// Adopt (#172): true quando il seed non crea un corso nuovo ma adotta
+	// un corso locale senza correlatore con titolo identico (embrione nato
+	// da una richiesta, migrazione 142): la UPDATE scrive anche il
+	// correlatore factorial_training_id. Primo contatto col sync: i campi
+	// si seminano come alla nascita di un gemello; dal run successivo il
+	// corso e' correlato a tutti gli effetti (regola curato inclusa).
+	Adopt bool
 	// VendorName: fornitore abituale dal testo Factorial ("" = nessuno,
 	// scartata la spazzatura "null"); ProviderKind: erogazione dal flag
 	// external; Tags: categorie Factorial come tag liberi (esclusa
@@ -126,13 +133,16 @@ type attendanceHoursItem struct {
 // Ref il miglior identificatore disponibile (id Factorial o locale).
 // LocalEntity/LocalID/EmployeeID: riferimento locale gia' disponibile nel
 // punto di generazione (nessuna lookup aggiuntiva), per la persistenza dei
-// finding (#154); vuoti quando non risolvibile li'.
+// finding (#154); vuoti quando non risolvibile li'. Detail (#172): payload
+// opzionale del finding (es. candidati di un'adozione ambigua), persistito
+// nel detail jsonb.
 type inboundIssue struct {
 	Kind        string
 	Ref         string
 	LocalEntity string
 	LocalID     string
 	EmployeeID  string
+	Detail      map[string]any
 }
 
 type trainingDiff struct {
@@ -233,6 +243,23 @@ func computeTrainingDiff(training factorial.TrainingsTraining, sub trainingClass
 			localCourseID = course.ID
 		}
 		diff.Warnings = append(diff.Warnings, inboundIssue{Kind: "course_title_missing", Ref: trainingID, LocalEntity: "course", LocalID: localCourseID})
+	}
+	// Adozione embrione (#172): senza corso correlato, prima di creare un
+	// gemello si cerca tra i corsi locali senza correlatore una corrispondenza
+	// esatta di titolo, case-insensitive (stessa convenzione del riuso in
+	// creazione richiesta). Un solo candidato -> adozione (correlatore + seed
+	// dei campi, con audit e finding dedicato); piu' candidati -> si crea il
+	// gemello come oggi, con warning che li elenca. Mai col titolo di
+	// fallback: un TitleMissing non adotta.
+	if course == nil && diff.Course != nil && diff.Course.Create && !diff.Course.TitleMissing {
+		if candidates := local.UnlinkedCourses[strings.ToLower(diff.Course.Title)]; len(candidates) == 1 {
+			diff.Course.Create = false
+			diff.Course.CourseID = candidates[0]
+			diff.Course.Adopt = true
+			diff.Warnings = append(diff.Warnings, inboundIssue{Kind: "course_adopted_by_title", Ref: trainingID, LocalEntity: "course", LocalID: candidates[0]})
+		} else if len(candidates) > 1 {
+			diff.Warnings = append(diff.Warnings, inboundIssue{Kind: "course_adopt_ambiguous", Ref: trainingID, LocalEntity: "course", Detail: map[string]any{"candidates": candidates}})
+		}
 	}
 
 	keptClasses := map[string]struct{}{}
@@ -712,6 +739,20 @@ func (s *SQLStore) applyInboundSync(ctx context.Context, graph factorialTraining
 		diff := computeTrainingDiff(training, sub, local, graph.Categories)
 		result.Conflicts = append(result.Conflicts, diff.Conflicts...)
 		result.Warnings = append(result.Warnings, diff.Warnings...)
+		// Bookkeeping in-run (#172): l'embrione adottato non e' piu' candidato
+		// per un altro Training omonimo dello stesso run (bulk letto una volta
+		// sola). Vale anche in dry-run: il piano deve restare coerente con
+		// quello che farebbe la run vera.
+		if diff.Course != nil && diff.Course.Adopt {
+			key := strings.ToLower(diff.Course.Title)
+			ids := local.UnlinkedCourses[key]
+			for i, id := range ids {
+				if id == diff.Course.CourseID {
+					local.UnlinkedCourses[key] = append(ids[:i:i], ids[i+1:]...)
+					break
+				}
+			}
+		}
 		if dryRun {
 			continue
 		}
@@ -1129,15 +1170,32 @@ RETURNING id::text`, item.Title, item.Description, item.FactorialTrainingID, ven
 			return "", err
 		}
 	} else {
-		if _, err := tx.ExecContext(ctx, `
+		// Ramo adozione (#172): primo aggancio di un corso senza correlatore,
+		// la UPDATE porta anche il correlatore (audit come nel ramo create).
+		// Nessun factorial_training_id precedentemente diverso puo' esistere:
+		// i candidati sono senza correlatore per costruzione (bulk snapshot +
+		// advisory lock + unique index a rete di sicurezza).
+		auditFieldsList := []string{"title", "description", "vendor_id", "provider_kind", "tags"}
+		if item.Adopt {
+			auditFieldsList = append([]string{"factorial_training_id"}, auditFieldsList...)
+			_, err = tx.ExecContext(ctx, `
+UPDATE training.course SET factorial_training_id = $7, title = $2, description = NULLIF($3, ''), vendor_id = NULLIF($4, '')::uuid,
+  provider_kind = $5::training.course_provider_kind,
+  tags = COALESCE((SELECT array_agg(t.x) FROM jsonb_array_elements_text($6::jsonb) AS t(x)), '{}'), updated_at = now()
+WHERE id = $1::uuid`,
+				item.CourseID, item.Title, item.Description, vendorID, item.ProviderKind, string(tagsJSON), item.FactorialTrainingID)
+		} else {
+			_, err = tx.ExecContext(ctx, `
 UPDATE training.course SET title = $2, description = NULLIF($3, ''), vendor_id = NULLIF($4, '')::uuid,
   provider_kind = $5::training.course_provider_kind,
   tags = COALESCE((SELECT array_agg(t.x) FROM jsonb_array_elements_text($6::jsonb) AS t(x)), '{}'), updated_at = now()
 WHERE id = $1::uuid`,
-			item.CourseID, item.Title, item.Description, vendorID, item.ProviderKind, string(tagsJSON)); err != nil {
+				item.CourseID, item.Title, item.Description, vendorID, item.ProviderKind, string(tagsJSON))
+		}
+		if err != nil {
 			return "", fmt.Errorf("reseed training course from factorial sync: %w", err)
 		}
-		if err := s.auditFields(ctx, tx, principal, "course", item.CourseID, actionFactorialImport, []string{"title", "description", "vendor_id", "provider_kind", "tags"}); err != nil {
+		if err := s.auditFields(ctx, tx, principal, "course", item.CourseID, actionFactorialImport, auditFieldsList); err != nil {
 			return "", err
 		}
 	}

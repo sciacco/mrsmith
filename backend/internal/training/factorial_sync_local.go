@@ -87,6 +87,13 @@ type localTrainingState struct {
 	Employees   map[string]string             // id Factorial employee -> id locale
 	Enrollments map[[2]string]localEnrollment // [employeeID, eventID] -> iscrizione
 	Assigns     map[[2]string]localAssign     // [enrollmentID, sessionID] -> riga
+	// UnlinkedCourses (#172): corsi senza correlatore (embrioni nati dalle
+	// richieste, migrazione 142, compresi i corsi solo locali), chiave
+	// lower(title) -> id ordinati per created_at, id: base dell'adozione
+	// inbound per titolo esatto case-insensitive. Solo id: al momento
+	// dell'adozione il corso e' un primo contatto (non ancora correlato),
+	// quindi il seed dei campi scritto dal sync vale comunque.
+	UnlinkedCourses map[string][]string
 }
 
 // loadLocalSyncState legge in blocco, per l'intera run, tutto lo stato
@@ -111,10 +118,41 @@ func (s *SQLStore) loadLocalSyncState(ctx context.Context, q sqlRunner) (localTr
 	if err != nil {
 		return localTrainingState{}, err
 	}
+	unlinked, err := s.bulkUnlinkedCourses(ctx, q)
+	if err != nil {
+		return localTrainingState{}, err
+	}
 	return localTrainingState{
 		Courses: courses, Events: events, Sessions: sessions,
 		Employees: employees, Enrollments: enrollments, Assigns: assigns,
+		UnlinkedCourses: unlinked,
 	}, nil
+}
+
+// bulkUnlinkedCourses legge in blocco i corsi senza correlatore (#172):
+// chiave lower(title) (stessa convenzione del riuso in creazione
+// richiesta, store_requests.go), valori id per created_at, id. Serve
+// all'inbound per adottare un embrione omonimo invece di creare un
+// gemello: senza correlatore il corso non entra in bulkCourses.
+func (s *SQLStore) bulkUnlinkedCourses(ctx context.Context, q sqlRunner) (map[string][]string, error) {
+	rows, err := q.QueryContext(ctx, `
+SELECT lower(title), id::text
+FROM training.course
+WHERE factorial_training_id IS NULL
+ORDER BY created_at, id`)
+	if err != nil {
+		return nil, fmt.Errorf("list unlinked training courses: %w", err)
+	}
+	defer rows.Close()
+	result := map[string][]string{}
+	for rows.Next() {
+		var key, id string
+		if err := rows.Scan(&key, &id); err != nil {
+			return nil, fmt.Errorf("scan unlinked training course: %w", err)
+		}
+		result[key] = append(result[key], id)
+	}
+	return result, rows.Err()
 }
 
 func (s *SQLStore) bulkCourses(ctx context.Context, q sqlRunner) (map[string]localCourse, error) {

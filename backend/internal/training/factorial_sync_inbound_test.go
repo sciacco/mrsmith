@@ -223,6 +223,77 @@ func TestComputeTrainingDiff_CancelledNotReopened(t *testing.T) {
 	})
 }
 
+func TestComputeTrainingDiff_EmbryoAdoption(t *testing.T) {
+	// #172: senza corso correlato, il sync cerca tra i corsi senza correlatore
+	// un titolo identico case-insensitive prima di creare il gemello.
+	t.Run("un solo candidato omonimo: adozione", func(t *testing.T) {
+		training := factorial.TrainingsTraining{ID: ptr("t-1"), Name: ptr(" Corso Sicurezza "), Description: ptr("desc")}
+		local := localTrainingState{UnlinkedCourses: map[string][]string{"corso sicurezza": {"c-1"}}}
+		diff := computeTrainingDiff(training, trainingClassPerimeter{}, local, nil)
+		if diff.Course == nil || diff.Course.Create || !diff.Course.Adopt || diff.Course.CourseID != "c-1" {
+			t.Fatalf("Course = %+v, want adozione su c-1 (Create=false, Adopt=true)", diff.Course)
+		}
+		if diff.Course.Title != "Corso Sicurezza" || diff.Course.Description != "desc" {
+			t.Fatalf("Course = %+v, want seed dei campi dal remoto", diff.Course)
+		}
+		if len(diff.Warnings) != 1 || diff.Warnings[0].Kind != "course_adopted_by_title" ||
+			diff.Warnings[0].Ref != "t-1" || diff.Warnings[0].LocalEntity != "course" || diff.Warnings[0].LocalID != "c-1" {
+			t.Fatalf("Warnings = %+v, want un solo course_adopted_by_title su c-1", diff.Warnings)
+		}
+	})
+	t.Run("piu' candidati omonimi: gemello come oggi + warning con i candidati", func(t *testing.T) {
+		training := factorial.TrainingsTraining{ID: ptr("t-2"), Name: ptr("Corso Sicurezza")}
+		local := localTrainingState{UnlinkedCourses: map[string][]string{"corso sicurezza": {"c-1", "c-2"}}}
+		diff := computeTrainingDiff(training, trainingClassPerimeter{}, local, nil)
+		if diff.Course == nil || !diff.Course.Create || diff.Course.Adopt {
+			t.Fatalf("Course = %+v, want Create=true senza adozione (ambiguita')", diff.Course)
+		}
+		if len(diff.Warnings) != 1 || diff.Warnings[0].Kind != "course_adopt_ambiguous" || diff.Warnings[0].Ref != "t-2" {
+			t.Fatalf("Warnings = %+v, want un solo course_adopt_ambiguous su t-2", diff.Warnings)
+		}
+		cand, _ := diff.Warnings[0].Detail["candidates"].([]string)
+		if len(cand) != 2 || cand[0] != "c-1" || cand[1] != "c-2" {
+			t.Fatalf("Detail = %+v, want candidates [c-1 c-2]", diff.Warnings[0].Detail)
+		}
+	})
+	t.Run("zero candidati: comportamento attuale", func(t *testing.T) {
+		training := factorial.TrainingsTraining{ID: ptr("t-3"), Name: ptr("Corso Nuovo")}
+		diff := computeTrainingDiff(training, trainingClassPerimeter{}, localTrainingState{}, nil)
+		if diff.Course == nil || !diff.Course.Create || diff.Course.Adopt {
+			t.Fatalf("Course = %+v, want Create=true senza adozione", diff.Course)
+		}
+		if len(diff.Warnings) != 0 {
+			t.Fatalf("Warnings = %+v, want nessuno", diff.Warnings)
+		}
+	})
+	t.Run("titolo remoto assente: nessuna adozione col titolo di fallback", func(t *testing.T) {
+		training := factorial.TrainingsTraining{ID: ptr("t-4")}
+		// anche un ipotetico corso locale col titolo di fallback non si adotta
+		local := localTrainingState{UnlinkedCourses: map[string][]string{"training factorial t-4": {"c-9"}}}
+		diff := computeTrainingDiff(training, trainingClassPerimeter{}, local, nil)
+		if diff.Course == nil || !diff.Course.Create || diff.Course.Adopt {
+			t.Fatalf("Course = %+v, want Create=true (mai adozione su titolo di fallback)", diff.Course)
+		}
+		if len(diff.Warnings) != 1 || diff.Warnings[0].Kind != "course_title_missing" {
+			t.Fatalf("Warnings = %+v, want il solo course_title_missing esistente", diff.Warnings)
+		}
+	})
+	t.Run("corso gia' correlato: nessuna adozione (idempotenza dal run successivo)", func(t *testing.T) {
+		training := factorial.TrainingsTraining{ID: ptr("t-5"), Name: ptr("Corso Sicurezza")}
+		local := localTrainingState{
+			Courses:         map[string]localCourse{"t-5": {ID: "c-5", IsActive: true}},
+			UnlinkedCourses: map[string][]string{"corso sicurezza": {"c-6"}},
+		}
+		diff := computeTrainingDiff(training, trainingClassPerimeter{}, local, nil)
+		if diff.Course != nil {
+			t.Fatalf("Course = %+v, want nil (correlato e attivo: curato, nessuna adozione)", diff.Course)
+		}
+		if len(diff.Warnings) != 0 {
+			t.Fatalf("Warnings = %+v, want nessuno", diff.Warnings)
+		}
+	})
+}
+
 func TestComputeTrainingDiff_Idempotent(t *testing.T) {
 	t.Run("tutte le entita' allineate", func(t *testing.T) {
 		training := factorial.TrainingsTraining{ID: ptr("t-1")}

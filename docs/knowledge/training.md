@@ -62,7 +62,7 @@ Names on the left are Factorial Trainings-API resources (`Trainings*` in `pkg/fa
 | `SessionAccessMembership` | `training.enrollment` + `training.enrollment_session` (session-level access; a remote access membership links both) |
 | `SessionAttendance` | `training.enrollment_session.participation_status` |
 
-Course-card fields seeded on import (August 2026 decisions, migration 135), all only while the local course is **not active** (once curated/activated the sync never touches the card again):
+Course-card fields seeded on import (August 2026 decisions, migration 135), all only while the local course is **not active** (once curated/activated the sync never touches the card again). Single exception — embryo adoption (#172): on the run that adopts a previously-unlinked course by exact title, the card is seeded once even if active (first contact with the sync, like a twin's birth); from the next run the course is correlated and the not-active gate applies again.
 
 - `Training.external_provider` → vendor registry get-or-create by case-insensitive name (`training.vendor`, citext unique) + `course.vendor_id`. The literal string `"null"` is junk and is discarded.
 - `Training.external` → `course.provider_kind` (`external`/`internal`). Real data is coherent: provider names exist only on external trainings; in the 3 observed category-vs-flag conflicts the flag wins.
@@ -84,6 +84,7 @@ Course-card fields seeded on import (August 2026 decisions, migration 135), all 
 - `Training.code` (a dedicated Factorial field on the course-level resource) holds the local `course` UUID.
 - Classes and sessions have no equivalent field: the local UUID is embedded as a `[MS:<uuid>]` token inside the Factorial `name`.
 - Every correlator-bearing create is search-before-create against the correlator: 0 matches → create, 1 match → adopt, more than 1 → conflict (isolates that branch, does not fail the run). Membership and access creates carry no token: they instead diff a `BulkCreate` batch by employee id against who is already linked.
+- Inbound course adoption by title (#172): a Training with no local correlated course first looks among local courses **without** correlator for an exact title match, case-insensitive (`lower(title)`, same convention as request-side embryo reuse). Exactly one candidate → the correlator is written on it (`factorial_training_id`, finding `course_adopted_by_title`) and the card is seeded once, active or not; more than one → new course as before plus finding `course_adopt_ambiguous` listing the candidate ids in the finding `detail`. Never on the fallback title (`Training Factorial <id>`). From the next run the adopted course is an ordinary correlated course (no re-adoption, no rewriting). Within one run the adopted course leaves the candidate pool, so two same-titled Trainings cannot adopt the same course.
 
 #### Configuration
 
