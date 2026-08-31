@@ -7,7 +7,7 @@
 // sequenzialita e l'override vivono nel backend, qui si offrono le azioni
 // coerenti coi fatti gia caricati e si mostrano per intero i 4xx.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, Drawer, Modal, MultiSelect, Skeleton, SingleSelect, StatusBadge, useToast, VisuallyHidden } from '@mrsmith/ui';
 import {
@@ -588,20 +588,25 @@ function DecisionForm({ request, onClose }: { request: RequestDetail; onClose: (
   const createCourse = useCreateCourse();
 
   const existing = request.decision;
+  const accepted = request.accepted;
+  // Riscrittura di un accoglimento (#175): parte precompilata dall'accoglimento
+  // precedente (corso, evento, fornitore, periodo, note) e con l'iscrizione
+  // risultante agganciata. Prima decisione e riscrittura da respinto: vuoto.
+  const prefill = existing?.decision === 'accepted' && !!accepted;
   const [decisionKind, setDecisionKind] = useState<'accepted' | 'rejected'>(existing?.decision ?? 'accepted');
   const [reason, setReason] = useState(existing?.reason ?? '');
-  const [existingEnrollmentId, setExistingEnrollmentId] = useState('');
+  const [existingEnrollmentId, setExistingEnrollmentId] = useState(prefill ? request.resultingEnrollmentId ?? '' : '');
   const [courseMode, setCourseMode] = useState<'catalog' | 'new'>('catalog');
-  const [courseId, setCourseId] = useState('');
+  const [courseId, setCourseId] = useState(prefill ? accepted?.courseId ?? '' : '');
   const [newCourseTitle, setNewCourseTitle] = useState('');
   const [newCourseProviderKind, setNewCourseProviderKind] = useState<'internal' | 'external'>('external');
   const [newCourseVendorId, setNewCourseVendorId] = useState('');
-  const [eventMode, setEventMode] = useState<'existing' | 'new'>('new');
-  const [eventId, setEventId] = useState('');
-  const [vendorId, setVendorId] = useState('');
-  const [periodStart, setPeriodStart] = useState('');
-  const [periodEnd, setPeriodEnd] = useState('');
-  const [notes, setNotes] = useState('');
+  const [eventMode, setEventMode] = useState<'existing' | 'new'>(prefill && !!accepted?.eventId ? 'existing' : 'new');
+  const [eventId, setEventId] = useState(prefill ? accepted?.eventId ?? '' : '');
+  const [vendorId, setVendorId] = useState(prefill ? accepted?.vendorId ?? '' : '');
+  const [periodStart, setPeriodStart] = useState(prefill ? accepted?.periodStart ?? '' : '');
+  const [periodEnd, setPeriodEnd] = useState(prefill ? accepted?.periodEnd ?? '' : '');
+  const [notes, setNotes] = useState(prefill ? accepted?.notes ?? '' : '');
   const [error, setError] = useState<string | null>(null);
 
   const coverage = request.existingCoverage;
@@ -609,13 +614,55 @@ function DecisionForm({ request, onClose }: { request: RequestDetail; onClose: (
   const linkingCoverage = existingEnrollmentId !== '';
   const pending = recordDecision.isPending || createCourse.isPending;
   const eventsForCourse = (events.data ?? []).filter((e) => e.courseId === courseId && !e.flags.cancelled);
+  // L'iscrizione risultante dell'accoglimento precedente è tipicamente «planned» e
+  // non compare tra le iscrizioni completate della copertura: la proponiamo come
+  // opzione dedicata, così la riconferma dello stesso accoglimento non produce
+  // il 409 già_iscritta (il backend la accetta: valida persona/corso, non lo stato).
+  const resultingEnrollment = request.resultingEnrollmentId
+    ? {
+        value: request.resultingEnrollmentId,
+        label: 'Iscrizione già collegata a questa richiesta',
+      }
+    : null;
+  const enrollmentOptions = [
+    ...coverage.completedEnrollments.map((en) => ({
+      value: en.enrollmentId,
+      label: `Completata il ${formatDateOnly(en.completedOn)}`,
+    })),
+    ...(resultingEnrollment && !coverage.completedEnrollments.some((en) => en.enrollmentId === resultingEnrollment.value)
+      ? [resultingEnrollment]
+      : []),
+  ];
+  // Il pannello di aggancio deve comparire anche quando c'è solo l'iscrizione
+  // risultante da riagganciare: altrimenti l'aggancio preselezionato nasconderebbe
+  // la sezione corso/evento senza un'UI per sganciarlo.
+  const showCoverageLink = hasCoverage || !!request.resultingEnrollmentId;
+  // Corso prefillato anche se non più attivo a catalogo: lo aggiungiamo alle
+  // opzioni con la label dell'accoglimento, così il prefill resta leggibile.
+  const catalogCourseOptions = (courses.data ?? []).filter((c) => c.active).map((c) => ({ value: c.id, label: c.title }));
+  if (prefill && accepted && accepted.courseId && !catalogCourseOptions.some((c) => c.value === accepted.courseId)) {
+    catalogCourseOptions.unshift({ value: accepted.courseId, label: accepted.courseTitle });
+  }
+
+  // I due reset di evento non devono clobberare il prefill al primo render:
+  // confrontiamo i valori precedenti (robusto anche con StrictMode) invece di
+  // una flag one-shot, così un cambio di corso da parte dell'utente resetta
+  // ancora l'evento come prima.
+  const prevCourse = useRef({ courseId, courseMode });
+  const prevEvent = useRef({ eventMode, eventsCount: eventsForCourse.length });
 
   useEffect(() => {
+    const prev = prevCourse.current;
+    prevCourse.current = { courseId, courseMode };
+    if (prev.courseId === courseId && prev.courseMode === courseMode) return;
     setEventMode('new');
     setEventId('');
   }, [courseId, courseMode]);
 
   useEffect(() => {
+    const prev = prevEvent.current;
+    prevEvent.current = { eventMode, eventsCount: eventsForCourse.length };
+    if (prev.eventMode === eventMode && prev.eventsCount === eventsForCourse.length) return;
     if (eventMode === 'existing' && eventsForCourse.length === 0) {
       setEventMode('new');
       setEventId('');
@@ -708,19 +755,16 @@ function DecisionForm({ request, onClose }: { request: RequestDetail; onClose: (
 
         {decisionKind === 'accepted' && (
           <>
-            {hasCoverage && (
+            {showCoverageLink && (
               <section className={localStyles.coveragePanel}>
                 <h4 className={localStyles.coverageTitle}>
                   Copertura esistente{coverage.courseTitle ? ` per ${coverage.courseTitle}` : ''}
                 </h4>
-                {coverage.completedEnrollments.length > 0 && (
+                {(coverage.completedEnrollments.length > 0 || !!request.resultingEnrollmentId) && (
                   <label className={formStyles.field}>
                     Collega iscrizione esistente (evita doppioni)
                     <SingleSelect
-                      options={coverage.completedEnrollments.map((en) => ({
-                        value: en.enrollmentId,
-                        label: `Completata il ${formatDateOnly(en.completedOn)}`,
-                      }))}
+                      options={enrollmentOptions}
                       selected={existingEnrollmentId || null}
                       onChange={(v) => setExistingEnrollmentId(v ?? '')}
                       placeholder="Nessuna: nuova assegnazione"
@@ -763,7 +807,7 @@ function DecisionForm({ request, onClose }: { request: RequestDetail; onClose: (
                       <VisuallyHidden>obbligatorio</VisuallyHidden>
                     </span>
                     <SingleSelect
-                      options={(courses.data ?? []).filter((c) => c.active).map((c) => ({ value: c.id, label: c.title }))}
+                      options={catalogCourseOptions}
                       selected={courseId || null}
                       onChange={(v) => setCourseId(v ?? '')}
                       placeholder="Seleziona corso..."

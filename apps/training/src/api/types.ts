@@ -937,8 +937,10 @@ export interface RequestDecisionFacts {
 }
 
 export interface RequestAcceptedData {
+  courseId: string;
   courseTitle: string;
   eventId?: string;
+  vendorId?: string;
   vendorName?: string;
   periodStart?: string;
   periodEnd?: string;
