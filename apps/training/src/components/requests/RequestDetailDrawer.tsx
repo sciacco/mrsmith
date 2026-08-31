@@ -13,13 +13,16 @@ import {
   useRecordRequestDecision,
   useRecordTLOpinion,
   useRequestDetail,
+  useResumeRequest,
+  useSuspendRequest,
   useTrainingCourses,
   useTrainingEvents,
   useTrainingLookups,
   useTrainingTeams,
+  useUpdateRequestAnnotations,
   useWithdrawRequest,
 } from '../../api/queries';
-import type { RequestAcceptedInput, RequestDetail, TLOpinionValue } from '../../api/types';
+import type { RequestAcceptedInput, RequestAreaRef, RequestDetail, TLOpinionValue } from '../../api/types';
 import { HistoryPanel } from '../audit/HistoryPanel';
 import { describeApiError } from '../events/apiErrors';
 import { ErrorPanel } from '../events/ErrorPanel';
@@ -35,6 +38,13 @@ function periodLabel(start?: string, end?: string): string {
   return `${formatDateOnly(start)} – ${formatDateOnly(end)}`;
 }
 
+function areaLabel(area: RequestAreaRef): string {
+  if (area.levelCurrent === undefined && area.levelTarget === undefined) return area.name;
+  const current = area.levelCurrent ?? '—';
+  const target = area.levelTarget ?? '—';
+  return `${area.name} (${current} → ${target})`;
+}
+
 interface RequestDetailDrawerProps {
   id: string;
   onClose: () => void;
@@ -45,13 +55,21 @@ export function RequestDetailDrawer({ id, onClose }: RequestDetailDrawerProps) {
   const detail = useRequestDetail(id);
   const withdrawRequest = useWithdrawRequest();
 
+  const suspendRequest = useSuspendRequest();
+  const resumeRequest = useResumeRequest();
+
   const [showTLOpinion, setShowTLOpinion] = useState(false);
   const [showDecision, setShowDecision] = useState(false);
   const [showWithdraw, setShowWithdraw] = useState(false);
+  const [showSuspend, setShowSuspend] = useState(false);
+  const [showAnnotations, setShowAnnotations] = useState(false);
+  const [suspendReason, setSuspendReason] = useState('');
+  const [suspendError, setSuspendError] = useState<string | null>(null);
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
 
   const request = detail.data;
   const isOpen = !!request && !request.outcome;
+  const isSuspended = !!request?.suspendedAt;
   const needsOpinion = isOpen && !request?.tlOpinion;
   const needsDecision = isOpen && !!request?.tlOpinion && !request?.decision;
 
@@ -63,6 +81,27 @@ export function RequestDetailDrawer({ id, onClose }: RequestDetailDrawerProps) {
       toast('Richiesta ritirata');
     } catch (e) {
       setWithdrawError(describeApiError(e, 'Ritiro non riuscito'));
+    }
+  }
+
+  async function handleSuspend() {
+    setSuspendError(null);
+    try {
+      await suspendRequest.mutateAsync({ id, input: { reason: suspendReason.trim() } });
+      setShowSuspend(false);
+      setSuspendReason('');
+      toast('Richiesta sospesa');
+    } catch (e) {
+      setSuspendError(describeApiError(e, 'Sospensione non riuscita'));
+    }
+  }
+
+  async function handleResume() {
+    try {
+      await resumeRequest.mutateAsync(id);
+      toast('Richiesta riattivata');
+    } catch (e) {
+      toast(describeApiError(e, 'Riattivazione non riuscita'));
     }
   }
 
@@ -80,6 +119,15 @@ export function RequestDetailDrawer({ id, onClose }: RequestDetailDrawerProps) {
               <Button variant="ghost" size="md" onClick={() => setShowWithdraw(true)}>
                 Ritira richiesta
               </Button>
+              {isSuspended ? (
+                <Button variant="secondary" size="md" loading={resumeRequest.isPending} onClick={handleResume}>
+                  Riattiva
+                </Button>
+              ) : (
+                <Button variant="ghost" size="md" onClick={() => setShowSuspend(true)}>
+                  Sospendi
+                </Button>
+              )}
               {needsOpinion && (
                 <Button variant="secondary" size="md" onClick={() => setShowTLOpinion(true)}>
                   Registra parere TL
@@ -119,8 +167,8 @@ export function RequestDetailDrawer({ id, onClose }: RequestDetailDrawerProps) {
                     <dd>{request.requested.courseTitle}</dd>
                   </div>
                   <div className={styles.item}>
-                    <dt>Aree di competenza</dt>
-                    <dd>{request.requested.skillAreas.length > 0 ? request.requested.skillAreas.map((a) => a.name).join(', ') : '—'}</dd>
+                    <dt>Aree di competenza (attuale → atteso)</dt>
+                    <dd>{request.requested.skillAreas.length > 0 ? request.requested.skillAreas.map(areaLabel).join(', ') : '—'}</dd>
                   </div>
                   <div className={styles.item}>
                     <dt>Periodo desiderato</dt>
@@ -130,6 +178,45 @@ export function RequestDetailDrawer({ id, onClose }: RequestDetailDrawerProps) {
                     <dt>Motivazione</dt>
                     <dd>{request.requested.motivation}</dd>
                   </div>
+                </dl>
+              </section>
+
+              <section className={styles.card}>
+                <h3 className={styles.cardTitle}>
+                  Pianificazione
+                  {isOpen && (
+                    <Button variant="ghost" size="sm" onClick={() => setShowAnnotations(true)}>
+                      Modifica
+                    </Button>
+                  )}
+                </h3>
+                <dl className={styles.grid}>
+                  <div className={styles.item}>
+                    <dt>Priorità</dt>
+                    <dd>{request.priority ?? '—'}</dd>
+                  </div>
+                  <div className={styles.item}>
+                    <dt>Promemoria</dt>
+                    <dd>
+                      {request.reminderText
+                        ? `${request.reminderText}${request.reminderAt ? ` · richiamo ${formatDateOnly(request.reminderAt)}` : ''}`
+                        : '—'}
+                    </dd>
+                  </div>
+                  <div className={styles.item}>
+                    <dt>Nota</dt>
+                    <dd>{request.notes || '—'}</dd>
+                  </div>
+                  {isSuspended && (
+                    <div className={styles.item}>
+                      <dt>Sospesa</dt>
+                      <dd>
+                        {formatInstantDate(request.suspendedAt)}
+                        {request.suspendedByName ? ` · ${request.suspendedByName}` : ''}
+                        {request.suspensionReason ? ` · ${request.suspensionReason}` : ''}
+                      </dd>
+                    </div>
+                  )}
                 </dl>
               </section>
 
@@ -242,6 +329,33 @@ export function RequestDetailDrawer({ id, onClose }: RequestDetailDrawerProps) {
 
       {request && showTLOpinion && <TLOpinionForm request={request} onClose={() => setShowTLOpinion(false)} />}
       {request && showDecision && <DecisionForm request={request} onClose={() => setShowDecision(false)} />}
+      {request && showAnnotations && <AnnotationsForm request={request} onClose={() => setShowAnnotations(false)} />}
+      {showSuspend && (
+        <Modal open onClose={() => setShowSuspend(false)} title="Sospendi richiesta" size="sm">
+          <div className={formStyles.body}>
+            <p>L'esigenza resta aperta ma esce dalle viste operative finché non viene riattivata.</p>
+            <label className={formStyles.field}>
+              Motivo (facoltativo)
+              <textarea
+                className={formStyles.textarea}
+                value={suspendReason}
+                onChange={(e) => setSuspendReason(e.target.value)}
+                rows={2}
+                placeholder="Es. fino a fine università"
+              />
+            </label>
+            <ErrorPanel message={suspendError} onDismiss={() => setSuspendError(null)} />
+            <div className={formStyles.actions}>
+              <Button variant="ghost" size="md" onClick={() => setShowSuspend(false)} disabled={suspendRequest.isPending}>
+                Annulla
+              </Button>
+              <Button variant="primary" size="md" loading={suspendRequest.isPending} onClick={handleSuspend}>
+                Sospendi
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
       {showWithdraw && (
         <Modal open onClose={() => setShowWithdraw(false)} title="Ritira richiesta" size="sm">
           <div className={formStyles.body}>
@@ -264,6 +378,85 @@ export function RequestDetailDrawer({ id, onClose }: RequestDetailDrawerProps) {
         </Modal>
       )}
     </>
+  );
+}
+
+// ── Annotazioni di pianificazione: nota, promemoria, priorità ──
+
+function AnnotationsForm({ request, onClose }: { request: RequestDetail; onClose: () => void }) {
+  const { toast } = useToast();
+  const updateAnnotations = useUpdateRequestAnnotations();
+
+  const [notes, setNotes] = useState(request.notes ?? '');
+  const [reminderText, setReminderText] = useState(request.reminderText ?? '');
+  const [reminderAt, setReminderAt] = useState(request.reminderAt ?? '');
+  const [priority, setPriority] = useState(request.priority !== undefined ? String(request.priority) : '');
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    setError(null);
+    try {
+      await updateAnnotations.mutateAsync({
+        id: request.id,
+        input: {
+          notes: notes.trim() || undefined,
+          reminderText: reminderText.trim() || undefined,
+          reminderAt: reminderAt || undefined,
+          priority: priority !== '' ? Number(priority) : undefined,
+        },
+      });
+      toast('Annotazioni aggiornate');
+      onClose();
+    } catch (e) {
+      setError(describeApiError(e, 'Aggiornamento non riuscito'));
+    }
+  }
+
+  return (
+    <Modal open onClose={onClose} title="Annotazioni di pianificazione" size="sm">
+      <div className={formStyles.body}>
+        <label className={formStyles.field}>
+          Priorità (1 = più importante)
+          <input
+            type="number"
+            min={1}
+            className={formStyles.input}
+            value={priority}
+            onChange={(e) => setPriority(e.target.value)}
+          />
+        </label>
+        <label className={formStyles.field}>
+          Promemoria (in attesa di / prossimo passo)
+          <input
+            className={formStyles.input}
+            value={reminderText}
+            onChange={(e) => setReminderText(e.target.value)}
+          />
+        </label>
+        <label className={formStyles.field}>
+          Data di richiamo
+          <input
+            type="date"
+            className={formStyles.input}
+            value={reminderAt}
+            onChange={(e) => setReminderAt(e.target.value)}
+          />
+        </label>
+        <label className={formStyles.field}>
+          Nota
+          <textarea className={formStyles.textarea} value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
+        </label>
+        <ErrorPanel message={error} onDismiss={() => setError(null)} />
+        <div className={formStyles.actions}>
+          <Button variant="ghost" size="md" onClick={onClose} disabled={updateAnnotations.isPending}>
+            Annulla
+          </Button>
+          <Button variant="primary" size="md" loading={updateAnnotations.isPending} onClick={submit}>
+            Salva
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

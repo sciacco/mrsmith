@@ -14,14 +14,38 @@ package training
 // transazione — ogni richiesta aggancia sempre un corso. Il team scelto deve
 // essere tra le appartenenze attive della persona.
 type RequestInput struct {
-	EmployeeID     string   `json:"employeeId"`
-	CourseID       string   `json:"courseId,omitempty"`
-	NewCourseTitle string   `json:"newCourseTitle,omitempty"`
-	SkillAreaIDs   []string `json:"skillAreaIds,omitempty"`
-	Motivation     string   `json:"motivation"`
-	SelectedTeamID string   `json:"selectedTeamId"`
-	DesiredStart   string   `json:"desiredStart,omitempty"` // YYYY-MM-DD
-	DesiredEnd     string   `json:"desiredEnd,omitempty"`   // YYYY-MM-DD
+	EmployeeID     string                  `json:"employeeId"`
+	CourseID       string                  `json:"courseId,omitempty"`
+	NewCourseTitle string                  `json:"newCourseTitle,omitempty"`
+	SkillAreas     []RequestSkillAreaInput `json:"skillAreas,omitempty"`
+	Motivation     string                  `json:"motivation"`
+	SelectedTeamID string                  `json:"selectedTeamId"`
+	DesiredStart   string                  `json:"desiredStart,omitempty"` // YYYY-MM-DD
+	DesiredEnd     string                  `json:"desiredEnd,omitempty"`   // YYYY-MM-DD
+	// Priorita facoltativa (1 = piu importante, senza unicita) e annotazioni
+	// di pianificazione, scritte nel gesto di registrazione.
+	Priority     *int   `json:"priority,omitempty"`
+	Notes        string `json:"notes,omitempty"`
+	ReminderText string `json:"reminderText,omitempty"`
+	ReminderAt   string `json:"reminderAt,omitempty"` // YYYY-MM-DD
+}
+
+// RequestSkillAreaInput e un'area dell'esigenza con la coppia facoltativa
+// livello attuale -> atteso (scala 0-5), scritta una volta alla
+// registrazione e mai piu richiesta.
+type RequestSkillAreaInput struct {
+	ID           string `json:"id"`
+	LevelCurrent *int   `json:"levelCurrent,omitempty"`
+	LevelTarget  *int   `json:"levelTarget,omitempty"`
+}
+
+// RequestAnnotationsInput sostituisce nota, promemoria e priorita di una
+// richiesta aperta (il campo vuoto azzera).
+type RequestAnnotationsInput struct {
+	Notes        string `json:"notes,omitempty"`
+	ReminderText string `json:"reminderText,omitempty"`
+	ReminderAt   string `json:"reminderAt,omitempty"` // YYYY-MM-DD
+	Priority     *int   `json:"priority,omitempty"`
 }
 
 // TLOpinionInput registra il parere TL come fatto: chi lo esprime deve essere
@@ -70,6 +94,10 @@ type RequestListRow struct {
 	SkillAreas     []SkillAreaRef `json:"skillAreas"`
 	SelectedTeamID string         `json:"selectedTeamId"`
 	SelectedTeam   string         `json:"selectedTeamName"`
+	Priority       *int           `json:"priority,omitempty"`
+	ReminderText   string         `json:"reminderText,omitempty"`
+	ReminderAt     string         `json:"reminderAt,omitempty"`
+	SuspendedAt    string         `json:"suspendedAt,omitempty"`
 	TLOpinion      string         `json:"tlOpinion,omitempty"`
 	PeopleDecision string         `json:"peopleDecision,omitempty"`
 	Outcome        string         `json:"outcome,omitempty"`
@@ -84,17 +112,26 @@ type RequestListResponse struct {
 // RequestOriginalData e la faccia originale della richiesta, cosi come
 // espressa dalla persona: nessuna API la modifica.
 type RequestOriginalData struct {
-	EmployeeID       string         `json:"employeeId"`
-	EmployeeName     string         `json:"employeeName"`
-	EmployeeEmail    string         `json:"employeeEmail"`
-	CourseID         string         `json:"courseId,omitempty"`
-	CourseTitle      string         `json:"courseTitle,omitempty"`
-	SkillAreas       []SkillAreaRef `json:"skillAreas"`
-	Motivation       string         `json:"motivation"`
-	SelectedTeamID   string         `json:"selectedTeamId"`
-	SelectedTeamName string         `json:"selectedTeamName"`
-	DesiredStart     string         `json:"desiredStart,omitempty"`
-	DesiredEnd       string         `json:"desiredEnd,omitempty"`
+	EmployeeID       string           `json:"employeeId"`
+	EmployeeName     string           `json:"employeeName"`
+	EmployeeEmail    string           `json:"employeeEmail"`
+	CourseID         string           `json:"courseId,omitempty"`
+	CourseTitle      string           `json:"courseTitle,omitempty"`
+	SkillAreas       []RequestAreaRef `json:"skillAreas"`
+	Motivation       string           `json:"motivation"`
+	SelectedTeamID   string           `json:"selectedTeamId"`
+	SelectedTeamName string           `json:"selectedTeamName"`
+	DesiredStart     string           `json:"desiredStart,omitempty"`
+	DesiredEnd       string           `json:"desiredEnd,omitempty"`
+}
+
+// RequestAreaRef e un'area dell'esigenza con la coppia facoltativa di
+// livelli attuale -> atteso.
+type RequestAreaRef struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	LevelCurrent *int   `json:"levelCurrent,omitempty"`
+	LevelTarget  *int   `json:"levelTarget,omitempty"`
 }
 
 // RequestTLOpinionFacts e il fatto immutabile del parere TL.
@@ -161,6 +198,13 @@ type RequestCoverage struct {
 type RequestDetail struct {
 	ID                    string                 `json:"id"`
 	Requested             RequestOriginalData    `json:"requested"`
+	Priority              *int                   `json:"priority,omitempty"`
+	Notes                 string                 `json:"notes,omitempty"`
+	ReminderText          string                 `json:"reminderText,omitempty"`
+	ReminderAt            string                 `json:"reminderAt,omitempty"`
+	SuspendedAt           string                 `json:"suspendedAt,omitempty"`
+	SuspendedByName       string                 `json:"suspendedByName,omitempty"`
+	SuspensionReason      string                 `json:"suspensionReason,omitempty"`
 	TLOpinion             *RequestTLOpinionFacts `json:"tlOpinion,omitempty"`
 	Decision              *RequestDecisionFacts  `json:"decision,omitempty"`
 	Outcome               string                 `json:"outcome,omitempty"`

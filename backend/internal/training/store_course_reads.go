@@ -34,6 +34,15 @@ const courseListColumns = `
   c.is_active,
   COALESCE(c.factorial_training_id, ''),
   COALESCE(to_json(c.tags)::text, '[]'),
+  COALESCE(c.reminder_text, ''),
+  COALESCE(c.reminder_at::text, ''),
+  COALESCE(c.suspended_at::text, ''),
+  COALESCE((
+    SELECT json_agg(json_build_object('employeeId', e.id::text, 'name', concat(e.last_name, ' ', e.first_name)) ORDER BY e.last_name, e.first_name)
+    FROM training.course_trainer ct
+    JOIN training.employee e ON e.id = ct.employee_id
+    WHERE ct.course_id = c.id
+  ), '[]')::text,
   c.updated_at::text`
 
 const courseListFrom = `
@@ -54,11 +63,12 @@ func (s *SQLStore) ListCourses(ctx context.Context) ([]CourseListRow, error) {
 		var row CourseListRow
 		var hours sql.NullInt64
 		var cost sql.NullFloat64
-		var areasRaw, tagsRaw string
+		var areasRaw, tagsRaw, trainersRaw string
 		if err := rows.Scan(
 			&row.ID, &row.Title, &areasRaw, &row.VendorID, &row.VendorName,
 			&row.DeliveryMode, &row.ProviderKind, &hours, &cost, &row.LeadsToCertID, &row.LeadsToCertName,
-			&row.ComplianceRelated, &row.ComplianceFramework, &row.Active, &row.FactorialTrainingID, &tagsRaw, &row.UpdatedAt,
+			&row.ComplianceRelated, &row.ComplianceFramework, &row.Active, &row.FactorialTrainingID, &tagsRaw,
+			&row.ReminderText, &row.ReminderAt, &row.SuspendedAt, &trainersRaw, &row.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan training course: %w", err)
 		}
@@ -67,6 +77,9 @@ func (s *SQLStore) ListCourses(ctx context.Context) ([]CourseListRow, error) {
 		}
 		if err := json.Unmarshal([]byte(tagsRaw), &row.Tags); err != nil {
 			return nil, fmt.Errorf("decode training course tags: %w", err)
+		}
+		if err := json.Unmarshal([]byte(trainersRaw), &row.Trainers); err != nil {
+			return nil, fmt.Errorf("decode training course trainers: %w", err)
 		}
 		row.DefaultHours = nullInt(hours)
 		row.DefaultCost = nullFloat(cost)
@@ -86,6 +99,14 @@ func (s *SQLStore) GetCourseDetail(ctx context.Context, id string) (CourseDetail
 	q := "SELECT" + courseListColumns + `,
   COALESCE(c.description, ''),
   COALESCE(c.course_url, ''),
+  COALESCE(c.notes, ''),
+  COALESCE(c.suspension_reason, ''),
+  COALESCE(c.visibility_target::text, ''),
+  COALESCE((
+    SELECT json_agg(cvp.employee_id::text ORDER BY cvp.employee_id)
+    FROM training.course_visibility_person cvp
+    WHERE cvp.course_id = c.id
+  ), '[]')::text,
   COALESCE((
     SELECT json_agg(json_build_object('id', r.id::text, 'name', r.name, 'isActive', r.is_active) ORDER BY r.is_active DESC, r.name)
     FROM training.training_rule r WHERE r.course_id = c.id
@@ -104,12 +125,15 @@ WHERE c.id = $1::uuid`
 		hours                                  sql.NullInt64
 		cost                                   sql.NullFloat64
 		areasRaw, tagsRaw, rulesRaw, eventsRaw string
+		trainersRaw, visibilityRaw, peopleRaw  string
 	)
 	err := s.db.QueryRowContext(ctx, q, id).Scan(
 		&detail.ID, &detail.Title, &areasRaw, &detail.VendorID, &detail.VendorName,
 		&detail.DeliveryMode, &detail.ProviderKind, &hours, &cost, &detail.LeadsToCertID, &detail.LeadsToCertName,
-		&detail.ComplianceRelated, &detail.ComplianceFramework, &detail.Active, &detail.FactorialTrainingID, &tagsRaw, &detail.UpdatedAt,
-		&detail.Description, &detail.CourseURL, &rulesRaw, &eventsRaw,
+		&detail.ComplianceRelated, &detail.ComplianceFramework, &detail.Active, &detail.FactorialTrainingID, &tagsRaw,
+		&detail.ReminderText, &detail.ReminderAt, &detail.SuspendedAt, &trainersRaw, &detail.UpdatedAt,
+		&detail.Description, &detail.CourseURL, &detail.Notes, &detail.SuspensionReason,
+		&visibilityRaw, &peopleRaw, &rulesRaw, &eventsRaw,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return CourseDetail{}, notFoundError("course_not_found", "corso non trovato")
@@ -122,6 +146,21 @@ WHERE c.id = $1::uuid`
 	}
 	if err := json.Unmarshal([]byte(tagsRaw), &detail.Tags); err != nil {
 		return CourseDetail{}, fmt.Errorf("decode training course tags: %w", err)
+	}
+	if err := json.Unmarshal([]byte(trainersRaw), &detail.Trainers); err != nil {
+		return CourseDetail{}, fmt.Errorf("decode training course trainers: %w", err)
+	}
+	if visibilityRaw != "" {
+		var vis CourseVisibilityInput
+		if err := json.Unmarshal([]byte(visibilityRaw), &vis); err != nil {
+			return CourseDetail{}, fmt.Errorf("decode training course visibility: %w", err)
+		}
+		if vis.Kind == "people" {
+			if err := json.Unmarshal([]byte(peopleRaw), &vis.EmployeeIDs); err != nil {
+				return CourseDetail{}, fmt.Errorf("decode training course visibility people: %w", err)
+			}
+		}
+		detail.Visibility = &vis
 	}
 	detail.DefaultHours = nullInt(hours)
 	detail.DefaultCost = nullFloat(cost)

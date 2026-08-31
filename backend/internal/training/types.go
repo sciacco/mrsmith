@@ -122,8 +122,20 @@ type CertificationInput struct {
 	IssuerVendorID        string `json:"issuerVendorId,omitempty"`
 	SkillAreaID           string `json:"skillAreaId,omitempty"`
 	TypicalValidityMonths *int   `json:"typicalValidityMonths,omitempty"`
-	Description           string `json:"description,omitempty"`
-	Active                *bool  `json:"active,omitempty"`
+	// AttestedLevel: livello che la certificazione attesta sulla sua area
+	// (scala 0-5 delle valutazioni), facoltativo.
+	AttestedLevel *int   `json:"attestedLevel,omitempty"`
+	Description   string `json:"description,omitempty"`
+	Active        *bool  `json:"active,omitempty"`
+}
+
+// CourseVisibilityInput e la platea di visibilita del corso, con lo stesso
+// vocabolario delle platee delle regole. Assente = riservato a People;
+// «all» = pubblico; per kind «people» i destinatari sono employeeIds.
+type CourseVisibilityInput struct {
+	Kind        string   `json:"kind"` // all|team|skill_area|custom_group|people
+	ID          string   `json:"id,omitempty"`
+	EmployeeIDs []string `json:"employeeIds,omitempty"`
 }
 
 type CourseInput struct {
@@ -142,6 +154,13 @@ type CourseInput struct {
 	ComplianceFramework string   `json:"complianceFramework,omitempty"`
 	Tags                []string `json:"tags,omitempty"`
 	Active              *bool    `json:"active,omitempty"`
+	Notes               string   `json:"notes,omitempty"`
+	ReminderText        string   `json:"reminderText,omitempty"`
+	ReminderAt          string   `json:"reminderAt,omitempty"` // YYYY-MM-DD
+	// TrainerIDs: formatori interni designati in istruttoria; alla
+	// declinazione in evento diventano il valore di partenza dell'evento.
+	TrainerIDs []string               `json:"trainerIds,omitempty"`
+	Visibility *CourseVisibilityInput `json:"visibility,omitempty"`
 }
 
 type AwardInput struct {

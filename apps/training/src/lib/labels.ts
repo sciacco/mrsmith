@@ -97,8 +97,9 @@ export const BULK_ASSIGN_MODE_LABELS: Record<string, string> = {
 };
 
 // Esito e stato delle richieste formative (#157).
-export const REQUEST_STATE_LABELS: Record<'open' | 'closed' | 'all', string> = {
+export const REQUEST_STATE_LABELS: Record<'open' | 'suspended' | 'closed' | 'all', string> = {
   open: 'Aperte',
+  suspended: 'Sospese',
   closed: 'Chiuse',
   all: 'Tutte',
 };

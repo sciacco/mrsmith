@@ -28,6 +28,10 @@ type CourseListRow struct {
 	Active              bool           `json:"active"`
 	FactorialTrainingID string         `json:"factorialTrainingId,omitempty"`
 	Tags                []string       `json:"tags"`
+	ReminderText        string         `json:"reminderText,omitempty"`
+	ReminderAt          string         `json:"reminderAt,omitempty"`
+	SuspendedAt         string         `json:"suspendedAt,omitempty"`
+	Trainers            []TrainerRef   `json:"trainers"`
 	UpdatedAt           string         `json:"updatedAt"`
 }
 
@@ -51,10 +55,13 @@ type CourseEventRef struct {
 
 type CourseDetail struct {
 	CourseListRow
-	Description string           `json:"description,omitempty"`
-	CourseURL   string           `json:"courseUrl,omitempty"`
-	Rules       []CourseRuleRef  `json:"rules"`
-	Events      []CourseEventRef `json:"events"`
+	Description      string                 `json:"description,omitempty"`
+	CourseURL        string                 `json:"courseUrl,omitempty"`
+	Notes            string                 `json:"notes,omitempty"`
+	SuspensionReason string                 `json:"suspensionReason,omitempty"`
+	Visibility       *CourseVisibilityInput `json:"visibility,omitempty"`
+	Rules            []CourseRuleRef        `json:"rules"`
+	Events           []CourseEventRef       `json:"events"`
 }
 
 type PersonTeamRef struct {
@@ -187,6 +194,7 @@ type CertificationCatalogRow struct {
 	SkillAreaID           string `json:"skillAreaId,omitempty"`
 	SkillAreaName         string `json:"skillAreaName,omitempty"`
 	TypicalValidityMonths *int   `json:"typicalValidityMonths,omitempty"`
+	AttestedLevel         *int   `json:"attestedLevel,omitempty"`
 }
 
 type CertificationCatalogResponse struct {

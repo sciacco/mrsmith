@@ -10,20 +10,20 @@ import { useTrainingRequests } from '../../api/queries';
 import type { RequestListRow } from '../../api/types';
 import { RequestCreateModal } from '../../components/requests/RequestCreateModal';
 import { RequestDetailDrawer } from '../../components/requests/RequestDetailDrawer';
-import { formatInstantDate } from '../../components/events/eventFormat';
+import { formatDateOnly, formatInstantDate } from '../../components/events/eventFormat';
 import { outcomeVariant, tlOpinionVariant } from '../../components/requests/requestVariants';
 import { REQUEST_OUTCOME_LABELS, REQUEST_STATE_LABELS, TL_OPINION_LABELS } from '../../lib/labels';
 import styles from './listPage.module.css';
 
-const STATE_OPTIONS = (['open', 'closed', 'all'] as const).map((value) => ({
+const STATE_OPTIONS = (['open', 'suspended', 'closed', 'all'] as const).map((value) => ({
   value,
   label: REQUEST_STATE_LABELS[value],
 }));
 
 export function RequestsPage() {
   const [params, setParams] = useSearchParams();
-  const state = (['open', 'closed', 'all'] as const).includes(params.get('state') as never)
-    ? (params.get('state') as 'open' | 'closed' | 'all')
+  const state = (['open', 'suspended', 'closed', 'all'] as const).includes(params.get('state') as never)
+    ? (params.get('state') as 'open' | 'suspended' | 'closed' | 'all')
     : 'open';
   const selectedId = params.get('id');
   const [q, setQ] = useState('');
@@ -121,6 +121,8 @@ export function RequestsPage() {
                 <th>Persona</th>
                 <th>Corso o titolo</th>
                 <th>Team</th>
+                <th>Priorità</th>
+                <th>Promemoria</th>
                 <th>Parere TL</th>
                 <th>Decisione</th>
                 <th>Esito</th>
@@ -144,6 +146,12 @@ export function RequestsPage() {
                   </td>
                   <td>{row.courseTitle || '—'}</td>
                   <td>{row.selectedTeamName}</td>
+                  <td>{row.priority ?? '—'}</td>
+                  <td>
+                    {row.reminderText
+                      ? `${row.reminderText}${row.reminderAt ? ` · ${formatDateOnly(row.reminderAt)}` : ''}`
+                      : '—'}
+                  </td>
                   <td>
                     {row.tlOpinion ? (
                       <StatusBadge

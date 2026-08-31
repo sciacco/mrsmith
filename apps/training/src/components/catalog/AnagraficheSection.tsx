@@ -350,6 +350,9 @@ function CertificationEditorModal({
   const [typicalValidityMonths, setTypicalValidityMonths] = useState(
     certification?.typicalValidityMonths !== undefined ? String(certification.typicalValidityMonths) : '',
   );
+  const [attestedLevel, setAttestedLevel] = useState(
+    certification?.attestedLevel !== undefined ? String(certification.attestedLevel) : '',
+  );
   const [description, setDescription] = useState(certification?.description ?? '');
   const [active, setActive] = useState(certification?.active ?? true);
   const [error, setError] = useState<string | null>(null);
@@ -363,6 +366,7 @@ function CertificationEditorModal({
       issuerVendorId: issuerVendorId || undefined,
       skillAreaId: skillAreaId || undefined,
       typicalValidityMonths: typicalValidityMonths !== '' ? Number(typicalValidityMonths) : undefined,
+      attestedLevel: attestedLevel !== '' ? Number(attestedLevel) : undefined,
       description: description.trim() || undefined,
       active,
     };
@@ -403,16 +407,29 @@ function CertificationEditorModal({
           />
         </label>
       </div>
-      <label className={formStyles.field}>
-        Validità tipica (mesi)
-        <input
-          type="number"
-          min={0}
-          className={formStyles.input}
-          value={typicalValidityMonths}
-          onChange={(e) => setTypicalValidityMonths(e.target.value)}
-        />
-      </label>
+      <div className={formStyles.row}>
+        <label className={formStyles.field}>
+          Validità tipica (mesi)
+          <input
+            type="number"
+            min={0}
+            className={formStyles.input}
+            value={typicalValidityMonths}
+            onChange={(e) => setTypicalValidityMonths(e.target.value)}
+          />
+        </label>
+        <label className={formStyles.field}>
+          Livello attestato sull'area (0–5)
+          <input
+            type="number"
+            min={0}
+            max={5}
+            className={formStyles.input}
+            value={attestedLevel}
+            onChange={(e) => setAttestedLevel(e.target.value)}
+          />
+        </label>
+      </div>
       <label className={formStyles.field}>
         Descrizione
         <textarea className={formStyles.textarea} value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />

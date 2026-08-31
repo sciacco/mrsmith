@@ -65,6 +65,10 @@ export function CertificationDetailDrawer({ id, onClose }: { id: string; onClose
                   <dd>{certification.typicalValidityMonths !== undefined ? `${certification.typicalValidityMonths} mesi` : '—'}</dd>
                 </div>
                 <div className={styles.item}>
+                  <dt>Livello attestato</dt>
+                  <dd>{certification.attestedLevel !== undefined ? `${certification.attestedLevel} / 5` : '—'}</dd>
+                </div>
+                <div className={styles.item}>
                   <dt>Stato</dt>
                   <dd>{certification.active ? 'Attiva' : 'Disattiva'}</dd>
                 </div>

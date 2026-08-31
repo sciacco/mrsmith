@@ -194,6 +194,7 @@ JOIN training.employee e ON e.id = r.employee_id
 JOIN training.team t ON t.id = r.selected_team_id
 LEFT JOIN training.course c ON c.id = r.course_id
 WHERE r.outcome IS NULL
+  AND r.suspended_at IS NULL
   AND r.tl_opinion IS NULL
 ORDER BY r.created_at, r.id
 LIMIT 500`
@@ -274,6 +275,7 @@ JOIN training.team t ON t.id = r.selected_team_id
 LEFT JOIN training.course c ON c.id = r.course_id
 LEFT JOIN training.employee tl ON tl.id = r.tl_opinion_by
 WHERE r.outcome IS NULL
+  AND r.suspended_at IS NULL
   AND r.tl_opinion IS NOT NULL
   AND r.people_decision IS NULL
 ORDER BY r.created_at, r.id

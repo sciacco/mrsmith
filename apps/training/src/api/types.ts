@@ -262,10 +262,18 @@ export interface EventFlags {
   concluded: boolean;
 }
 
+export interface TrainerRef {
+  employeeId: string;
+  name: string;
+}
+
 export interface EventListRow {
   id: string;
   courseId: string;
   courseTitle: string;
+  title: string;
+  reminderText?: string;
+  reminderAt?: string;
   vendorId?: string;
   vendorName?: string;
   agreedPrice?: number;
@@ -297,6 +305,12 @@ export interface EventInput {
   agreedPrice?: number;
   agreedConditions?: string;
   notes?: string;
+  // Alla creazione il titolo è sempre ereditato dal corso; in modifica il
+  // campo vuoto conserva il titolo corrente.
+  title?: string;
+  reminderText?: string;
+  reminderAt?: string; // YYYY-MM-DD
+  trainerIds?: string[];
 }
 
 export interface ReasonInput {
@@ -408,6 +422,10 @@ export interface EventDetail {
   id: string;
   courseId: string;
   courseTitle: string;
+  title: string;
+  reminderText?: string;
+  reminderAt?: string;
+  trainers: TrainerRef[];
   vendorId?: string;
   vendorName?: string;
   agreedPrice?: number;
@@ -518,6 +536,10 @@ export interface CourseListRow {
   active: boolean;
   factorialTrainingId?: string;
   tags: string[];
+  reminderText?: string;
+  reminderAt?: string;
+  suspendedAt?: string;
+  trainers: TrainerRef[];
   updatedAt: string;
 }
 
@@ -539,9 +561,18 @@ export interface CourseEventRef {
   sessionsCount: number;
 }
 
+export interface CourseVisibility {
+  kind: 'all' | 'team' | 'skill_area' | 'custom_group' | 'people';
+  id?: string;
+  employeeIds?: string[];
+}
+
 export interface CourseDetail extends CourseListRow {
   description?: string;
   courseUrl?: string;
+  notes?: string;
+  suspensionReason?: string;
+  visibility?: CourseVisibility;
   rules: CourseRuleRef[];
   events: CourseEventRef[];
 }
@@ -565,6 +596,11 @@ export interface CourseInput {
   complianceFramework?: string;
   tags?: string[];
   active?: boolean;
+  notes?: string;
+  reminderText?: string;
+  reminderAt?: string; // YYYY-MM-DD
+  trainerIds?: string[];
+  visibility?: CourseVisibility;
 }
 
 export interface PersonTeamRef {
@@ -727,6 +763,7 @@ export interface CertificationCatalogRow {
   skillAreaId?: string;
   skillAreaName?: string;
   typicalValidityMonths?: number;
+  attestedLevel?: number;
 }
 
 export interface CertificationCatalogResponse {
@@ -739,6 +776,7 @@ export interface CertificationInput {
   issuerVendorId?: string;
   skillAreaId?: string;
   typicalValidityMonths?: number;
+  attestedLevel?: number;
   description?: string;
   active?: boolean;
 }
@@ -774,15 +812,32 @@ export interface GroupMembersInput {
 // decisione People sono fatti immutabili. Vedi backend/internal/training
 // types_requests.go per il contratto completo.
 
+export interface RequestSkillAreaInput {
+  id: string;
+  levelCurrent?: number;
+  levelTarget?: number;
+}
+
 export interface RequestInput {
   employeeId: string;
   courseId?: string;
   newCourseTitle?: string;
-  skillAreaIds?: string[];
+  skillAreas?: RequestSkillAreaInput[];
   motivation: string;
   selectedTeamId: string;
   desiredStart?: string;
   desiredEnd?: string;
+  priority?: number;
+  notes?: string;
+  reminderText?: string;
+  reminderAt?: string; // YYYY-MM-DD
+}
+
+export interface RequestAnnotationsInput {
+  notes?: string;
+  reminderText?: string;
+  reminderAt?: string; // YYYY-MM-DD
+  priority?: number;
 }
 
 export type TLOpinionValue = 'favorable' | 'unfavorable';
@@ -816,6 +871,10 @@ export interface RequestListRow {
   employeeName: string;
   courseTitle?: string;
   selectedTeamName: string;
+  priority?: number;
+  reminderText?: string;
+  reminderAt?: string;
+  suspendedAt?: string;
   tlOpinion?: TLOpinionValue;
   peopleDecision?: RequestDecisionValue;
   outcome?: string;
@@ -826,10 +885,17 @@ export interface RequestListResponse {
   requests: RequestListRow[];
 }
 
+export interface RequestAreaRef {
+  id: string;
+  name: string;
+  levelCurrent?: number;
+  levelTarget?: number;
+}
+
 export interface RequestOriginalData {
   employeeName: string;
   courseTitle?: string;
-  skillAreas: SkillAreaRef[];
+  skillAreas: RequestAreaRef[];
   motivation: string;
   selectedTeamId: string;
   selectedTeamName: string;
@@ -881,6 +947,13 @@ export interface RequestCoverage {
 export interface RequestDetail {
   id: string;
   requested: RequestOriginalData;
+  priority?: number;
+  notes?: string;
+  reminderText?: string;
+  reminderAt?: string;
+  suspendedAt?: string;
+  suspendedByName?: string;
+  suspensionReason?: string;
   tlOpinion?: RequestTLOpinionFacts;
   decision?: RequestDecisionFacts;
   outcome?: string;

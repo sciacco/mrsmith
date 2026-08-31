@@ -51,6 +51,7 @@ import type {
   PersonListResponse,
   PersonUpdateInput,
   ReasonInput,
+  RequestAnnotationsInput,
   RequestDecisionInput,
   RequestDetail,
   RequestInput,
@@ -526,7 +527,7 @@ export function useDeleteExpense() {
 
 // ── Richieste formative (#157) ──
 
-export function useTrainingRequests(state: 'open' | 'closed' | 'all') {
+export function useTrainingRequests(state: 'open' | 'suspended' | 'closed' | 'all') {
   const api = useApiClient();
   return useQuery({
     queryKey: ['training', 'requests', state],
@@ -565,6 +566,24 @@ export function useRecordRequestDecision() {
 export function useWithdrawRequest() {
   return useTrainingMutation<string, ActionResponse>((api, id) =>
     api.post(`${TRAINING_PREFIX}/requests/${id}/withdraw`),
+  );
+}
+
+export function useUpdateRequestAnnotations() {
+  return useTrainingMutation<{ id: string; input: RequestAnnotationsInput }, ActionResponse>((api, { id, input }) =>
+    api.put(`${TRAINING_PREFIX}/requests/${id}/annotations`, input),
+  );
+}
+
+export function useSuspendRequest() {
+  return useTrainingMutation<{ id: string; input: ReasonInput }, ActionResponse>((api, { id, input }) =>
+    api.post(`${TRAINING_PREFIX}/requests/${id}/suspend`, input),
+  );
+}
+
+export function useResumeRequest() {
+  return useTrainingMutation<string, ActionResponse>((api, id) =>
+    api.post(`${TRAINING_PREFIX}/requests/${id}/resume`),
   );
 }
 
@@ -683,6 +702,18 @@ export function useUpdateCourse() {
 export function useArchiveCourse() {
   return useTrainingMutation<string, ActionResponse>((api, id) =>
     api.post(`${TRAINING_PREFIX}/courses/${id}/archive`),
+  );
+}
+
+export function useSuspendCourse() {
+  return useTrainingMutation<{ id: string; input: ReasonInput }, ActionResponse>((api, { id, input }) =>
+    api.post(`${TRAINING_PREFIX}/courses/${id}/suspend`, input),
+  );
+}
+
+export function useResumeCourse() {
+  return useTrainingMutation<string, ActionResponse>((api, id) =>
+    api.post(`${TRAINING_PREFIX}/courses/${id}/resume`),
   );
 }
 

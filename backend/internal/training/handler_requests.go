@@ -15,6 +15,56 @@ func (h *handler) registerRequestRoutes(mux *http.ServeMux, protect func(http.Ha
 	mux.Handle("POST /training/v1/requests/{id}/tl-opinion", protect(h.requireStore(http.HandlerFunc(h.handleRecordTLOpinion))))
 	mux.Handle("POST /training/v1/requests/{id}/decision", protect(h.requireStore(http.HandlerFunc(h.handleRecordPeopleDecision))))
 	mux.Handle("POST /training/v1/requests/{id}/withdraw", protect(h.requireStore(http.HandlerFunc(h.handleWithdrawRequest))))
+	mux.Handle("PUT /training/v1/requests/{id}/annotations", protect(h.requireStore(http.HandlerFunc(h.handleUpdateRequestAnnotations))))
+	mux.Handle("POST /training/v1/requests/{id}/suspend", protect(h.requireStore(http.HandlerFunc(h.handleSuspendRequest))))
+	mux.Handle("POST /training/v1/requests/{id}/resume", protect(h.requireStore(http.HandlerFunc(h.handleResumeRequest))))
+}
+
+func (h *handler) handleUpdateRequestAnnotations(w http.ResponseWriter, r *http.Request) {
+	principal, ok := h.principalOrUnauthorized(w, r)
+	if !ok {
+		return
+	}
+	input, ok := decodeJSONBody[RequestAnnotationsInput](w, r)
+	if !ok {
+		return
+	}
+	response, err := h.store.UpdateRequestAnnotations(r.Context(), principal, r.PathValue("id"), input)
+	if err != nil {
+		h.writeActionError(w, r, err, "training.request_annotations")
+		return
+	}
+	httputil.JSON(w, http.StatusOK, response)
+}
+
+func (h *handler) handleSuspendRequest(w http.ResponseWriter, r *http.Request) {
+	principal, ok := h.principalOrUnauthorized(w, r)
+	if !ok {
+		return
+	}
+	input, ok := decodeJSONBody[ReasonInput](w, r)
+	if !ok {
+		return
+	}
+	response, err := h.store.SuspendRequest(r.Context(), principal, r.PathValue("id"), input)
+	if err != nil {
+		h.writeActionError(w, r, err, "training.suspend_request")
+		return
+	}
+	httputil.JSON(w, http.StatusOK, response)
+}
+
+func (h *handler) handleResumeRequest(w http.ResponseWriter, r *http.Request) {
+	principal, ok := h.principalOrUnauthorized(w, r)
+	if !ok {
+		return
+	}
+	response, err := h.store.ResumeRequest(r.Context(), principal, r.PathValue("id"))
+	if err != nil {
+		h.writeActionError(w, r, err, "training.resume_request")
+		return
+	}
+	httputil.JSON(w, http.StatusOK, response)
 }
 
 func (h *handler) handleListRequests(w http.ResponseWriter, r *http.Request) {

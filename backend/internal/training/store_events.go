@@ -8,6 +8,20 @@ import (
 	"strings"
 )
 
+// copyCourseTrainers copia i formatori designati del corso sull'evento appena
+// creato: valore di partenza, poi l'evento vive di formatori propri.
+func copyCourseTrainers(ctx context.Context, tx *sql.Tx, eventID, courseID string) error {
+	if _, err := tx.ExecContext(ctx, `
+INSERT INTO training.event_trainer (event_id, employee_id)
+SELECT $1::uuid, ct.employee_id
+FROM training.course_trainer ct
+WHERE ct.course_id = $2::uuid
+ON CONFLICT DO NOTHING`, eventID, courseID); err != nil {
+		return fmt.Errorf("copy course trainers to event: %w", err)
+	}
+	return nil
+}
+
 func (s *SQLStore) CreateEvent(ctx context.Context, principal Principal, input EventInput) (ActionResponse, error) {
 	if !principal.IsPeopleAdmin {
 		return ActionResponse{}, forbiddenError("people_role_required", "azione riservata a People")
@@ -15,9 +29,13 @@ func (s *SQLStore) CreateEvent(ctx context.Context, principal Principal, input E
 	if err := validateEventInput(input); err != nil {
 		return ActionResponse{}, err
 	}
+	reminderAt, err := parseOptionalDate(input.ReminderAt)
+	if err != nil {
+		return ActionResponse{}, validationError("invalid_reminder_at", "data di richiamo non valida")
+	}
 
 	var response ActionResponse
-	err := s.withTx(ctx, func(tx *sql.Tx) error {
+	err = s.withTx(ctx, func(tx *sql.Tx) error {
 		if err := s.ensureCourseExists(ctx, tx, input.CourseID); err != nil {
 			return err
 		}
@@ -26,15 +44,22 @@ func (s *SQLStore) CreateEvent(ctx context.Context, principal Principal, input E
 		}
 		// origin='direct' imposto dal server; i campi sorgente riservati
 		// (regola, richiesta, Factorial) non sono mai scrivibili dal client.
+		// Il titolo si eredita dal corso alla creazione, poi vive di suo.
 		const stmt = `
 INSERT INTO training.training_event (
   course_id,
+  title,
   vendor_id,
   agreed_price,
   agreed_conditions,
   origin,
-  notes
-) VALUES ($1::uuid, $2::uuid, $3, NULLIF($4, ''), 'direct', NULLIF($5, ''))
+  notes,
+  reminder_text,
+  reminder_at
+) VALUES (
+  $1::uuid,
+  (SELECT c.title FROM training.course c WHERE c.id = $1::uuid),
+  $2::uuid, $3, NULLIF($4, ''), 'direct', NULLIF($5, ''), NULLIF($6, ''), $7::date)
 RETURNING id::text`
 		if err := tx.QueryRowContext(
 			ctx,
@@ -44,8 +69,13 @@ RETURNING id::text`
 			input.AgreedPrice,
 			strings.TrimSpace(input.AgreedConditions),
 			strings.TrimSpace(input.Notes),
+			strings.TrimSpace(input.ReminderText),
+			reminderAt,
 		).Scan(&response.ID); err != nil {
 			return fmt.Errorf("create training event: %w", err)
+		}
+		if err := copyCourseTrainers(ctx, tx, response.ID, strings.TrimSpace(input.CourseID)); err != nil {
+			return err
 		}
 		after, err := entitySnapshot(ctx, tx, "training_event", response.ID)
 		if err != nil {
@@ -71,9 +101,17 @@ func (s *SQLStore) UpdateEvent(ctx context.Context, principal Principal, id stri
 	if err := validateEventInput(input); err != nil {
 		return ActionResponse{}, err
 	}
+	reminderAt, err := parseOptionalDate(input.ReminderAt)
+	if err != nil {
+		return ActionResponse{}, validationError("invalid_reminder_at", "data di richiamo non valida")
+	}
+	trainerIDs, err := s.normalizeActiveEmployeeIDs(ctx, input.TrainerIDs)
+	if err != nil {
+		return ActionResponse{}, err
+	}
 
 	var response ActionResponse
-	err := s.withTx(ctx, func(tx *sql.Tx) error {
+	err = s.withTx(ctx, func(tx *sql.Tx) error {
 		var (
 			currentCourseID string
 			origin          string
@@ -133,6 +171,8 @@ SELECT
 			return err
 		}
 
+		// title: unico campo che il PUT non azzera (NOT NULL per contratto);
+		// il campo vuoto conserva il titolo corrente.
 		const stmt = `
 UPDATE training.training_event
 SET course_id = $2::uuid,
@@ -140,6 +180,9 @@ SET course_id = $2::uuid,
     agreed_price = $4,
     agreed_conditions = NULLIF($5, ''),
     notes = NULLIF($6, ''),
+    title = COALESCE(NULLIF($7, ''), title),
+    reminder_text = NULLIF($8, ''),
+    reminder_at = $9::date,
     updated_at = now()
 WHERE id = $1::uuid
 RETURNING id::text`
@@ -152,8 +195,14 @@ RETURNING id::text`
 			input.AgreedPrice,
 			strings.TrimSpace(input.AgreedConditions),
 			strings.TrimSpace(input.Notes),
+			strings.TrimSpace(input.Title),
+			strings.TrimSpace(input.ReminderText),
+			reminderAt,
 		).Scan(&response.ID); err != nil {
 			return fmt.Errorf("update training event: %w", err)
+		}
+		if err := replaceEmployeeLinks(ctx, tx, "event_trainer", "event_id", id, trainerIDs); err != nil {
+			return err
 		}
 		after, err := entitySnapshot(ctx, tx, "training_event", id)
 		if err != nil {

@@ -162,10 +162,12 @@ func (s *SQLStore) ListRequests(ctx context.Context, state string) ([]RequestLis
 		state = "open"
 	}
 	switch state {
-	case "open", "closed", "all":
+	case "open", "suspended", "closed", "all":
 	default:
 		return nil, validationError("invalid_state", "filtro stato non valido")
 	}
+	// La sospesa esce dalla vista operativa di default (open) e ha il suo
+	// filtro dedicato; closed e all restano invariati.
 	const q = `
 SELECT
   r.id::text,
@@ -182,6 +184,10 @@ SELECT
   ), '[]')::text,
   r.selected_team_id::text,
   t.name,
+  r.priority,
+  COALESCE(r.reminder_text, ''),
+  COALESCE(r.reminder_at::text, ''),
+  COALESCE(r.suspended_at::text, ''),
   COALESCE(r.tl_opinion, ''),
   COALESCE(r.people_decision, ''),
   COALESCE(r.outcome, ''),
@@ -192,9 +198,10 @@ JOIN training.employee e ON e.id = r.employee_id
 JOIN training.team t ON t.id = r.selected_team_id
 LEFT JOIN training.course c ON c.id = r.course_id
 WHERE ($1 = 'all')
-   OR ($1 = 'open' AND r.outcome IS NULL)
+   OR ($1 = 'open' AND r.outcome IS NULL AND r.suspended_at IS NULL)
+   OR ($1 = 'suspended' AND r.outcome IS NULL AND r.suspended_at IS NOT NULL)
    OR ($1 = 'closed' AND r.outcome IS NOT NULL)
-ORDER BY r.created_at DESC, r.id
+ORDER BY r.priority NULLS LAST, r.created_at DESC, r.id
 LIMIT 1000`
 	rows, err := s.db.QueryContext(ctx, q, state)
 	if err != nil {
@@ -206,6 +213,7 @@ LIMIT 1000`
 	for rows.Next() {
 		var row RequestListRow
 		var areasRaw string
+		var priority sql.NullInt64
 		if err := rows.Scan(
 			&row.ID,
 			&row.EmployeeID,
@@ -216,6 +224,10 @@ LIMIT 1000`
 			&areasRaw,
 			&row.SelectedTeamID,
 			&row.SelectedTeam,
+			&priority,
+			&row.ReminderText,
+			&row.ReminderAt,
+			&row.SuspendedAt,
 			&row.TLOpinion,
 			&row.PeopleDecision,
 			&row.Outcome,
@@ -227,6 +239,7 @@ LIMIT 1000`
 		if err := json.Unmarshal([]byte(areasRaw), &row.SkillAreas); err != nil {
 			return nil, fmt.Errorf("decode training request skill areas: %w", err)
 		}
+		row.Priority = nullInt(priority)
 		result = append(result, row)
 	}
 	return result, rows.Err()
@@ -246,7 +259,10 @@ SELECT
   COALESCE(r.course_id::text, ''),
   COALESCE(c.title, ''),
   COALESCE((
-    SELECT json_agg(json_build_object('id', sa.id::text, 'name', sa.name) ORDER BY sa.name)
+    SELECT json_agg(json_build_object(
+      'id', sa.id::text, 'name', sa.name,
+      'levelCurrent', rsa.level_current, 'levelTarget', rsa.level_target
+    ) ORDER BY sa.name)
     FROM training.training_request_skill_area rsa
     JOIN training.skill_area sa ON sa.id = rsa.skill_area_id
     WHERE rsa.request_id = r.id
@@ -256,6 +272,13 @@ SELECT
   t.name,
   COALESCE(r.desired_start::text, ''),
   COALESCE(r.desired_end::text, ''),
+  r.priority,
+  COALESCE(r.notes, ''),
+  COALESCE(r.reminder_text, ''),
+  COALESCE(r.reminder_at::text, ''),
+  COALESCE(r.suspended_at::text, ''),
+  COALESCE(sb.last_name || ' ' || sb.first_name, ''),
+  COALESCE(r.suspension_reason, ''),
   COALESCE(r.tl_opinion, ''),
   COALESCE(r.tl_opinion_by::text, ''),
   COALESCE(tl.last_name || ' ' || tl.first_name, ''),
@@ -283,6 +306,7 @@ FROM training.training_request r
 JOIN training.employee e ON e.id = r.employee_id
 JOIN training.team t ON t.id = r.selected_team_id
 LEFT JOIN training.course c ON c.id = r.course_id
+LEFT JOIN training.employee sb ON sb.id = r.suspended_by
 LEFT JOIN training.employee tl ON tl.id = r.tl_opinion_by
 LEFT JOIN training.employee pd ON pd.id = r.people_decision_by
 LEFT JOIN training.course ac ON ac.id = r.accepted_course_id
@@ -297,6 +321,7 @@ WHERE r.id = $1::uuid`
 		hasDecision       string
 		acceptedCourse    string
 		requestedAreasRaw string
+		priority          sql.NullInt64
 	)
 	err := s.db.QueryRowContext(ctx, q, id).Scan(
 		&detail.ID,
@@ -311,6 +336,13 @@ WHERE r.id = $1::uuid`
 		&detail.Requested.SelectedTeamName,
 		&detail.Requested.DesiredStart,
 		&detail.Requested.DesiredEnd,
+		&priority,
+		&detail.Notes,
+		&detail.ReminderText,
+		&detail.ReminderAt,
+		&detail.SuspendedAt,
+		&detail.SuspendedByName,
+		&detail.SuspensionReason,
 		&hasTLOpinion,
 		&tlOpinion.ByEmployeeID,
 		&tlOpinion.ByName,
@@ -344,6 +376,7 @@ WHERE r.id = $1::uuid`
 	if err := json.Unmarshal([]byte(requestedAreasRaw), &detail.Requested.SkillAreas); err != nil {
 		return RequestDetail{}, fmt.Errorf("decode training request skill areas: %w", err)
 	}
+	detail.Priority = nullInt(priority)
 	if hasTLOpinion != "" {
 		tlOpinion.Opinion = hasTLOpinion
 		detail.TLOpinion = &tlOpinion
@@ -525,7 +558,14 @@ func (s *SQLStore) CreateRequest(ctx context.Context, principal Principal, input
 	if desiredStart != nil && desiredEnd != nil && desiredEnd.Before(*desiredStart) {
 		return ActionResponse{}, validationError("desired_end_before_start", "la fine desiderata non puo precedere l'inizio")
 	}
-	areaIDs, err := s.normalizeSkillAreaIDs(ctx, input.SkillAreaIDs)
+	if input.Priority != nil && *input.Priority < 1 {
+		return ActionResponse{}, validationError("invalid_priority", "priorita non valida: 1 = piu importante")
+	}
+	reminderAt, err := parseOptionalDate(input.ReminderAt)
+	if err != nil {
+		return ActionResponse{}, validationError("invalid_reminder_at", "data di richiamo non valida")
+	}
+	areas, err := s.normalizeRequestAreas(ctx, input.SkillAreas)
 	if err != nil {
 		return ActionResponse{}, err
 	}
@@ -560,14 +600,22 @@ INSERT INTO training.training_request (
   motivation,
   selected_team_id,
   desired_start,
-  desired_end
+  desired_end,
+  priority,
+  notes,
+  reminder_text,
+  reminder_at
 ) VALUES (
   $1::uuid,
   $2::uuid,
   $3,
   $4::uuid,
   NULLIF($5, '')::date,
-  NULLIF($6, '')::date
+  NULLIF($6, '')::date,
+  $7,
+  NULLIF($8, ''),
+  NULLIF($9, ''),
+  $10::date
 )
 RETURNING id::text`
 		if err := tx.QueryRowContext(
@@ -579,10 +627,14 @@ RETURNING id::text`
 			teamID,
 			strings.TrimSpace(input.DesiredStart),
 			strings.TrimSpace(input.DesiredEnd),
+			input.Priority,
+			strings.TrimSpace(input.Notes),
+			strings.TrimSpace(input.ReminderText),
+			reminderAt,
 		).Scan(&response.ID); err != nil {
 			return fmt.Errorf("create training request: %w", err)
 		}
-		if err := replaceSkillAreaLinks(ctx, tx, "training_request_skill_area", "request_id", response.ID, areaIDs); err != nil {
+		if err := replaceRequestSkillAreas(ctx, tx, response.ID, areas); err != nil {
 			return err
 		}
 		after, err := entitySnapshot(ctx, tx, "training_request", response.ID)
@@ -867,10 +919,16 @@ FOR UPDATE OF en`, accepted.ExistingEnrollmentID).Scan(
 		if acceptedEventID == "" {
 			// Nessun evento adatto esistente: viene creato contestualmente.
 			if err := tx.QueryRowContext(ctx, `
-INSERT INTO training.training_event (course_id, origin, source_request_id)
-VALUES ($1::uuid, 'request', $2::uuid)
+INSERT INTO training.training_event (course_id, title, origin, source_request_id)
+VALUES (
+  $1::uuid,
+  (SELECT c.title FROM training.course c WHERE c.id = $1::uuid),
+  'request', $2::uuid)
 RETURNING id::text`, accepted.CourseID, facts.ID).Scan(&acceptedEventID); err != nil {
 				return fmt.Errorf("create training event from request: %w", err)
+			}
+			if err := copyCourseTrainers(ctx, tx, acceptedEventID, accepted.CourseID); err != nil {
+				return err
 			}
 			afterEvent, err := entitySnapshot(ctx, tx, "training_event", acceptedEventID)
 			if err != nil {

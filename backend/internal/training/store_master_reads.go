@@ -118,7 +118,8 @@ const certificationCatalogColumns = `
   COALESCE(v.name, ''),
   COALESCE(cert.skill_area_id::text, ''),
   COALESCE(sa.name, ''),
-  (EXTRACT(YEAR FROM cert.typical_validity) * 12 + EXTRACT(MONTH FROM cert.typical_validity))::int`
+  (EXTRACT(YEAR FROM cert.typical_validity) * 12 + EXTRACT(MONTH FROM cert.typical_validity))::int,
+  cert.attested_level`
 
 const certificationCatalogFrom = `
 FROM training.certification cert
@@ -142,14 +143,16 @@ func (s *SQLStore) ListCertificationCatalog(ctx context.Context) ([]Certificatio
 		var (
 			row    CertificationCatalogRow
 			months sql.NullInt64
+			level  sql.NullInt64
 		)
 		if err := rows.Scan(
 			&row.ID, &row.Code, &row.Name, &row.Description, &row.Active,
-			&row.IssuerVendorID, &row.IssuerVendorName, &row.SkillAreaID, &row.SkillAreaName, &months,
+			&row.IssuerVendorID, &row.IssuerVendorName, &row.SkillAreaID, &row.SkillAreaName, &months, &level,
 		); err != nil {
 			return nil, fmt.Errorf("scan training certification catalog: %w", err)
 		}
 		row.TypicalValidityMonths = nullInt(months)
+		row.AttestedLevel = nullInt(level)
 		result = append(result, row)
 	}
 	return result, rows.Err()
@@ -205,11 +208,12 @@ WHERE cert.id = $1::uuid`
 	var (
 		detail                           CertificationDetail
 		months                           sql.NullInt64
+		level                            sql.NullInt64
 		holdersRaw, coursesRaw, rulesRaw string
 	)
 	err := s.db.QueryRowContext(ctx, q, id).Scan(
 		&detail.ID, &detail.Code, &detail.Name, &detail.Description, &detail.Active,
-		&detail.IssuerVendorID, &detail.IssuerVendorName, &detail.SkillAreaID, &detail.SkillAreaName, &months,
+		&detail.IssuerVendorID, &detail.IssuerVendorName, &detail.SkillAreaID, &detail.SkillAreaName, &months, &level,
 		&holdersRaw, &coursesRaw, &rulesRaw,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -219,6 +223,7 @@ WHERE cert.id = $1::uuid`
 		return CertificationDetail{}, fmt.Errorf("load training certification detail: %w", err)
 	}
 	detail.TypicalValidityMonths = nullInt(months)
+	detail.AttestedLevel = nullInt(level)
 	if detail.Holders, err = decodeJSONSlice[CertificationHolderRef](holdersRaw); err != nil {
 		return CertificationDetail{}, err
 	}

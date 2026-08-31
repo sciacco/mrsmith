@@ -5,24 +5,52 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatCurrency } from '@mrsmith/format';
-import { Button, Drawer, Skeleton, StatusBadge, useToast } from '@mrsmith/ui';
-import { useArchiveCourse, useCourseDetail } from '../../api/queries';
+import { Button, Drawer, Modal, Skeleton, StatusBadge, useToast } from '@mrsmith/ui';
+import { useArchiveCourse, useCourseDetail, useResumeCourse, useSuspendCourse } from '../../api/queries';
 import { describeApiError } from '../events/apiErrors';
 import { ErrorPanel } from '../events/ErrorPanel';
-import { formatInstantDate } from '../events/eventFormat';
+import { formatDateOnly, formatInstantDate } from '../events/eventFormat';
 import { DELIVERY_MODE_LABELS, PROVIDER_KIND_LABELS } from '../../lib/labels';
 import { CourseEditorModal } from './CourseEditorModal';
 import styles from '../requests/drawerShared.module.css';
+import formStyles from '../requests/requestShared.module.css';
 import localStyles from './CourseDetailDrawer.module.css';
 
 export function CourseDetailDrawer({ id, onClose }: { id: string; onClose: () => void }) {
   const { toast } = useToast();
   const detail = useCourseDetail(id);
   const archiveCourse = useArchiveCourse();
+  const suspendCourse = useSuspendCourse();
+  const resumeCourse = useResumeCourse();
   const [showEdit, setShowEdit] = useState(false);
+  const [suspendReason, setSuspendReason] = useState('');
+  const [showSuspend, setShowSuspend] = useState(false);
   const [archiveError, setArchiveError] = useState<string | null>(null);
 
   const course = detail.data;
+  const isSuspended = !!course?.suspendedAt;
+
+  async function suspend() {
+    setArchiveError(null);
+    try {
+      await suspendCourse.mutateAsync({ id, input: { reason: suspendReason.trim() } });
+      setShowSuspend(false);
+      setSuspendReason('');
+      toast('Corso sospeso');
+    } catch (e) {
+      setArchiveError(describeApiError(e, 'Sospensione non riuscita'));
+    }
+  }
+
+  async function resume() {
+    setArchiveError(null);
+    try {
+      await resumeCourse.mutateAsync(id);
+      toast('Corso riattivato');
+    } catch (e) {
+      setArchiveError(describeApiError(e, 'Riattivazione non riuscita'));
+    }
+  }
 
   async function archive() {
     setArchiveError(null);
@@ -48,6 +76,15 @@ export function CourseDetailDrawer({ id, onClose }: { id: string; onClose: () =>
               <Button variant="ghost" size="md" onClick={() => setShowEdit(true)}>
                 Modifica
               </Button>
+              {isSuspended ? (
+                <Button variant="secondary" size="md" loading={resumeCourse.isPending} onClick={resume}>
+                  Riattiva
+                </Button>
+              ) : (
+                <Button variant="ghost" size="md" onClick={() => setShowSuspend(true)}>
+                  Sospendi
+                </Button>
+              )}
               {course.active && (
                 <Button variant="danger" size="md" loading={archiveCourse.isPending} onClick={archive}>
                   Archivia
@@ -105,7 +142,39 @@ export function CourseDetailDrawer({ id, onClose }: { id: string; onClose: () =>
                   </div>
                   <div className={styles.item}>
                     <dt>Stato</dt>
-                    <dd>{course.active ? 'Attivo' : 'Archiviato'}</dd>
+                    <dd>
+                      {course.active ? 'Attivo' : 'Archiviato'}
+                      {isSuspended &&
+                        ` · sospeso${course.suspensionReason ? `: ${course.suspensionReason}` : ''}`}
+                    </dd>
+                  </div>
+                  <div className={styles.item}>
+                    <dt>Formatori designati</dt>
+                    <dd>{course.trainers.length > 0 ? course.trainers.map((t) => t.name).join(', ') : '—'}</dd>
+                  </div>
+                  <div className={styles.item}>
+                    <dt>Promemoria</dt>
+                    <dd>
+                      {course.reminderText
+                        ? `${course.reminderText}${course.reminderAt ? ` · richiamo ${formatDateOnly(course.reminderAt)}` : ''}`
+                        : '—'}
+                    </dd>
+                  </div>
+                  <div className={styles.item}>
+                    <dt>Nota</dt>
+                    <dd>{course.notes || '—'}</dd>
+                  </div>
+                  <div className={styles.item}>
+                    <dt>Visibilità</dt>
+                    <dd>
+                      {!course.visibility
+                        ? 'Riservato a People'
+                        : course.visibility.kind === 'all'
+                          ? 'Tutti'
+                          : course.visibility.kind === 'people'
+                            ? `Persone scelte (${course.visibility.employeeIds?.length ?? 0})`
+                            : 'Cerchia dedicata'}
+                    </dd>
                   </div>
                   <div className={styles.item}>
                     <dt>Origine</dt>
@@ -177,6 +246,31 @@ export function CourseDetailDrawer({ id, onClose }: { id: string; onClose: () =>
         </div>
       </Drawer>
 
+      {showSuspend && (
+        <Modal open onClose={() => setShowSuspend(false)} title="Sospendi corso" size="sm">
+          <div className={formStyles.body}>
+            <p>Il tema resta a catalogo ma esce dalle viste operative finché non viene riattivato.</p>
+            <label className={formStyles.field}>
+              Motivo (facoltativo)
+              <textarea
+                className={formStyles.textarea}
+                value={suspendReason}
+                onChange={(e) => setSuspendReason(e.target.value)}
+                rows={2}
+                placeholder="Es. standby per accordo con partner"
+              />
+            </label>
+            <div className={formStyles.actions}>
+              <Button variant="ghost" size="md" onClick={() => setShowSuspend(false)} disabled={suspendCourse.isPending}>
+                Annulla
+              </Button>
+              <Button variant="primary" size="md" loading={suspendCourse.isPending} onClick={suspend}>
+                Sospendi
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
       {course && showEdit && (
         <CourseEditorModal
           mode="edit"

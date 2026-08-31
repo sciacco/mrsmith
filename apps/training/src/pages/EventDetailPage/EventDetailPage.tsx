@@ -112,8 +112,11 @@ export function EventDetailPage() {
 
       <header className={styles.header}>
         <div>
-          <h1 className={styles.title}>{event.courseTitle}</h1>
-          <p className={styles.subtitle}>{event.vendorName || 'Nessun fornitore'}</p>
+          <h1 className={styles.title}>{event.title}</h1>
+          <p className={styles.subtitle}>
+            {event.title !== event.courseTitle ? `Corso: ${event.courseTitle} · ` : ''}
+            {event.vendorName || 'Nessun fornitore'}
+          </p>
         </div>
         <div className={styles.headerActions}>
           {event.origin === 'rule' && (
@@ -159,6 +162,18 @@ export function EventDetailPage() {
               {event.ruleDeadline && (
                 <span className={styles.mutedInline}> · scadenza tornata {formatInstantDate(event.ruleDeadline)}</span>
               )}
+            </dd>
+          </div>
+          <div className={styles.detailItem}>
+            <dt>Formatori interni</dt>
+            <dd>{event.trainers.length > 0 ? event.trainers.map((t) => t.name).join(', ') : '—'}</dd>
+          </div>
+          <div className={styles.detailItem}>
+            <dt>Promemoria</dt>
+            <dd>
+              {event.reminderText
+                ? `${event.reminderText}${event.reminderAt ? ` · richiamo ${formatInstantDate(event.reminderAt)}` : ''}`
+                : '—'}
             </dd>
           </div>
           <div className={styles.detailItem}>
@@ -212,9 +227,14 @@ export function EventDetailPage() {
             agreedPrice: event.agreedPrice,
             agreedConditions: event.agreedConditions,
             notes: event.notes,
+            title: event.title,
+            reminderText: event.reminderText,
+            reminderAt: event.reminderAt,
+            trainerIds: event.trainers.map((t) => t.employeeId),
           }}
           courses={lookups.data?.courses ?? []}
           vendors={lookups.data?.vendors ?? []}
+          people={lookups.data?.employees ?? []}
           pending={updateEvent.isPending}
           error={editError}
           onSubmit={handleUpdate}

@@ -550,13 +550,20 @@ SELECT EXISTS (
 		const insertEvent = `
 INSERT INTO training.training_event (
   course_id,
+  title,
   origin,
   source_rule_id,
   rule_deadline
-) VALUES ($1::uuid, 'rule', $2::uuid, $3::date)
+) VALUES (
+  $1::uuid,
+  (SELECT c.title FROM training.course c WHERE c.id = $1::uuid),
+  'rule', $2::uuid, $3::date)
 RETURNING id::text`
 		if err := tx.QueryRowContext(ctx, insertEvent, facts.CourseID, facts.ID, deadline).Scan(&response.ID); err != nil {
 			return fmt.Errorf("create training rule event: %w", err)
+		}
+		if err := copyCourseTrainers(ctx, tx, response.ID, facts.CourseID); err != nil {
+			return err
 		}
 		afterEvent, err := entitySnapshot(ctx, tx, "training_event", response.ID)
 		if err != nil {

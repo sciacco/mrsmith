@@ -776,12 +776,19 @@ func (s *SQLStore) UpsertCertification(ctx context.Context, principal Principal,
 	if strings.TrimSpace(input.Code) == "" || strings.TrimSpace(input.Name) == "" {
 		return ActionResponse{}, validationError("code_name_required", "codice e nome obbligatori")
 	}
+	if err := validateLevel(input.AttestedLevel, "invalid_attested_level"); err != nil {
+		return ActionResponse{}, err
+	}
+	if input.AttestedLevel != nil && strings.TrimSpace(input.SkillAreaID) == "" {
+		return ActionResponse{}, validationError("attested_level_requires_area", "il livello attestato richiede l'area della certificazione")
+	}
 	return s.upsertSimple(ctx, principal, "certification", id, []upsertField{
 		field("code", strings.TrimSpace(input.Code)),
 		field("name", strings.TrimSpace(input.Name)),
 		typedField("issuer_vendor_id", nullableUUID(input.IssuerVendorID), "::uuid"),
 		typedField("skill_area_id", nullableUUID(input.SkillAreaID), "::uuid"),
 		typedField("typical_validity", monthsInterval(input.TypicalValidityMonths), "::interval"),
+		field("attested_level", input.AttestedLevel),
 		field("description", nullableText(input.Description)),
 		field("is_active", boolValue(input.Active, true)),
 	})
@@ -820,6 +827,18 @@ func (s *SQLStore) UpsertCourse(ctx context.Context, principal Principal, id str
 	if err != nil {
 		return ActionResponse{}, err
 	}
+	reminderAt, err := parseOptionalDate(input.ReminderAt)
+	if err != nil {
+		return ActionResponse{}, validationError("invalid_reminder_at", "data di richiamo non valida")
+	}
+	trainerIDs, err := s.normalizeActiveEmployeeIDs(ctx, input.TrainerIDs)
+	if err != nil {
+		return ActionResponse{}, err
+	}
+	visibilityJSON, visibilityPeople, err := s.normalizeCourseVisibility(ctx, input.Visibility)
+	if err != nil {
+		return ActionResponse{}, err
+	}
 	return s.upsertSimple(ctx, principal, "course", id, []upsertField{
 		field("title", strings.TrimSpace(input.Title)),
 		typedField("tags", textArrayLiteral(normalizeTags(input.Tags)), "::text[]"),
@@ -831,11 +850,21 @@ func (s *SQLStore) UpsertCourse(ctx context.Context, principal Principal, id str
 		field("default_cost", input.DefaultCost),
 		field("course_url", nullableText(input.CourseURL)),
 		field("description", nullableText(input.Description)),
+		field("notes", nullableText(input.Notes)),
+		field("reminder_text", nullableText(input.ReminderText)),
+		typedField("reminder_at", reminderAt, "::date"),
+		typedField("visibility_target", visibilityJSON, "::jsonb"),
 		field("is_compliance_course", complianceRelated),
 		field("compliance_framework", nullableText(complianceFramework)),
 		field("is_active", boolValue(input.Active, true)),
 	}, func(ctx context.Context, tx *sql.Tx, courseID string) error {
-		return replaceSkillAreaLinks(ctx, tx, "course_skill_area", "course_id", courseID, areaIDs)
+		if err := replaceSkillAreaLinks(ctx, tx, "course_skill_area", "course_id", courseID, areaIDs); err != nil {
+			return err
+		}
+		if err := replaceEmployeeLinks(ctx, tx, "course_trainer", "course_id", courseID, trainerIDs); err != nil {
+			return err
+		}
+		return replaceEmployeeLinks(ctx, tx, "course_visibility_person", "course_id", courseID, visibilityPeople)
 	})
 }
 

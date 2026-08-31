@@ -14,6 +14,9 @@ SELECT
   ev.id::text,
   ev.course_id::text,
   c.title,
+  ev.title,
+  COALESCE(ev.reminder_text, ''),
+  COALESCE(ev.reminder_at::text, ''),
   COALESCE(ev.vendor_id::text, ''),
   COALESCE(v.name, ''),
   ev.agreed_price::float8,
@@ -50,6 +53,9 @@ LIMIT 5000`
 			&row.ID,
 			&row.CourseID,
 			&row.CourseTitle,
+			&row.Title,
+			&row.ReminderText,
+			&row.ReminderAt,
 			&row.VendorID,
 			&row.VendorName,
 			&price,
@@ -86,6 +92,9 @@ SELECT
   ev.id::text,
   ev.course_id::text,
   c.title,
+  ev.title,
+  COALESCE(ev.reminder_text, ''),
+  COALESCE(ev.reminder_at::text, ''),
   COALESCE(ev.vendor_id::text, ''),
   COALESCE(v.name, ''),
   ev.agreed_price::float8,
@@ -117,6 +126,9 @@ WHERE ev.id = $1::uuid`
 		&detail.ID,
 		&detail.CourseID,
 		&detail.CourseTitle,
+		&detail.Title,
+		&detail.ReminderText,
+		&detail.ReminderAt,
 		&detail.VendorID,
 		&detail.VendorName,
 		&price,
@@ -146,6 +158,9 @@ WHERE ev.id = $1::uuid`
 	}
 	detail.AgreedPrice = nullFloat(price)
 
+	if detail.Trainers, err = s.eventTrainers(ctx, id); err != nil {
+		return EventDetail{}, err
+	}
 	if detail.Sessions, err = s.eventSessions(ctx, id); err != nil {
 		return EventDetail{}, err
 	}
@@ -156,6 +171,30 @@ WHERE ev.id = $1::uuid`
 		return EventDetail{}, err
 	}
 	return detail, nil
+}
+
+func (s *SQLStore) eventTrainers(ctx context.Context, eventID string) ([]TrainerRef, error) {
+	const q = `
+SELECT et.employee_id::text, concat(e.last_name, ' ', e.first_name)
+FROM training.event_trainer et
+JOIN training.employee e ON e.id = et.employee_id
+WHERE et.event_id = $1::uuid
+ORDER BY e.last_name, e.first_name`
+	rows, err := s.db.QueryContext(ctx, q, eventID)
+	if err != nil {
+		return nil, fmt.Errorf("list training event trainers: %w", err)
+	}
+	defer rows.Close()
+
+	result := make([]TrainerRef, 0)
+	for rows.Next() {
+		var row TrainerRef
+		if err := rows.Scan(&row.EmployeeID, &row.Name); err != nil {
+			return nil, fmt.Errorf("scan training event trainer: %w", err)
+		}
+		result = append(result, row)
+	}
+	return result, rows.Err()
 }
 
 func (s *SQLStore) eventSessions(ctx context.Context, eventID string) ([]SessionDetail, error) {

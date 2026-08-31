@@ -28,6 +28,8 @@ export function RequestCreateModal({ open, onClose, onCreated }: RequestCreateMo
   const [courseId, setCourseId] = useState('');
   const [newCourseTitle, setNewCourseTitle] = useState('');
   const [skillAreaIds, setSkillAreaIds] = useState<string[]>([]);
+  const [areaLevels, setAreaLevels] = useState<Record<string, { current: string; target: string }>>({});
+  const [priority, setPriority] = useState('');
   const [motivation, setMotivation] = useState('');
   const [desiredStart, setDesiredStart] = useState('');
   const [desiredEnd, setDesiredEnd] = useState('');
@@ -65,7 +67,16 @@ export function RequestCreateModal({ open, onClose, onCreated }: RequestCreateMo
         selectedTeamId: teamId,
         courseId: courseMode === 'catalog' ? courseId : undefined,
         newCourseTitle: courseMode === 'new' ? newCourseTitle.trim() : undefined,
-        skillAreaIds,
+        skillAreas: skillAreaIds.map((areaId) => ({
+          id: areaId,
+          levelCurrent: areaLevels[areaId]?.current !== undefined && areaLevels[areaId]?.current !== ''
+            ? Number(areaLevels[areaId]?.current)
+            : undefined,
+          levelTarget: areaLevels[areaId]?.target !== undefined && areaLevels[areaId]?.target !== ''
+            ? Number(areaLevels[areaId]?.target)
+            : undefined,
+        })),
+        priority: priority !== '' ? Number(priority) : undefined,
         motivation: motivation.trim(),
         desiredStart: desiredStart || undefined,
         desiredEnd: desiredEnd || undefined,
@@ -162,6 +173,47 @@ export function RequestCreateModal({ open, onClose, onCreated }: RequestCreateMo
             selected={skillAreaIds}
             onChange={setSkillAreaIds}
             placeholder="Nessuna area"
+          />
+        </label>
+        {skillAreaIds.map((areaId) => {
+          const area = (skillAreas.data ?? []).find((a) => a.id === areaId);
+          const levels = areaLevels[areaId] ?? { current: '', target: '' };
+          return (
+            <div className={styles.row} key={areaId}>
+              <label className={styles.field}>
+                {area?.name ?? 'Area'} — livello attuale (0–5)
+                <input
+                  type="number"
+                  min={0}
+                  max={5}
+                  className={styles.input}
+                  value={levels.current}
+                  onChange={(e) => setAreaLevels({ ...areaLevels, [areaId]: { ...levels, current: e.target.value } })}
+                />
+              </label>
+              <label className={styles.field}>
+                Livello atteso (0–5)
+                <input
+                  type="number"
+                  min={0}
+                  max={5}
+                  className={styles.input}
+                  value={levels.target}
+                  onChange={(e) => setAreaLevels({ ...areaLevels, [areaId]: { ...levels, target: e.target.value } })}
+                />
+              </label>
+            </div>
+          );
+        })}
+
+        <label className={styles.field}>
+          Priorità (1 = più importante)
+          <input
+            type="number"
+            min={1}
+            className={styles.input}
+            value={priority}
+            onChange={(e) => setPriority(e.target.value)}
           />
         </label>
 

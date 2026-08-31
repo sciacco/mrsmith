@@ -132,6 +132,7 @@ export function EventsPage() {
           <table className={styles.table}>
             <thead>
               <tr>
+                <th>Titolo</th>
                 <th>Corso</th>
                 <th>Fornitore</th>
                 <th className={styles.numCell}>Sessioni</th>
@@ -150,9 +151,10 @@ export function EventsPage() {
                       className={styles.rowLink}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {row.courseTitle}
+                      {row.title}
                     </Link>
                   </td>
+                  <td>{row.courseTitle}</td>
                   <td>{row.vendorName || '—'}</td>
                   <td className={styles.numCell}>{formatNumber(row.sessionsCount)}</td>
                   <td className={styles.numCell}>{formatNumber(row.enrollmentsCount)}</td>

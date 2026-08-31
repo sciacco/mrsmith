@@ -180,6 +180,36 @@ func (h *handler) handleArchiveCourse(w http.ResponseWriter, r *http.Request) {
 	httputil.JSON(w, http.StatusOK, resp)
 }
 
+func (h *handler) handleSuspendCourse(w http.ResponseWriter, r *http.Request) {
+	principal, ok := h.principalOrUnauthorized(w, r)
+	if !ok {
+		return
+	}
+	input, ok := decodeJSONBody[ReasonInput](w, r)
+	if !ok {
+		return
+	}
+	resp, err := h.store.SuspendCourse(r.Context(), principal, r.PathValue("id"), input)
+	if err != nil {
+		h.writeActionError(w, r, err, "training.suspend_course")
+		return
+	}
+	httputil.JSON(w, http.StatusOK, resp)
+}
+
+func (h *handler) handleResumeCourse(w http.ResponseWriter, r *http.Request) {
+	principal, ok := h.principalOrUnauthorized(w, r)
+	if !ok {
+		return
+	}
+	resp, err := h.store.ResumeCourse(r.Context(), principal, r.PathValue("id"))
+	if err != nil {
+		h.writeActionError(w, r, err, "training.resume_course")
+		return
+	}
+	httputil.JSON(w, http.StatusOK, resp)
+}
+
 func (h *handler) handleUpsert(w http.ResponseWriter, r *http.Request, fn func(Principal, string) (ActionResponse, error)) {
 	principal, ok := h.principalOrUnauthorized(w, r)
 	if !ok {

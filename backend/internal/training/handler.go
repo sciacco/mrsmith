@@ -134,6 +134,8 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	mux.Handle("POST /training/v1/courses", protect(h.requireStore(http.HandlerFunc(h.handleUpsertCourse))))
 	mux.Handle("PUT /training/v1/courses/{id}", protect(h.requireStore(http.HandlerFunc(h.handleUpsertCourse))))
 	mux.Handle("POST /training/v1/courses/{id}/archive", protect(h.requireStore(http.HandlerFunc(h.handleArchiveCourse))))
+	mux.Handle("POST /training/v1/courses/{id}/suspend", protect(h.requireStore(http.HandlerFunc(h.handleSuspendCourse))))
+	mux.Handle("POST /training/v1/courses/{id}/resume", protect(h.requireStore(http.HandlerFunc(h.handleResumeCourse))))
 
 	mux.Handle("GET /training/v1/directory/sync/runs", protect(h.requireStore(http.HandlerFunc(h.handleListDirectorySyncRuns))))
 	mux.Handle("POST /training/v1/directory/sync", protect(h.requireStore(http.HandlerFunc(h.handleRunDirectorySync))))

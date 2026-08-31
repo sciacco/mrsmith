@@ -13,6 +13,21 @@ type EventInput struct {
 	AgreedPrice      *float64 `json:"agreedPrice,omitempty"`
 	AgreedConditions string   `json:"agreedConditions,omitempty"`
 	Notes            string   `json:"notes,omitempty"`
+	// Title: alla creazione e sempre ereditato dal corso; in update il campo
+	// vuoto conserva il titolo corrente (unico campo che non si azzera: e
+	// NOT NULL per contratto).
+	Title        string `json:"title,omitempty"`
+	ReminderText string `json:"reminderText,omitempty"`
+	ReminderAt   string `json:"reminderAt,omitempty"` // YYYY-MM-DD
+	// TrainerIDs: in update sostituisce l'elenco dei formatori dell'evento;
+	// alla creazione l'evento parte dai formatori designati del corso.
+	TrainerIDs []string `json:"trainerIds,omitempty"`
+}
+
+// TrainerRef e un formatore interno designato (corso) o assegnato (evento).
+type TrainerRef struct {
+	EmployeeID string `json:"employeeId"`
+	Name       string `json:"name"`
 }
 
 type ReasonInput struct {
@@ -76,6 +91,9 @@ type EventListRow struct {
 	ID                        string     `json:"id"`
 	CourseID                  string     `json:"courseId"`
 	CourseTitle               string     `json:"courseTitle"`
+	Title                     string     `json:"title"`
+	ReminderText              string     `json:"reminderText,omitempty"`
+	ReminderAt                string     `json:"reminderAt,omitempty"`
 	VendorID                  string     `json:"vendorId,omitempty"`
 	VendorName                string     `json:"vendorName,omitempty"`
 	AgreedPrice               *float64   `json:"agreedPrice,omitempty"`
@@ -138,6 +156,10 @@ type EventDetail struct {
 	ID                 string             `json:"id"`
 	CourseID           string             `json:"courseId"`
 	CourseTitle        string             `json:"courseTitle"`
+	Title              string             `json:"title"`
+	ReminderText       string             `json:"reminderText,omitempty"`
+	ReminderAt         string             `json:"reminderAt,omitempty"`
+	Trainers           []TrainerRef       `json:"trainers"`
 	VendorID           string             `json:"vendorId,omitempty"`
 	VendorName         string             `json:"vendorName,omitempty"`
 	AgreedPrice        *float64           `json:"agreedPrice,omitempty"`

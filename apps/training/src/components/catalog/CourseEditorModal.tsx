@@ -9,11 +9,14 @@ import { Button, Modal, MoneyInput, MultiSelect, SingleSelect, ToggleSwitch, Vis
 import {
   useCreateCourse,
   useTrainingCertifications,
+  useTrainingGroups,
+  useTrainingPeople,
   useTrainingSkillAreas,
+  useTrainingTeams,
   useTrainingVendors,
   useUpdateCourse,
 } from '../../api/queries';
-import type { CourseDetail, CourseInput } from '../../api/types';
+import type { CourseDetail, CourseInput, CourseVisibility } from '../../api/types';
 import { describeApiError } from '../events/apiErrors';
 import { ErrorPanel } from '../events/ErrorPanel';
 import { DELIVERY_MODE_LABELS } from '../../lib/labels';
@@ -34,6 +37,9 @@ export function CourseEditorModal({ mode, courseId, initial, open, onClose, onSa
   const vendors = useTrainingVendors();
   const skillAreas = useTrainingSkillAreas();
   const certifications = useTrainingCertifications();
+  const people = useTrainingPeople();
+  const teams = useTrainingTeams();
+  const groups = useTrainingGroups();
   const createCourse = useCreateCourse();
   const updateCourse = useUpdateCourse();
 
@@ -53,15 +59,24 @@ export function CourseEditorModal({ mode, courseId, initial, open, onClose, onSa
   const [complianceFramework, setComplianceFramework] = useState(initial?.complianceFramework ?? '');
   const [tags, setTags] = useState((initial?.tags ?? []).join(', '));
   const [active, setActive] = useState(initial?.active ?? true);
+  const [notes, setNotes] = useState(initial?.notes ?? '');
+  const [reminderText, setReminderText] = useState(initial?.reminderText ?? '');
+  const [reminderAt, setReminderAt] = useState(initial?.reminderAt ?? '');
+  const [trainerIds, setTrainerIds] = useState<string[]>((initial?.trainers ?? []).map((t) => t.employeeId));
+  const [visibilityKind, setVisibilityKind] = useState<'' | CourseVisibility['kind']>(initial?.visibility?.kind ?? '');
+  const [visibilityId, setVisibilityId] = useState(initial?.visibility?.id ?? '');
+  const [visibilityPeople, setVisibilityPeople] = useState<string[]>(initial?.visibility?.employeeIds ?? []);
   const [error, setError] = useState<string | null>(null);
 
   if (!open) return null;
 
   const pending = createCourse.isPending || updateCourse.isPending;
+  const needsVisibilityId = visibilityKind === 'team' || visibilityKind === 'skill_area' || visibilityKind === 'custom_group';
   const canSubmit =
     title.trim() !== '' &&
     (providerKind === 'internal' || vendorId !== '') &&
-    (!complianceRelated || complianceFramework.trim() !== '');
+    (!complianceRelated || complianceFramework.trim() !== '') &&
+    (!needsVisibilityId || visibilityId !== '');
 
   async function submit() {
     if (!canSubmit) return;
@@ -81,6 +96,18 @@ export function CourseEditorModal({ mode, courseId, initial, open, onClose, onSa
       complianceFramework: complianceRelated ? complianceFramework.trim() : undefined,
       tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
       active,
+      notes: notes.trim() || undefined,
+      reminderText: reminderText.trim() || undefined,
+      reminderAt: reminderAt || undefined,
+      trainerIds,
+      visibility:
+        visibilityKind === ''
+          ? undefined
+          : {
+              kind: visibilityKind,
+              id: needsVisibilityId ? visibilityId : undefined,
+              employeeIds: visibilityKind === 'people' ? visibilityPeople : undefined,
+            },
     };
     try {
       if (mode === 'edit' && courseId) {
@@ -205,6 +232,105 @@ export function CourseEditorModal({ mode, courseId, initial, open, onClose, onSa
           Tag (separati da virgola)
           <input className={styles.input} value={tags} onChange={(e) => setTags(e.target.value)} />
         </label>
+
+        <label className={styles.field}>
+          Formatori interni designati
+          <MultiSelect<string>
+            options={(people.data ?? [])
+              .filter((p) => p.status === 'active')
+              .map((p) => ({ value: p.id, label: `${p.lastName} ${p.firstName}` }))}
+            selected={trainerIds}
+            onChange={setTrainerIds}
+            placeholder="Nessuno"
+          />
+          <span className={styles.hint}>Alla creazione di un evento diventano il valore di partenza dei suoi formatori.</span>
+        </label>
+
+        <div className={styles.row}>
+          <label className={styles.field}>
+            Promemoria (in attesa di / prossimo passo)
+            <input className={styles.input} value={reminderText} onChange={(e) => setReminderText(e.target.value)} />
+          </label>
+          <label className={styles.field}>
+            Data di richiamo
+            <input type="date" className={styles.input} value={reminderAt} onChange={(e) => setReminderAt(e.target.value)} />
+          </label>
+        </div>
+
+        <label className={styles.field}>
+          Nota
+          <textarea className={styles.textarea} value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+        </label>
+
+        <div className={styles.row}>
+          <label className={styles.field}>
+            Visibilità (chi può scegliere il corso)
+            <SingleSelect
+              options={[
+                { value: 'all', label: 'Tutti' },
+                { value: 'team', label: 'Un team' },
+                { value: 'skill_area', label: "Un'area di competenza" },
+                { value: 'custom_group', label: 'Un gruppo' },
+                { value: 'people', label: 'Persone scelte' },
+              ]}
+              selected={visibilityKind || null}
+              onChange={(v) => {
+                setVisibilityKind((v as CourseVisibility['kind']) ?? '');
+                setVisibilityId('');
+                setVisibilityPeople([]);
+              }}
+              placeholder="Riservato a People"
+              allowClear
+            />
+          </label>
+          {visibilityKind === 'team' && (
+            <label className={styles.field}>
+              Team
+              <SingleSelect
+                options={(teams.data ?? []).map((t) => ({ value: t.id, label: t.name }))}
+                selected={visibilityId || null}
+                onChange={(v) => setVisibilityId(v ?? '')}
+                placeholder="Seleziona team..."
+              />
+            </label>
+          )}
+          {visibilityKind === 'skill_area' && (
+            <label className={styles.field}>
+              Area
+              <SingleSelect
+                options={(skillAreas.data ?? []).map((a) => ({ value: a.id, label: a.name }))}
+                selected={visibilityId || null}
+                onChange={(v) => setVisibilityId(v ?? '')}
+                placeholder="Seleziona area..."
+                searchable
+              />
+            </label>
+          )}
+          {visibilityKind === 'custom_group' && (
+            <label className={styles.field}>
+              Gruppo
+              <SingleSelect
+                options={(groups.data ?? []).map((g) => ({ value: g.id, label: g.name }))}
+                selected={visibilityId || null}
+                onChange={(v) => setVisibilityId(v ?? '')}
+                placeholder="Seleziona gruppo..."
+              />
+            </label>
+          )}
+          {visibilityKind === 'people' && (
+            <label className={styles.field}>
+              Persone
+              <MultiSelect<string>
+                options={(people.data ?? [])
+                  .filter((p) => p.status === 'active')
+                  .map((p) => ({ value: p.id, label: `${p.lastName} ${p.firstName}` }))}
+                selected={visibilityPeople}
+                onChange={setVisibilityPeople}
+                placeholder="Nessuna"
+              />
+            </label>
+          )}
+        </div>
 
         <div className={styles.row}>
           <div className={styles.field}>

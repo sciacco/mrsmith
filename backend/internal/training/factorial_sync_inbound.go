@@ -765,11 +765,15 @@ func (s *SQLStore) applyTrainingDiff(ctx context.Context, tx *sql.Tx, principal 
 	for _, item := range diff.Events {
 		var id string
 		if err := tx.QueryRowContext(ctx, `
-INSERT INTO training.training_event (course_id, origin, factorial_class_id, notes) VALUES ($1::uuid, 'factorial_import', $2, NULLIF($3, ''))
+INSERT INTO training.training_event (course_id, title, origin, factorial_class_id, notes)
+VALUES ($1::uuid, (SELECT c.title FROM training.course c WHERE c.id = $1::uuid), 'factorial_import', $2, NULLIF($3, ''))
 RETURNING id::text`, courseID, item.FactorialClassID, item.Notes).Scan(&id); err != nil {
 			return nil, fmt.Errorf("create training event from factorial sync: %w", err)
 		}
-		if err := s.auditFields(ctx, tx, principal, "training_event", id, actionFactorialImport, []string{"course_id", "factorial_class_id", "notes"}); err != nil {
+		if err := copyCourseTrainers(ctx, tx, id, courseID); err != nil {
+			return nil, err
+		}
+		if err := s.auditFields(ctx, tx, principal, "training_event", id, actionFactorialImport, []string{"course_id", "title", "factorial_class_id", "notes"}); err != nil {
 			return nil, err
 		}
 		eventID[item.FactorialClassID] = id

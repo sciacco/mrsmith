@@ -6,10 +6,11 @@
 // intero.
 
 import { useState } from 'react';
-import { Button, Modal, MoneyInput, SingleSelect, VisuallyHidden } from '@mrsmith/ui';
+import { Button, Modal, MoneyInput, MultiSelect, SingleSelect, VisuallyHidden } from '@mrsmith/ui';
 import type { EventInput, LookupItem } from '../../api/types';
 import { ErrorPanel } from './ErrorPanel';
 import styles from './EventFormModal.module.css';
+import formStyles from '../requests/requestShared.module.css';
 
 function selectableOptions(items: LookupItem[], currentId: string | undefined) {
   const options = items.filter((i) => i.active).map((i) => ({ value: i.id, label: i.label }));
@@ -26,6 +27,7 @@ interface EventFormModalProps {
   initial?: EventInput;
   courses: LookupItem[];
   vendors: LookupItem[];
+  people?: LookupItem[];
   pending: boolean;
   error?: string | null;
   onSubmit: (input: EventInput) => void;
@@ -38,28 +40,37 @@ export function EventFormModal({
   initial,
   courses,
   vendors,
+  people = [],
   pending,
   error,
   onSubmit,
   onClose,
 }: EventFormModalProps) {
   const [courseId, setCourseId] = useState(initial?.courseId ?? '');
+  const [title, setTitle] = useState(initial?.title ?? '');
   const [vendorId, setVendorId] = useState(initial?.vendorId ?? '');
   const [agreedPrice, setAgreedPrice] = useState(
     initial?.agreedPrice !== undefined ? initial.agreedPrice.toFixed(2) : '',
   );
   const [agreedConditions, setAgreedConditions] = useState(initial?.agreedConditions ?? '');
   const [notes, setNotes] = useState(initial?.notes ?? '');
+  const [reminderText, setReminderText] = useState(initial?.reminderText ?? '');
+  const [reminderAt, setReminderAt] = useState(initial?.reminderAt ?? '');
+  const [trainerIds, setTrainerIds] = useState<string[]>(initial?.trainerIds ?? []);
 
   if (!open) return null;
 
   function submit() {
     onSubmit({
       courseId,
+      title: mode === 'edit' ? title.trim() || undefined : undefined,
       vendorId: vendorId || undefined,
       agreedPrice: agreedPrice === '' ? undefined : Number(agreedPrice),
       agreedConditions: agreedConditions.trim() || undefined,
       notes: notes.trim() || undefined,
+      reminderText: reminderText.trim() || undefined,
+      reminderAt: reminderAt || undefined,
+      trainerIds: mode === 'edit' ? trainerIds : undefined,
     });
   }
 
@@ -89,6 +100,36 @@ export function EventFormModal({
             allowClear
           />
         </label>
+        {mode === 'edit' && (
+          <label className={styles.field}>
+            Titolo dell'evento
+            <input className={formStyles.input} value={title} onChange={(e) => setTitle(e.target.value)} />
+          </label>
+        )}
+        {mode === 'create' && (
+          <p className={formStyles.hint}>Il titolo viene ereditato dal corso; si può cambiare dopo la creazione.</p>
+        )}
+        {mode === 'edit' && (
+          <label className={styles.field}>
+            Formatori interni
+            <MultiSelect<string>
+              options={people.filter((p) => p.active).map((p) => ({ value: p.id, label: p.label }))}
+              selected={trainerIds}
+              onChange={setTrainerIds}
+              placeholder="Nessuno"
+            />
+          </label>
+        )}
+        <div className={formStyles.row}>
+          <label className={styles.field}>
+            Promemoria (in attesa di / prossimo passo)
+            <input className={formStyles.input} value={reminderText} onChange={(e) => setReminderText(e.target.value)} />
+          </label>
+          <label className={styles.field}>
+            Data di richiamo
+            <input type="date" className={formStyles.input} value={reminderAt} onChange={(e) => setReminderAt(e.target.value)} />
+          </label>
+        </div>
         <MoneyInput label="Prezzo pattuito" value={agreedPrice} onChange={setAgreedPrice} />
         <label className={styles.field}>
           Condizioni
