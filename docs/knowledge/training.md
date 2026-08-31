@@ -105,3 +105,14 @@ Course-card fields seeded on import (August 2026 decisions, migration 135), all 
 - Registered debt: create audits use `auditFields` (a named list of changed fields) instead of the package's full before/after snapshot. Provenance checks still work (they only read `action`), but conflict forensics lose the pre-update state on session updates.
 - Each run performs two full anagrafica censuses (a prerequisite directory sync, then a fresh active-employee snapshot) — factor this into `TRAINING_JOBS_INTERVAL` sizing.
 - Composition lesson: the inbound dry-run gap (the #141 no-domain-write guarantee wasn't honored by `applyInboundSync`; it slipped past two slice-4 gates and only surfaced when slice 7 composed the full run; closed by threading a `dryRun` parameter through `applyInboundSync`) — a cross-cutting guarantee needs a check on every slice that writes, not just the slice that states it.
+
+#### Operational Notes (accumulated during the final smoke)
+
+- The enrollment facts `PUT` is a full replacement: omitted fields are cleared (omitting `actualEnd` wipes a date the sync had backfilled). Clients must resend the complete facts set on every update.
+- `POST /jobs/run` executes the same jobs with the same switches as the periodic worker (`WithDirectorySync`/`WithFactorialSync` wired from the handler deps): with the flags off it is a safe no-op with no Factorial calls. The per-person notification job no longer exists.
+- Seat-rule "in training" attribution: an enrollment counts as linked to a seat rule when it carries `source_rule_id` **or** lives on a non-cancelled round event of that rule — enrolling someone on the rule's round is the linking gesture, no dedicated action exists.
+- Sync findings persist `local_entity`/`local_id`; the read query resolves the owning event (`localEventId`) for sessions and enrollments so the UI can always offer "Apri evento".
+- Award deletion is a hard delete mirroring assessments (audit snapshot before the delete); `training.document` rows cascade by FK, but `training.document_blob` rows have no FK and are deleted explicitly in the same transaction.
+- `enrollment.actual_end` is backfilled by the inbound sync only once (only when NULL and completed); coverage falls back to `COALESCE(actual_end, updated_at::date)` and the delivered report computes hours as `COALESCE(hours_actual, course.default_hours)`.
+- `training_session.occupancy` counts only non-terminal assignments (assigned/in progress), never completed ones: capacity gates future seats, so a fully-delivered session shows occupancy 0.
+- Portal gating for Training uses `app_training_people_admin` only: the POC role `app_training_access` was removed from `@mrsmith/auth-client` during the final static sweep.

@@ -9,12 +9,8 @@ export const CP_BACKOFFICE_APP_ACCESS_ROLES = [
   ...CP_BACKOFFICE_BIOMETRIC_ACCESS_ROLES,
 ] as const;
 
-export const TRAINING_ACCESS_ROLES = ['app_training_access'] as const;
 export const TRAINING_PEOPLE_ADMIN_ROLES = ['app_training_people_admin'] as const;
-export const TRAINING_APP_ACCESS_ROLES = [
-  ...TRAINING_ACCESS_ROLES,
-  ...TRAINING_PEOPLE_ADMIN_ROLES,
-] as const;
+export const TRAINING_APP_ACCESS_ROLES = [...TRAINING_PEOPLE_ADMIN_ROLES] as const;
 
 export const APP_ACCESS_ROLES = {
   aenad: ['app_aenad_access'],

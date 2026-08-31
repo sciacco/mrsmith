@@ -2,20 +2,14 @@
 
 ## Training App
 
-### POC Course Data Is Obsolete — Cleanup Pending
-The courses currently loaded in `training.course` (and the enrollments/plans that reference them) were current only for the POC validation and are to be considered obsolete (decision 2026-08-21, post-briefing HR re-analysis, issue #130). Do not treat them as production data or build reporting on them. Cleanup is deferred until the domain redesign lands: at that point decide what survives (likely nothing of the courses; possibly historical certifications), whether the authoritative history is re-imported from Factorial's training module (218 courses 2018–2026 with per-person memberships, see #131/#132), and deliver the purge as a reviewed migration — never an ad-hoc delete.
-
 ### Calendar Integration Deferred Post Go-Live
 The Training mini-app intentionally excludes Outlook/iCal calendar integration from v1. When Product asks to reopen it, prefer a backend-owned read-only iCal feed for employee-visible training dates. Do not add Microsoft Graph writes or calendar mutation flows without a new product decision.
 
-### Legacy Excel Import Mode Depends on Go-Live Date
-The Training schema supports both a 2026 in-flight import and a clean future-year start, but the import mode remains a business decision tied to the real go-live date. The import path is a one-shot CLI cutover tool, not an ongoing People UI workflow. Before running it against staging or production, confirm whether Q3 2026 requires a 1:1 import of the active 2026 plan or whether a later go-live should import only historical certifications and start the next annual plan cleanly.
+### Go-Live Gate for Training
+Remaining gate before switching the periodic regime on in the target environment: the `app_training_people_admin` Keycloak role assigned to the People operators (the POC role `app_training_access` no longer exists anywhere), and the three env flags (`TRAINING_JOBS_ENABLED`, `TRAINING_DIRECTORY_SYNC_ENABLED`, `TRAINING_FACTORIAL_SYNC_ENABLED`) entering the encrypted env with a coordinated restart. The POC cleanup, the one-shot CSV import, the notification job and the local-filesystem storage are all gone: the domain is populated by the directory and Factorial syncs (import-only by default via `mrsmith.runtime_config`), attestati live in `training.document_blob`.
 
-### Staging Gates for Training
-Final go-live still requires staging resources: Anisetta migration application and view smoke test, Keycloak roles `app_training_access` and `app_training_people_admin`, notification delivery/deep links, and People validation of the Excel dry-run report. Local build/test/screenshot gates are run through Docker so they do not depend on host Go/Node/pnpm binaries. (Storage: resolved — attestati and documents live in the database, `training.document_blob`, migration 134.)
-
-### Training Employee Connectors
-Training treats `training.employee` primarily as a local read model. Initial cutover may bootstrap active employees from the one-shot import CLI, while ongoing population and synchronization are delegated to external connectors outside the Training mini-app scope. The approved exception is People-admin manual creation from the Training Persone page: it creates local, audited employee rows for immediate training planning needs. Login and employee self-service workflows must not create employee records.
+### Training Employee Records
+`training.employee` is a local read model rebuilt by the directory sync from active Factorial employees. The approved exception is People-admin manual creation from the Training Persone page: it creates local, audited employee rows for immediate training planning needs. Login and employee self-service workflows must not create employee records.
 
 ## Listini e Sconti App
 
