@@ -34,6 +34,10 @@ type Deps struct {
 	Factorial       *factorial.Client
 	Directory       directory.Provider
 	Arak            *arak.Client
+	// Flag dei sync periodici: il POST /jobs/run esegue gli stessi job del
+	// worker, con gli stessi interruttori (spenti = nessuna chiamata Factorial).
+	DirectorySyncEnabled bool
+	FactorialSyncEnabled bool
 }
 
 type handler struct {
@@ -48,6 +52,9 @@ type handler struct {
 	factorial       *factorial.Client
 	directory       directory.Provider
 	arak            *arak.Client
+
+	directorySyncEnabled bool
+	factorialSyncEnabled bool
 }
 
 func RegisterRoutes(mux *http.ServeMux, deps Deps) {
@@ -78,6 +85,9 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 		factorial:       deps.Factorial,
 		directory:       deps.Directory,
 		arak:            deps.Arak,
+
+		directorySyncEnabled: deps.DirectorySyncEnabled,
+		factorialSyncEnabled: deps.FactorialSyncEnabled,
 	}
 
 	// Ruolo unico: tutte le route Training, letture comprese, richiedono
@@ -123,6 +133,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	mux.Handle("POST /training/v1/documents/{id}/validate", protect(h.requireStore(http.HandlerFunc(h.handleValidateDocument))))
 	mux.Handle("POST /training/v1/jobs/run", protect(h.requireStore(http.HandlerFunc(h.handleRunJobs))))
 	mux.Handle("PUT /training/v1/awards/{id}", protect(h.requireStore(http.HandlerFunc(h.handleUpdateAward))))
+	mux.Handle("DELETE /training/v1/awards/{id}", protect(h.requireStore(http.HandlerFunc(h.handleDeleteAward))))
 	mux.Handle("POST /training/v1/vendors", protect(h.requireStore(http.HandlerFunc(h.handleUpsertVendor))))
 	mux.Handle("PUT /training/v1/vendors/{id}", protect(h.requireStore(http.HandlerFunc(h.handleUpsertVendor))))
 	mux.Handle("POST /training/v1/teams", protect(h.requireStore(http.HandlerFunc(h.handleUpsertTeam))))

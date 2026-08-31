@@ -180,6 +180,42 @@ RETURNING id::text, outcome::text`
 	return response, err
 }
 
+// DeleteAward elimina un conseguimento registrato per errore, a specchio
+// dell'eliminazione delle valutazioni: hard delete con snapshot in audit.
+// I documenti collegati cascano per FK; i loro blob non hanno FK verso il
+// documento e vanno rimossi esplicitamente nella stessa transazione.
+func (s *SQLStore) DeleteAward(ctx context.Context, principal Principal, id string) (ActionResponse, error) {
+	if !principal.IsPeopleAdmin {
+		return ActionResponse{}, forbiddenError("people_role_required", "azione riservata a People")
+	}
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return ActionResponse{}, validationError("missing_id", "id conseguimento obbligatorio")
+	}
+	response := ActionResponse{OK: true, ID: id}
+	err := s.withTx(ctx, func(tx *sql.Tx) error {
+		before, err := entitySnapshot(ctx, tx, "certification_award", id)
+		if appErr, ok := asAppError(err); ok && appErr.code == "entity_not_found" {
+			return notFoundError("award_not_found", "conseguimento non trovato")
+		}
+		if err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `
+DELETE FROM training.document_blob
+WHERE storage_key IN (
+  SELECT storage_key FROM training.document WHERE certification_award_id = $1::uuid
+)`, id); err != nil {
+			return fmt.Errorf("delete training award document blobs: %w", err)
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM training.certification_award WHERE id = $1::uuid`, id); err != nil {
+			return fmt.Errorf("delete training award: %w", err)
+		}
+		return s.audit(ctx, tx, principal, "certification_award", id, "delete", before, nil)
+	})
+	return response, err
+}
+
 func (s *SQLStore) InsertDocument(ctx context.Context, principal Principal, enrollmentID string, awardID string, filename string, mime string, stored StoredObject) (DocumentMetadata, error) {
 	var result DocumentMetadata
 	err := s.withTx(ctx, func(tx *sql.Tx) error {

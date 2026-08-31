@@ -117,6 +117,19 @@ func (h *handler) handleUpdateAward(w http.ResponseWriter, r *http.Request) {
 	httputil.JSON(w, http.StatusOK, response)
 }
 
+func (h *handler) handleDeleteAward(w http.ResponseWriter, r *http.Request) {
+	principal, ok := h.principalOrUnauthorized(w, r)
+	if !ok {
+		return
+	}
+	response, err := h.store.DeleteAward(r.Context(), principal, r.PathValue("id"))
+	if err != nil {
+		h.writeActionError(w, r, err, "training.delete_award")
+		return
+	}
+	httputil.JSON(w, http.StatusOK, response)
+}
+
 func (h *handler) handleUpsertVendor(w http.ResponseWriter, r *http.Request) {
 	h.handleUpsert(w, r, func(principal Principal, id string) (ActionResponse, error) {
 		input, ok := decodeJSONBody[VendorInput](w, r)
@@ -366,7 +379,11 @@ func (h *handler) handleValidateDocument(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *handler) handleRunJobs(w http.ResponseWriter, r *http.Request) {
-	runner := NewJobRunner(h.store, h.logger)
+	// Stessi job e stessi interruttori del worker periodico: a flag spenti
+	// il run e' un no-op senza chiamate Factorial.
+	runner := NewJobRunner(h.store, h.logger).
+		WithDirectorySync(h.directory, h.directorySyncEnabled).
+		WithFactorialSync(h.factorial, h.factorialSyncEnabled)
 	response, err := runner.RunOnce(r.Context())
 	if err != nil {
 		h.writeActionError(w, r, err, "training.jobs")

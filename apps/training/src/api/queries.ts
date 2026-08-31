@@ -731,6 +731,12 @@ export function useUpdateAward() {
   );
 }
 
+export function useDeleteAward() {
+  return useTrainingMutation<string, ActionResponse>((api, id) =>
+    api.delete(`${TRAINING_PREFIX}/awards/${id}`),
+  );
+}
+
 export function useUploadAwardDocument() {
   return useTrainingMutation<{ awardId: string; file: File }, DocumentMetadata>((api, { awardId, file }) => {
     const form = new FormData();

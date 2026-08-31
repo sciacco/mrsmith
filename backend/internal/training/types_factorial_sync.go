@@ -31,6 +31,7 @@ type FactorialSyncFindingRecord struct {
 	Ref          string         `json:"ref"`
 	LocalEntity  string         `json:"localEntity,omitempty"`
 	LocalID      string         `json:"localId,omitempty"`
+	LocalEventID string         `json:"localEventId,omitempty"` // evento proprietario, risolto in lettura per sessioni e iscrizioni
 	EmployeeID   string         `json:"employeeId,omitempty"`
 	EmployeeName string         `json:"employeeName,omitempty"`
 	Detail       map[string]any `json:"detail,omitempty"`

@@ -7,6 +7,7 @@ import { type ChangeEvent, useRef, useState } from 'react';
 import { Button, Icon, Modal, SingleSelect, StatusBadge, VisuallyHidden, useToast } from '@mrsmith/ui';
 import {
   useCreateAward,
+  useDeleteAward,
   useTrainingCertifications,
   useUpdateAward,
   useUploadAwardDocument,
@@ -37,9 +38,24 @@ export function AwardsSection({ personId, awards, enrollments }: AwardsSectionPr
   const { toast } = useToast();
   const api = useApiClient();
   const validateDocument = useValidateDocument();
+  const deleteAward = useDeleteAward();
   const [editing, setEditing] = useState<PersonAwardRef | 'create' | null>(null);
   const [docError, setDocError] = useState<string | null>(null);
   const [pendingDownload, setPendingDownload] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<PersonAwardRef | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleteError(null);
+    try {
+      await deleteAward.mutateAsync(deleteTarget.awardId);
+      toast('Conseguimento eliminato');
+      setDeleteTarget(null);
+    } catch (e) {
+      setDeleteError(describeApiError(e, 'Eliminazione non riuscita'));
+    }
+  }
 
   async function download(documentId: string, filename: string) {
     setDocError(null);
@@ -118,6 +134,9 @@ export function AwardsSection({ personId, awards, enrollments }: AwardsSectionPr
                     <Button variant="ghost" size="sm" onClick={() => setEditing(a)}>
                       Correggi
                     </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(a)}>
+                      Elimina
+                    </Button>
                   </td>
                 </tr>
               ))}
@@ -134,6 +153,31 @@ export function AwardsSection({ personId, awards, enrollments }: AwardsSectionPr
           onClose={() => setEditing(null)}
         />
       )}
+
+      <Modal
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        title="Elimina conseguimento"
+        size="sm"
+        dismissible={!deleteAward.isPending}
+      >
+        <div className={formStyles.body}>
+          <p>
+            Eliminare il conseguimento di «{deleteTarget?.certificationName}» del{' '}
+            {deleteTarget ? formatDateOnly(deleteTarget.awardedOn) : ''}? L'attestato collegato viene eliminato con lui.
+            L'operazione non è reversibile.
+          </p>
+          <ErrorPanel message={deleteError} onDismiss={() => setDeleteError(null)} />
+          <div className={formStyles.actions}>
+            <Button variant="ghost" size="md" onClick={() => setDeleteTarget(null)} disabled={deleteAward.isPending}>
+              Annulla
+            </Button>
+            <Button variant="danger" size="md" loading={deleteAward.isPending} onClick={confirmDelete}>
+              Elimina
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </section>
   );
 }

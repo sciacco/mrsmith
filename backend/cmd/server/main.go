@@ -667,6 +667,9 @@ func main() {
 		Factorial:       factorialCli,
 		Directory:       directoryProvider,
 		Arak:            arakCli,
+
+		DirectorySyncEnabled: cfg.TrainingDirectorySyncEnabled,
+		FactorialSyncEnabled: cfg.TrainingFactorialSyncEnabled,
 	})
 	panoramica.RegisterRoutes(api, mistraDB, grappaDB, anisettaDB)
 	quotes.RegisterRoutes(api, quotes.Deps{

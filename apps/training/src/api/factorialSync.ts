@@ -27,6 +27,7 @@ export interface FactorialSyncFindingRecord {
   ref: string;
   localEntity?: string;
   localId?: string;
+  localEventId?: string;
   employeeId?: string;
   employeeName?: string;
   detail?: Record<string, unknown>;

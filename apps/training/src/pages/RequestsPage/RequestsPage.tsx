@@ -103,8 +103,14 @@ export function RequestsPage() {
           <div className={styles.emptyIcon}>
             <Icon name="file-text" size={32} />
           </div>
-          <p className={styles.emptyTitle}>Nessuna richiesta</p>
-          <p className={styles.emptyDescription}>Registra la prima richiesta per conto di una persona.</p>
+          <p className={styles.emptyTitle}>
+            {state === 'open' ? 'Nessuna richiesta aperta' : state === 'suspended' ? 'Nessuna richiesta sospesa' : state === 'closed' ? 'Nessuna richiesta chiusa' : 'Nessuna richiesta'}
+          </p>
+          <p className={styles.emptyDescription}>
+            {state === 'open' || state === 'all'
+              ? 'Registra una richiesta per conto di una persona.'
+              : 'Cambia il filtro dello stato per vedere le altre richieste.'}
+          </p>
           <Button variant="primary" size="md" onClick={() => setShowCreate(true)}>
             Registra richiesta
           </Button>

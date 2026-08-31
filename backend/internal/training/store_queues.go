@@ -321,6 +321,9 @@ LIMIT 500`
 
 // seatRuleInTraining elenca le iscrizioni collegate alla regola e non
 // concluse (planned/in_progress): chi si sta formando sulle posizioni.
+// Il collegamento e' diretto (source_rule_id sull'iscrizione) oppure per
+// tornata: iscriversi a un evento-tornata della regola e' il gesto con cui
+// People collega le posizioni, senza un'azione dedicata.
 func (s *SQLStore) seatRuleInTraining(ctx context.Context, ruleID string) ([]SeatRuleInTrainingRow, error) {
 	const query = `
 SELECT
@@ -331,7 +334,9 @@ SELECT
   en.delivery_status
 FROM training.enrollment en
 JOIN training.employee e ON e.id = en.employee_id
-WHERE en.source_rule_id = $1::uuid
+LEFT JOIN training.training_event ev ON ev.id = en.event_id
+WHERE (en.source_rule_id = $1::uuid
+   OR (ev.source_rule_id = $1::uuid AND ev.cancelled_at IS NULL))
   AND en.delivery_status IN ('planned', 'in_progress')
 ORDER BY 3, en.id
 LIMIT 300`

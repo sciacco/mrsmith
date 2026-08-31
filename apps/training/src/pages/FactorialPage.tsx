@@ -1142,6 +1142,8 @@ function TrainingSyncRunDrawer({ id, onClose }: { id: string; onClose: () => voi
                                 <td>
                                   {f.localEntity === 'training_event' && f.localId ? (
                                     <Link to={`/eventi/${f.localId}`}>Apri evento</Link>
+                                  ) : f.localEventId ? (
+                                    <Link to={`/eventi/${f.localEventId}`}>Apri evento</Link>
                                   ) : (
                                     '—'
                                   )}

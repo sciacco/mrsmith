@@ -205,10 +205,16 @@ WHERE r.id = $1::uuid`, id))
 
 	findingRows, err := s.db.QueryContext(ctx, `
 SELECT f.id::text, f.phase, f.severity, f.kind, f.ref, COALESCE(f.local_entity, ''),
-  COALESCE(f.local_id::text, ''), COALESCE(f.employee_id::text, ''),
-  COALESCE(concat(e.last_name, ' ', e.first_name), ''), COALESCE(f.detail::text, '{}')
+  COALESCE(f.local_id::text, ''),
+  COALESCE(ts.event_id::text, en.event_id::text, ''),
+  COALESCE(f.employee_id::text, ''),
+  TRIM(COALESCE(concat(e.last_name, ' ', e.first_name), '')), COALESCE(f.detail::text, '{}')
 FROM training.factorial_sync_finding f
 LEFT JOIN training.employee e ON e.id = f.employee_id
+LEFT JOIN training.training_session ts
+  ON f.local_entity = 'training_session' AND ts.id = f.local_id
+LEFT JOIN training.enrollment en
+  ON f.local_entity = 'enrollment' AND en.id = f.local_id
 WHERE f.run_id = $1::uuid
 ORDER BY f.phase, f.severity, f.kind`, id)
 	if err != nil {
@@ -220,7 +226,7 @@ ORDER BY f.phase, f.severity, f.kind`, id)
 		var f FactorialSyncFindingRecord
 		var detail string
 		if err := findingRows.Scan(&f.ID, &f.Phase, &f.Severity, &f.Kind, &f.Ref, &f.LocalEntity,
-			&f.LocalID, &f.EmployeeID, &f.EmployeeName, &detail); err != nil {
+			&f.LocalID, &f.LocalEventID, &f.EmployeeID, &f.EmployeeName, &detail); err != nil {
 			return FactorialSyncRunDetail{}, fmt.Errorf("scan factorial sync finding: %w", err)
 		}
 		if detail != "" && detail != "{}" {
