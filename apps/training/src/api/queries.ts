@@ -56,6 +56,7 @@ import type {
   RequestDetail,
   RequestInput,
   RequestListResponse,
+  RequestOriginalDataInput,
   RequestsAwaitingDecisionResponse,
   RequestsWithoutTLOpinionResponse,
   RoundsWithoutEventResponse,
@@ -572,6 +573,12 @@ export function useWithdrawRequest() {
 export function useUpdateRequestAnnotations() {
   return useTrainingMutation<{ id: string; input: RequestAnnotationsInput }, ActionResponse>((api, { id, input }) =>
     api.put(`${TRAINING_PREFIX}/requests/${id}/annotations`, input),
+  );
+}
+
+export function useUpdateRequestOriginal() {
+  return useTrainingMutation<{ id: string; input: RequestOriginalDataInput }, ActionResponse>((api, { id, input }) =>
+    api.put(`${TRAINING_PREFIX}/requests/${id}/original`, input),
   );
 }
 

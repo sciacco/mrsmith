@@ -6,8 +6,8 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
 
-// registerRequestRoutes registra le route delle richieste formative (#140).
-// I dati originali sono create-only: non esiste una route di modifica.
+// registerRequestRoutes registra le route delle richieste formative (#140;
+// #171 per la modifica dei dati originali).
 func (h *handler) registerRequestRoutes(mux *http.ServeMux, protect func(http.Handler) http.Handler) {
 	mux.Handle("GET /training/v1/requests", protect(h.requireStore(http.HandlerFunc(h.handleListRequests))))
 	mux.Handle("POST /training/v1/requests", protect(h.requireStore(http.HandlerFunc(h.handleCreateRequest))))
@@ -16,8 +16,26 @@ func (h *handler) registerRequestRoutes(mux *http.ServeMux, protect func(http.Ha
 	mux.Handle("POST /training/v1/requests/{id}/decision", protect(h.requireStore(http.HandlerFunc(h.handleRecordPeopleDecision))))
 	mux.Handle("POST /training/v1/requests/{id}/withdraw", protect(h.requireStore(http.HandlerFunc(h.handleWithdrawRequest))))
 	mux.Handle("PUT /training/v1/requests/{id}/annotations", protect(h.requireStore(http.HandlerFunc(h.handleUpdateRequestAnnotations))))
+	mux.Handle("PUT /training/v1/requests/{id}/original", protect(h.requireStore(http.HandlerFunc(h.handleUpdateRequestOriginal))))
 	mux.Handle("POST /training/v1/requests/{id}/suspend", protect(h.requireStore(http.HandlerFunc(h.handleSuspendRequest))))
 	mux.Handle("POST /training/v1/requests/{id}/resume", protect(h.requireStore(http.HandlerFunc(h.handleResumeRequest))))
+}
+
+func (h *handler) handleUpdateRequestOriginal(w http.ResponseWriter, r *http.Request) {
+	principal, ok := h.principalOrUnauthorized(w, r)
+	if !ok {
+		return
+	}
+	input, ok := decodeJSONBody[RequestOriginalDataInput](w, r)
+	if !ok {
+		return
+	}
+	response, err := h.store.UpdateRequestOriginalData(r.Context(), principal, r.PathValue("id"), input)
+	if err != nil {
+		h.writeActionError(w, r, err, "training.request_original")
+		return
+	}
+	httputil.JSON(w, http.StatusOK, response)
 }
 
 func (h *handler) handleUpdateRequestAnnotations(w http.ResponseWriter, r *http.Request) {

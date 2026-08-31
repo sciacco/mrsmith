@@ -9,17 +9,22 @@ import (
 	"strings"
 )
 
-// Richieste formative (#140, §4-Richieste, decisioni D5 e D8).
+// Richieste formative (#140, §4-Richieste, decisioni D5 e D8; #171).
 //
-// I dati originali della richiesta sono create-only: nessuna API li modifica
-// e nessun UPDATE li include. Parere TL e decisione People sono fatti
-// immutabili; sequenzialita e override vivono soltanto in
-// requestDecisionPolicy; l'accoglimento e una transazione unica.
+// I dati originali della richiesta sono modificabili finche la richiesta
+// non e chiusa (esito assente; vale anche da sospesa): la persona resta
+// invariata (correzione = ritiro + nuova richiesta). Parere TL e decisione
+// People sono riscrivibili finche la richiesta non e chiusa; il parere e
+// ammesso solo a richiesta aperta, la decisione e riscrivibile anche a
+// richiesta chiusa da decisione (accepted|rejected); withdrawn resta
+// terminale. Sequenzialita e override vivono in requestDecisionPolicy;
+// l'accoglimento e una transazione unica; l'audit conserva la storia.
 
 const (
 	requestActionTLOpinion = "tl_opinion"
 	requestActionDecision  = "decision"
 	requestActionWithdraw  = "withdraw"
+	requestActionEdit      = "edit_original"
 
 	requestOpinionFavorable   = "favorable"
 	requestOpinionUnfavorable = "unfavorable"
@@ -42,37 +47,47 @@ type requestPolicyFacts struct {
 }
 
 // requestDecisionPolicy e l'UNICO punto che codifica la sequenzialita e
-// l'override del workflow richieste (D5): cambiare la policy non riscrive i
-// fatti storici gia registrati.
+// l'override del workflow richieste (D5; #171): cambiare la policy non
+// riscrive i fatti storici gia registrati, resta nell'audit.
 //
 // Policy corrente:
-//   - ogni azione e ammessa solo su richiesta aperta (esito assente);
-//   - parere TL una sola volta;
-//   - decisione People una sola volta e solo con parere TL presente
-//     (sequenzialita iniziale);
-//   - accoglimento con parere sfavorevole = override, ammesso: la motivazione
-//     obbligatoria della decisione e la motivazione dell'override, nessun
-//     campo aggiuntivo;
+//   - edit_original: ammessa solo su richiesta aperta (esito assente);
+//   - parere TL: registrabile e riscrivibile solo su richiesta aperta; vale
+//     l'ultimo, la motivazione e facoltativa;
+//   - decisione People: prima decisione solo su richiesta aperta e con il
+//     parere TL presente (sequenzialita iniziale); riscrittura ammessa anche
+//     a richiesta chiusa da decisione (outcome accepted|rejected),
+//     motivazione facoltativa; withdrawn resta terminale (nessuna azione);
+//   - accoglimento con parere sfavorevole = override, ammesso: la
+//     motivazione facoltativa della decisione e la motivazione
+//     dell'override, nessun campo aggiuntivo;
 //   - ritiro ammesso finche la richiesta e aperta, senza toccare i campi del
 //     parere e della decisione.
 func requestDecisionPolicy(facts requestPolicyFacts, action string) error {
-	if facts.Outcome != "" {
-		return conflictError("request_closed", "la richiesta e gia chiusa")
-	}
 	switch action {
+	case requestActionEdit:
+		if facts.Outcome != "" {
+			return conflictError("request_closed", "la richiesta e gia chiusa")
+		}
 	case requestActionTLOpinion:
-		if facts.TLOpinion != "" {
-			return conflictError("tl_opinion_already_recorded", "parere TL gia registrato")
+		if facts.Outcome != "" {
+			return conflictError("request_closed", "la richiesta e gia chiusa")
 		}
 	case requestActionDecision:
-		if facts.PeopleDecision != "" {
-			return conflictError("decision_already_recorded", "decisione People gia registrata")
-		}
-		if facts.TLOpinion == "" {
-			return conflictError("tl_opinion_required", "decisione ammessa solo con il parere TL registrato")
+		switch facts.Outcome {
+		case "":
+			if facts.TLOpinion == "" {
+				return conflictError("tl_opinion_required", "decisione ammessa solo con il parere TL registrato")
+			}
+		case requestDecisionAccepted, requestDecisionRejected:
+			// Riscrittura ammessa.
+		case requestOutcomeWithdrawn:
+			return conflictError("request_withdrawn", "la richiesta e stata ritirata")
 		}
 	case requestActionWithdraw:
-		// Nessun vincolo oltre alla richiesta aperta.
+		if facts.Outcome != "" {
+			return conflictError("request_closed", "la richiesta e gia chiusa")
+		}
 	default:
 		return fmt.Errorf("unknown training request action: %s", action)
 	}
@@ -667,9 +682,6 @@ func (s *SQLStore) RecordTLOpinion(ctx context.Context, principal Principal, id 
 		return ActionResponse{}, validationError("invalid_opinion", "esito del parere non valido")
 	}
 	reason := strings.TrimSpace(input.Reason)
-	if reason == "" {
-		return ActionResponse{}, validationError("reason_required", "motivazione obbligatoria")
-	}
 
 	var response ActionResponse
 	err := s.withTx(ctx, func(tx *sql.Tx) error {
@@ -688,13 +700,14 @@ func (s *SQLStore) RecordTLOpinion(ctx context.Context, principal Principal, id 
 			return err
 		}
 		// tl_opinion_by e il lead validato, non l'operatore People: l'attore
-		// della registrazione resta nell'audit.
+		// della registrazione resta nell'audit. La riscrittura ammessa su
+		// richiesta aperta sovrascrive il parere precedente (#171).
 		if _, err := tx.ExecContext(ctx, `
 UPDATE training.training_request
 SET tl_opinion = $2,
     tl_opinion_by = $3::uuid,
     tl_opinion_at = now(),
-    tl_opinion_reason = $4,
+    tl_opinion_reason = NULLIF($4, ''),
     updated_at = now()
 WHERE id = $1::uuid`, id, opinion, leadID, reason); err != nil {
 			return fmt.Errorf("record training request tl opinion: %w", err)
@@ -764,9 +777,6 @@ func (s *SQLStore) RecordPeopleDecision(ctx context.Context, principal Principal
 		return ActionResponse{}, validationError("invalid_decision", "decisione non valida")
 	}
 	reason := strings.TrimSpace(input.Reason)
-	if reason == "" {
-		return ActionResponse{}, validationError("reason_required", "motivazione obbligatoria")
-	}
 	if decision == requestDecisionAccepted && input.Accepted == nil {
 		return ActionResponse{}, validationError("accepted_payload_required", "i dati di accoglimento sono obbligatori per accogliere la richiesta")
 	}
@@ -798,14 +808,25 @@ func (s *SQLStore) RecordPeopleDecision(ctx context.Context, principal Principal
 		actorID := s.actorEmployeeID(ctx, tx, principal)
 
 		if decision == requestDecisionRejected {
+			// Respingi (o riscrivi in respinto): azzera la faccia accolta e
+			// l'iscrizione risultante; la storia resta nell'audit. L'evento
+			// o l'iscrizione gia nati non vengono smontati (#171, gesto
+			// separato).
 			if _, err := tx.ExecContext(ctx, `
 UPDATE training.training_request
 SET people_decision = 'rejected',
     people_decision_by = $2::uuid,
     people_decision_at = now(),
-    people_decision_reason = $3,
+    people_decision_reason = NULLIF($3, ''),
     outcome = 'rejected',
     closed_at = now(),
+    accepted_course_id = NULL,
+    accepted_event_id = NULL,
+    accepted_vendor_id = NULL,
+    accepted_period_start = NULL,
+    accepted_period_end = NULL,
+    accepted_notes = NULL,
+    resulting_enrollment_id = NULL,
     updated_at = now()
 WHERE id = $1::uuid`, id, nullableUUIDPtr(actorID), reason); err != nil {
 				return fmt.Errorf("reject training request: %w", err)
@@ -963,7 +984,7 @@ UPDATE training.training_request
 SET people_decision = 'accepted',
     people_decision_by = $2::uuid,
     people_decision_at = now(),
-    people_decision_reason = $3,
+    people_decision_reason = NULLIF($3, ''),
     outcome = 'accepted',
     closed_at = now(),
     accepted_course_id = $4::uuid,
@@ -1030,6 +1051,118 @@ WHERE id = $1::uuid`, id); err != nil {
 			return err
 		}
 		response = ActionResponse{OK: true, ID: id, Status: requestOutcomeWithdrawn}
+		return nil
+	})
+	return response, err
+}
+
+// UpdateRequestOriginalData sostituisce i dati originali della richiesta
+// (corso o titolo nuovo, aree con livelli, motivazione, team, date
+// desiderate) su richiesta aperta (esito assente; vale anche da sospesa).
+// La persona e invariata (correzione = ritiro + nuova richiesta); priorita,
+// nota e promemoria restano sul PUT annotations. Modello: CreateRequest
+// (validazioni) + UpdateRequestAnnotations (struttura tx). (#171)
+func (s *SQLStore) UpdateRequestOriginalData(ctx context.Context, principal Principal, id string, input RequestOriginalDataInput) (ActionResponse, error) {
+	if !principal.IsPeopleAdmin {
+		return ActionResponse{}, forbiddenError("people_role_required", "azione riservata a People")
+	}
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return ActionResponse{}, validationError("missing_id", "id richiesta obbligatorio")
+	}
+	courseID := strings.TrimSpace(input.CourseID)
+	newCourseTitle := strings.TrimSpace(input.NewCourseTitle)
+	if courseID == "" && newCourseTitle == "" {
+		return ActionResponse{}, validationError("course_or_title_required", "indicare il corso a catalogo oppure il titolo del corso da creare")
+	}
+	if courseID != "" && newCourseTitle != "" {
+		return ActionResponse{}, validationError("course_xor_title", "corso a catalogo e titolo nuovo sono alternativi")
+	}
+	motivation := strings.TrimSpace(input.Motivation)
+	if motivation == "" {
+		return ActionResponse{}, validationError("motivation_required", "motivazione obbligatoria")
+	}
+	teamID := strings.TrimSpace(input.SelectedTeamID)
+	if teamID == "" {
+		return ActionResponse{}, validationError("selected_team_required", "team obbligatorio")
+	}
+	desiredStart, err := parseOptionalDate(input.DesiredStart)
+	if err != nil {
+		return ActionResponse{}, validationError("invalid_desired_start", "data inizio desiderata non valida")
+	}
+	desiredEnd, err := parseOptionalDate(input.DesiredEnd)
+	if err != nil {
+		return ActionResponse{}, validationError("invalid_desired_end", "data fine desiderata non valida")
+	}
+	if desiredStart != nil && desiredEnd != nil && desiredEnd.Before(*desiredStart) {
+		return ActionResponse{}, validationError("desired_end_before_start", "la fine desiderata non puo precedere l'inizio")
+	}
+	areas, err := s.normalizeRequestAreas(ctx, input.SkillAreas)
+	if err != nil {
+		return ActionResponse{}, err
+	}
+
+	var response ActionResponse
+	err = s.withTx(ctx, func(tx *sql.Tx) error {
+		facts, err := s.lockRequestFacts(ctx, tx, id)
+		if err != nil {
+			return err
+		}
+		if err := requestDecisionPolicy(facts, requestActionEdit); err != nil {
+			return err
+		}
+		if courseID != "" {
+			if err := s.ensureCourseExists(ctx, tx, courseID); err != nil {
+				return err
+			}
+		} else {
+			// Un titolo e l'embrione di un corso: si riusa il corso con lo
+			// stesso titolo se esiste, altrimenti nasce l'embrione (come in
+			// creazione).
+			resolved, err := s.resolveOrCreateEmbryoCourse(ctx, tx, principal, newCourseTitle)
+			if err != nil {
+				return err
+			}
+			courseID = resolved
+		}
+		// La persona e invariata: il team scelto deve essere tra le
+		// appartenenze attive della persona della richiesta.
+		if err := s.ensureSelectedTeamMembership(ctx, tx, facts.EmployeeID, teamID); err != nil {
+			return err
+		}
+		before, err := entitySnapshot(ctx, tx, "training_request", id)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `
+UPDATE training.training_request
+SET course_id = $2::uuid,
+    motivation = $3,
+    selected_team_id = $4::uuid,
+    desired_start = NULLIF($5, '')::date,
+    desired_end = NULLIF($6, '')::date,
+    updated_at = now()
+WHERE id = $1::uuid`,
+			id,
+			courseID,
+			motivation,
+			teamID,
+			strings.TrimSpace(input.DesiredStart),
+			strings.TrimSpace(input.DesiredEnd),
+		); err != nil {
+			return fmt.Errorf("update training request original data: %w", err)
+		}
+		if err := replaceRequestSkillAreas(ctx, tx, id, areas); err != nil {
+			return err
+		}
+		after, err := entitySnapshot(ctx, tx, "training_request", id)
+		if err != nil {
+			return err
+		}
+		if err := s.audit(ctx, tx, principal, "training_request", id, "edit_original", before, after); err != nil {
+			return err
+		}
+		response = ActionResponse{OK: true, ID: id}
 		return nil
 	})
 	return response, err

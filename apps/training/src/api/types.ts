@@ -807,10 +807,12 @@ export interface GroupMembersInput {
   employeeIds: string[];
 }
 
-// ── Richieste formative (#140, #157) ──
-// Faccia originale (create-only) e faccia accolta separate; parere TL e
-// decisione People sono fatti immutabili. Vedi backend/internal/training
-// types_requests.go per il contratto completo.
+// ── Richieste formative (#140, #157, #171) ──
+// Faccia originale (modificabile finche la richiesta non e chiusa; la
+// persona e invariata) e faccia accolta separate; parere TL e decisione
+// People sono riscrivibili (la decisione anche a richiesta chiusa da
+// decisione). Vedi backend/internal/training types_requests.go per il
+// contratto completo.
 
 export interface RequestSkillAreaInput {
   id: string;
@@ -845,7 +847,7 @@ export type TLOpinionValue = 'favorable' | 'unfavorable';
 export interface TLOpinionInput {
   leadEmployeeId: string;
   opinion: TLOpinionValue;
-  reason: string;
+  reason?: string;
 }
 
 export interface RequestAcceptedInput {
@@ -862,8 +864,21 @@ export type RequestDecisionValue = 'accepted' | 'rejected';
 
 export interface RequestDecisionInput {
   decision: RequestDecisionValue;
-  reason: string;
+  reason?: string;
   accepted?: RequestAcceptedInput;
+}
+
+// RequestOriginalDataInput sostituisce i dati originali di una richiesta
+// aperta (#171): corso a catalogo o titolo nuovo (alternativi), aree con
+// livelli, motivazione, team e date desiderate. La persona e invariata.
+export interface RequestOriginalDataInput {
+  courseId?: string;
+  newCourseTitle?: string;
+  skillAreas?: RequestSkillAreaInput[];
+  motivation: string;
+  selectedTeamId: string;
+  desiredStart?: string;
+  desiredEnd?: string;
 }
 
 export interface RequestListRow {
@@ -893,6 +908,8 @@ export interface RequestAreaRef {
 }
 
 export interface RequestOriginalData {
+  employeeId: string;
+  courseId?: string;
   employeeName: string;
   courseTitle?: string;
   skillAreas: RequestAreaRef[];
@@ -905,6 +922,7 @@ export interface RequestOriginalData {
 
 export interface RequestTLOpinionFacts {
   opinion: TLOpinionValue;
+  byEmployeeId?: string;
   byName?: string;
   at: string;
   reason?: string;
@@ -912,9 +930,10 @@ export interface RequestTLOpinionFacts {
 
 export interface RequestDecisionFacts {
   decision: RequestDecisionValue;
+  byEmployeeId?: string;
   byName?: string;
   at: string;
-  reason: string;
+  reason?: string;
 }
 
 export interface RequestAcceptedData {

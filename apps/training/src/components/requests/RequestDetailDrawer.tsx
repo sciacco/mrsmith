@@ -1,13 +1,15 @@
-// Dettaglio richiesta (#157, §Richieste 2/4/5/6): faccia originale immutabile
+// Dettaglio richiesta (#157, §Richieste 2/4/5/6; #171): faccia originale
+// modificabile (finche la richiesta non e chiusa; la persona e invariata)
 // separata dalla faccia accolta, fatti come cronologia (parere, decisione,
-// esito, iscrizione generata), azioni guidate per parere TL, decisione con
-// accoglimento anti-doppione e ritiro. Nessuna state machine locale: la
+// esito, iscrizione generata), azioni guidate per parere TL (riscrivibile),
+// decisione con accoglimento anti-doppione (riscrivibile anche a richiesta
+// chiusa da decisione) e ritiro. Nessuna state machine locale: la
 // sequenzialita e l'override vivono nel backend, qui si offrono le azioni
 // coerenti coi fatti gia caricati e si mostrano per intero i 4xx.
 
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Button, Drawer, Modal, Skeleton, SingleSelect, StatusBadge, useToast, VisuallyHidden } from '@mrsmith/ui';
+import { Button, Drawer, Modal, MultiSelect, Skeleton, SingleSelect, StatusBadge, useToast, VisuallyHidden } from '@mrsmith/ui';
 import {
   useCreateCourse,
   useRecordRequestDecision,
@@ -18,11 +20,20 @@ import {
   useTrainingCourses,
   useTrainingEvents,
   useTrainingLookups,
+  useTrainingPeople,
+  useTrainingSkillAreas,
   useTrainingTeams,
   useUpdateRequestAnnotations,
+  useUpdateRequestOriginal,
   useWithdrawRequest,
 } from '../../api/queries';
-import type { RequestAcceptedInput, RequestAreaRef, RequestDetail, TLOpinionValue } from '../../api/types';
+import type {
+  RequestAcceptedInput,
+  RequestAreaRef,
+  RequestDetail,
+  RequestOriginalDataInput,
+  TLOpinionValue,
+} from '../../api/types';
 import { HistoryPanel } from '../audit/HistoryPanel';
 import { describeApiError } from '../events/apiErrors';
 import { ErrorPanel } from '../events/ErrorPanel';
@@ -63,6 +74,7 @@ export function RequestDetailDrawer({ id, onClose }: RequestDetailDrawerProps) {
   const [showWithdraw, setShowWithdraw] = useState(false);
   const [showSuspend, setShowSuspend] = useState(false);
   const [showAnnotations, setShowAnnotations] = useState(false);
+  const [showOriginal, setShowOriginal] = useState(false);
   const [suspendReason, setSuspendReason] = useState('');
   const [suspendError, setSuspendError] = useState<string | null>(null);
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
@@ -72,6 +84,10 @@ export function RequestDetailDrawer({ id, onClose }: RequestDetailDrawerProps) {
   const isSuspended = !!request?.suspendedAt;
   const needsOpinion = isOpen && !request?.tlOpinion;
   const needsDecision = isOpen && !!request?.tlOpinion && !request?.decision;
+  // Riscrittura decisione su richiesta chiusa da decisione (accepted|rejected);
+  // withdrawn resta terminale (#171).
+  const canRewriteDecision =
+    !!request && (request.outcome === 'accepted' || request.outcome === 'rejected');
 
   async function handleWithdraw() {
     setWithdrawError(null);
@@ -128,16 +144,20 @@ export function RequestDetailDrawer({ id, onClose }: RequestDetailDrawerProps) {
                   Sospendi
                 </Button>
               )}
-              {needsOpinion && (
-                <Button variant="secondary" size="md" onClick={() => setShowTLOpinion(true)}>
-                  Registra parere TL
-                </Button>
-              )}
+              <Button variant="secondary" size="md" onClick={() => setShowTLOpinion(true)}>
+                {needsOpinion ? 'Registra parere TL' : 'Riscrivi parere TL'}
+              </Button>
               {needsDecision && (
                 <Button variant="primary" size="md" onClick={() => setShowDecision(true)}>
                   Registra decisione
                 </Button>
               )}
+            </div>
+          ) : canRewriteDecision ? (
+            <div className={styles.footerActions}>
+              <Button variant="primary" size="md" onClick={() => setShowDecision(true)}>
+                Riscrivi decisione
+              </Button>
             </div>
           ) : undefined
         }
@@ -152,7 +172,14 @@ export function RequestDetailDrawer({ id, onClose }: RequestDetailDrawerProps) {
           {request && (
             <>
               <section className={styles.card}>
-                <h3 className={styles.cardTitle}>Richiesta originale</h3>
+                <h3 className={styles.cardTitle}>
+                  Richiesta originale
+                  {isOpen && (
+                    <Button variant="ghost" size="sm" onClick={() => setShowOriginal(true)}>
+                      Modifica
+                    </Button>
+                  )}
+                </h3>
                 <dl className={styles.grid}>
                   <div className={styles.item}>
                     <dt>Persona</dt>
@@ -330,6 +357,7 @@ export function RequestDetailDrawer({ id, onClose }: RequestDetailDrawerProps) {
       {request && showTLOpinion && <TLOpinionForm request={request} onClose={() => setShowTLOpinion(false)} />}
       {request && showDecision && <DecisionForm request={request} onClose={() => setShowDecision(false)} />}
       {request && showAnnotations && <AnnotationsForm request={request} onClose={() => setShowAnnotations(false)} />}
+      {request && showOriginal && <OriginalDataForm request={request} onClose={() => setShowOriginal(false)} />}
       {showSuspend && (
         <Modal open onClose={() => setShowSuspend(false)} title="Sospendi richiesta" size="sm">
           <div className={formStyles.body}>
@@ -467,21 +495,22 @@ function TLOpinionForm({ request, onClose }: { request: RequestDetail; onClose: 
   const teams = useTrainingTeams();
   const recordTLOpinion = useRecordTLOpinion();
 
-  const [leadEmployeeId, setLeadEmployeeId] = useState('');
-  const [opinion, setOpinion] = useState<TLOpinionValue>('favorable');
-  const [reason, setReason] = useState('');
+  const existing = request.tlOpinion;
+  const [leadEmployeeId, setLeadEmployeeId] = useState(existing?.byEmployeeId ?? '');
+  const [opinion, setOpinion] = useState<TLOpinionValue>(existing?.opinion ?? 'favorable');
+  const [reason, setReason] = useState(existing?.reason ?? '');
   const [error, setError] = useState<string | null>(null);
 
   const team = (teams.data ?? []).find((t) => t.id === request.requested.selectedTeamId);
   const leads = team?.leads ?? [];
-  const canSubmit = leadEmployeeId !== '' && reason.trim() !== '';
+  const canSubmit = leadEmployeeId !== '';
 
   async function submit() {
     if (!canSubmit) return;
     setError(null);
     try {
-      await recordTLOpinion.mutateAsync({ id: request.id, input: { leadEmployeeId, opinion, reason: reason.trim() } });
-      toast('Parere TL registrato');
+      await recordTLOpinion.mutateAsync({ id: request.id, input: { leadEmployeeId, opinion, reason: reason.trim() || undefined } });
+      toast(existing ? 'Parere TL aggiornato' : 'Parere TL registrato');
       onClose();
     } catch (e) {
       setError(describeApiError(e, 'Registrazione del parere non riuscita'));
@@ -521,11 +550,7 @@ function TLOpinionForm({ request, onClose }: { request: RequestDetail; onClose: 
           </Button>
         </div>
         <label className={formStyles.field}>
-          <span className={formStyles.labelHead}>
-            Motivazione
-            <span className={formStyles.requiredMarker} aria-hidden="true" />
-            <VisuallyHidden>obbligatorio</VisuallyHidden>
-          </span>
+          Motivazione (facoltativa)
           <textarea className={formStyles.textarea} value={reason} onChange={(e) => setReason(e.target.value)} rows={3} />
         </label>
         <ErrorPanel message={error} onDismiss={() => setError(null)} />
@@ -540,7 +565,7 @@ function TLOpinionForm({ request, onClose }: { request: RequestDetail; onClose: 
             disabled={!canSubmit}
             onClick={submit}
           >
-            Registra parere
+            {existing ? 'Riscrivi parere' : 'Registra parere'}
           </Button>
         </div>
       </div>
@@ -562,8 +587,9 @@ function DecisionForm({ request, onClose }: { request: RequestDetail; onClose: (
   const recordDecision = useRecordRequestDecision();
   const createCourse = useCreateCourse();
 
-  const [decisionKind, setDecisionKind] = useState<'accepted' | 'rejected'>('accepted');
-  const [reason, setReason] = useState('');
+  const existing = request.decision;
+  const [decisionKind, setDecisionKind] = useState<'accepted' | 'rejected'>(existing?.decision ?? 'accepted');
+  const [reason, setReason] = useState(existing?.reason ?? '');
   const [existingEnrollmentId, setExistingEnrollmentId] = useState('');
   const [courseMode, setCourseMode] = useState<'catalog' | 'new'>('catalog');
   const [courseId, setCourseId] = useState('');
@@ -597,21 +623,20 @@ function DecisionForm({ request, onClose }: { request: RequestDetail; onClose: (
   }, [eventsForCourse.length, eventMode]);
 
   const canSubmit =
-    reason.trim() !== '' &&
-    (decisionKind === 'rejected' ||
-      linkingCoverage ||
-      ((courseMode === 'catalog'
-        ? courseId !== ''
-        : newCourseTitle.trim() !== '' && (newCourseProviderKind === 'internal' || newCourseVendorId !== '')) &&
-        (eventMode !== 'existing' || eventId !== '')));
+    decisionKind === 'rejected' ||
+    linkingCoverage ||
+    ((courseMode === 'catalog'
+      ? courseId !== ''
+      : newCourseTitle.trim() !== '' && (newCourseProviderKind === 'internal' || newCourseVendorId !== '')) &&
+      (eventMode !== 'existing' || eventId !== ''));
 
   async function submit() {
     if (!canSubmit) return;
     setError(null);
     try {
       if (decisionKind === 'rejected') {
-        await recordDecision.mutateAsync({ id: request.id, input: { decision: 'rejected', reason: reason.trim() } });
-        toast('Richiesta respinta');
+        await recordDecision.mutateAsync({ id: request.id, input: { decision: 'rejected', reason: reason.trim() || undefined } });
+        toast(existing ? 'Decisione aggiornata' : 'Richiesta respinta');
         onClose();
         return;
       }
@@ -637,9 +662,9 @@ function DecisionForm({ request, onClose }: { request: RequestDetail; onClose: (
       };
       await recordDecision.mutateAsync({
         id: request.id,
-        input: { decision: 'accepted', reason: reason.trim(), accepted },
+        input: { decision: 'accepted', reason: reason.trim() || undefined, accepted },
       });
-      toast('Richiesta accolta');
+      toast(existing ? 'Decisione aggiornata' : 'Richiesta accolta');
       onClose();
     } catch (e) {
       setError(describeApiError(e, 'Registrazione della decisione non riuscita'));
@@ -647,7 +672,7 @@ function DecisionForm({ request, onClose }: { request: RequestDetail; onClose: (
   }
 
   return (
-    <Modal open onClose={onClose} title="Decisione People" size="wide">
+    <Modal open onClose={onClose} title={existing ? 'Riscrivi decisione' : 'Decisione People'} size="wide">
       <div className={formStyles.body}>
         <div className={formStyles.toggleGroup}>
           <Button
@@ -677,11 +702,7 @@ function DecisionForm({ request, onClose }: { request: RequestDetail; onClose: (
         )}
 
         <label className={formStyles.field}>
-          <span className={formStyles.labelHead}>
-            Motivazione
-            <span className={formStyles.requiredMarker} aria-hidden="true" />
-            <VisuallyHidden>obbligatorio</VisuallyHidden>
-          </span>
+          Motivazione (facoltativa)
           <textarea className={formStyles.textarea} value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
         </label>
 
@@ -874,7 +895,238 @@ function DecisionForm({ request, onClose }: { request: RequestDetail; onClose: (
             disabled={!canSubmit}
             onClick={submit}
           >
-            {decisionKind === 'accepted' ? 'Accogli richiesta' : 'Respingi richiesta'}
+            {decisionKind === 'accepted'
+              ? existing
+                ? 'Riscrivi accoglimento'
+                : 'Accogli richiesta'
+              : existing
+                ? 'Riscrivi in respinto'
+                : 'Respingi richiesta'}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ── Modifica dei dati originali (#171): corso o titolo nuovo, aree con
+// livelli, motivazione, team (persona invariata) e date desiderate. Reusa i
+// pezzi della creazione: select del team tra le appartenenze attive della
+// persona, editor aree/livelli. Ammessa solo a richiesta aperta. ──
+
+function OriginalDataForm({ request, onClose }: { request: RequestDetail; onClose: () => void }) {
+  const { toast } = useToast();
+  const people = useTrainingPeople();
+  const lookups = useTrainingLookups();
+  const skillAreas = useTrainingSkillAreas();
+  const updateOriginal = useUpdateRequestOriginal();
+
+  const requested = request.requested;
+  const person = (people.data ?? []).find((p) => p.id === requested.employeeId);
+  const activeTeams = person?.teams ?? [];
+
+  const [courseMode, setCourseMode] = useState<'catalog' | 'new'>(requested.courseId ? 'catalog' : 'new');
+  const [courseId, setCourseId] = useState(requested.courseId ?? '');
+  const [newCourseTitle, setNewCourseTitle] = useState(requested.courseTitle ?? '');
+  const [skillAreaIds, setSkillAreaIds] = useState<string[]>(requested.skillAreas.map((a) => a.id));
+  const [areaLevels, setAreaLevels] = useState<Record<string, { current: string; target: string }>>(
+    Object.fromEntries(
+      requested.skillAreas.map((a) => [
+        a.id,
+        { current: a.levelCurrent !== undefined ? String(a.levelCurrent) : '', target: a.levelTarget !== undefined ? String(a.levelTarget) : '' },
+      ]),
+    ),
+  );
+  const [motivation, setMotivation] = useState(requested.motivation);
+  const [teamId, setTeamId] = useState(requested.selectedTeamId);
+  const [desiredStart, setDesiredStart] = useState(requested.desiredStart ?? '');
+  const [desiredEnd, setDesiredEnd] = useState(requested.desiredEnd ?? '');
+  const [error, setError] = useState<string | null>(null);
+
+  const canSubmit =
+    motivation.trim() !== '' &&
+    teamId !== '' &&
+    (courseMode === 'catalog' ? courseId !== '' : newCourseTitle.trim() !== '');
+
+  async function submit() {
+    if (!canSubmit) return;
+    setError(null);
+    try {
+      const input: RequestOriginalDataInput = {
+        courseId: courseMode === 'catalog' ? courseId : undefined,
+        newCourseTitle: courseMode === 'new' ? newCourseTitle.trim() : undefined,
+        skillAreas: skillAreaIds.map((areaId) => ({
+          id: areaId,
+          levelCurrent:
+            areaLevels[areaId]?.current !== undefined && areaLevels[areaId]?.current !== ''
+              ? Number(areaLevels[areaId]?.current)
+              : undefined,
+          levelTarget:
+            areaLevels[areaId]?.target !== undefined && areaLevels[areaId]?.target !== ''
+              ? Number(areaLevels[areaId]?.target)
+              : undefined,
+        })),
+        motivation: motivation.trim(),
+        selectedTeamId: teamId,
+        desiredStart: desiredStart || undefined,
+        desiredEnd: desiredEnd || undefined,
+      };
+      await updateOriginal.mutateAsync({ id: request.id, input });
+      toast('Dati originali aggiornati');
+      onClose();
+    } catch (e) {
+      setError(describeApiError(e, 'Aggiornamento dei dati originali non riuscito'));
+    }
+  }
+
+  return (
+    <Modal open onClose={onClose} title="Modifica richiesta originale" size="md">
+      <div className={formStyles.body}>
+        <label className={formStyles.field}>
+          Persona
+          <input className={formStyles.input} value={requested.employeeName} disabled readOnly />
+          <span className={formStyles.hint}>
+            La persona non si cambia: per correggere l'identità ritira la richiesta e registrane una nuova.
+          </span>
+        </label>
+        <label className={formStyles.field}>
+          <span className={formStyles.labelHead}>
+            Team
+            <span className={formStyles.requiredMarker} aria-hidden="true" />
+            <VisuallyHidden>obbligatorio</VisuallyHidden>
+          </span>
+          <SingleSelect
+            options={activeTeams.map((t) => ({ value: t.id, label: t.name }))}
+            selected={teamId || null}
+            onChange={(v) => setTeamId(v ?? '')}
+            placeholder={activeTeams.length === 0 ? 'Nessuna appartenenza attiva' : 'Seleziona team...'}
+          />
+        </label>
+
+        <div className={formStyles.toggleGroup}>
+          <Button
+            variant={courseMode === 'catalog' ? 'primary' : 'secondary'}
+            size="sm"
+            onClick={() => setCourseMode('catalog')}
+          >
+            Corso a catalogo
+          </Button>
+          <Button
+            variant={courseMode === 'new' ? 'primary' : 'secondary'}
+            size="sm"
+            onClick={() => setCourseMode('new')}
+          >
+            Nuovo corso
+          </Button>
+        </div>
+        {courseMode === 'catalog' ? (
+          <label className={formStyles.field}>
+            Corso
+            <SingleSelect
+              options={(lookups.data?.courses ?? []).filter((c) => c.active).map((c) => ({ value: c.id, label: c.label }))}
+              selected={courseId || null}
+              onChange={(v) => setCourseId(v ?? '')}
+              placeholder="Seleziona corso..."
+              searchable
+            />
+          </label>
+        ) : (
+          <label className={formStyles.field}>
+            Titolo
+            <input
+              className={formStyles.input}
+              value={newCourseTitle}
+              onChange={(e) => setNewCourseTitle(e.target.value)}
+              placeholder="Titolo della formazione desiderata"
+            />
+            <span className={formStyles.hint}>
+              Il titolo entra a catalogo come corso da completare; se esiste già un corso con lo stesso nome, la richiesta si aggancia a quello.
+            </span>
+          </label>
+        )}
+
+        <label className={formStyles.field}>
+          Aree di competenza
+          <MultiSelect<string>
+            options={(skillAreas.data ?? []).map((a) => ({ value: a.id, label: a.name }))}
+            selected={skillAreaIds}
+            onChange={setSkillAreaIds}
+            placeholder="Nessuna area"
+          />
+        </label>
+        {skillAreaIds.map((areaId) => {
+          const area = (skillAreas.data ?? []).find((a) => a.id === areaId);
+          const levels = areaLevels[areaId] ?? { current: '', target: '' };
+          return (
+            <div className={formStyles.row} key={areaId}>
+              <label className={formStyles.field}>
+                {area?.name ?? 'Area'} — livello attuale (0–5)
+                <input
+                  type="number"
+                  min={0}
+                  max={5}
+                  className={formStyles.input}
+                  value={levels.current}
+                  onChange={(e) => setAreaLevels({ ...areaLevels, [areaId]: { ...levels, current: e.target.value } })}
+                />
+              </label>
+              <label className={formStyles.field}>
+                Livello atteso (0–5)
+                <input
+                  type="number"
+                  min={0}
+                  max={5}
+                  className={formStyles.input}
+                  value={levels.target}
+                  onChange={(e) => setAreaLevels({ ...areaLevels, [areaId]: { ...levels, target: e.target.value } })}
+                />
+              </label>
+            </div>
+          );
+        })}
+
+        <label className={formStyles.field}>
+          <span className={formStyles.labelHead}>
+            Motivazione
+            <span className={formStyles.requiredMarker} aria-hidden="true" />
+            <VisuallyHidden>obbligatorio</VisuallyHidden>
+          </span>
+          <textarea
+            className={formStyles.textarea}
+            value={motivation}
+            onChange={(e) => setMotivation(e.target.value)}
+            rows={3}
+          />
+        </label>
+
+        <div className={formStyles.row}>
+          <label className={formStyles.field}>
+            Inizio desiderato
+            <input
+              type="date"
+              className={formStyles.input}
+              value={desiredStart}
+              onChange={(e) => setDesiredStart(e.target.value)}
+            />
+          </label>
+          <label className={formStyles.field}>
+            Fine desiderata
+            <input
+              type="date"
+              className={formStyles.input}
+              value={desiredEnd}
+              onChange={(e) => setDesiredEnd(e.target.value)}
+            />
+          </label>
+        </div>
+
+        <ErrorPanel message={error} onDismiss={() => setError(null)} />
+        <div className={formStyles.actions}>
+          <Button variant="ghost" size="md" onClick={onClose} disabled={updateOriginal.isPending}>
+            Annulla
+          </Button>
+          <Button variant="primary" size="md" loading={updateOriginal.isPending} disabled={!canSubmit} onClick={submit}>
+            Salva
           </Button>
         </div>
       </div>

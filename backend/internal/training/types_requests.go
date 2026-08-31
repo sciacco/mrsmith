@@ -1,11 +1,12 @@
 package training
 
-// ── Richiesta formativa (#140, §4-Richieste) ──
+// ── Richiesta formativa (#140, §4-Richieste; #171) ──
 //
 // La richiesta conserva due facce separate: i dati originali espressi dalla
-// persona (create-only: nessuna API li modifica dopo la registrazione) e i
-// dati accolti da People. Parere TL e decisione People sono fatti immutabili;
-// il ritiro e un esito distinto.
+// persona (modificabili finche la richiesta non e chiusa; la persona e
+// invariata) e i dati accolti da People. Parere TL e decisione People sono
+// riscrivibili finche la richiesta non e chiusa (la decisione anche a
+// richiesta chiusa da decisione); il ritiro e un esito terminale distinto.
 
 // RequestInput sono i dati originali della richiesta, registrati da People
 // per conto della persona. Corso a catalogo e titolo nuovo sono alternativi:
@@ -48,22 +49,41 @@ type RequestAnnotationsInput struct {
 	Priority     *int   `json:"priority,omitempty"`
 }
 
+// RequestOriginalDataInput sostituisce i dati originali di una richiesta
+// aperta (#171): corso a catalogo o titolo nuovo (alternativi; un titolo e
+// l'embrione di un corso), aree con livelli, motivazione, team scelto e
+// date desiderate. La persona e invariata (correzione = ritiro + nuova
+// richiesta); priorita, nota e promemoria restano sul PUT annotations.
+// Stesse validazioni di RequestInput.
+type RequestOriginalDataInput struct {
+	CourseID       string                  `json:"courseId,omitempty"`
+	NewCourseTitle string                  `json:"newCourseTitle,omitempty"`
+	SkillAreas     []RequestSkillAreaInput `json:"skillAreas,omitempty"`
+	Motivation     string                  `json:"motivation"`
+	SelectedTeamID string                  `json:"selectedTeamId"`
+	DesiredStart   string                  `json:"desiredStart,omitempty"` // YYYY-MM-DD
+	DesiredEnd     string                  `json:"desiredEnd,omitempty"`   // YYYY-MM-DD
+}
+
 // TLOpinionInput registra il parere TL come fatto: chi lo esprime deve essere
-// un lead attivo del team scelto sulla richiesta. La motivazione e sempre
-// obbligatoria, come per la decisione People.
+// un lead attivo del team scelto sulla richiesta. Il parere e riscrivibile
+// finche la richiesta non e chiusa: vale l'ultimo, la storia resta
+// nell'audit. La motivazione e facoltativa.
 type TLOpinionInput struct {
 	LeadEmployeeID string `json:"leadEmployeeId"`
 	Opinion        string `json:"opinion"` // favorable|unfavorable
-	Reason         string `json:"reason"`
+	Reason         string `json:"reason,omitempty"`
 }
 
-// RequestDecisionInput registra la decisione People. La motivazione e sempre
-// obbligatoria: nell'accoglimento con parere sfavorevole e anche la
-// motivazione dell'override (D5). Accepted e obbligatorio se la richiesta
-// viene accolta, vietato se respinta.
+// RequestDecisionInput registra la decisione People. La prima decisione
+// richiede il parere TL (sequenzialita iniziale); la riscrittura e ammessa
+// anche a richiesta chiusa da decisione. La motivazione e facoltativa:
+// nell'accoglimento con parere sfavorevole e anche la motivazione
+// dell'override (D5). Accepted e obbligatorio se la richiesta viene
+// accolta, vietato se respinta.
 type RequestDecisionInput struct {
 	Decision string                `json:"decision"` // accepted|rejected
-	Reason   string                `json:"reason"`
+	Reason   string                `json:"reason,omitempty"`
 	Accepted *RequestAcceptedInput `json:"accepted,omitempty"`
 }
 
@@ -110,7 +130,8 @@ type RequestListResponse struct {
 }
 
 // RequestOriginalData e la faccia originale della richiesta, cosi come
-// espressa dalla persona: nessuna API la modifica.
+// espressa dalla persona: modificabile finche la richiesta non e chiusa
+// (PUT /requests/{id}/original; la persona e invariata).
 type RequestOriginalData struct {
 	EmployeeID       string           `json:"employeeId"`
 	EmployeeName     string           `json:"employeeName"`
@@ -134,7 +155,8 @@ type RequestAreaRef struct {
 	LevelTarget  *int   `json:"levelTarget,omitempty"`
 }
 
-// RequestTLOpinionFacts e il fatto immutabile del parere TL.
+// RequestTLOpinionFacts e il parere TL: vale l'ultimo, la storia resta
+// nell'audit (riscrivibile finche la richiesta non e chiusa).
 type RequestTLOpinionFacts struct {
 	Opinion      string `json:"opinion"`
 	ByEmployeeID string `json:"byEmployeeId,omitempty"`
@@ -143,13 +165,14 @@ type RequestTLOpinionFacts struct {
 	Reason       string `json:"reason,omitempty"`
 }
 
-// RequestDecisionFacts e il fatto immutabile della decisione People.
+// RequestDecisionFacts e la decisione People: riscrivibile anche a
+// richiesta chiusa da decisione, la storia resta nell'audit.
 type RequestDecisionFacts struct {
 	Decision     string `json:"decision"`
 	ByEmployeeID string `json:"byEmployeeId,omitempty"`
 	ByName       string `json:"byName,omitempty"`
 	At           string `json:"at"`
-	Reason       string `json:"reason"`
+	Reason       string `json:"reason,omitempty"`
 }
 
 // RequestAcceptedData e la faccia accolta: non sovrascrive mai i dati
