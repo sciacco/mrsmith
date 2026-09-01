@@ -1,89 +1,156 @@
-import { Button, Icon, Skeleton, StatusBadge, VisuallyHidden } from '@mrsmith/ui';
+import { useMemo, useState } from 'react';
+import { formatCurrency, formatLocalDate, formatNumber } from '@mrsmith/format';
+import { Button, Drawer, Icon, Skeleton, VisuallyHidden } from '@mrsmith/ui';
 import { useAlyanteInvoices } from '../api/queries';
 import type { AlyanteInvoiceRow } from '../types';
 import styles from './AlyanteInvoicesPage.module.css';
 
-type ColumnKind = 'text' | 'integer' | 'decimal' | 'money' | 'date' | 'boolean';
-
-interface ColumnDef {
-  key: keyof AlyanteInvoiceRow;
-  label: string;
-  kind: ColumnKind;
-  group: 'documento' | 'scadenziario' | 'righe';
+/** Una fattura = testata + righe DO30 ripetute dall'estrazione Alyante. */
+interface InvoiceGroup {
+  key: string;
+  header: AlyanteInvoiceRow;
+  lines: AlyanteInvoiceRow[];
 }
 
-const columns: ColumnDef[] = [
-  { key: 'DO11_DITTA_CG18', label: 'DO11_DITTA_CG18', kind: 'integer', group: 'documento' },
-  { key: 'DO11_NUMREG_CO99', label: 'DO11_NUMREG_CO99', kind: 'integer', group: 'documento' },
-  { key: 'DO11_DOCUM_MG36', label: 'DO11_DOCUM_MG36', kind: 'text', group: 'documento' },
-  { key: 'MG36_DESCDOCUM', label: 'MG36_DESCDOCUM', kind: 'text', group: 'documento' },
-  { key: 'DO11_NUMDOC', label: 'DO11_NUMDOC', kind: 'text', group: 'documento' },
-  { key: 'DO11_SEZDOC', label: 'DO11_SEZDOC', kind: 'text', group: 'documento' },
-  { key: 'DO11_DATADOC', label: 'DO11_DATADOC', kind: 'date', group: 'documento' },
-  { key: 'DO11_CLIFOR_CG44', label: 'DO11_CLIFOR_CG44', kind: 'integer', group: 'documento' },
-  { key: 'DO11_NUMDOCORIG', label: 'DO11_NUMDOCORIG', kind: 'text', group: 'documento' },
-  { key: 'DO11_NOTEDOCUM', label: 'DO11_NOTEDOCUM', kind: 'text', group: 'documento' },
-  { key: 'DO13_TOTDOCUMENTO', label: 'DO13_TOTDOCUMENTO', kind: 'money', group: 'scadenziario' },
-  { key: 'DO13_TOTAPAGARE', label: 'DO13_TOTAPAGARE', kind: 'money', group: 'scadenziario' },
-  { key: 'NUM_RATE_APERTE', label: 'NUM_RATE_APERTE', kind: 'integer', group: 'scadenziario' },
-  { key: 'TOTRATE', label: 'TOTRATE', kind: 'integer', group: 'scadenziario' },
-  { key: 'EF01_SCADE_S', label: 'EF01_SCADE_S', kind: 'date', group: 'scadenziario' },
-  { key: 'EF01_IMPEFFORIG', label: 'EF01_IMPEFFORIG', kind: 'money', group: 'scadenziario' },
-  { key: 'RESIDUO', label: 'RESIDUO', kind: 'money', group: 'scadenziario' },
-  { key: 'PAGATO_SU_RESIDUO', label: 'PAGATO_SU_RESIDUO', kind: 'money', group: 'scadenziario' },
-  { key: 'IN_SCADENZIARIO', label: 'IN_SCADENZIARIO', kind: 'boolean', group: 'scadenziario' },
-  { key: 'DO30_PROGRIGA', label: 'DO30_PROGRIGA', kind: 'integer', group: 'righe' },
-  { key: 'DO30_PROGVISUASTA', label: 'DO30_PROGVISUASTA', kind: 'integer', group: 'righe' },
-  { key: 'DO30_INDTIPORIGA', label: 'DO30_INDTIPORIGA', kind: 'integer', group: 'righe' },
-  { key: 'DO30_CODART_MG66', label: 'DO30_CODART_MG66', kind: 'text', group: 'righe' },
-  { key: 'DO30_DESCART', label: 'DO30_DESCART', kind: 'text', group: 'righe' },
-  { key: 'DO30_UM1', label: 'DO30_UM1', kind: 'text', group: 'righe' },
-  { key: 'DO30_QTA1', label: 'DO30_QTA1', kind: 'decimal', group: 'righe' },
-  { key: 'DO30_PREZZO1', label: 'DO30_PREZZO1', kind: 'money', group: 'righe' },
-  { key: 'DO30_SCPER1', label: 'DO30_SCPER1', kind: 'decimal', group: 'righe' },
-  { key: 'DO30_SCPER2', label: 'DO30_SCPER2', kind: 'decimal', group: 'righe' },
-  { key: 'DO30_SCPER3', label: 'DO30_SCPER3', kind: 'decimal', group: 'righe' },
-  { key: 'DO30_SCIMP', label: 'DO30_SCIMP', kind: 'money', group: 'righe' },
-  { key: 'DO30_IMPORTO', label: 'DO30_IMPORTO', kind: 'money', group: 'righe' },
-  { key: 'DO30_IMPNETSCP', label: 'DO30_IMPNETSCP', kind: 'money', group: 'righe' },
-  { key: 'DO30_ALIVA_CG28', label: 'DO30_ALIVA_CG28', kind: 'text', group: 'righe' },
-  { key: 'DO30_IMPORTOIVA', label: 'DO30_IMPORTOIVA', kind: 'money', group: 'righe' },
+type LineKind = 'text' | 'integer' | 'decimal' | 'money';
+
+interface LineColumnDef {
+  key: keyof AlyanteInvoiceRow;
+  kind: LineKind;
+  label?: string;
+}
+
+const lineMainColumns: LineColumnDef[] = [
+  { key: 'DO30_INDTIPORIGA', kind: 'integer', label: 'Tipo' },
+  { key: 'DO30_UM1', kind: 'text' },
+  { key: 'DO30_QTA1', kind: 'decimal' },
+  { key: 'DO30_PREZZO1', kind: 'money' },
+  { key: 'DO30_SCIMP', kind: 'money' },
+  { key: 'DO30_IMPORTO', kind: 'money' },
+  { key: 'DO30_IMPNETSCP', kind: 'money' },
+  { key: 'DO30_ALIVA_CG28', kind: 'text' },
+  { key: 'DO30_IMPORTOIVA', kind: 'money' },
 ];
 
-const numberFormatter = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 4 });
-const integerFormatter = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 0 });
-const moneyFormatter = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' });
-const dateFormatter = new Intl.DateTimeFormat('it-IT');
-
-function formatDate(value: string | null): string {
-  if (!value) return '—';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return dateFormatter.format(date);
+function lineSubParts(line: AlyanteInvoiceRow): { codArt: string | null; descArt: string | null } {
+  const codArt =
+    line.DO30_CODART_MG66 !== null && String(line.DO30_CODART_MG66).trim() !== ''
+      ? String(line.DO30_CODART_MG66).trim()
+      : null;
+  const descArt =
+    line.DO30_DESCART !== null && String(line.DO30_DESCART).trim() !== ''
+      ? String(line.DO30_DESCART).trim()
+      : null;
+  return { codArt, descArt };
 }
 
-function formatValue(row: AlyanteInvoiceRow, column: ColumnDef): string {
+function hasLineData(row: AlyanteInvoiceRow): boolean {
+  return (
+    row.DO30_PROGRIGA !== null ||
+    row.DO30_CODART_MG66 !== null ||
+    row.DO30_DESCART !== null ||
+    row.DO30_IMPORTO !== null
+  );
+}
+
+function groupInvoices(rows: AlyanteInvoiceRow[]): InvoiceGroup[] {
+  const groups: InvoiceGroup[] = [];
+  const byKey = new Map<string, InvoiceGroup>();
+  rows.forEach((row, index) => {
+    const key =
+      row.DO11_NUMREG_CO99 !== null && row.DO11_NUMREG_CO99 !== undefined
+        ? `${row.DO11_DITTA_CG18 ?? 'd'}-${row.DO11_NUMREG_CO99}`
+        : `noidx-${index}`;
+    const existing = byKey.get(key);
+    if (existing) {
+      if (hasLineData(row)) existing.lines.push(row);
+      return;
+    }
+    const group: InvoiceGroup = { key, header: row, lines: hasLineData(row) ? [row] : [] };
+    byKey.set(key, group);
+    groups.push(group);
+  });
+  return groups;
+}
+
+function money(value: number | null): string {
+  return formatCurrency(value) ?? '—';
+}
+
+function integer(value: number | null): string {
+  return formatNumber(value, { format: { maximumFractionDigits: 0 } }) ?? '—';
+}
+
+function decimal(value: number | null): string {
+  return formatNumber(value, { format: { maximumFractionDigits: 4 } }) ?? '—';
+}
+
+function text(value: string | number | null): string {
+  if (value === null || value === undefined || value === '') return '—';
+  return String(value).trim() || '—';
+}
+
+function date(value: string | null): string {
+  return formatLocalDate(value) ?? text(value);
+}
+
+interface DetailField {
+  label: string;
+  value: string;
+  wide?: boolean;
+}
+
+function detailFields(h: AlyanteInvoiceRow): DetailField[] {
+  return [
+    { label: 'Data documento', value: date(h.DO11_DATADOC) },
+    { label: 'Fornitore (codice)', value: integer(h.DO11_CLIFOR_CG44) },
+    { label: 'Riferimento fornitore', value: text(h.DO11_NUMDOCORIG) },
+    { label: 'In scadenziario', value: h.IN_SCADENZIARIO ? 'Sì' : 'No' },
+    { label: 'Prossima scadenza', value: date(h.EF01_SCADE_S) },
+    { label: 'Rate aperte', value: integer(h.NUM_RATE_APERTE) },
+    { label: 'Rate totali', value: integer(h.TOTRATE) },
+    { label: 'Importo rate', value: money(h.EF01_IMPEFFORIG) },
+    { label: 'Residuo', value: money(h.RESIDUO) },
+    { label: 'Pagato su residuo', value: money(h.PAGATO_SU_RESIDUO) },
+    { label: 'Totale a pagare', value: money(h.DO13_TOTAPAGARE) },
+    { label: 'Totale documento', value: money(h.DO13_TOTDOCUMENTO) },
+    { label: 'Note', value: text(h.DO11_NOTEDOCUM), wide: true },
+  ];
+}
+
+function lineValue(row: AlyanteInvoiceRow, column: LineColumnDef): string {
   const value = row[column.key];
   if (value === null || value === undefined || value === '') return '—';
-  if (column.kind === 'date') return formatDate(String(value));
-  if (column.kind === 'integer' && typeof value === 'number') return integerFormatter.format(value);
-  if (column.kind === 'decimal' && typeof value === 'number') return numberFormatter.format(value);
-  if (column.kind === 'money' && typeof value === 'number') return moneyFormatter.format(value);
-  if (column.kind === 'boolean') return value ? 'Sì' : 'No';
+  if (column.kind === 'integer' && typeof value === 'number') return integer(value);
+  if (column.kind === 'decimal' && typeof value === 'number') return decimal(value);
+  if (column.kind === 'money' && typeof value === 'number') return money(value);
   return String(value);
 }
 
-function statusVariant(row: AlyanteInvoiceRow): 'warning' | 'danger' {
-  return row.IN_SCADENZIARIO ? 'warning' : 'danger';
+function DetailGrid({ fields }: { fields: DetailField[] }) {
+  return (
+    <dl className={styles.grid}>
+      {fields.map((field) => (
+        <div key={field.label} className={field.wide ? styles.itemWide : styles.item}>
+          <dt>{field.label}</dt>
+          <dd>{field.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
 }
 
-function statusLabel(row: AlyanteInvoiceRow) {
-  return row.IN_SCADENZIARIO ? 'Residuo aperto' : 'Non in scadenziario';
+function rateAperte(h: AlyanteInvoiceRow): string {
+  if (h.NUM_RATE_APERTE === null || h.TOTRATE === null) return '—';
+  return `${h.NUM_RATE_APERTE}/${h.TOTRATE}`;
 }
 
 export function AlyanteInvoicesPage() {
   const query = useAlyanteInvoices();
   const rows = query.data ?? [];
+  const groups = useMemo(() => groupInvoices(rows), [rows]);
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const activeGroup = groups.find((g) => g.key === activeKey) ?? null;
 
   return (
     <section className={styles.page}>
@@ -92,8 +159,8 @@ export function AlyanteInvoicesPage() {
           <p className={styles.eyebrow}>Utility</p>
           <h1>Fatture Alyante</h1>
           <p className={styles.description}>
-            Estrazione tecnica delle fatture di acquisto non saldate o non presenti nello scadenziario.
-            La tabella conserva i riferimenti Alyante e ripete i campi di testata per ogni riga DO30.
+            Estrazione delle fatture di acquisto non saldate o non presenti nello scadenziario.
+            Una riga per fattura: testata, scadenziario e righe documento sono consultabili dal dettaglio.
           </p>
         </div>
         <Button
@@ -123,7 +190,7 @@ export function AlyanteInvoicesPage() {
         </div>
       )}
 
-      {query.isSuccess && rows.length === 0 && (
+      {query.isSuccess && groups.length === 0 && (
         <div className={styles.empty}>
           <span className={styles.emptyIcon}><Icon name="database" size={32} /></span>
           <strong>Nessuna fattura da mostrare</strong>
@@ -131,10 +198,10 @@ export function AlyanteInvoicesPage() {
         </div>
       )}
 
-      {query.isSuccess && rows.length > 0 && (
+      {query.isSuccess && groups.length > 0 && (
         <div className={styles.tablePanel}>
           <div className={styles.tableMeta}>
-            <span>Granularità: riga documento DO30</span>
+            <span>Granularità: fattura — dettaglio con righe documento DO30</span>
             <span>Valori grezzi Alyante, formattati solo per consultazione</span>
           </div>
           <div className={styles.tableWrap}>
@@ -144,34 +211,134 @@ export function AlyanteInvoicesPage() {
               </VisuallyHidden>
               <thead>
                 <tr>
-                  <th className={styles.stickyColumn}>Stato</th>
-                  {columns.map((column) => (
-                    <th key={column.key} className={styles[column.group]}>
-                      {column.label}
-                    </th>
-                  ))}
+                  <th className={styles.detailHead}><VisuallyHidden>Dettaglio</VisuallyHidden></th>
+                  <th>Data documento</th>
+                  <th>Numero</th>
+                  <th>Tipo</th>
+                  <th className={styles.numTh}>Fornitore</th>
+                  <th>Rif. fornitore</th>
+                  <th>Scadenza</th>
+                  <th className={styles.numTh}>Rate aperte</th>
+                  <th className={styles.numTh}>Totale documento</th>
+                  <th className={styles.numTh}>Residuo</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row, index) => (
-                  <tr key={`${row.DO11_NUMREG_CO99 ?? 'doc'}-${row.DO30_PROGRIGA ?? index}`}>
-                    <td className={styles.stickyColumn}>
-                      <StatusBadge value={statusLabel(row)} variant={statusVariant(row)} />
-                    </td>
-                    {columns.map((column) => (
-                      <td
-                        key={column.key}
-                        className={column.kind === 'money' || column.kind === 'decimal' || column.kind === 'integer' ? styles.numeric : undefined}
-                      >
-                        {formatValue(row, column)}
+                {groups.map((group, index) => {
+                  const h = group.header;
+                  const selected = group.key === activeKey;
+                  return (
+                    <tr
+                      key={group.key}
+                      className={selected ? `${styles.row} ${styles.rowSelected}` : styles.row}
+                      onClick={() => setActiveKey(group.key)}
+                      style={{ animationDelay: `${Math.min(index * 40, 600)}ms` }}
+                    >
+                      <td className={styles.detailCell}>
+                        <div className={styles.accentBar} />
+                        <button
+                          type="button"
+                          className={styles.detailBtn}
+                          onClick={() => setActiveKey(group.key)}
+                          aria-haspopup="dialog"
+                          aria-expanded={selected}
+                        >
+                          <Icon name="chevron-right" size={14} />
+                          <VisuallyHidden>Dettagli fattura {text(h.DO11_NUMDOC)}</VisuallyHidden>
+                        </button>
                       </td>
-                    ))}
-                  </tr>
-                ))}
+                      <td className={styles.cellDate}>{date(h.DO11_DATADOC)}</td>
+                      <td>{text(h.DO11_NUMDOC)}</td>
+                      <td>{text(h.DO11_DOCUM_MG36)}</td>
+                      <td className={styles.numeric}>{integer(h.DO11_CLIFOR_CG44)}</td>
+                      <td>{text(h.DO11_NUMDOCORIG)}</td>
+                      <td className={styles.cellDate}>{date(h.EF01_SCADE_S)}</td>
+                      <td className={styles.numeric}>{rateAperte(h)}</td>
+                      <td className={styles.numeric}>{money(h.DO13_TOTDOCUMENTO)}</td>
+                      <td className={styles.numeric}>{money(h.RESIDUO)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
+      )}
+
+      {activeGroup && (
+        <Drawer
+          open
+          onClose={() => setActiveKey(null)}
+          size="xl"
+          title={`Fattura ${text(activeGroup.header.DO11_NUMDOC)}`}
+          subtitle={
+            <span className={styles.drawerSubtitle}>
+              {text(activeGroup.header.DO11_DOCUM_MG36)}
+              {' · '}
+              {text(activeGroup.header.MG36_DESCDOCUM)}
+              {' · '}
+              Reg. {text(activeGroup.header.DO11_NUMREG_CO99)}
+            </span>
+          }
+        >
+          <div className={styles.drawerBody}>
+            <section className={styles.card}>
+              <DetailGrid fields={detailFields(activeGroup.header)} />
+            </section>
+
+            <section className={styles.card}>
+              <h3 className={styles.cardTitle}>Righe documento</h3>
+              {activeGroup.lines.length === 0 ? (
+                <p className={styles.noLines}>Nessuna riga documento in estrazione.</p>
+              ) : (
+                <div className={styles.linesWrap}>
+                  <table className={styles.miniTable}>
+                    <thead>
+                      <tr>
+                        {lineMainColumns.map((column) => (
+                          <th
+                            key={column.key}
+                            className={column.kind === 'text' ? undefined : styles.numTh}
+                          >
+                            {column.label ?? column.key}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    {activeGroup.lines.map((line, index) => {
+                      const { codArt, descArt } = lineSubParts(line);
+                      return (
+                        <tbody key={`${line.DO30_PROGRIGA ?? 'riga'}-${index}`}>
+                          <tr>
+                            {lineMainColumns.map((column) => (
+                              <td
+                                key={column.key}
+                                className={column.kind === 'text' ? undefined : styles.numeric}
+                              >
+                                {lineValue(line, column)}
+                              </td>
+                            ))}
+                          </tr>
+                          {(codArt !== null || descArt !== null) && (
+                            <tr className={styles.lineSub}>
+                              <td aria-hidden="true" />
+                              <td colSpan={lineMainColumns.length - 1}>
+                                {descArt ?? '—'}
+                                {codArt !== null && (
+                                  <span className={styles.lineCode}> COD: {codArt}</span>
+                                )}
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      );
+                    })}
+                  </table>
+                </div>
+              )}
+            </section>
+          </div>
+        </Drawer>
       )}
     </section>
   );
