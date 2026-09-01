@@ -81,6 +81,7 @@ FROM rda.purchase_order po
     LEFT JOIN rda.reference_warehouse wh ON wh.name::text = po.reference_warehouse::text
     LEFT JOIN rda.purchase_order_row por ON por.order_id = po.id
 WHERE po."state" NOT IN ('DRAFT','CANCELED')
+  AND po.deleted IS NULL
 ORDER BY po.id, por.id;`
 
 const alyanteInvoicesQuery = `SELECT
