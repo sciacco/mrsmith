@@ -60,6 +60,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/rdfbackend"
 	"github.com/sciacco/mrsmith/internal/reports"
 	"github.com/sciacco/mrsmith/internal/simulatorivendita"
+	"github.com/sciacco/mrsmith/internal/smartpassive"
 	"github.com/sciacco/mrsmith/internal/statsrda"
 	"github.com/sciacco/mrsmith/internal/support"
 	"github.com/sciacco/mrsmith/internal/training"
@@ -705,6 +706,7 @@ func main() {
 	rdfbackend.RegisterRoutes(api, anisettaDB)
 	reports.RegisterRoutes(api, mistraDB, grappaDB, anisettaDB, reportsCarboneSvc)
 	simulatorivendita.RegisterRoutes(api, simulatoriVenditaCarboneSvc)
+	smartpassive.RegisterRoutes(api, alyanteDB)
 	notifications.RegisterRoutes(api, notifications.Deps{Store: notificationStore, Logger: logger})
 	support.RegisterRoutes(api, support.Deps{DB: anisettaDB, Mailer: mailer, Logger: logger})
 	diagnostics.RegisterRoutes(api, diagnostics.Deps{Store: diagnosticStore, Sink: diagnosticSink, Logger: logger})

@@ -1,0 +1,37 @@
+export interface AlyanteInvoiceRow {
+  DO11_DITTA_CG18: number | null;
+  DO11_NUMREG_CO99: number | null;
+  DO11_DOCUM_MG36: string | null;
+  MG36_DESCDOCUM: string | null;
+  DO11_NUMDOC: string | null;
+  DO11_SEZDOC: string | null;
+  DO11_DATADOC: string | null;
+  DO11_CLIFOR_CG44: number | null;
+  DO11_NUMDOCORIG: string | null;
+  DO11_NOTEDOCUM: string | null;
+  DO13_TOTDOCUMENTO: number | null;
+  DO13_TOTAPAGARE: number | null;
+  NUM_RATE_APERTE: number | null;
+  TOTRATE: number | null;
+  EF01_SCADE_S: string | null;
+  EF01_IMPEFFORIG: number | null;
+  RESIDUO: number | null;
+  PAGATO_SU_RESIDUO: number | null;
+  IN_SCADENZIARIO: boolean;
+  DO30_PROGRIGA: number | null;
+  DO30_PROGVISUASTA: number | null;
+  DO30_INDTIPORIGA: number | null;
+  DO30_CODART_MG66: string | null;
+  DO30_DESCART: string | null;
+  DO30_UM1: string | null;
+  DO30_QTA1: number | null;
+  DO30_PREZZO1: number | null;
+  DO30_SCPER1: number | null;
+  DO30_SCPER2: number | null;
+  DO30_SCPER3: number | null;
+  DO30_SCIMP: number | null;
+  DO30_IMPORTO: number | null;
+  DO30_IMPNETSCP: number | null;
+  DO30_ALIVA_CG28: string | null;
+  DO30_IMPORTOIVA: number | null;
+}

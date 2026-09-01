@@ -1,9 +1,21 @@
 import { useRoutes } from 'react-router-dom';
 import { APP_ACCESS_ROLES, getAppAccessState } from '@mrsmith/auth-client';
-import { AccessNotice, AppShell, TabNav } from '@mrsmith/ui';
+import { AccessNotice, AppShell, TabNavGroup, type TabGroup } from '@mrsmith/ui';
 import { routes } from './routes';
 import { useOptionalAuth } from './hooks/useOptionalAuth';
 import styles from './App.module.css';
+
+const navGroups: TabGroup[] = [
+  {
+    label: 'Panoramica',
+    items: [{ label: 'Dashboard', path: '/dashboard' }],
+  },
+  {
+    label: 'Utility',
+    forceDropdown: true,
+    items: [{ label: 'Fatture Alyante', path: '/fatture-alyante' }],
+  },
+];
 
 function AppRoutes() {
   const element = useRoutes(routes);
@@ -25,15 +37,11 @@ export function App() {
     );
   }
 
-  const navItems = [
-    { label: 'Dashboard', path: '/dashboard' },
-  ];
-
   return (
     <AppShell appName="Smart Passive" userName={user?.name ?? 'John Doe'} onLogout={logout} support={auth}>
       <AppShell.Nav>
         <div className={styles.navRow}>
-          <TabNav items={navItems} />
+          <TabNavGroup groups={navGroups} />
         </div>
       </AppShell.Nav>
       <AppShell.Content>

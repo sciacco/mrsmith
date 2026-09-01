@@ -8,6 +8,7 @@ export type TabNavGroupItem = TabNavItem & { path: string };
 export interface TabGroup {
   label: string;
   items: TabNavGroupItem[];
+  forceDropdown?: boolean;
 }
 
 interface TabNavGroupProps {
@@ -47,12 +48,16 @@ export function TabNavGroup({ groups }: TabNavGroupProps) {
     return () => window.removeEventListener('resize', updateIndicator);
   }, [updateIndicator]);
 
+  function groupUsesDropdown(group: TabGroup) {
+    return group.forceDropdown || group.items.length > 1;
+  }
+
   function handleMouseEnter(index: number) {
     if (closeTimer.current) {
       clearTimeout(closeTimer.current);
       closeTimer.current = null;
     }
-    if (groups[index]!.items.length > 1) {
+    if (groupUsesDropdown(groups[index]!)) {
       setOpenIndex(index);
     }
   }
@@ -70,7 +75,7 @@ export function TabNavGroup({ groups }: TabNavGroupProps) {
       setOpenIndex(null);
     } else if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      if (group.items.length > 1) {
+      if (groupUsesDropdown(group)) {
         setOpenIndex(openIndex === index ? null : index);
       }
     }
@@ -81,7 +86,7 @@ export function TabNavGroup({ groups }: TabNavGroupProps) {
       {groups.map((group, i) => {
         const isActive = i === activeGroupIndex;
         const isOpen = openIndex === i;
-        const isSingle = group.items.length === 1;
+        const isSingle = !groupUsesDropdown(group);
 
         return (
           <div
