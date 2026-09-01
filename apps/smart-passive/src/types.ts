@@ -7,6 +7,7 @@ export interface AlyanteInvoiceRow {
   DO11_SEZDOC: string | null;
   DO11_DATADOC: string | null;
   DO11_CLIFOR_CG44: number | null;
+  RAGIONE_SOCIALE: string | null;
   DO11_NUMDOCORIG: string | null;
   DO11_NOTEDOCUM: string | null;
   DO13_TOTDOCUMENTO: number | null;
@@ -34,6 +35,59 @@ export interface AlyanteInvoiceRow {
   DO30_IMPNETSCP: number | null;
   DO30_ALIVA_CG28: string | null;
   DO30_IMPORTOIVA: number | null;
+}
+
+export interface MatchingFunnelProfileCounts {
+  one_time: number;
+  recurring: number;
+  mixed: number;
+  unknown: number;
+}
+
+export type MatchingFunnelProfile = 'one_time' | 'recurring' | 'mixed' | 'unknown';
+
+export interface MatchingFunnelInvoice {
+  registration: number;
+  document_number: string;
+  document_date: string | null;
+  supplier_reference: string;
+  total: number | null;
+}
+
+export interface MatchingFunnelRDA {
+  id: number;
+  code: string;
+  state: string;
+  object: string;
+  total: number | null;
+  currency: string;
+  created: string | null;
+  profile: MatchingFunnelProfile;
+}
+
+export interface MatchingFunnelSupplier {
+  supplier_erp_id: number | null;
+  alyante_supplier_name: string | null;
+  provider_name: string | null;
+  invoice_count: number;
+  candidate_count: number;
+  outcome: 'none' | 'one' | 'multiple';
+  profiles: MatchingFunnelProfileCounts;
+  invoices: MatchingFunnelInvoice[];
+  candidates: MatchingFunnelRDA[];
+}
+
+export interface MatchingFunnelResponse {
+  summary: {
+    invoice_count: number;
+    no_candidates: number;
+    one_candidate: number;
+    multiple_candidates: number;
+    rda_count: number;
+    rdas_without_erp_id: number;
+  };
+  profiles: MatchingFunnelProfileCounts;
+  suppliers: MatchingFunnelSupplier[];
 }
 
 export interface ArakRDARow {

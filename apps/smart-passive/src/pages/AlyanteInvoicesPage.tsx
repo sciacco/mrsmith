@@ -94,6 +94,13 @@ function date(value: string | null): string {
   return formatLocalDate(value) ?? text(value);
 }
 
+function supplierLabel(h: AlyanteInvoiceRow): string {
+  const name = text(h.RAGIONE_SOCIALE);
+  const code = integer(h.DO11_CLIFOR_CG44);
+  if (name === '—') return code === '—' ? '—' : `ERP ${code}`;
+  return code === '—' ? name : `${name} (ERP ${code})`;
+}
+
 interface DetailField {
   label: string;
   value: string;
@@ -103,7 +110,7 @@ interface DetailField {
 function detailFields(h: AlyanteInvoiceRow): DetailField[] {
   return [
     { label: 'Data documento', value: date(h.DO11_DATADOC) },
-    { label: 'Fornitore (codice)', value: integer(h.DO11_CLIFOR_CG44) },
+    { label: 'Fornitore', value: supplierLabel(h) },
     { label: 'Riferimento fornitore', value: text(h.DO11_NUMDOCORIG) },
     { label: 'In scadenziario', value: h.IN_SCADENZIARIO ? 'Sì' : 'No' },
     { label: 'Prossima scadenza', value: date(h.EF01_SCADE_S) },
@@ -215,7 +222,7 @@ export function AlyanteInvoicesPage() {
                   <th>Data documento</th>
                   <th>Numero</th>
                   <th>Tipo</th>
-                  <th className={styles.numTh}>Fornitore</th>
+                  <th>Fornitore</th>
                   <th>Rif. fornitore</th>
                   <th>Scadenza</th>
                   <th className={styles.numTh}>Rate aperte</th>
@@ -250,7 +257,7 @@ export function AlyanteInvoicesPage() {
                       <td className={styles.cellDate}>{date(h.DO11_DATADOC)}</td>
                       <td>{text(h.DO11_NUMDOC)}</td>
                       <td>{text(h.DO11_DOCUM_MG36)}</td>
-                      <td className={styles.numeric}>{integer(h.DO11_CLIFOR_CG44)}</td>
+                      <td>{supplierLabel(h)}</td>
                       <td>{text(h.DO11_NUMDOCORIG)}</td>
                       <td className={styles.cellDate}>{date(h.EF01_SCADE_S)}</td>
                       <td className={styles.numeric}>{rateAperte(h)}</td>

@@ -1,12 +1,20 @@
 import { useQuery } from '@tanstack/react-query';
 import { useApiClient } from './client';
-import type { AlyanteInvoiceRow, ArakRDARow } from '../types';
+import type { AlyanteInvoiceRow, ArakRDARow, MatchingFunnelResponse } from '../types';
 
 export function useAlyanteInvoices() {
   const api = useApiClient();
   return useQuery<AlyanteInvoiceRow[]>({
     queryKey: ['smart-passive', 'alyante-invoices'],
     queryFn: () => api.get<AlyanteInvoiceRow[]>('/smart-passive/v1/alyante-invoices'),
+  });
+}
+
+export function useMatchingFunnel() {
+  const api = useApiClient();
+  return useQuery<MatchingFunnelResponse>({
+    queryKey: ['smart-passive', 'matching-funnel'],
+    queryFn: () => api.get<MatchingFunnelResponse>('/smart-passive/v1/matching-funnel'),
   });
 }
 

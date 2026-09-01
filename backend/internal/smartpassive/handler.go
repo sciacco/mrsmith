@@ -104,6 +104,7 @@ const alyanteInvoicesQuery = `SELECT
     t.DO11_SEZDOC,
     t.DO11_DATADOC,
     t.DO11_CLIFOR_CG44,
+    ISNULL(a.CG16_RAGSOANAG, '') AS RAGIONE_SOCIALE,
     t.DO11_NUMDOCORIG,
     t.DO11_NOTEDOCUM,
     tot.DO13_TOTDOCUMENTO,
@@ -140,6 +141,12 @@ INNER JOIN dbo.MG36_DOCUMENTI AS d
 LEFT JOIN dbo.DO13_DOCTOTALI AS tot
     ON tot.DO13_DITTA_CG18 = t.DO11_DITTA_CG18
    AND tot.DO13_NUMREG_CO99 = t.DO11_NUMREG_CO99
+LEFT JOIN dbo.CG44_CLIFOR AS cf
+    ON cf.CG44_DITTA_CG18 = t.DO11_DITTACF_CG44
+   AND cf.CG44_TIPOCF = t.DO11_TIPOCF_CG44
+   AND cf.CG44_CLIFOR = t.DO11_CLIFOR_CG44
+LEFT JOIN dbo.CG16_ANAGGEN AS a
+    ON a.CG16_CODICE = cf.CG44_CODICE_CG16
 LEFT JOIN (
     SELECT
         EF01_DITTA_CG18,
@@ -263,6 +270,7 @@ type AlyanteInvoiceRow struct {
 	DO11Sezdoc       *string    `json:"DO11_SEZDOC"`
 	DO11Datadoc      *time.Time `json:"DO11_DATADOC"`
 	DO11CliforCG44   *int64     `json:"DO11_CLIFOR_CG44"`
+	SupplierName     *string    `json:"RAGIONE_SOCIALE"`
 	DO11Numdocorig   *string    `json:"DO11_NUMDOCORIG"`
 	DO11Notedocum    *string    `json:"DO11_NOTEDOCUM"`
 	DO13Totdocumento *float64   `json:"DO13_TOTDOCUMENTO"`
@@ -297,6 +305,7 @@ func RegisterRoutes(mux *http.ServeMux, alyanteDB, arakDB *sql.DB) {
 	protect := acl.RequireRole(applaunch.SmartPassiveAccessRoles()...)
 	mux.Handle("GET /smart-passive/v1/alyante-invoices", protect(http.HandlerFunc(h.handleAlyanteInvoices)))
 	mux.Handle("GET /smart-passive/v1/arak-rdas", protect(http.HandlerFunc(h.handleArakRDAs)))
+	mux.Handle("GET /smart-passive/v1/matching-funnel", protect(http.HandlerFunc(h.handleMatchingFunnel)))
 }
 
 func (h *Handler) handleAlyanteInvoices(w http.ResponseWriter, r *http.Request) {
@@ -323,6 +332,7 @@ func (h *Handler) handleAlyanteInvoices(w http.ResponseWriter, r *http.Request) 
 		var sezdoc sql.NullString
 		var datadoc sql.NullTime
 		var clifor sql.NullInt64
+		var supplierName sql.NullString
 		var numdocorig sql.NullString
 		var notedocum sql.NullString
 		var totdocumento sql.NullFloat64
@@ -360,6 +370,7 @@ func (h *Handler) handleAlyanteInvoices(w http.ResponseWriter, r *http.Request) 
 			&sezdoc,
 			&datadoc,
 			&clifor,
+			&supplierName,
 			&numdocorig,
 			&notedocum,
 			&totdocumento,
@@ -400,6 +411,7 @@ func (h *Handler) handleAlyanteInvoices(w http.ResponseWriter, r *http.Request) 
 		row.DO11Sezdoc = stringPtr(sezdoc)
 		row.DO11Datadoc = timePtr(datadoc)
 		row.DO11CliforCG44 = int64Ptr(clifor)
+		row.SupplierName = stringPtr(supplierName)
 		row.DO11Numdocorig = stringPtr(numdocorig)
 		row.DO11Notedocum = stringPtr(notedocum)
 		row.DO13Totdocumento = float64Ptr(totdocumento)
