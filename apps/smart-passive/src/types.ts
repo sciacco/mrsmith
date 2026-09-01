@@ -83,4 +83,13 @@ export interface ArakRDARow {
   row_description: string | null;
   total: number | null;
   price: number | null;
+  row_is_recurrent: boolean | null;
+  row_advance_payment: boolean | null;
+  row_month_recursion: number | null;
+  row_start_at_date: string | null;
+  row_start_pay_at_activation_date: boolean | null;
+  row_automatic_renew: boolean | null;
+  row_initial_subscription_months: number | null;
+  row_next_subscription_months: number | null;
+  row_cancellation_advice_days: number | null;
 }

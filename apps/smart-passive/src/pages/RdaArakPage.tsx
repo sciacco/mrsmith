@@ -151,6 +151,38 @@ function lineValue(row: ArakRDARow, column: LineColumnDef, currency: string | nu
   return text(value as string | number | boolean | null);
 }
 
+function contractualDetails(row: ArakRDARow): string[] {
+  const details: string[] = [];
+  if (row.row_is_recurrent !== null) {
+    details.push(`Ricorrente: ${bool(row.row_is_recurrent)}`);
+  }
+  if (row.row_month_recursion !== null) {
+    details.push(`Ricorrenza: ogni ${integer(row.row_month_recursion)} mesi`);
+  }
+  if (row.row_start_at_date !== null) {
+    details.push(`Decorrenza: ${date(row.row_start_at_date)}`);
+  }
+  if (row.row_start_pay_at_activation_date !== null) {
+    details.push(`Decorrenza all’attivazione: ${bool(row.row_start_pay_at_activation_date)}`);
+  }
+  if (row.row_advance_payment !== null) {
+    details.push(`Pagamento anticipato: ${bool(row.row_advance_payment)}`);
+  }
+  if (row.row_initial_subscription_months !== null) {
+    details.push(`Durata iniziale: ${integer(row.row_initial_subscription_months)} mesi`);
+  }
+  if (row.row_automatic_renew !== null) {
+    details.push(`Rinnovo automatico: ${bool(row.row_automatic_renew)}`);
+  }
+  if (row.row_next_subscription_months !== null) {
+    details.push(`Durata rinnovo: ${integer(row.row_next_subscription_months)} mesi`);
+  }
+  if (row.row_cancellation_advice_days !== null) {
+    details.push(`Preavviso disdetta: ${integer(row.row_cancellation_advice_days)} giorni`);
+  }
+  return details;
+}
+
 function DetailGrid({ fields }: { fields: DetailField[] }) {
   return (
     <dl className={styles.grid}>
@@ -320,30 +352,47 @@ export function RdaArakPage() {
                         ))}
                       </tr>
                     </thead>
-                    {activeGroup.lines.map((line, index) => (
-                      <tbody key={`${line.row_id ?? 'riga'}-${index}`}>
-                        <tr>
-                          {lineColumns.map((column) => (
-                            <td
-                              key={column.key}
-                              className={column.kind === 'text' ? undefined : styles.numeric}
-                            >
-                              {lineValue(line, column, activeGroup.header.currency)}
-                            </td>
-                          ))}
-                        </tr>
-                        {(text(line.product_description) !== '—' || text(line.row_description) !== '—') && (
+                    {activeGroup.lines.map((line, index) => {
+                      const contract = contractualDetails(line);
+                      const isService = line.row_type?.toLowerCase() === 'service';
+                      return (
+                        <tbody key={`${line.row_id ?? 'riga'}-${index}`}>
                           <tr>
-                            <td colSpan={lineColumns.length}>
-                              {text(line.product_description)}
-                              {text(line.row_description) !== '—' && (
-                                <span> · {text(line.row_description)}</span>
-                              )}
-                            </td>
+                            {lineColumns.map((column) => (
+                              <td
+                                key={column.key}
+                                className={column.kind === 'text' ? undefined : styles.numeric}
+                              >
+                                {lineValue(line, column, activeGroup.header.currency)}
+                              </td>
+                            ))}
                           </tr>
-                        )}
-                      </tbody>
-                    ))}
+                          {(text(line.product_description) !== '—' || text(line.row_description) !== '—') && (
+                            <tr className={styles.lineDetail}>
+                              <td colSpan={lineColumns.length}>
+                                <strong>Descrizione</strong>
+                                <span>{text(line.product_description)}</span>
+                                {text(line.row_description) !== '—' && (
+                                  <span> · {text(line.row_description)}</span>
+                                )}
+                              </td>
+                            </tr>
+                          )}
+                          {isService && (
+                            <tr className={styles.lineDetail}>
+                              <td colSpan={lineColumns.length}>
+                                <strong>Condizioni servizio</strong>
+                                <span>
+                                  {contract.length > 0
+                                    ? contract.join(' · ')
+                                    : 'Dati di ricorrenza non disponibili'}
+                                </span>
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      );
+                    })}
                   </table>
                 </div>
               )}

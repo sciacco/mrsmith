@@ -72,7 +72,16 @@ const arakRDAsQuery = `SELECT
     por.product_description,
     por.description AS row_description,
     por.total,
-    por.price
+    por.price,
+    porp.is_recurrent AS row_is_recurrent,
+    porp.advance_payment AS row_advance_payment,
+    porp.month_recursion AS row_month_recursion,
+    porp.start_at_date AS row_start_at_date,
+    porp.start_pay_at_activation_date AS row_start_pay_at_activation_date,
+    porr.automatic_renew AS row_automatic_renew,
+    porr.initial_subscription_months AS row_initial_subscription_months,
+    porr.next_subscription_months AS row_next_subscription_months,
+    porr.cancellation_advice_days AS row_cancellation_advice_days
 FROM rda.purchase_order po
     LEFT JOIN provider_qualifications.provider p ON p.id = po.provider_id
     LEFT JOIN budgets.budget b ON b.id = po.budget_id
@@ -80,6 +89,8 @@ FROM rda.purchase_order po
     LEFT JOIN provider_qualifications.payment_method pm ON pm.code = po.payment_method
     LEFT JOIN rda.reference_warehouse wh ON wh.name::text = po.reference_warehouse::text
     LEFT JOIN rda.purchase_order_row por ON por.order_id = po.id
+    LEFT JOIN rda.purchase_order_row_payment porp ON porp.purchase_order_row_id = por.id
+    LEFT JOIN rda.purchase_order_row_renew_rule porr ON porr.purchase_order_row_id = por.id
 WHERE po."state" NOT IN ('DRAFT','CANCELED')
   AND po.deleted IS NULL
 ORDER BY po.id, por.id;`
@@ -179,59 +190,68 @@ ORDER BY
 
 type Handler struct {
 	alyanteDB *sql.DB
-	arakDB     *sql.DB
+	arakDB    *sql.DB
 }
 
 // ArakRDARow is one row of the RDA Arak extraction: header fields are repeated
 // for each purchase_order_row. Null join results (provider, budget,
 // payment method, rows) are represented as nil pointers.
 type ArakRDARow struct {
-	ID                       *int64     `json:"id"`
-	Type                     *string    `json:"type"`
-	Project                  *string    `json:"project"`
-	Description              *string    `json:"description"`
-	Note                     *string    `json:"note"`
-	Object                   *string    `json:"object"`
-	RequesterID              *int64     `json:"requester_id"`
-	Code                     *string    `json:"code"`
-	PaymentMethod            *string    `json:"payment_method"`
-	BudgetID                 *int64     `json:"budget_id"`
-	CostCenter               *string    `json:"cost_center"`
-	BudgetUserID             *int64     `json:"budget_user_id"`
-	ProviderID               *int64     `json:"provider_id"`
-	Currency                 *string    `json:"currency"`
-	Leasing                  *bool      `json:"leasing"`
-	TotalPrice               *float64   `json:"total_price"`
-	State                    *string    `json:"state"`
-	CreatedDocument          *string    `json:"created_document"`
-	Created                  *time.Time `json:"created"`
-	Updated                  *time.Time `json:"updated"`
-	Deleted                  *time.Time `json:"deleted"`
-	BudgetIncrementID        *int64     `json:"budget_increment_id"`
-	SubtractedFromBudget     *bool      `json:"subtracted_from_budget"`
-	ProviderOfferDate        *time.Time `json:"provider_offer_date"`
-	ProviderOfferCode        *string    `json:"provider_offer_code"`
-	ReferenceWarehouse       *string    `json:"reference_warehouse"`
-	AdvancePayment           *bool      `json:"advance_payment"`
-	ProviderCompanyName      *string    `json:"provider_company_name"`
-	ErpID                    *string    `json:"erp_id"`
-	ProviderState            *string    `json:"provider_state"`
-	BudgetName               *string    `json:"budget_name"`
-	BudgetYear               *int       `json:"budget_year"`
-	RequesterEmail           *string    `json:"requester_email"`
-	PaymentMethodCode        *string    `json:"payment_method_code"`
-	PaymentMethodDescription *string    `json:"payment_method_description"`
-	CurrentApprovalLevel     *int64     `json:"current_approval_level"`
-	RowID                    *int64     `json:"row_id"`
-	ProductCode              *string    `json:"product_code"`
-	RowType                  *string    `json:"row_type"`
-	Qty                      *float64   `json:"qty"`
-	NRC                      *float64   `json:"nrc"`
-	MRC                      *float64   `json:"mrc"`
-	ProductDescription       *string    `json:"product_description"`
-	RowDescription           *string    `json:"row_description"`
-	Total                    *float64   `json:"total"`
-	Price                    *float64   `json:"price"`
+	ID                        *int64     `json:"id"`
+	Type                      *string    `json:"type"`
+	Project                   *string    `json:"project"`
+	Description               *string    `json:"description"`
+	Note                      *string    `json:"note"`
+	Object                    *string    `json:"object"`
+	RequesterID               *int64     `json:"requester_id"`
+	Code                      *string    `json:"code"`
+	PaymentMethod             *string    `json:"payment_method"`
+	BudgetID                  *int64     `json:"budget_id"`
+	CostCenter                *string    `json:"cost_center"`
+	BudgetUserID              *int64     `json:"budget_user_id"`
+	ProviderID                *int64     `json:"provider_id"`
+	Currency                  *string    `json:"currency"`
+	Leasing                   *bool      `json:"leasing"`
+	TotalPrice                *float64   `json:"total_price"`
+	State                     *string    `json:"state"`
+	CreatedDocument           *string    `json:"created_document"`
+	Created                   *time.Time `json:"created"`
+	Updated                   *time.Time `json:"updated"`
+	Deleted                   *time.Time `json:"deleted"`
+	BudgetIncrementID         *int64     `json:"budget_increment_id"`
+	SubtractedFromBudget      *bool      `json:"subtracted_from_budget"`
+	ProviderOfferDate         *time.Time `json:"provider_offer_date"`
+	ProviderOfferCode         *string    `json:"provider_offer_code"`
+	ReferenceWarehouse        *string    `json:"reference_warehouse"`
+	AdvancePayment            *bool      `json:"advance_payment"`
+	ProviderCompanyName       *string    `json:"provider_company_name"`
+	ErpID                     *string    `json:"erp_id"`
+	ProviderState             *string    `json:"provider_state"`
+	BudgetName                *string    `json:"budget_name"`
+	BudgetYear                *int       `json:"budget_year"`
+	RequesterEmail            *string    `json:"requester_email"`
+	PaymentMethodCode         *string    `json:"payment_method_code"`
+	PaymentMethodDescription  *string    `json:"payment_method_description"`
+	CurrentApprovalLevel      *int64     `json:"current_approval_level"`
+	RowID                     *int64     `json:"row_id"`
+	ProductCode               *string    `json:"product_code"`
+	RowType                   *string    `json:"row_type"`
+	Qty                       *float64   `json:"qty"`
+	NRC                       *float64   `json:"nrc"`
+	MRC                       *float64   `json:"mrc"`
+	ProductDescription        *string    `json:"product_description"`
+	RowDescription            *string    `json:"row_description"`
+	Total                     *float64   `json:"total"`
+	Price                     *float64   `json:"price"`
+	RowIsRecurrent            *bool      `json:"row_is_recurrent"`
+	RowAdvancePayment         *bool      `json:"row_advance_payment"`
+	RowMonthRecursion         *int       `json:"row_month_recursion"`
+	RowStartAtDate            *time.Time `json:"row_start_at_date"`
+	RowStartPayAtActivation   *bool      `json:"row_start_pay_at_activation_date"`
+	RowAutomaticRenew         *bool      `json:"row_automatic_renew"`
+	RowInitialMonths          *int       `json:"row_initial_subscription_months"`
+	RowNextMonths             *int       `json:"row_next_subscription_months"`
+	RowCancellationAdviceDays *int       `json:"row_cancellation_advice_days"`
 }
 
 type AlyanteInvoiceRow struct {
@@ -480,6 +500,15 @@ func (h *Handler) handleArakRDAs(w http.ResponseWriter, r *http.Request) {
 		var rowDescription sql.NullString
 		var total sql.NullFloat64
 		var price sql.NullFloat64
+		var rowIsRecurrent sql.NullBool
+		var rowAdvancePayment sql.NullBool
+		var rowMonthRecursion sql.NullInt64
+		var rowStartAtDate sql.NullTime
+		var rowStartPayAtActivation sql.NullBool
+		var rowAutomaticRenew sql.NullBool
+		var rowInitialMonths sql.NullInt64
+		var rowNextMonths sql.NullInt64
+		var rowCancellationAdviceDays sql.NullInt64
 
 		if err := rows.Scan(
 			&id,
@@ -528,6 +557,15 @@ func (h *Handler) handleArakRDAs(w http.ResponseWriter, r *http.Request) {
 			&rowDescription,
 			&total,
 			&price,
+			&rowIsRecurrent,
+			&rowAdvancePayment,
+			&rowMonthRecursion,
+			&rowStartAtDate,
+			&rowStartPayAtActivation,
+			&rowAutomaticRenew,
+			&rowInitialMonths,
+			&rowNextMonths,
+			&rowCancellationAdviceDays,
 		); err != nil {
 			httputil.InternalError(w, r, err, "arak rdas scan failed", "component", component, "operation", "list_arak_rdas")
 			return
@@ -579,6 +617,15 @@ func (h *Handler) handleArakRDAs(w http.ResponseWriter, r *http.Request) {
 		row.RowDescription = stringPtr(rowDescription)
 		row.Total = float64Ptr(total)
 		row.Price = float64Ptr(price)
+		row.RowIsRecurrent = boolPtr(rowIsRecurrent)
+		row.RowAdvancePayment = boolPtr(rowAdvancePayment)
+		row.RowMonthRecursion = intPtr(rowMonthRecursion)
+		row.RowStartAtDate = timePtr(rowStartAtDate)
+		row.RowStartPayAtActivation = boolPtr(rowStartPayAtActivation)
+		row.RowAutomaticRenew = boolPtr(rowAutomaticRenew)
+		row.RowInitialMonths = intPtr(rowInitialMonths)
+		row.RowNextMonths = intPtr(rowNextMonths)
+		row.RowCancellationAdviceDays = intPtr(rowCancellationAdviceDays)
 
 		out = append(out, row)
 	}

@@ -94,15 +94,34 @@
           WHERE a.order_id = po.id AND po.state::text = 'PENDING_APPROVAL'::text AND NOT (EXISTS ( SELECT 1
                    FROM rda.approval a2
                   WHERE a2.order_id = po.id AND a2.level = a.level AND (a2.state::text = ANY (ARRAY['APPROVED'::character varying, 'REJECTED'::character varying]::text[]))))) AS current_approval_level,
-    por.id as row_id, por.product_code, por."type",              
-    por.qty,por.nrc,por.mrc,por.product_code,por.product_description,
-    por.description,por.total,por.price 
+    por.id AS row_id,
+    por.product_code,
+    por."type" AS row_type,
+    por.qty,
+    por.nrc,
+    por.mrc,
+    por.product_description,
+    por.description AS row_description,
+    por.total,
+    por.price,
+    porp.is_recurrent AS row_is_recurrent,
+    porp.advance_payment AS row_advance_payment,
+    porp.month_recursion AS row_month_recursion,
+    porp.start_at_date AS row_start_at_date,
+    porp.start_pay_at_activation_date AS row_start_pay_at_activation_date,
+    porr.automatic_renew AS row_automatic_renew,
+    porr.initial_subscription_months AS row_initial_subscription_months,
+    porr.next_subscription_months AS row_next_subscription_months,
+    porr.cancellation_advice_days AS row_cancellation_advice_days
    FROM rda.purchase_order po
      LEFT JOIN provider_qualifications.provider p ON p.id = po.provider_id
      LEFT JOIN budgets.budget b ON b.id = po.budget_id
      LEFT JOIN users_int."user" u ON u.id = po.requester_id
      LEFT JOIN provider_qualifications.payment_method pm ON pm.code = po.payment_method
      LEFT JOIN rda.reference_warehouse wh ON wh.name::text = po.reference_warehouse::text
-     LEFT JOIN rda.purchase_order_row por on por.order_id = po.id 
-   WHERE po."state" not in ('DRAFT','CANCELED');
+     LEFT JOIN rda.purchase_order_row por ON por.order_id = po.id
+     LEFT JOIN rda.purchase_order_row_payment porp ON porp.purchase_order_row_id = por.id
+     LEFT JOIN rda.purchase_order_row_renew_rule porr ON porr.purchase_order_row_id = por.id
+   WHERE po."state" NOT IN ('DRAFT','CANCELED')
+     AND po.deleted IS NULL;
 ```

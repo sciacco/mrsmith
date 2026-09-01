@@ -357,6 +357,22 @@
   white-space: nowrap;
 }
 
+.lineDetail td {
+  padding-top: 0;
+  padding-bottom: var(--space-2);
+  color: var(--color-text-muted);
+  white-space: normal;
+}
+
+.lineDetail strong {
+  margin-right: var(--space-2);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary);
+}
+
 @media (max-width: 760px) {
   .header,
   .tableMeta {
