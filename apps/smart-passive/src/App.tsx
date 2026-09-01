@@ -13,7 +13,10 @@ const navGroups: TabGroup[] = [
   {
     label: 'Utility',
     forceDropdown: true,
-    items: [{ label: 'Fatture Alyante', path: '/fatture-alyante' }],
+    items: [
+      { label: 'Fatture Alyante', path: '/fatture-alyante' },
+      { label: 'RDA Arak', path: '/rda-arak' },
+    ],
   },
 ];
 

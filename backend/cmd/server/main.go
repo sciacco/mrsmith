@@ -706,7 +706,7 @@ func main() {
 	rdfbackend.RegisterRoutes(api, anisettaDB)
 	reports.RegisterRoutes(api, mistraDB, grappaDB, anisettaDB, reportsCarboneSvc)
 	simulatorivendita.RegisterRoutes(api, simulatoriVenditaCarboneSvc)
-	smartpassive.RegisterRoutes(api, alyanteDB)
+	smartpassive.RegisterRoutes(api, alyanteDB, arakDB)
 	notifications.RegisterRoutes(api, notifications.Deps{Store: notificationStore, Logger: logger})
 	support.RegisterRoutes(api, support.Deps{DB: anisettaDB, Mailer: mailer, Logger: logger})
 	diagnostics.RegisterRoutes(api, diagnostics.Deps{Store: diagnosticStore, Sink: diagnosticSink, Logger: logger})

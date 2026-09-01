@@ -35,3 +35,52 @@ export interface AlyanteInvoiceRow {
   DO30_ALIVA_CG28: string | null;
   DO30_IMPORTOIVA: number | null;
 }
+
+export interface ArakRDARow {
+  id: number | null;
+  type: string | null;
+  project: string | null;
+  description: string | null;
+  note: string | null;
+  object: string | null;
+  requester_id: number | null;
+  code: string | null;
+  payment_method: string | null;
+  budget_id: number | null;
+  cost_center: string | null;
+  budget_user_id: number | null;
+  provider_id: number | null;
+  currency: string | null;
+  leasing: boolean | null;
+  total_price: number | null;
+  state: string | null;
+  created_document: string | null;
+  created: string | null;
+  updated: string | null;
+  deleted: string | null;
+  budget_increment_id: number | null;
+  subtracted_from_budget: boolean | null;
+  provider_offer_date: string | null;
+  provider_offer_code: string | null;
+  reference_warehouse: string | null;
+  advance_payment: boolean | null;
+  provider_company_name: string | null;
+  erp_id: string | null;
+  provider_state: string | null;
+  budget_name: string | null;
+  budget_year: number | null;
+  requester_email: string | null;
+  payment_method_code: string | null;
+  payment_method_description: string | null;
+  current_approval_level: number | null;
+  row_id: number | null;
+  product_code: string | null;
+  row_type: string | null;
+  qty: number | null;
+  nrc: number | null;
+  mrc: number | null;
+  product_description: string | null;
+  row_description: string | null;
+  total: number | null;
+  price: number | null;
+}
