@@ -142,12 +142,12 @@ function detailFields(h: ArakRDARow): DetailField[] {
   ];
 }
 
-function lineValue(row: ArakRDARow, column: LineColumnDef): string {
+function lineValue(row: ArakRDARow, column: LineColumnDef, currency: string | null): string {
   const value = row[column.key];
   if (value === null || value === undefined || value === '') return '—';
   if (column.kind === 'integer' && typeof value === 'number') return integer(value);
   if (column.kind === 'decimal' && typeof value === 'number') return decimal(value);
-  if (column.kind === 'money' && typeof value === 'number') return formatNumber(value, { format: { minimumFractionDigits: 2, maximumFractionDigits: 2 } }) ?? '—';
+  if (column.kind === 'money' && typeof value === 'number') return money(value, currency);
   return text(value as string | number | boolean | null);
 }
 
@@ -328,7 +328,7 @@ export function RdaArakPage() {
                               key={column.key}
                               className={column.kind === 'text' ? undefined : styles.numeric}
                             >
-                              {lineValue(line, column)}
+                              {lineValue(line, column, activeGroup.header.currency)}
                             </td>
                           ))}
                         </tr>
