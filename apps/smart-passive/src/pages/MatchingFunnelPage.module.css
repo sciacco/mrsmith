@@ -13,6 +13,14 @@
   gap: var(--space-5);
 }
 
+.headerActions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
 .eyebrow {
   width: fit-content;
   margin-bottom: var(--space-3);
@@ -378,6 +386,10 @@
   .toolbar,
   .filteredEmpty {
     flex-direction: column;
+    align-items: stretch;
+  }
+
+  .headerActions {
     align-items: stretch;
   }
 

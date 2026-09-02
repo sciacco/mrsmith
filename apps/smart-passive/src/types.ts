@@ -162,7 +162,10 @@ export interface MatchingFunnelSupplier {
   candidates: MatchingFunnelRDA[];
 }
 
+export type MatchingFunnelScope = 'open' | 'all';
+
 export interface MatchingFunnelResponse {
+  scope: MatchingFunnelScope;
   summary: {
     invoice_count: number;
     no_candidates: number;

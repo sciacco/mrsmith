@@ -10,7 +10,36 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
 )
 
-const funnelInvoicesQuery = `SELECT
+// funnelScope selects the invoice base: "open" is the real Smart Passive
+// scope (invoices not yet settled or not yet in the payment schedule), "all"
+// widens it to every purchase invoice of the period and exists only for this
+// analysis work.
+type funnelScope string
+
+const (
+	funnelScopeOpen funnelScope = "open"
+	funnelScopeAll  funnelScope = "all"
+)
+
+func parseFunnelScope(raw string) (funnelScope, bool) {
+	switch raw {
+	case "", string(funnelScopeOpen):
+		return funnelScopeOpen, true
+	case string(funnelScopeAll):
+		return funnelScopeAll, true
+	}
+	return "", false
+}
+
+// funnelInvoicesQuery assembles the invoice query for the requested scope.
+func funnelInvoicesQuery(scope funnelScope) string {
+	if scope == funnelScopeAll {
+		return funnelInvoicesSelect + funnelInvoicesWhere + ";"
+	}
+	return funnelInvoicesSelect + funnelOpenBalanceJoin + funnelInvoicesWhere + funnelOpenBalanceWhere + ";"
+}
+
+const funnelInvoicesSelect = `SELECT
     t.DO11_DITTA_CG18,
     t.DO11_NUMREG_CO99,
     t.DO11_CLIFOR_CG44,
@@ -39,7 +68,9 @@ LEFT JOIN dbo.CG44_CLIFOR AS cf
    AND cf.CG44_CLIFOR = t.DO11_CLIFOR_CG44
 LEFT JOIN dbo.CG16_ANAGGEN AS a
     ON a.CG16_CODICE = cf.CG44_CODICE_CG16
-LEFT JOIN (
+`
+
+const funnelOpenBalanceJoin = `LEFT JOIN (
     SELECT
         EF01_DITTA_CG18,
         EF01_NUMREG_CO99,
@@ -55,15 +86,19 @@ LEFT JOIN (
 ) AS s
     ON s.EF01_DITTA_CG18 = t.DO11_DITTA_CG18
    AND s.EF01_NUMREG_CO99 = t.DO11_NUMREG_CO99
-WHERE d.MG36_INDCLIFOR = 2
+`
+
+const funnelInvoicesWhere = `WHERE d.MG36_INDCLIFOR = 2
   AND d.MG36_INDLISACQVEN = 1
   AND d.MG36_TIPODOC IN (3, 4, 5)
   AND t.DO11_DITTA_CG18 = 1
-  AND t.DO11_ANNODOC > 2025
+  AND t.DO11_ANNODOC > 2025`
+
+const funnelOpenBalanceWhere = `
   AND (
         s.EF01_NUMREG_CO99 IS NULL
      OR ABS(ISNULL(s.RESIDUO, 0)) > 0.02
-  );`
+  )`
 
 const funnelRDAsQuery = `SELECT
     po.id,
@@ -195,6 +230,7 @@ type MatchingFunnelSupplier struct {
 }
 
 type MatchingFunnelResponse struct {
+	Scope     funnelScope                    `json:"scope"`
 	Summary   MatchingFunnelSummary          `json:"summary"`
 	Profiles  MatchingFunnelProfileCounts    `json:"profiles"`
 	Reference MatchingFunnelReferenceSummary `json:"reference"`
@@ -212,7 +248,13 @@ func (h *Handler) handleMatchingFunnel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	invoices, err := h.loadFunnelInvoices(r)
+	scope, ok := parseFunnelScope(r.URL.Query().Get("scope"))
+	if !ok {
+		httputil.Error(w, http.StatusBadRequest, "Parametro scope non valido: usare open oppure all")
+		return
+	}
+
+	invoices, err := h.loadFunnelInvoices(r, scope)
 	if err != nil {
 		httputil.InternalError(w, r, err, "matching funnel invoices query failed", "component", component, "operation", "load_funnel_invoices")
 		return
@@ -224,11 +266,12 @@ func (h *Handler) handleMatchingFunnel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := buildMatchingFunnel(invoices, rdas)
+	response.Scope = scope
 	httputil.JSON(w, http.StatusOK, response)
 }
 
-func (h *Handler) loadFunnelInvoices(r *http.Request) ([]funnelInvoice, error) {
-	rows, err := h.alyanteDB.QueryContext(r.Context(), funnelInvoicesQuery)
+func (h *Handler) loadFunnelInvoices(r *http.Request, scope funnelScope) ([]funnelInvoice, error) {
+	rows, err := h.alyanteDB.QueryContext(r.Context(), funnelInvoicesQuery(scope))
 	if err != nil {
 		return nil, err
 	}

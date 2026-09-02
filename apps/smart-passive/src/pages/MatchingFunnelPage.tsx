@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { formatCurrency, formatLocalDate, formatNumber } from '@mrsmith/format';
-import { Button, Drawer, Icon, SearchInput, Skeleton, VisuallyHidden } from '@mrsmith/ui';
+import { Button, Drawer, Icon, SearchInput, Skeleton, TabNav, VisuallyHidden } from '@mrsmith/ui';
 import { useMatchingFunnel } from '../api/queries';
-import type { MatchingFunnelInvoice, MatchingFunnelReferencedRDA, MatchingFunnelSupplier } from '../types';
+import type { MatchingFunnelInvoice, MatchingFunnelReferencedRDA, MatchingFunnelScope, MatchingFunnelSupplier } from '../types';
 import styles from './MatchingFunnelPage.module.css';
 
 function integer(value: number): string {
@@ -101,8 +101,14 @@ function arakSupplierLabel(row: MatchingFunnelSupplier): string {
   return row.provider_name ?? 'Nessuna RDA candidata';
 }
 
+const scopeTabs = [
+  { key: 'open', label: 'Fatture da saldare' },
+  { key: 'all', label: 'Tutte le fatture 2026' },
+];
+
 export function MatchingFunnelPage() {
-  const query = useMatchingFunnel();
+  const [scope, setScope] = useState<MatchingFunnelScope>('open');
+  const query = useMatchingFunnel(scope);
   const [search, setSearch] = useState('');
   const [activeSupplierID, setActiveSupplierID] = useState<number | 'missing' | null>(null);
   const suppliers = query.data?.suppliers ?? [];
@@ -134,15 +140,25 @@ export function MatchingFunnelPage() {
             per misurare il funnel, mai come ingresso del matching.
           </p>
         </div>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => void query.refetch()}
-          disabled={query.isFetching}
-          leftIcon={<Icon name="refresh-cw" size={14} />}
-        >
-          Aggiorna
-        </Button>
+        <div className={styles.headerActions}>
+          <TabNav
+            items={scopeTabs}
+            activeKey={scope}
+            onTabChange={(key) => {
+              setScope(key as MatchingFunnelScope);
+              setActiveSupplierID(null);
+            }}
+          />
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => void query.refetch()}
+            disabled={query.isFetching}
+            leftIcon={<Icon name="refresh-cw" size={14} />}
+          >
+            Aggiorna
+          </Button>
+        </div>
       </div>
 
       {query.isLoading && (

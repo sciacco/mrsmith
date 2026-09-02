@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useApiClient } from './client';
-import type { AlyanteInvoiceRow, ArakRDARow, MatchingFunnelResponse } from '../types';
+import type { AlyanteInvoiceRow, ArakRDARow, MatchingFunnelResponse, MatchingFunnelScope } from '../types';
 
 export function useAlyanteInvoices() {
   const api = useApiClient();
@@ -10,11 +10,11 @@ export function useAlyanteInvoices() {
   });
 }
 
-export function useMatchingFunnel() {
+export function useMatchingFunnel(scope: MatchingFunnelScope) {
   const api = useApiClient();
   return useQuery<MatchingFunnelResponse>({
-    queryKey: ['smart-passive', 'matching-funnel'],
-    queryFn: () => api.get<MatchingFunnelResponse>('/smart-passive/v1/matching-funnel'),
+    queryKey: ['smart-passive', 'matching-funnel', scope],
+    queryFn: () => api.get<MatchingFunnelResponse>(`/smart-passive/v1/matching-funnel?scope=${scope}`),
   });
 }
 
