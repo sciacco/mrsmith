@@ -240,7 +240,9 @@ export interface MatchingFunnelSDISummary {
   order_rule_ambiguous_resolved: number;
 }
 
-export type MatchingCascadeLevelKey = 'sdi' | 'orders' | 'fixed_fee' | 'residual';
+export type MatchingCascadeLevelKey = 'sdi' | 'contracts' | 'orders' | 'fixed_fee' | 'residual';
+
+export type MatchingCascadeContractsReason = '' | 'no_contracts' | 'no_match' | 'ambiguous';
 
 export type MatchingCascadeVerdict = 'match' | 'partial' | 'wrong' | 'no_truth' | 'afc_linked' | 'afc_unlinked';
 
@@ -255,6 +257,8 @@ export interface MatchingCascadeInvoice {
   proposals: string[];
   verdict: MatchingCascadeVerdict;
   sdi_reason: MatchingCascadeSDIReason;
+  contracts_reason: MatchingCascadeContractsReason;
+  contract_candidates: number;
   orders_reason: MatchingCascadeOrdersReason;
   fixed_fee_reason: MatchingCascadeFixedFeeReason;
   series_size: number;
@@ -262,7 +266,7 @@ export interface MatchingCascadeInvoice {
 }
 
 export interface MatchingCascadeLevel {
-  key: 'sdi' | 'orders' | 'fixed_fee';
+  key: 'sdi' | 'contracts' | 'orders' | 'fixed_fee';
   entered: number;
   closed: number;
   passed: number;
@@ -286,6 +290,7 @@ export interface MatchingCascadeSummary {
   residual_by_sdi: MatchingCascadeReason[];
   residual_by_orders: MatchingCascadeReason[];
   residual_by_pair: MatchingCascadeReason[];
+  residual_by_contracts: MatchingCascadeReason[];
   residual_by_fixed_fee: MatchingCascadeReason[];
   residual_by_family: MatchingCascadeReason[];
 }
@@ -340,6 +345,7 @@ export interface MatchingFunnelSupplier {
   invoices: MatchingFunnelInvoice[];
   candidates: MatchingFunnelRDA[];
   order_candidate_count: number;
+  contracts: MatchingFunnelContract[];
   order_outcome: 'none' | 'one' | 'multiple';
   orders: MatchingFunnelOrder[];
 }
@@ -363,6 +369,22 @@ export interface MatchingFunnelChainSummary {
   orders_by_year: Record<string, MatchingFunnelOrderYearCounts>;
 }
 
+export interface MatchingFunnelContract {
+  registration: number;
+  label: string;
+  date: string | null;
+  category: string;
+  description: string;
+  fee: number;
+  linked_invoices: number;
+}
+
+export interface MatchingFunnelContractsSummary {
+  contract_count: number;
+  suppliers_with_contracts: number;
+  invoices_linked: number;
+}
+
 export interface MatchingFunnelResponse {
   scope: MatchingFunnelScope;
   chain: MatchingFunnelChainSummary;
@@ -381,6 +403,7 @@ export interface MatchingFunnelResponse {
   rules: MatchingFunnelRulesSummary;
   orders: MatchingFunnelOrdersSummary;
   order_rules: MatchingFunnelOrderRulesSummary;
+  contracts: MatchingFunnelContractsSummary;
   sdi: MatchingFunnelSDISummary;
   cascade: MatchingCascadeSummary;
   suppliers: MatchingFunnelSupplier[];

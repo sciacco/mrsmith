@@ -32,20 +32,23 @@ function money(value: number | null, currency = 'EUR'): string {
 
 const levelTitles: Record<MatchingCascadeLevel['key'], string> = {
   sdi: 'Riferimento ordine nell’XML',
+  contracts: 'Contratti di acquisto',
   orders: 'Riga per riga sugli ordini aperti',
   fixed_fee: 'Canone fisso per ripetizione',
 };
 
 const levelNotes: Record<MatchingCascadeLevel['key'], string> = {
   sdi: 'Il codice ordine scritto dal fornitore nella fattura elettronica, risolto sugli ordini Alyante tramite il codice RDA o PA nel numero originale.',
+  contracts: 'I contratti che AFC registra in Alyante per i canoni ricorrenti, uno per contratto con il suo canone. La fattura chiude sul contratto, o sulla combinazione di contratti, il cui canone somma esattamente all’imponibile. Esistono da luglio 2026: prima, e per i fornitori non censiti, valgono i livelli seguenti. Confronto con i contratti che AFC ha collegato alla fattura.',
   orders: 'Stesso articolo, stesso importo o prezzo unitario, quantità entro il residuo, fra gli ordini aperti dello stesso fornitore. Chiude solo se una combinazione sola regge.',
   fixed_fee: 'Serie di fatture dello stesso fornitore con lo stesso imponibile, una al mese per almeno tre mesi. La fattura prende l’ordine collegato da AFC sulla precedente della serie. La serie è letta su tutte le fatture 2026 del fornitore, saldate comprese.',
 };
 
 function levelLabel(level: MatchingCascadeInvoice['level']): string {
   if (level === 'sdi') return '1 · XML';
-  if (level === 'orders') return '2 · Ordini';
-  if (level === 'fixed_fee') return '3 · Canone';
+  if (level === 'contracts') return '2 · Contratti';
+  if (level === 'orders') return '3 · Ordini';
+  if (level === 'fixed_fee') return '4 · Canone';
   return 'Residuo';
 }
 
@@ -66,6 +69,15 @@ function sdiReasonLabel(reason: string): string {
     case 'no_ref': return 'XML senza riferimento ordine';
     case 'no_code': return 'Riferimento senza codice PO o PA';
     case 'unresolved': return 'Codice non trovato';
+    default: return '—';
+  }
+}
+
+function contractsReasonLabel(reason: string): string {
+  switch (reason) {
+    case 'no_contracts': return 'Nessun contratto del fornitore alla data';
+    case 'no_match': return 'Nessuna combinazione di canoni torna';
+    case 'ambiguous': return 'Più combinazioni tornano';
     default: return '—';
   }
 }
@@ -110,7 +122,7 @@ function pairLabel(reason: string): string {
 
 function residualReason(cascade: MatchingCascadeInvoice): string {
   if (cascade.level !== 'residual') return '—';
-  return `${sdiReasonLabel(cascade.sdi_reason)} · ${ordersReasonLabel(cascade.orders_reason)} · ${fixedFeeReasonLabel(cascade.fixed_fee_reason)}`;
+  return `${sdiReasonLabel(cascade.sdi_reason)} · ${contractsReasonLabel(cascade.contracts_reason)} · ${ordersReasonLabel(cascade.orders_reason)} · ${fixedFeeReasonLabel(cascade.fixed_fee_reason)}`;
 }
 
 function proposalsText(cascade: MatchingCascadeInvoice): string {
@@ -126,6 +138,7 @@ function afcLinksText(invoice: MatchingFunnelInvoice): string {
 
 interface SupplierCounts {
   sdi: number;
+  contracts: number;
   orders: number;
   fixedFee: number;
   residual: number;
@@ -134,10 +147,11 @@ interface SupplierCounts {
 }
 
 function supplierCounts(row: MatchingFunnelSupplier): SupplierCounts {
-  const counts: SupplierCounts = { sdi: 0, orders: 0, fixedFee: 0, residual: 0, residualLinked: 0, wrong: 0 };
+  const counts: SupplierCounts = { sdi: 0, contracts: 0, orders: 0, fixedFee: 0, residual: 0, residualLinked: 0, wrong: 0 };
   for (const invoice of row.invoices) {
     const c = invoice.cascade;
     if (c.level === 'sdi') counts.sdi++;
+    else if (c.level === 'contracts') counts.contracts++;
     else if (c.level === 'orders') counts.orders++;
     else if (c.level === 'fixed_fee') counts.fixedFee++;
     else {
@@ -304,8 +318,9 @@ export function MatchingCascadePage() {
           <div className={styles.residualGrid}>
             <ReasonTable title="Residuo per famiglia" rows={cascade.residual_by_family} label={familyLabel} />
             <ReasonTable title="Residuo per esito del livello 1" rows={cascade.residual_by_sdi} label={sdiReasonLabel} />
-            <ReasonTable title="Residuo per esito del livello 2" rows={cascade.residual_by_orders} label={ordersReasonLabel} />
-            <ReasonTable title="Residuo per esito del livello 3" rows={cascade.residual_by_fixed_fee} label={fixedFeeReasonLabel} />
+            <ReasonTable title="Residuo per esito del livello 2" rows={cascade.residual_by_contracts} label={contractsReasonLabel} />
+            <ReasonTable title="Residuo per esito del livello 3" rows={cascade.residual_by_orders} label={ordersReasonLabel} />
+            <ReasonTable title="Residuo per esito del livello 4" rows={cascade.residual_by_fixed_fee} label={fixedFeeReasonLabel} />
             <ReasonTable title="Residuo per coppia di esiti" rows={cascade.residual_by_pair} label={pairLabel} />
           </div>
 
@@ -341,6 +356,7 @@ export function MatchingCascadePage() {
                       <th className={base.numeric}>Chiuse al livello 1</th>
                       <th className={base.numeric}>Chiuse al livello 2</th>
                       <th className={base.numeric}>Chiuse al livello 3</th>
+                      <th className={base.numeric}>Chiuse al livello 4</th>
                       <th className={base.numeric}>Residuo</th>
                       <th className={base.numeric}>di cui collegate da AFC</th>
                       <th className={base.numeric}>Diverse da AFC</th>
@@ -367,6 +383,7 @@ export function MatchingCascadePage() {
                         <td>{supplierLabel(row)}</td>
                         <td className={base.numeric}>{integer(row.invoice_count)}</td>
                         <td className={base.numeric}>{integer(counts.sdi)}</td>
+                        <td className={base.numeric}>{integer(counts.contracts)}</td>
                         <td className={base.numeric}>{integer(counts.orders)}</td>
                         <td className={base.numeric}>{integer(counts.fixedFee)}</td>
                         <td className={base.numeric}>{integer(counts.residual)}</td>
@@ -409,7 +426,7 @@ export function MatchingCascadePage() {
                           <th className={base.numeric}>Imponibile</th>
                           <th>Fermata a</th>
                           <th>Serie</th>
-                          <th>Ordini proposti</th>
+                          <th>Ordini o contratti proposti</th>
                           <th>Ordini collegati da AFC</th>
                           <th>Confronto</th>
                           <th>Motivo del residuo</th>
@@ -438,6 +455,43 @@ export function MatchingCascadePage() {
                       </tbody>
                     </table>
                   </div>
+                </section>
+
+                <section className={base.detailSection}>
+                  <div className={base.detailHeading}>
+                    <h3>Contratti di acquisto dello stesso fornitore</h3>
+                    <span>{integer(activeSupplier.contracts.length)}</span>
+                  </div>
+                  {activeSupplier.contracts.length === 0 ? (
+                    <p className={base.noCandidates}>Nessun contratto di acquisto registrato in Alyante per questo fornitore.</p>
+                  ) : (
+                    <div className={base.detailTableWrap}>
+                      <table className={base.detailTable}>
+                        <thead>
+                          <tr>
+                            <th>Contratto</th>
+                            <th>Data</th>
+                            <th>Categoria</th>
+                            <th>Descrizione</th>
+                            <th className={base.numeric}>Canone</th>
+                            <th className={base.numeric}>Fatture collegate da AFC</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {activeSupplier.contracts.map((contract) => (
+                            <tr key={contract.registration}>
+                              <td>{contract.label}</td>
+                              <td>{date(contract.date)}</td>
+                              <td>{contract.category || '—'}</td>
+                              <td>{contract.description || '—'}</td>
+                              <td className={base.numeric}>{money(contract.fee)}</td>
+                              <td className={base.numeric}>{integer(contract.linked_invoices)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </section>
               </div>
             </Drawer>

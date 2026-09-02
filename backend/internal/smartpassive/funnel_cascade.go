@@ -11,31 +11,48 @@ import (
 //
 //  1. sdi: the order reference the supplier wrote in the electronic invoice,
 //     resolved to Alyante orders through the RDA or PA code.
-//  2. orders: line by line against the open orders of the same supplier.
-//  3. fixed_fee: fixed monthly fee recognised by repetition, taking the order
+//  2. contracts: the purchase contracts AFC keeps in Alyante for recurring
+//     commitments, by amount (one contract or a combination of them).
+//  3. orders: line by line against the open orders of the same supplier.
+//  4. fixed_fee: fixed monthly fee recognised by repetition, taking the order
 //     confirmed on the previous invoice of the series.
-//  4. residual: whatever is left, split by reason.
+//  5. residual: whatever is left, split by reason.
+//
+// Contracts exist since July 2026 and not for every supplier: the levels
+// after them are the fallback.
 //
 // Closed invoices are checked against the orders AFC linked in Alyante.
 
 const (
-	cascadeLevelSDI      = "sdi"
-	cascadeLevelOrders   = "orders"
-	cascadeLevelFixedFee = "fixed_fee"
-	cascadeLevelResidual = "residual"
+	cascadeLevelSDI       = "sdi"
+	cascadeLevelContracts = "contracts"
+	cascadeLevelOrders    = "orders"
+	cascadeLevelFixedFee  = "fixed_fee"
+	cascadeLevelResidual  = "residual"
 )
 
 // cascadeLevels lists the closing levels in order.
-var cascadeLevels = []string{cascadeLevelSDI, cascadeLevelOrders, cascadeLevelFixedFee}
+var cascadeLevels = []string{cascadeLevelSDI, cascadeLevelContracts, cascadeLevelOrders, cascadeLevelFixedFee}
 
 type MatchingCascadeInvoice struct {
-	// Level where the invoice stopped: sdi, orders, fixed_fee, residual.
+	// Level where the invoice stopped: sdi, contracts, orders, fixed_fee,
+	// residual.
 	Level string `json:"level"`
-	// Proposals are the order labels proposed by the closing level.
+	// Proposals are the order labels proposed by the closing level, or the
+	// contract labels for the contracts level.
 	Proposals []string `json:"proposals"`
 	// Verdict vs the AFC link: match, partial, wrong, no_truth for closed
-	// invoices; afc_linked or afc_unlinked for the residual.
+	// invoices; afc_linked or afc_unlinked for the residual. The contracts
+	// level is checked against the contracts AFC linked, the others against
+	// the orders.
 	Verdict string `json:"verdict"`
+	// ContractsReason tells why the contracts level did not close:
+	// no_contracts (none for the supplier at the invoice date), no_match (no
+	// combination of fees sums to the invoice), ambiguous (more than one).
+	ContractsReason string `json:"contracts_reason"`
+	// ContractCandidates is the number of contracts of the supplier at the
+	// invoice date.
+	ContractCandidates int `json:"contract_candidates"`
 	// SDIReason tells why level 1 did not close: no_xml, no_ref (no order
 	// reference in the XML), no_code (reference without a PO or PA code),
 	// unresolved (code not found).
@@ -80,9 +97,10 @@ type MatchingCascadeSummary struct {
 	ResidualBySDI       []MatchingCascadeReason `json:"residual_by_sdi"`
 	ResidualByOrders    []MatchingCascadeReason `json:"residual_by_orders"`
 	// ResidualByPair crosses the two reasons ("no_xml / ambiguous").
-	ResidualByPair     []MatchingCascadeReason `json:"residual_by_pair"`
-	ResidualByFixedFee []MatchingCascadeReason `json:"residual_by_fixed_fee"`
-	ResidualByFamily   []MatchingCascadeReason `json:"residual_by_family"`
+	ResidualByPair      []MatchingCascadeReason `json:"residual_by_pair"`
+	ResidualByContracts []MatchingCascadeReason `json:"residual_by_contracts"`
+	ResidualByFixedFee  []MatchingCascadeReason `json:"residual_by_fixed_fee"`
+	ResidualByFamily    []MatchingCascadeReason `json:"residual_by_family"`
 }
 
 func newCascadeSummary() MatchingCascadeSummary {
@@ -95,7 +113,7 @@ func newCascadeSummary() MatchingCascadeSummary {
 
 // applyCascade derives the cascade outcome of one invoice from the level
 // results already computed, using the AFC links as the check.
-func applyCascade(invoice funnelInvoice, sdi MatchingFunnelSDIResult, orderRules MatchingFunnelOrderRuleResult, fixedFee fixedFeeResult, supplierOrders []funnelOrder, supplierRDAs []funnelRDA, idx funnelOrderIndex, rdaByID map[int64]funnelRDA) MatchingCascadeInvoice {
+func applyCascade(invoice funnelInvoice, sdi MatchingFunnelSDIResult, contracts contractResult, contractTruth []string, orderRules MatchingFunnelOrderRuleResult, fixedFee fixedFeeResult, supplierOrders []funnelOrder, supplierRDAs []funnelRDA, idx funnelOrderIndex, rdaByID map[int64]funnelRDA) MatchingCascadeInvoice {
 	out := MatchingCascadeInvoice{Proposals: []string{}}
 
 	// Level 1: order reference in the XML.
@@ -128,7 +146,20 @@ func applyCascade(invoice funnelInvoice, sdi MatchingFunnelSDIResult, orderRules
 		}
 	}
 
-	// Level 2: line by line on the open orders of the supplier.
+	// Level 2: the supplier's contracts, by amount. Checked against the
+	// contracts AFC linked to the invoice.
+	if out.Level == "" {
+		out.ContractCandidates = contracts.Candidates
+		if len(contracts.Proposals) > 0 {
+			out.Level = cascadeLevelContracts
+			out.Proposals = append(out.Proposals, contracts.Proposals...)
+			out.Verdict = cascadeVerdict(out.Proposals, contractTruth)
+			return out
+		}
+		out.ContractsReason = contracts.Reason
+	}
+
+	// Level 3: line by line on the open orders of the supplier.
 	if out.Level == "" {
 		unique := len(orderRules.Proposals) == 1 && orderRules.AmbiguousLines == 0
 		switch {
@@ -147,7 +178,7 @@ func applyCascade(invoice funnelInvoice, sdi MatchingFunnelSDIResult, orderRules
 		}
 	}
 
-	// Level 3: fixed monthly fee, order taken from the previous invoice of
+	// Level 4: fixed monthly fee, order taken from the previous invoice of
 	// the series.
 	if out.Level == "" {
 		out.SeriesSize = fixedFee.SeriesSize
@@ -218,6 +249,7 @@ func addCascade(summary *MatchingCascadeSummary, result MatchingCascadeInvoice) 
 	summary.ResidualBySDI = addReason(summary.ResidualBySDI, result.SDIReason, linked)
 	summary.ResidualByOrders = addReason(summary.ResidualByOrders, result.OrdersReason, linked)
 	summary.ResidualByPair = addReason(summary.ResidualByPair, result.SDIReason+" / "+result.OrdersReason, linked)
+	summary.ResidualByContracts = addReason(summary.ResidualByContracts, result.ContractsReason, linked)
 	summary.ResidualByFixedFee = addReason(summary.ResidualByFixedFee, result.FixedFeeReason, linked)
 	summary.ResidualByFamily = addReason(summary.ResidualByFamily, result.Family, linked)
 }

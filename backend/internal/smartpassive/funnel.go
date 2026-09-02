@@ -270,6 +270,7 @@ type MatchingFunnelSupplier struct {
 	OrderCandidateCount int                            `json:"order_candidate_count"`
 	OrderOutcome        string                         `json:"order_outcome"`
 	Orders              []MatchingFunnelOrder          `json:"orders"`
+	Contracts           []MatchingFunnelContract       `json:"contracts"`
 }
 
 // MatchingFunnelRDAOrderCounts counts, for one RDA type, the RDAs of the
@@ -306,6 +307,7 @@ type MatchingFunnelResponse struct {
 	Rules      MatchingFunnelRulesSummary      `json:"rules"`
 	Orders     MatchingFunnelOrdersSummary     `json:"orders"`
 	OrderRules MatchingFunnelOrderRulesSummary `json:"order_rules"`
+	Contracts  MatchingFunnelContractsSummary  `json:"contracts"`
 	SDI        MatchingFunnelSDISummary        `json:"sdi"`
 	Cascade    MatchingCascadeSummary          `json:"cascade"`
 	Suppliers  []MatchingFunnelSupplier        `json:"suppliers"`
@@ -361,6 +363,16 @@ func (h *Handler) handleMatchingFunnel(w http.ResponseWriter, r *http.Request) {
 		httputil.InternalError(w, r, err, "matching funnel order links query failed", "component", component, "operation", "load_funnel_order_links")
 		return
 	}
+	contracts, err := h.loadFunnelContracts(r)
+	if err != nil {
+		httputil.InternalError(w, r, err, "matching funnel contracts query failed", "component", component, "operation", "load_funnel_contracts")
+		return
+	}
+	contractLinks, err := h.loadFunnelContractLinks(r)
+	if err != nil {
+		httputil.InternalError(w, r, err, "matching funnel contract links query failed", "component", component, "operation", "load_funnel_contract_links")
+		return
+	}
 
 	sdiDocs, err := h.loadFunnelSDI(r, invoices)
 	if err != nil {
@@ -374,7 +386,7 @@ func (h *Handler) handleMatchingFunnel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := buildMatchingFunnel(invoices, seriesBase, rdas, orders, invoiceLines, orderLinks, sdiDocs, billing)
+	response := buildMatchingFunnel(invoices, seriesBase, rdas, orders, invoiceLines, orderLinks, newFunnelContractIndex(contracts, contractLinks), sdiDocs, billing)
 	response.Scope = scope
 	httputil.JSON(w, http.StatusOK, response)
 }
@@ -517,16 +529,17 @@ func (h *Handler) loadFunnelRDAs(r *http.Request) ([]funnelRDA, error) {
 	return out, nil
 }
 
-func buildMatchingFunnel(invoices, seriesBase []funnelInvoice, rdas []funnelRDA, orders []funnelOrder, invoiceLines map[string][]funnelDocLine, orderLinks funnelOrderLinks, sdiDocs map[string][]*sdiDocument, billing map[string]MatchingSupplierBilling) MatchingFunnelResponse {
+func buildMatchingFunnel(invoices, seriesBase []funnelInvoice, rdas []funnelRDA, orders []funnelOrder, invoiceLines map[string][]funnelDocLine, orderLinks funnelOrderLinks, contractIndex funnelContractIndex, sdiDocs map[string][]*sdiDocument, billing map[string]MatchingSupplierBilling) MatchingFunnelResponse {
 	rdasBySupplier := make(map[int64][]funnelRDA)
 	rdaByID := make(map[int64]funnelRDA, len(rdas))
 	profilesByRDA := make(map[int64]funnelProfile, len(rdas))
 	referenceIndex := newFunnelReferenceIndex(rdas)
 	orderIndex := newFunnelOrderIndex(orders, referenceIndex, orderLinks)
 	response := MatchingFunnelResponse{
-		Orders:  orderIndex.summary,
-		Chain:   buildChainSummary(rdas, orders, orderIndex),
-		Cascade: newCascadeSummary(),
+		Orders:    orderIndex.summary,
+		Contracts: MatchingFunnelContractsSummary{ContractCount: contractIndex.count},
+		Chain:     buildChainSummary(rdas, orders, orderIndex),
+		Cascade:   newCascadeSummary(),
 		Summary: MatchingFunnelSummary{
 			InvoiceCount:      len(invoices),
 			RDACount:          len(rdas),
@@ -625,6 +638,14 @@ func buildMatchingFunnel(invoices, seriesBase []funnelInvoice, rdas []funnelRDA,
 		for _, o := range orderCandidates {
 			row.Orders = append(row.Orders, orderIndex.export(o))
 		}
+		supplierContracts := contractIndex.candidates(acc.supplierID)
+		row.Contracts = make([]MatchingFunnelContract, 0, len(supplierContracts))
+		for _, c := range supplierContracts {
+			row.Contracts = append(row.Contracts, contractIndex.export(c))
+		}
+		if len(supplierContracts) > 0 {
+			response.Contracts.SuppliersWithContracts++
+		}
 		sort.Slice(row.Orders, func(i, j int) bool {
 			return timeAfter(row.Orders[i].Date, row.Orders[j].Date)
 		})
@@ -652,7 +673,11 @@ func buildMatchingFunnel(invoices, seriesBase []funnelInvoice, rdas []funnelRDA,
 			sdi := applySDI(invoice, sdiDocs[normalizeDocNumber(invoice.supplierReference)], orderIndex, referenceIndex)
 			addSDIResult(&response.SDI, sdi, orderRules)
 			fixedFee := applyFixedFee(invoice, fixedFeeSeries, orderIndex)
-			cascade := applyCascade(invoice, sdi, orderRules, fixedFee, orderCandidates, candidates, orderIndex, rdaByID)
+			contractTruth := contractIndex.truth(invoice.key)
+			if len(contractTruth) > 0 {
+				response.Contracts.InvoicesLinked++
+			}
+			cascade := applyCascade(invoice, sdi, applyContracts(invoice, supplierContracts), contractTruth, orderRules, fixedFee, orderCandidates, candidates, orderIndex, rdaByID)
 			addCascade(&response.Cascade, cascade)
 			switch funnelOutcome(orderRules.OpenCandidates) {
 			case "none":
@@ -709,6 +734,7 @@ func buildMatchingFunnel(invoices, seriesBase []funnelInvoice, rdas []funnelRDA,
 	sortReasons(response.Cascade.ResidualByOrders)
 	sortReasons(response.Cascade.ResidualByPair)
 	sortReasons(response.Cascade.ResidualByFixedFee)
+	sortReasons(response.Cascade.ResidualByContracts)
 	sortReasons(response.Cascade.ResidualByFamily)
 	sort.Slice(response.Suppliers, func(i, j int) bool {
 		if response.Suppliers[i].InvoiceCount != response.Suppliers[j].InvoiceCount {
