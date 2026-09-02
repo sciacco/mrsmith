@@ -18,8 +18,12 @@ import "sort"
 //     line names one order by its identifying text and the order's residual
 //     covers the amount; a hint when the lines fit several orders or the
 //     named order has no residual left.
-//  4. fixed_fee: the order confirmed on the previous invoice of the series is
-//     verified when it still has residual for the amount; otherwise a hint.
+//  4. fixed_fee: the order confirmed on the previous invoice of the series.
+//     It rests on AFC's earlier work, not on an RDA, an order or a contract,
+//     so it is always a hint.
+//
+// Whenever a level finds the right order but its residual does not cover the
+// amount, the invoice is flagged as billed beyond the order.
 //
 // Proposals are checked afterwards against the orders AFC linked in Alyante.
 
@@ -41,7 +45,7 @@ type MatchingSuggestionCheck struct {
 	// unresolved, truncated, not_covered. contracts: no_contracts, no_match,
 	// ambiguous. orders: no_orders, goods_only (only goods orders, loaded at
 	// delivery), no_open_orders, no_match, ambiguous, not_covered.
-	// fixed_fee: no_series, no_anchor, not_covered.
+	// fixed_fee: no_series, no_anchor, anchor_only, not_covered.
 	Reason    string   `json:"reason"`
 	Proposals []string `json:"proposals"`
 }
@@ -60,6 +64,9 @@ type MatchingSuggestionInvoice struct {
 	// Verdict vs the AFC link: match, partial, wrong, no_truth when there is a
 	// suggestion; afc_linked or afc_unlinked otherwise.
 	Verdict string `json:"verdict"`
+	// OverBilled flags an invoice whose order was found by some level but has
+	// no residual left for the amount: billed beyond the order.
+	OverBilled bool `json:"over_billed"`
 	// Family classifies an invoice without suggestion by what exists upstream
 	// for its supplier.
 	Family string `json:"family"`
@@ -107,6 +114,7 @@ type MatchingSuggestionSummary struct {
 	HintOnly            int                       `json:"hint_only"`
 	Residual            int                       `json:"residual"`
 	ResidualWithAFCLink int                       `json:"residual_with_afc_link"`
+	OverBilled          int                       `json:"over_billed"`
 	Final               []MatchingSuggestionFinal `json:"final"`
 	ResidualBySDI       []MatchingCascadeReason   `json:"residual_by_sdi"`
 	ResidualByContracts []MatchingCascadeReason   `json:"residual_by_contracts"`
@@ -145,6 +153,9 @@ func applySuggestion(invoice funnelInvoice, sdi MatchingFunnelSDIResult, contrac
 	hint := -1
 	for i, check := range checks {
 		out.Checks = append(out.Checks, check)
+		if check.Reason == "not_covered" {
+			out.OverBilled = true
+		}
 		if check.Outcome == suggestionHint && hint < 0 {
 			hint = i
 		}
@@ -267,17 +278,19 @@ func suggestOrders(invoice funnelInvoice, orderRules MatchingFunnelOrderRuleResu
 	return check
 }
 
+// suggestFixedFee is level 4: the orders AFC confirmed on the previous invoice
+// of the series. It rests on AFC's earlier work, so it is always a hint; when
+// the residual no longer covers the amount the reason says so.
 func suggestFixedFee(invoice funnelInvoice, fixedFee fixedFeeResult, idx funnelOrderIndex) MatchingSuggestionCheck {
 	check := MatchingSuggestionCheck{Level: cascadeLevelFixedFee, Outcome: suggestionNone, Reason: fixedFee.Reason, Proposals: []string{}}
 	if len(fixedFee.Proposals) == 0 {
 		return check
 	}
 	check.Proposals = append(check.Proposals, fixedFee.Proposals...)
-	if _, covered := orderCoverage(invoice, fixedFee.OrderKeys, idx); covered && len(fixedFee.OrderKeys) == len(fixedFee.Proposals) {
-		check.Outcome, check.Reason = suggestionVerified, ""
-		return check
+	check.Outcome, check.Reason = suggestionHint, "anchor_only"
+	if _, covered := orderCoverage(invoice, fixedFee.OrderKeys, idx); !covered || len(fixedFee.OrderKeys) != len(fixedFee.Proposals) {
+		check.Reason = "not_covered"
 	}
-	check.Outcome, check.Reason = suggestionHint, "not_covered"
 	return check
 }
 
@@ -308,6 +321,9 @@ func orderCoverage(invoice funnelInvoice, keys []string, idx funnelOrderIndex) (
 
 func addSuggestion(summary *MatchingSuggestionSummary, result MatchingSuggestionInvoice) {
 	summary.Invoices++
+	if result.OverBilled {
+		summary.OverBilled++
+	}
 	for _, check := range result.Checks {
 		for i := range summary.Levels {
 			if summary.Levels[i].Key != check.Level {

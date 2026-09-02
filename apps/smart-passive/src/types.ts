@@ -312,6 +312,7 @@ export interface MatchingSuggestionInvoice {
   verified: boolean;
   proposals: string[];
   verdict: MatchingCascadeVerdict;
+  over_billed: boolean;
   family: '' | 'recurring_in_course' | 'goods_orders' | 'service_orders_expired' | 'rda_only' | 'unknown';
 }
 
@@ -343,6 +344,7 @@ export interface MatchingSuggestionSummary {
   hint_only: number;
   residual: number;
   residual_with_afc_link: number;
+  over_billed: number;
   final: MatchingSuggestionFinal[];
   residual_by_sdi: MatchingCascadeReason[];
   residual_by_contracts: MatchingCascadeReason[];

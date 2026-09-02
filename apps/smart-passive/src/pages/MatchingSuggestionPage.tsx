@@ -49,7 +49,7 @@ const levelNotes: Record<MatchingSuggestionLevelKey, string> = {
   sdi: 'Il codice ordine scritto dal fornitore nella fattura elettronica, risolto sugli ordini Alyante tramite il codice RDA o PA nel numero originale. Verifica se ogni riferimento dichiarato è risolto, nessuno riempie i 20 caratteri del campo e il residuo degli ordini copre l’imponibile. Gli ordini trovati senza queste condizioni restano un suggerimento.',
   contracts: 'I contratti che AFC registra in Alyante per i canoni ricorrenti, uno per contratto con il suo canone. Verifica se un solo contratto, o una sola combinazione, somma esattamente all’imponibile. Esistono da luglio 2026: prima, e per i fornitori non censiti, valgono i livelli seguenti.',
   orders: 'Stesso articolo, stesso importo o prezzo unitario, quantità entro il residuo, fra gli ordini aperti dello stesso fornitore, esclusi gli ordini di beni: sono caricati alla consegna e non confermano nulla. Verifica se una combinazione sola regge; se le righe reggono su più ordini, quegli ordini restano un suggerimento. Oppure una riga con articolo e descrizione presenti in un solo ordine del fornitore (pratica, targa, contratto) nomina quell’ordine, qualunque sia il prezzo: verificato se l’ordine ha ancora residuo per l’imponibile.',
-  fixed_fee: 'Serie di fatture dello stesso fornitore con lo stesso imponibile, una al mese per almeno tre mesi. Prende l’ordine collegato da AFC sulla precedente della serie e verifica che abbia ancora residuo per l’imponibile; altrimenti resta un suggerimento.',
+  fixed_fee: 'Serie di fatture dello stesso fornitore con lo stesso imponibile, una al mese per almeno tre mesi. Propone l’ordine collegato da AFC sulla precedente della serie. Si fonda sulla lavorazione precedente, non su RDA, ordine o contratto: resta sempre un suggerimento, e segnala se l’ordine non ha più residuo.',
 };
 
 function outcomeLabel(s: MatchingSuggestionInvoice): string {
@@ -105,6 +105,7 @@ function fixedFeeReasonLabel(reason: string): string {
   switch (reason) {
     case 'no_series': return 'Nessuna serie mensile a importo fisso';
     case 'no_anchor': return 'Canone fisso senza ordine collegato';
+    case 'anchor_only': return 'Solo l’ordine della fattura precedente';
     case 'not_covered': return 'Ordine della serie senza residuo sufficiente';
     default: return '—';
   }
@@ -152,10 +153,11 @@ interface SupplierCounts {
   residual: number;
   residualLinked: number;
   wrong: number;
+  overBilled: number;
 }
 
 function supplierCounts(row: MatchingFunnelSupplier): SupplierCounts {
-  const counts: SupplierCounts = { verified: 0, hint: 0, residual: 0, residualLinked: 0, wrong: 0 };
+  const counts: SupplierCounts = { verified: 0, hint: 0, residual: 0, residualLinked: 0, wrong: 0, overBilled: 0 };
   for (const invoice of row.invoices) {
     const s = invoice.suggestion;
     if (s.level === 'residual') {
@@ -167,6 +169,7 @@ function supplierCounts(row: MatchingFunnelSupplier): SupplierCounts {
       counts.hint++;
     }
     if (s.verdict === 'wrong' || s.verdict === 'partial') counts.wrong++;
+    if (s.over_billed) counts.overBilled++;
   }
   return counts;
 }
@@ -331,6 +334,10 @@ export function MatchingSuggestionPage() {
                 <strong>{integer(summary.residual)}</strong>
                 <span>senza suggerimento ({percent(summary.residual, summary.invoices)}), di cui {integer(summary.residual_with_afc_link)} collegate da AFC</span>
               </div>
+              <div className={styles.figure}>
+                <strong className={summary.over_billed > 0 ? base.codeWarn : undefined}>{integer(summary.over_billed)}</strong>
+                <span>fatturate oltre l’ordine: l’ordine c’è ma non ha più residuo per l’importo</span>
+              </div>
             </div>
             <table className={base.summaryTable}>
               <thead>
@@ -427,6 +434,7 @@ export function MatchingSuggestionPage() {
                       <th className={base.numeric}>Solo suggerimento</th>
                       <th className={base.numeric}>Senza suggerimento</th>
                       <th className={base.numeric}>di cui collegate da AFC</th>
+                      <th className={base.numeric}>Oltre l’ordine</th>
                       <th className={base.numeric}>Diverse da AFC</th>
                     </tr>
                   </thead>
@@ -450,6 +458,7 @@ export function MatchingSuggestionPage() {
                         <td className={base.numeric}>{integer(counts.hint)}</td>
                         <td className={base.numeric}>{integer(counts.residual)}</td>
                         <td className={base.numeric}>{integer(counts.residualLinked)}</td>
+                        <td className={`${base.numeric} ${counts.overBilled > 0 ? base.codeWarn : ''}`}>{integer(counts.overBilled)}</td>
                         <td className={`${base.numeric} ${counts.wrong > 0 ? base.codeWarn : ''}`}>{integer(counts.wrong)}</td>
                       </tr>
                     ))}
@@ -486,6 +495,7 @@ export function MatchingSuggestionPage() {
                           <th>Ordini o contratti proposti</th>
                           <th>Ordini collegati da AFC</th>
                           <th>Confronto</th>
+                          <th>Segnalazione</th>
                           <th>Livelli provati</th>
                           <th>Famiglia</th>
                         </tr>
@@ -505,6 +515,7 @@ export function MatchingSuggestionPage() {
                               <td className={base.codesCell}>{proposalsText(s)}</td>
                               <td className={base.codesCell}>{afcLinksText(invoice)}</td>
                               <td className={warn ? base.codeWarn : undefined}>{verdictLabel(s.verdict)}</td>
+                              <td className={s.over_billed ? base.codeWarn : undefined}>{s.over_billed ? 'Fatturato oltre l’ordine' : '—'}</td>
                               <td>
                                 <ul className={styles.checkList}>
                                   {s.checks.map((check) => (
