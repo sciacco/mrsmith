@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { formatCurrency, formatInstant, formatLocalDate, formatNumber } from '@mrsmith/format';
 import { Button, Drawer, Icon, SearchInput, Skeleton, TabNav, VisuallyHidden } from '@mrsmith/ui';
 import { useMatchingFunnel, useSDIImportStatus } from '../api/queries';
@@ -165,6 +165,12 @@ const sdiImportStaleAfterMs = 24 * 60 * 60 * 1000;
 
 function sdiImportModeLabel(mode: 'incremental' | 'full'): string {
   return mode === 'full' ? 'passata completa' : 'incrementale';
+}
+
+// breakable lets long constant names (PENDING_APPROVAL_PROVIDER) wrap at the
+// underscores instead of mid-word.
+function breakable(value: string): string {
+  return value.replaceAll('_', '_\u200b');
 }
 
 function sdiImportStatusLabel(status: SDIImportStatus | undefined): { text: string; stale: boolean } {
@@ -370,6 +376,38 @@ export function MatchingFunnelPage() {
               </table>
               <p className={styles.summaryNote}>
                 Ordini di tipo 22 letti da Alyante, tutti gli anni. Il residuo di ogni riga è quantità ordinata meno quantità delle righe di fattura che AFC vi ha collegato. Un ordine è aperto se una riga ha residuo.
+              </p>
+            </section>
+
+            <section className={styles.summaryPanel}>
+              <h2>Catena RDA → ordine Alyante</h2>
+              <table className={styles.summaryTable}>
+                <thead>
+                  <tr><th scope="col">RDA per tipo</th><th scope="col">Con ordine</th><th scope="col">Senza</th></tr>
+                </thead>
+                <tbody>
+                  {Object.entries(query.data.chain.rdas_by_type).sort().map(([kind, counts]) => (
+                    <Fragment key={kind}>
+                      <tr><th scope="row">{kind}</th><td>{integer(counts.with_order)}</td><td>{integer(counts.without_order)}</td></tr>
+                      {Object.entries(counts.without_order_by_state).sort(([, a], [, b]) => b - a).map(([state, count]) => (
+                        <tr key={state}><th scope="row" className={styles.summarySubRow}>di cui {breakable(state)}</th><td colSpan={2}>{integer(count)}</td></tr>
+                      ))}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+              <table className={styles.summaryTable}>
+                <thead>
+                  <tr><th scope="col">Ordini per anno</th><th scope="col">RDA</th><th scope="col">PA</th><th scope="col">Senza</th></tr>
+                </thead>
+                <tbody>
+                  {Object.entries(query.data.chain.orders_by_year).sort().map(([year, counts]) => (
+                    <tr key={year}><th scope="row">{year}</th><td>{integer(counts.with_rda_code)}</td><td>{integer(counts.with_legacy_code)}</td><td>{integer(counts.without_code)}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className={styles.summaryNote}>
+                Una RDA ha ordine se un ordine Alyante porta il suo codice nel numero originale. Per gli ordini, il codice nel numero originale è RDA Arak, PA del gestionale precedente o assente: senza codice la catena verso la RDA si spezza.
               </p>
             </section>
 
@@ -631,7 +669,9 @@ export function MatchingFunnelPage() {
                         <thead>
                           <tr>
                             <th>Codice</th>
+                            <th>Tipo</th>
                             <th>Stato</th>
+                            <th>Ordine Alyante</th>
                             <th>Oggetto</th>
                             <th>Creazione</th>
                             <th>Profilo</th>
@@ -642,7 +682,9 @@ export function MatchingFunnelPage() {
                           {activeSupplier.candidates.map((candidate) => (
                             <tr key={candidate.id}>
                               <td>{candidate.code || `ID ${integer(candidate.id)}`}</td>
+                              <td>{candidate.type || '—'}</td>
                               <td>{candidate.state || '—'}</td>
+                              <td>{candidate.has_order ? 'sì' : <span className={styles.codeWarn}>no</span>}</td>
                               <td className={styles.objectCell}>{candidate.object || '—'}</td>
                               <td>{date(candidate.created)}</td>
                               <td>{profileLabel(candidate.profile)}</td>

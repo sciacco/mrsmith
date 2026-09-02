@@ -65,10 +65,29 @@ func NewSDIImporter(db *sql.DB, client *fattureincloud.Client, logger *slog.Logg
 	}
 }
 
-// Run executes one import at start, then one every interval until ctx ends.
+// Run executes one import every interval until ctx ends. At start it closes
+// the runs left open by a previous process and, when the last successful run
+// is more recent than the interval, waits for the remaining time instead of
+// running at once: a restart does not add a run.
 func (im *SDIImporter) Run(ctx context.Context, interval time.Duration) {
 	if interval <= 0 {
 		interval = sdiImportInterval
+	}
+	if err := im.closeOrphans(ctx); err != nil {
+		im.logger.Warn("sdi import: chiusura esecuzioni interrotte fallita", "error", err)
+	}
+	wait, err := im.timeToNextRun(ctx, interval)
+	if err != nil {
+		im.logger.Warn("sdi import: lettura ultima esecuzione fallita", "error", err)
+		wait = 0
+	}
+	if wait > 0 {
+		im.logger.Info("sdi import: ultimo giro recente, prossimo giro rinviato", "wait", wait.Round(time.Second))
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(wait):
+		}
 	}
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -82,6 +101,43 @@ func (im *SDIImporter) Run(ctx context.Context, interval time.Duration) {
 		case <-ticker.C:
 		}
 	}
+}
+
+// closeOrphans marks as stopped the runs that a previous process left without
+// an outcome: the backend was restarted while they were running.
+func (im *SDIImporter) closeOrphans(ctx context.Context) error {
+	if im == nil || im.db == nil {
+		return nil
+	}
+	_, err := im.db.ExecContext(ctx, `
+UPDATE smartpassive.sdi_import_run
+SET finished_at = now(),
+    outcome = $1,
+    details = details || jsonb_build_object('stop_reason', 'interrotto da riavvio del backend')
+WHERE finished_at IS NULL`, sdiImportOutcomeStopped)
+	return err
+}
+
+// timeToNextRun returns how long to wait before the next run so that runs stay
+// one interval apart from the last successful one; zero when a run is due.
+func (im *SDIImporter) timeToNextRun(ctx context.Context, interval time.Duration) (time.Duration, error) {
+	if im == nil || im.db == nil {
+		return 0, nil
+	}
+	var last sql.NullTime
+	err := im.db.QueryRowContext(ctx, `
+SELECT max(finished_at) FROM smartpassive.sdi_import_run WHERE outcome = $1`, sdiImportOutcomeOK).Scan(&last)
+	if err != nil {
+		return 0, err
+	}
+	if !last.Valid {
+		return 0, nil
+	}
+	wait := interval - time.Since(last.Time)
+	if wait < 0 {
+		return 0, nil
+	}
+	return wait, nil
 }
 
 // sdiImportDoc identifies one document in the run diagnostics.

@@ -14,6 +14,7 @@ const navGroups: TabGroup[] = [
     label: 'Utility',
     forceDropdown: true,
     items: [
+      { label: 'Abbinamento a livelli', path: '/abbinamento-livelli' },
       { label: 'Funnel dati', path: '/funnel-dati' },
       { label: 'Fatture Alyante', path: '/fatture-alyante' },
       { label: 'RDA Arak', path: '/rda-arak' },

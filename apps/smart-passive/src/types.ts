@@ -239,6 +239,49 @@ export interface MatchingFunnelSDISummary {
   order_rule_ambiguous_resolved: number;
 }
 
+export type MatchingCascadeLevelKey = 'sdi' | 'orders' | 'residual';
+
+export type MatchingCascadeVerdict = 'match' | 'partial' | 'wrong' | 'no_truth' | 'afc_linked' | 'afc_unlinked';
+
+export type MatchingCascadeSDIReason = '' | 'no_xml' | 'no_ref' | 'no_code' | 'unresolved';
+
+export type MatchingCascadeOrdersReason = '' | 'no_orders' | 'no_open_orders' | 'no_match' | 'ambiguous';
+
+export interface MatchingCascadeInvoice {
+  level: MatchingCascadeLevelKey;
+  proposals: string[];
+  verdict: MatchingCascadeVerdict;
+  sdi_reason: MatchingCascadeSDIReason;
+  orders_reason: MatchingCascadeOrdersReason;
+}
+
+export interface MatchingCascadeLevel {
+  key: 'sdi' | 'orders';
+  entered: number;
+  closed: number;
+  passed: number;
+  match: number;
+  partial: number;
+  wrong: number;
+  no_truth: number;
+}
+
+export interface MatchingCascadeReason {
+  reason: string;
+  count: number;
+  with_afc_link: number;
+}
+
+export interface MatchingCascadeSummary {
+  invoices: number;
+  levels: MatchingCascadeLevel[];
+  residual: number;
+  residual_with_afc_link: number;
+  residual_by_sdi: MatchingCascadeReason[];
+  residual_by_orders: MatchingCascadeReason[];
+  residual_by_pair: MatchingCascadeReason[];
+}
+
 export interface MatchingFunnelInvoice {
   registration: number;
   document_number: string;
@@ -249,12 +292,15 @@ export interface MatchingFunnelInvoice {
   rules: MatchingFunnelRuleResult;
   order_rules: MatchingFunnelOrderRuleResult;
   sdi: MatchingFunnelSDIResult;
+  cascade: MatchingCascadeInvoice;
 }
 
 export interface MatchingFunnelRDA {
   id: number;
   code: string;
   state: string;
+  type: string;
+  has_order: boolean;
   object: string;
   total: number | null;
   currency: string;
@@ -280,8 +326,26 @@ export interface MatchingFunnelSupplier {
 
 export type MatchingFunnelScope = 'open' | 'all';
 
+export interface MatchingFunnelRDAOrderCounts {
+  with_order: number;
+  without_order: number;
+  without_order_by_state: Record<string, number>;
+}
+
+export interface MatchingFunnelOrderYearCounts {
+  with_rda_code: number;
+  with_legacy_code: number;
+  without_code: number;
+}
+
+export interface MatchingFunnelChainSummary {
+  rdas_by_type: Record<string, MatchingFunnelRDAOrderCounts>;
+  orders_by_year: Record<string, MatchingFunnelOrderYearCounts>;
+}
+
 export interface MatchingFunnelResponse {
   scope: MatchingFunnelScope;
+  chain: MatchingFunnelChainSummary;
   summary: {
     invoice_count: number;
     no_candidates: number;
@@ -298,6 +362,7 @@ export interface MatchingFunnelResponse {
   orders: MatchingFunnelOrdersSummary;
   order_rules: MatchingFunnelOrderRulesSummary;
   sdi: MatchingFunnelSDISummary;
+  cascade: MatchingCascadeSummary;
   suppliers: MatchingFunnelSupplier[];
 }
 

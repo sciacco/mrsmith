@@ -509,6 +509,16 @@ func newFunnelOrderIndex(orders []funnelOrder, refs funnelReferenceIndex, links 
 	return idx
 }
 
+// hasOrderFor reports whether an Alyante order carries the RDA code in its
+// original document number.
+func (idx funnelOrderIndex) hasOrderFor(rda funnelRDA) bool {
+	m := rdaCodeShape.FindStringSubmatch(strings.ToUpper(strings.TrimSpace(rda.code)))
+	if m == nil {
+		return false
+	}
+	return len(idx.byArakNumber[m[1]]) > 0
+}
+
 func (idx funnelOrderIndex) candidates(supplierID *int64) []funnelOrder {
 	if supplierID == nil {
 		return nil

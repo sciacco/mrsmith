@@ -107,6 +107,7 @@ const funnelRDAsQuery = `SELECT
     po.id,
     po.code,
     po.state,
+    po."type",
     po.object,
     po.total_price,
     po.currency,
@@ -129,7 +130,7 @@ LEFT JOIN provider_qualifications.provider p ON p.id = po.provider_id
 LEFT JOIN rda.purchase_order_row por ON por.order_id = po.id
 LEFT JOIN rda.purchase_order_row_payment porp ON porp.purchase_order_row_id = por.id
 LEFT JOIN rda.purchase_order_row_renew_rule porr ON porr.purchase_order_row_id = por.id
-WHERE po."state" NOT IN ('DRAFT','CANCELED')
+WHERE po."state" NOT IN ('DRAFT','CANCELED','REJECTED')
   AND po.deleted IS NULL
 ORDER BY po.id, por.id;`
 
@@ -175,6 +176,7 @@ type funnelRDA struct {
 	id           int64
 	code         string
 	state        string
+	rdaType      string
 	object       string
 	total        *float64
 	currency     string
@@ -212,12 +214,17 @@ type MatchingFunnelInvoice struct {
 	Rules             MatchingFunnelRuleResult      `json:"rules"`
 	OrderRules        MatchingFunnelOrderRuleResult `json:"order_rules"`
 	SDI               MatchingFunnelSDIResult       `json:"sdi"`
+	Cascade           MatchingCascadeInvoice        `json:"cascade"`
 }
 
 type MatchingFunnelRDA struct {
-	ID       int64         `json:"id"`
-	Code     string        `json:"code"`
-	State    string        `json:"state"`
+	ID    int64  `json:"id"`
+	Code  string `json:"code"`
+	State string `json:"state"`
+	Type  string `json:"type"`
+	// HasOrder is true when an Alyante order carries this RDA code in its
+	// original document number.
+	HasOrder bool          `json:"has_order"`
 	Object   string        `json:"object"`
 	Total    *float64      `json:"total"`
 	Currency string        `json:"currency"`
@@ -241,15 +248,42 @@ type MatchingFunnelSupplier struct {
 	Orders              []MatchingFunnelOrder          `json:"orders"`
 }
 
+// MatchingFunnelRDAOrderCounts counts, for one RDA type, the RDAs of the
+// universe that have an Alyante order carrying their code and those that do not.
+type MatchingFunnelRDAOrderCounts struct {
+	WithOrder    int `json:"with_order"`
+	WithoutOrder int `json:"without_order"`
+	// WithoutOrderByState splits the RDAs without an order by Arak state, to
+	// tell the ones not yet approved from the ones AFC should have loaded.
+	WithoutOrderByState map[string]int `json:"without_order_by_state"`
+}
+
+// MatchingFunnelOrderYearCounts counts the Alyante orders dated in one year, by
+// document code, by what their original document number carries.
+type MatchingFunnelOrderYearCounts struct {
+	WithRDACode    int `json:"with_rda_code"`
+	WithLegacyCode int `json:"with_legacy_code"`
+	WithoutCode    int `json:"without_code"`
+}
+
+// MatchingFunnelChainSummary measures the RDA → Alyante order link in both
+// directions: which RDAs have an order, and which orders carry a code.
+type MatchingFunnelChainSummary struct {
+	RDAsByType   map[string]MatchingFunnelRDAOrderCounts  `json:"rdas_by_type"`
+	OrdersByYear map[string]MatchingFunnelOrderYearCounts `json:"orders_by_year"`
+}
+
 type MatchingFunnelResponse struct {
 	Scope      funnelScope                     `json:"scope"`
 	Summary    MatchingFunnelSummary           `json:"summary"`
+	Chain      MatchingFunnelChainSummary      `json:"chain"`
 	Profiles   MatchingFunnelProfileCounts     `json:"profiles"`
 	Reference  MatchingFunnelReferenceSummary  `json:"reference"`
 	Rules      MatchingFunnelRulesSummary      `json:"rules"`
 	Orders     MatchingFunnelOrdersSummary     `json:"orders"`
 	OrderRules MatchingFunnelOrderRulesSummary `json:"order_rules"`
 	SDI        MatchingFunnelSDISummary        `json:"sdi"`
+	Cascade    MatchingCascadeSummary          `json:"cascade"`
 	Suppliers  []MatchingFunnelSupplier        `json:"suppliers"`
 }
 
@@ -373,6 +407,7 @@ func (h *Handler) loadFunnelRDAs(r *http.Request) ([]funnelRDA, error) {
 		var id int64
 		var code sql.NullString
 		var state sql.NullString
+		var rdaType sql.NullString
 		var object sql.NullString
 		var total sql.NullFloat64
 		var currency sql.NullString
@@ -385,6 +420,7 @@ func (h *Handler) loadFunnelRDAs(r *http.Request) ([]funnelRDA, error) {
 			&id,
 			&code,
 			&state,
+			&rdaType,
 			&object,
 			&total,
 			&currency,
@@ -412,6 +448,7 @@ func (h *Handler) loadFunnelRDAs(r *http.Request) ([]funnelRDA, error) {
 				id:           id,
 				code:         code.String,
 				state:        state.String,
+				rdaType:      rdaType.String,
 				object:       object.String,
 				total:        float64Ptr(total),
 				currency:     currency.String,
@@ -444,7 +481,9 @@ func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA, orders []fu
 	referenceIndex := newFunnelReferenceIndex(rdas)
 	orderIndex := newFunnelOrderIndex(orders, referenceIndex, orderLinks)
 	response := MatchingFunnelResponse{
-		Orders: orderIndex.summary,
+		Orders:  orderIndex.summary,
+		Chain:   buildChainSummary(rdas, orders, orderIndex),
+		Cascade: newCascadeSummary(),
 		Summary: MatchingFunnelSummary{
 			InvoiceCount:      len(invoices),
 			RDACount:          len(rdas),
@@ -553,6 +592,8 @@ func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA, orders []fu
 			addOrderRuleResult(&response.OrderRules, orderRules)
 			sdi := applySDI(invoice, sdiDocs[normalizeDocNumber(invoice.supplierReference)], orderIndex, referenceIndex)
 			addSDIResult(&response.SDI, sdi, orderRules)
+			cascade := applyCascade(sdi, orderRules, len(orderCandidates))
+			addCascade(&response.Cascade, cascade)
 			switch funnelOutcome(orderRules.OpenCandidates) {
 			case "none":
 				response.Orders.InvoicesNoOpen++
@@ -571,6 +612,7 @@ func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA, orders []fu
 				Rules:             rules,
 				OrderRules:        orderRules,
 				SDI:               sdi,
+				Cascade:           cascade,
 			})
 		}
 		for _, candidate := range candidates {
@@ -580,6 +622,8 @@ func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA, orders []fu
 				ID:       candidate.id,
 				Code:     candidate.code,
 				State:    candidate.state,
+				Type:     candidate.rdaType,
+				HasOrder: orderIndex.hasOrderFor(candidate),
 				Object:   candidate.object,
 				Total:    candidate.total,
 				Currency: candidate.currency,
@@ -600,6 +644,9 @@ func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA, orders []fu
 		response.Suppliers = append(response.Suppliers, row)
 	}
 
+	sortReasons(response.Cascade.ResidualBySDI)
+	sortReasons(response.Cascade.ResidualByOrders)
+	sortReasons(response.Cascade.ResidualByPair)
 	sort.Slice(response.Suppliers, func(i, j int) bool {
 		if response.Suppliers[i].InvoiceCount != response.Suppliers[j].InvoiceCount {
 			return response.Suppliers[i].InvoiceCount > response.Suppliers[j].InvoiceCount
@@ -615,6 +662,49 @@ func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA, orders []fu
 	})
 
 	return response
+}
+
+// buildChainSummary measures the RDA → order link in both directions.
+func buildChainSummary(rdas []funnelRDA, orders []funnelOrder, idx funnelOrderIndex) MatchingFunnelChainSummary {
+	out := MatchingFunnelChainSummary{
+		RDAsByType:   make(map[string]MatchingFunnelRDAOrderCounts),
+		OrdersByYear: make(map[string]MatchingFunnelOrderYearCounts),
+	}
+	for _, rda := range rdas {
+		kind := rda.rdaType
+		if kind == "" {
+			kind = "?"
+		}
+		counts := out.RDAsByType[kind]
+		if counts.WithoutOrderByState == nil {
+			counts.WithoutOrderByState = make(map[string]int)
+		}
+		if idx.hasOrderFor(rda) {
+			counts.WithOrder++
+		} else {
+			counts.WithoutOrder++
+			counts.WithoutOrderByState[rda.state]++
+		}
+		out.RDAsByType[kind] = counts
+	}
+	for _, o := range orders {
+		year := "?"
+		if o.date != nil {
+			year = strconv.Itoa(o.date.Year())
+		}
+		year += " " + o.docCode
+		counts := out.OrdersByYear[year]
+		switch {
+		case o.rdaCode == nil:
+			counts.WithoutCode++
+		case o.rdaLegacy:
+			counts.WithLegacyCode++
+		default:
+			counts.WithRDACode++
+		}
+		out.OrdersByYear[year] = counts
+	}
+	return out
 }
 
 func classifyFunnelRDA(rda funnelRDA) funnelProfile {
