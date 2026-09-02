@@ -233,9 +233,12 @@ type MatchingFunnelRDA struct {
 }
 
 type MatchingFunnelSupplier struct {
-	SupplierERPID       *int64                         `json:"supplier_erp_id"`
-	AlyanteSupplierName *string                        `json:"alyante_supplier_name"`
-	ProviderName        *string                        `json:"provider_name"`
+	SupplierERPID       *int64  `json:"supplier_erp_id"`
+	AlyanteSupplierName *string `json:"alyante_supplier_name"`
+	ProviderName        *string `json:"provider_name"`
+	// Billing is the supplier's billing profile read from all its electronic
+	// invoices; nil when the supplier never sent one.
+	Billing             *MatchingSupplierBilling       `json:"billing"`
 	InvoiceCount        int                            `json:"invoice_count"`
 	CandidateCount      int                            `json:"candidate_count"`
 	Outcome             string                         `json:"outcome"`
@@ -335,7 +338,13 @@ func (h *Handler) handleMatchingFunnel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := buildMatchingFunnel(invoices, rdas, orders, invoiceLines, orderLinks, sdiDocs)
+	billing, err := h.loadFunnelBilling(r)
+	if err != nil {
+		httputil.InternalError(w, r, err, "matching funnel billing query failed", "component", component, "operation", "load_funnel_billing")
+		return
+	}
+
+	response := buildMatchingFunnel(invoices, rdas, orders, invoiceLines, orderLinks, sdiDocs, billing)
 	response.Scope = scope
 	httputil.JSON(w, http.StatusOK, response)
 }
@@ -475,8 +484,9 @@ func (h *Handler) loadFunnelRDAs(r *http.Request) ([]funnelRDA, error) {
 	return out, nil
 }
 
-func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA, orders []funnelOrder, invoiceLines map[string][]funnelDocLine, orderLinks funnelOrderLinks, sdiDocs map[string][]*sdiDocument) MatchingFunnelResponse {
+func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA, orders []funnelOrder, invoiceLines map[string][]funnelDocLine, orderLinks funnelOrderLinks, sdiDocs map[string][]*sdiDocument, billing map[string]MatchingSupplierBilling) MatchingFunnelResponse {
 	rdasBySupplier := make(map[int64][]funnelRDA)
+	rdaByID := make(map[int64]funnelRDA, len(rdas))
 	profilesByRDA := make(map[int64]funnelProfile, len(rdas))
 	referenceIndex := newFunnelReferenceIndex(rdas)
 	orderIndex := newFunnelOrderIndex(orders, referenceIndex, orderLinks)
@@ -494,6 +504,7 @@ func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA, orders []fu
 	}
 
 	for _, rda := range rdas {
+		rdaByID[rda.id] = rda
 		profile := classifyFunnelRDA(rda)
 		profilesByRDA[rda.id] = profile
 		addFunnelProfile(&response.Profiles, profile)
@@ -580,6 +591,11 @@ func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA, orders []fu
 			row.AlyanteSupplierName = &name
 		}
 		for _, invoice := range acc.invoices {
+			if row.Billing = supplierBilling(billing, invoice); row.Billing != nil {
+				break
+			}
+		}
+		for _, invoice := range acc.invoices {
 			reference := referenceIndex.resolve(invoice, parseAFCNote(invoice.note))
 			addReferenceOutcome(&row.Reference, reference)
 			addReferenceOutcome(&response.Reference, reference)
@@ -592,7 +608,7 @@ func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA, orders []fu
 			addOrderRuleResult(&response.OrderRules, orderRules)
 			sdi := applySDI(invoice, sdiDocs[normalizeDocNumber(invoice.supplierReference)], orderIndex, referenceIndex)
 			addSDIResult(&response.SDI, sdi, orderRules)
-			cascade := applyCascade(sdi, orderRules, len(orderCandidates))
+			cascade := applyCascade(invoice, sdi, orderRules, orderCandidates, candidates, orderIndex, rdaByID)
 			addCascade(&response.Cascade, cascade)
 			switch funnelOutcome(orderRules.OpenCandidates) {
 			case "none":
@@ -647,6 +663,7 @@ func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA, orders []fu
 	sortReasons(response.Cascade.ResidualBySDI)
 	sortReasons(response.Cascade.ResidualByOrders)
 	sortReasons(response.Cascade.ResidualByPair)
+	sortReasons(response.Cascade.ResidualByFamily)
 	sort.Slice(response.Suppliers, func(i, j int) bool {
 		if response.Suppliers[i].InvoiceCount != response.Suppliers[j].InvoiceCount {
 			return response.Suppliers[i].InvoiceCount > response.Suppliers[j].InvoiceCount

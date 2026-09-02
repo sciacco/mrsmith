@@ -77,6 +77,17 @@ function ordersReasonLabel(reason: string): string {
   }
 }
 
+function familyLabel(family: string): string {
+  switch (family) {
+    case 'recurring_in_course': return 'Contratto ricorrente in corso';
+    case 'goods_orders': return 'Ordini di beni mai collegati';
+    case 'service_orders_expired': return 'Ordini a servizi, nessuno in corso';
+    case 'rda_only': return 'Solo RDA, senza ordine';
+    case 'unknown': return 'Fornitore senza ordini né RDA';
+    default: return '—';
+  }
+}
+
 function pairLabel(reason: string): string {
   const [sdi = '', orders = ''] = reason.split(' / ');
   return `${sdiReasonLabel(sdi)} · ${ordersReasonLabel(orders)}`;
@@ -119,6 +130,14 @@ function supplierCounts(row: MatchingFunnelSupplier): SupplierCounts {
     if (c.verdict === 'wrong' || c.verdict === 'partial') counts.wrong++;
   }
   return counts;
+}
+
+function decimal(value: number): string {
+  return formatNumber(value, { format: { maximumFractionDigits: 1 } }) ?? String(value);
+}
+
+function share(value: number): string {
+  return `${Math.round(value * 100)}%`;
 }
 
 function supplierLabel(row: MatchingFunnelSupplier): string {
@@ -266,6 +285,7 @@ export function MatchingCascadePage() {
           </div>
 
           <div className={styles.residualGrid}>
+            <ReasonTable title="Residuo per famiglia" rows={cascade.residual_by_family} label={familyLabel} />
             <ReasonTable title="Residuo per esito del livello 1" rows={cascade.residual_by_sdi} label={sdiReasonLabel} />
             <ReasonTable title="Residuo per esito del livello 2" rows={cascade.residual_by_orders} label={ordersReasonLabel} />
             <ReasonTable title="Residuo per coppia di esiti" rows={cascade.residual_by_pair} label={pairLabel} />
@@ -275,7 +295,7 @@ export function MatchingCascadePage() {
             <div className={base.toolbar}>
               <div>
                 <h2>Per fornitore</h2>
-                <p>Dove si fermano le fatture di ogni fornitore.</p>
+                <p>Dove si fermano le fatture di ogni fornitore, e come il fornitore fattura: XML ricevuti al mese, righe per XML, quota di XML con lo stesso imponibile di un altro, quota con periodo di competenza.</p>
               </div>
               <SearchInput
                 value={search}
@@ -305,6 +325,10 @@ export function MatchingCascadePage() {
                       <th className={base.numeric}>Residuo</th>
                       <th className={base.numeric}>di cui collegate da AFC</th>
                       <th className={base.numeric}>Diverse da AFC</th>
+                      <th className={base.numeric}>XML al mese</th>
+                      <th className={base.numeric}>Righe per XML</th>
+                      <th className={base.numeric}>Stesso imponibile</th>
+                      <th className={base.numeric}>Con periodo</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -328,6 +352,10 @@ export function MatchingCascadePage() {
                         <td className={base.numeric}>{integer(counts.residual)}</td>
                         <td className={base.numeric}>{integer(counts.residualLinked)}</td>
                         <td className={`${base.numeric} ${counts.wrong > 0 ? base.codeWarn : ''}`}>{integer(counts.wrong)}</td>
+                        <td className={base.numeric}>{row.billing ? decimal(row.billing.per_month) : '—'}</td>
+                        <td className={base.numeric}>{row.billing ? decimal(row.billing.median_lines) : '—'}</td>
+                        <td className={base.numeric}>{row.billing ? share(row.billing.repeat_share) : '—'}</td>
+                        <td className={base.numeric}>{row.billing ? share(row.billing.period_share) : '—'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -364,6 +392,7 @@ export function MatchingCascadePage() {
                           <th>Ordini collegati da AFC</th>
                           <th>Confronto</th>
                           <th>Motivo del residuo</th>
+                          <th>Famiglia</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -380,6 +409,7 @@ export function MatchingCascadePage() {
                               <td className={base.codesCell}>{afcLinksText(invoice)}</td>
                               <td className={warn ? base.codeWarn : undefined}>{verdictLabel(c.verdict)}</td>
                               <td>{residualReason(c)}</td>
+                              <td>{familyLabel(c.family)}</td>
                             </tr>
                           );
                         })}

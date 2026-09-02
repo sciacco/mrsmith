@@ -3,6 +3,7 @@ package smartpassive
 import (
 	"sort"
 	"strings"
+	"time"
 )
 
 // The cascade runs the matching as a sequence of levels: each level tries to
@@ -36,6 +37,10 @@ type MatchingCascadeInvoice struct {
 	// OrdersReason tells why level 2 did not close: no_orders, no_open_orders,
 	// no_match, ambiguous.
 	OrdersReason string `json:"orders_reason"`
+	// Family classifies a residual invoice by what exists upstream for its
+	// supplier: recurring_in_course, goods_orders, service_orders_expired,
+	// rda_only, unknown.
+	Family string `json:"family"`
 }
 
 type MatchingCascadeLevel struct {
@@ -63,7 +68,8 @@ type MatchingCascadeSummary struct {
 	ResidualBySDI       []MatchingCascadeReason `json:"residual_by_sdi"`
 	ResidualByOrders    []MatchingCascadeReason `json:"residual_by_orders"`
 	// ResidualByPair crosses the two reasons ("no_xml / ambiguous").
-	ResidualByPair []MatchingCascadeReason `json:"residual_by_pair"`
+	ResidualByPair   []MatchingCascadeReason `json:"residual_by_pair"`
+	ResidualByFamily []MatchingCascadeReason `json:"residual_by_family"`
 }
 
 func newCascadeSummary() MatchingCascadeSummary {
@@ -74,7 +80,7 @@ func newCascadeSummary() MatchingCascadeSummary {
 
 // applyCascade derives the cascade outcome of one invoice from the level
 // results already computed, using the AFC links as the check.
-func applyCascade(sdi MatchingFunnelSDIResult, orderRules MatchingFunnelOrderRuleResult, supplierOrders int) MatchingCascadeInvoice {
+func applyCascade(invoice funnelInvoice, sdi MatchingFunnelSDIResult, orderRules MatchingFunnelOrderRuleResult, supplierOrders []funnelOrder, supplierRDAs []funnelRDA, idx funnelOrderIndex, rdaByID map[int64]funnelRDA) MatchingCascadeInvoice {
 	out := MatchingCascadeInvoice{Proposals: []string{}}
 
 	// Level 1: order reference in the XML.
@@ -111,7 +117,7 @@ func applyCascade(sdi MatchingFunnelSDIResult, orderRules MatchingFunnelOrderRul
 	if out.Level == "" {
 		unique := len(orderRules.Proposals) == 1 && orderRules.AmbiguousLines == 0
 		switch {
-		case supplierOrders == 0:
+		case len(supplierOrders) == 0:
 			out.OrdersReason = "no_orders"
 		case orderRules.OpenCandidates == 0:
 			out.OrdersReason = "no_open_orders"
@@ -130,6 +136,7 @@ func applyCascade(sdi MatchingFunnelSDIResult, orderRules MatchingFunnelOrderRul
 	sort.Strings(truth)
 	if out.Level == "" {
 		out.Level = cascadeLevelResidual
+		out.Family = classifyResidual(invoice, supplierOrders, supplierRDAs, idx.rdaByOrder, rdaByID)
 		if len(truth) > 0 {
 			out.Verdict = "afc_linked"
 		} else {
@@ -185,6 +192,7 @@ func addCascade(summary *MatchingCascadeSummary, result MatchingCascadeInvoice) 
 		summary.ResidualBySDI = addReason(summary.ResidualBySDI, result.SDIReason, linked)
 		summary.ResidualByOrders = addReason(summary.ResidualByOrders, result.OrdersReason, linked)
 		summary.ResidualByPair = addReason(summary.ResidualByPair, result.SDIReason+" / "+result.OrdersReason, linked)
+		summary.ResidualByFamily = addReason(summary.ResidualByFamily, result.Family, linked)
 	}
 }
 
@@ -235,4 +243,95 @@ func sortedKeys(set map[string]struct{}) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// Residual families, in order of precedence.
+const (
+	familyRecurringInCourse    = "recurring_in_course"
+	familyGoodsOrders          = "goods_orders"
+	familyServiceOrdersExpired = "service_orders_expired"
+	familyRDAOnly              = "rda_only"
+	familyUnknown              = "unknown"
+)
+
+// classifyResidual tells what exists upstream for the supplier of a residual
+// invoice. A service order is "in course" when the invoice date falls within
+// its duration: for orders with a known RDA the recurrence rules of the RDA
+// decide, otherwise the order lines, whose quantity is the number of months
+// for recurring services. A recurring RDA is in course from its creation for
+// the initial months, or indefinitely when it renews automatically.
+func classifyResidual(invoice funnelInvoice, orders []funnelOrder, rdas []funnelRDA, rdaByOrder map[string]*int64, rdaByID map[int64]funnelRDA) string {
+	hasGoods, hasService := false, false
+	for _, o := range orders {
+		switch {
+		case strings.HasPrefix(o.docCode, "BGF"):
+			hasGoods = true
+		default:
+			hasService = true
+			if invoice.documentDate == nil {
+				continue
+			}
+			// With the RDA known, its recurrence rules decide; otherwise
+			// the order lines: a quantity of 12 or more reads as months.
+			if id := rdaByOrder[o.key]; id != nil {
+				if rda, ok := rdaByID[*id]; ok && recurringRDACovers(rda, *invoice.documentDate) {
+					return familyRecurringInCourse
+				}
+				continue
+			}
+			if serviceOrderCovers(o, *invoice.documentDate) {
+				return familyRecurringInCourse
+			}
+		}
+	}
+	for _, rda := range rdas {
+		if invoice.documentDate != nil && recurringRDACovers(rda, *invoice.documentDate) {
+			return familyRecurringInCourse
+		}
+	}
+	switch {
+	case hasGoods:
+		return familyGoodsOrders
+	case hasService:
+		return familyServiceOrdersExpired
+	case len(rdas) > 0:
+		return familyRDAOnly
+	default:
+		return familyUnknown
+	}
+}
+
+func serviceOrderCovers(o funnelOrder, day time.Time) bool {
+	if o.date == nil || o.date.After(day) {
+		return false
+	}
+	months := 0.0
+	for _, l := range o.lines {
+		if l.isAmountLine() && l.qty != nil && *l.qty > months {
+			months = *l.qty
+		}
+	}
+	if months < 12 {
+		return false
+	}
+	end := o.date.AddDate(0, int(months), 0)
+	return !day.After(end)
+}
+
+func recurringRDACovers(rda funnelRDA, day time.Time) bool {
+	if rda.created == nil || rda.created.After(day) {
+		return false
+	}
+	for _, l := range rda.lines {
+		if classifyFunnelLine(l) != funnelProfileRecurring {
+			continue
+		}
+		if l.automaticRenew.Valid && l.automaticRenew.Bool {
+			return true
+		}
+		if l.initialMonths.Valid && !day.After(rda.created.AddDate(0, int(l.initialMonths.Int64), 0)) {
+			return true
+		}
+	}
+	return false
 }

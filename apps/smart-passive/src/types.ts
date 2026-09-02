@@ -253,6 +253,7 @@ export interface MatchingCascadeInvoice {
   verdict: MatchingCascadeVerdict;
   sdi_reason: MatchingCascadeSDIReason;
   orders_reason: MatchingCascadeOrdersReason;
+  family: '' | 'recurring_in_course' | 'goods_orders' | 'service_orders_expired' | 'rda_only' | 'unknown';
 }
 
 export interface MatchingCascadeLevel {
@@ -280,6 +281,7 @@ export interface MatchingCascadeSummary {
   residual_by_sdi: MatchingCascadeReason[];
   residual_by_orders: MatchingCascadeReason[];
   residual_by_pair: MatchingCascadeReason[];
+  residual_by_family: MatchingCascadeReason[];
 }
 
 export interface MatchingFunnelInvoice {
@@ -308,10 +310,21 @@ export interface MatchingFunnelRDA {
   profile: MatchingFunnelProfile;
 }
 
+export interface MatchingSupplierBilling {
+  documents: number;
+  months: number;
+  per_month: number;
+  median_lines: number;
+  repeat_share: number;
+  period_share: number;
+  code_share: number;
+}
+
 export interface MatchingFunnelSupplier {
   supplier_erp_id: number | null;
   alyante_supplier_name: string | null;
   provider_name: string | null;
+  billing: MatchingSupplierBilling | null;
   invoice_count: number;
   candidate_count: number;
   outcome: 'none' | 'one' | 'multiple';

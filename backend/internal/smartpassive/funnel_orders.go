@@ -581,6 +581,9 @@ func applyOrderRules(invoice funnelInvoice, lines []funnelDocLine, idx funnelOrd
 	result := MatchingFunnelOrderRuleResult{Proposals: [][]string{}, AFCLinks: []string{}}
 	own := idx.links.own(invoice.key)
 	links := idx.links.ordersOf(invoice.key)
+	// Orders dated after the invoice stay candidates: AFC often loads the
+	// order in Alyante when the invoice arrives, so the order date is the
+	// loading date, not the origination date (101 of 953 AFC links in 2026).
 	candidates := idx.openCandidates(invoice.supplierID, own)
 	result.OpenCandidates = len(candidates)
 	for _, link := range links {
