@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { formatCurrency, formatLocalDate, formatNumber } from '@mrsmith/format';
+import { formatCurrency, formatInstant, formatLocalDate, formatNumber } from '@mrsmith/format';
 import { Button, Drawer, Icon, SearchInput, Skeleton, TabNav, VisuallyHidden } from '@mrsmith/ui';
-import { useMatchingFunnel } from '../api/queries';
-import type { MatchingFunnelInvoice, MatchingFunnelReferencedRDA, MatchingFunnelScope, MatchingFunnelSupplier } from '../types';
+import { useMatchingFunnel, useSDIImportStatus } from '../api/queries';
+import type { MatchingFunnelInvoice, MatchingFunnelReferencedRDA, MatchingFunnelScope, MatchingFunnelSupplier, SDIImportStatus } from '../types';
 import styles from './MatchingFunnelPage.module.css';
 
 function integer(value: number): string {
@@ -159,6 +159,26 @@ function arakSupplierLabel(row: MatchingFunnelSupplier): string {
   return row.provider_name ?? 'Nessuna RDA candidata';
 }
 
+// The import runs every 8 hours: a success older than a day means three
+// missed runs, which is the only signal worth showing.
+const sdiImportStaleAfterMs = 24 * 60 * 60 * 1000;
+
+function sdiImportModeLabel(mode: 'incremental' | 'full'): string {
+  return mode === 'full' ? 'passata completa' : 'incrementale';
+}
+
+function sdiImportStatusLabel(status: SDIImportStatus | undefined): { text: string; stale: boolean } {
+  if (!status) return { text: '—', stale: false };
+  if (!status.last_success) {
+    return { text: 'Nessun giro riuscito', stale: status.last_run !== null };
+  }
+  const run = status.last_success;
+  const finished = run.finished_at ?? run.started_at;
+  const when = formatInstant(finished) ?? finished;
+  const stale = Date.now() - new Date(finished).getTime() > sdiImportStaleAfterMs;
+  return { text: `${when} (${sdiImportModeLabel(run.mode)}, ${integer(run.inserted)} inseriti)`, stale };
+}
+
 const scopeTabs = [
   { key: 'open', label: 'Fatture da saldare' },
   { key: 'all', label: 'Tutte le fatture 2026' },
@@ -167,6 +187,8 @@ const scopeTabs = [
 export function MatchingFunnelPage() {
   const [scope, setScope] = useState<MatchingFunnelScope>('open');
   const query = useMatchingFunnel(scope);
+  const importStatus = useSDIImportStatus();
+  const importLabel = sdiImportStatusLabel(importStatus.data);
   const [search, setSearch] = useState('');
   const [activeSupplierID, setActiveSupplierID] = useState<number | 'missing' | null>(null);
   const suppliers = query.data?.suppliers ?? [];
@@ -375,6 +397,12 @@ export function MatchingFunnelPage() {
               <h2>Fattura elettronica (SDI)</h2>
               <table className={styles.summaryTable}>
                 <tbody>
+                  <tr>
+                    <th scope="row">Ultima importazione riuscita</th>
+                    <td className={importLabel.stale ? styles.codeWarn : undefined}>
+                      {importStatus.isError ? 'Stato non disponibile' : importLabel.text}
+                    </td>
+                  </tr>
                   <tr><th scope="row">Fatture con XML agganciato</th><td>{integer(query.data.sdi.invoices_linked)}</td></tr>
                   <tr><th scope="row">di cui solo per numero e data</th><td>{integer(query.data.sdi.linked_number_only)}</td></tr>
                   <tr><th scope="row">Fatture senza XML</th><td>{integer(query.data.sdi.invoices_not_linked)}</td></tr>

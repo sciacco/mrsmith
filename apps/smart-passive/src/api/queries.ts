@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useApiClient } from './client';
-import type { AlyanteInvoiceRow, ArakRDARow, MatchingFunnelResponse, MatchingFunnelScope } from '../types';
+import type { AlyanteInvoiceRow, ArakRDARow, MatchingFunnelResponse, MatchingFunnelScope, SDIImportStatus } from '../types';
 
 export function useAlyanteInvoices() {
   const api = useApiClient();
@@ -15,6 +15,14 @@ export function useMatchingFunnel(scope: MatchingFunnelScope) {
   return useQuery<MatchingFunnelResponse>({
     queryKey: ['smart-passive', 'matching-funnel', scope],
     queryFn: () => api.get<MatchingFunnelResponse>(`/smart-passive/v1/matching-funnel?scope=${scope}`),
+  });
+}
+
+export function useSDIImportStatus() {
+  const api = useApiClient();
+  return useQuery<SDIImportStatus>({
+    queryKey: ['smart-passive', 'sdi-import-status'],
+    queryFn: () => api.get<SDIImportStatus>('/smart-passive/v1/sdi-import/status'),
   });
 }
 

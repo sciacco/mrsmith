@@ -301,6 +301,20 @@ export interface MatchingFunnelResponse {
   suppliers: MatchingFunnelSupplier[];
 }
 
+export interface SDIImportRun {
+  id: number;
+  started_at: string;
+  finished_at: string | null;
+  mode: 'incremental' | 'full';
+  outcome: 'ok' | 'failed' | 'stopped' | null;
+  inserted: number;
+}
+
+export interface SDIImportStatus {
+  last_success: SDIImportRun | null;
+  last_run: SDIImportRun | null;
+}
+
 export interface ArakRDARow {
   id: number | null;
   type: string | null;

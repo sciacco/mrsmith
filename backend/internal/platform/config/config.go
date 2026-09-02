@@ -167,6 +167,12 @@ type Config struct {
 	FactorialAPIKey  string
 	FactorialBaseURL string
 
+	// Fatture in Cloud (SDI received invoices) and the Smart Passive import job.
+	FattureInCloudToken           string
+	FattureInCloudCompanyID       int64
+	SmartPassiveSDIImportEnabled  bool
+	SmartPassiveSDIImportInterval time.Duration
+
 	// Frontend Keycloak (public client, no secret — served to browser via GET /config)
 	KeycloakFrontendURL      string
 	KeycloakFrontendRealm    string
@@ -309,6 +315,11 @@ func Load() Config {
 
 		FactorialAPIKey:  envOr("FACTORIAL_API_KEY", ""),
 		FactorialBaseURL: envOr("FACTORIAL_BASE_URL", ""),
+
+		FattureInCloudToken:           envOr("FATTUREINCLOUD_TOKEN", ""),
+		FattureInCloudCompanyID:       int64(positiveIntEnvOr("FATTUREINCLOUD_COMPANY_ID", 0)),
+		SmartPassiveSDIImportEnabled:  boolEnvOr("SMART_PASSIVE_SDI_IMPORT_ENABLED", false),
+		SmartPassiveSDIImportInterval: durationEnvOr("SMART_PASSIVE_SDI_IMPORT_INTERVAL", 8*time.Hour),
 
 		KeycloakFrontendURL:      keycloakFrontendURL,
 		KeycloakFrontendRealm:    keycloakFrontendRealm,

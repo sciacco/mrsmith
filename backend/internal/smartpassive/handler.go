@@ -307,6 +307,20 @@ func RegisterRoutes(mux *http.ServeMux, alyanteDB, arakDB, anisettaDB *sql.DB) {
 	mux.Handle("GET /smart-passive/v1/alyante-invoices", protect(http.HandlerFunc(h.handleAlyanteInvoices)))
 	mux.Handle("GET /smart-passive/v1/arak-rdas", protect(http.HandlerFunc(h.handleArakRDAs)))
 	mux.Handle("GET /smart-passive/v1/matching-funnel", protect(http.HandlerFunc(h.handleMatchingFunnel)))
+	mux.Handle("GET /smart-passive/v1/sdi-import/status", protect(http.HandlerFunc(h.handleSDIImportStatus)))
+}
+
+func (h *Handler) handleSDIImportStatus(w http.ResponseWriter, r *http.Request) {
+	if h.anisettaDB == nil {
+		httputil.Error(w, http.StatusServiceUnavailable, "Connessione Anisetta non configurata")
+		return
+	}
+	status, err := h.loadSDIImportStatus(r.Context())
+	if err != nil {
+		httputil.InternalError(w, r, err, "sdi import status query failed", "component", component, "operation", "load_sdi_import_status")
+		return
+	}
+	httputil.JSON(w, http.StatusOK, status)
 }
 
 func (h *Handler) handleAlyanteInvoices(w http.ResponseWriter, r *http.Request) {

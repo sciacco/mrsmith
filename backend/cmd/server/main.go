@@ -42,6 +42,7 @@ import (
 	"github.com/sciacco/mrsmith/internal/platform/directory/factorialdir"
 	"github.com/sciacco/mrsmith/internal/platform/email"
 	"github.com/sciacco/mrsmith/internal/platform/emailledger"
+	"github.com/sciacco/mrsmith/internal/platform/fattureincloud"
 	"github.com/sciacco/mrsmith/internal/platform/googledrive"
 	"github.com/sciacco/mrsmith/internal/platform/health"
 	"github.com/sciacco/mrsmith/internal/platform/httputil"
@@ -818,6 +819,26 @@ func main() {
 		logger.Info("training jobs worker not started without anisetta database", "component", "training")
 	} else {
 		logger.Info("training jobs worker disabled", "component", "training")
+	}
+	switch {
+	case cfg.SmartPassiveSDIImportEnabled && anisettaDB != nil && cfg.FattureInCloudToken != "":
+		ficCli := fattureincloud.New(fattureincloud.Config{
+			Token:      cfg.FattureInCloudToken,
+			CompanyID:  cfg.FattureInCloudCompanyID,
+			HTTPClient: &http.Client{Timeout: 60 * time.Second},
+		})
+		worker := smartpassive.NewSDIImporter(anisettaDB, ficCli, logger)
+		workerWG.Add(1)
+		go func() {
+			defer workerWG.Done()
+			worker.Run(appCtx, cfg.SmartPassiveSDIImportInterval)
+		}()
+	case cfg.SmartPassiveSDIImportEnabled && anisettaDB == nil:
+		logger.Info("smart passive sdi import worker not started without anisetta database", "component", "smartpassive")
+	case cfg.SmartPassiveSDIImportEnabled:
+		logger.Info("smart passive sdi import worker not started without FATTUREINCLOUD_TOKEN", "component", "smartpassive")
+	default:
+		logger.Info("smart passive sdi import worker disabled", "component", "smartpassive")
 	}
 	if diagnosticSink != nil && diagnosticSink.Enabled() {
 		workerWG.Add(1)
