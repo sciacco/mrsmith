@@ -185,6 +185,8 @@ func applyCascade(invoice funnelInvoice, sdi MatchingFunnelSDIResult, contracts 
 		switch {
 		case len(supplierOrders) == 0:
 			out.OrdersReason = "no_orders"
+		case len(withoutGoodsOrders(supplierOrders)) == 0:
+			out.OrdersReason = "goods_only"
 		case orderRules.OpenCandidates == 0:
 			out.OrdersReason = "no_open_orders"
 		case len(orderRules.Proposals) == 0:

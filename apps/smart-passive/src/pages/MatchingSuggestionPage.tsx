@@ -48,7 +48,7 @@ const levelShort: Record<MatchingSuggestionLevelKey, string> = {
 const levelNotes: Record<MatchingSuggestionLevelKey, string> = {
   sdi: 'Il codice ordine scritto dal fornitore nella fattura elettronica, risolto sugli ordini Alyante tramite il codice RDA o PA nel numero originale. Verifica se ogni riferimento dichiarato è risolto, nessuno riempie i 20 caratteri del campo e il residuo degli ordini copre l’imponibile. Gli ordini trovati senza queste condizioni restano un suggerimento.',
   contracts: 'I contratti che AFC registra in Alyante per i canoni ricorrenti, uno per contratto con il suo canone. Verifica se un solo contratto, o una sola combinazione, somma esattamente all’imponibile. Esistono da luglio 2026: prima, e per i fornitori non censiti, valgono i livelli seguenti.',
-  orders: 'Stesso articolo, stesso importo o prezzo unitario, quantità entro il residuo, fra gli ordini aperti dello stesso fornitore. Verifica se una combinazione sola regge; se le righe reggono su più ordini, quegli ordini restano un suggerimento.',
+  orders: 'Stesso articolo, stesso importo o prezzo unitario, quantità entro il residuo, fra gli ordini aperti dello stesso fornitore, esclusi gli ordini di beni: sono caricati alla consegna e non confermano nulla. Verifica se una combinazione sola regge; se le righe reggono su più ordini, quegli ordini restano un suggerimento. Oppure una riga con articolo e descrizione presenti in un solo ordine del fornitore (pratica, targa, contratto) nomina quell’ordine, qualunque sia il prezzo: verificato se l’ordine ha ancora residuo per l’imponibile.',
   fixed_fee: 'Serie di fatture dello stesso fornitore con lo stesso imponibile, una al mese per almeno tre mesi. Prende l’ordine collegato da AFC sulla precedente della serie e verifica che abbia ancora residuo per l’imponibile; altrimenti resta un suggerimento.',
 };
 
@@ -92,9 +92,11 @@ function contractsReasonLabel(reason: string): string {
 function ordersReasonLabel(reason: string): string {
   switch (reason) {
     case 'no_orders': return 'Fornitore senza ordini';
+    case 'goods_only': return 'Solo ordini di beni, caricati alla consegna';
     case 'no_open_orders': return 'Nessun ordine aperto';
     case 'no_match': return 'Nessuna riga corrisponde';
     case 'ambiguous': return 'Più ordini possibili';
+    case 'not_covered': return 'Ordine per descrizione senza residuo sufficiente';
     default: return '—';
   }
 }

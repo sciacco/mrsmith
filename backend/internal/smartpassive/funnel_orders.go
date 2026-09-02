@@ -360,12 +360,44 @@ type MatchingFunnelOrder struct {
 	// summed over the amount lines; Open is true when any line has residual.
 	Residual float64 `json:"residual_qty"`
 	Open     bool    `json:"open"`
+	Lines    []MatchingFunnelDocLine `json:"lines"`
+}
+
+// MatchingFunnelDocLine is an amount line of an order or an invoice.
+type MatchingFunnelDocLine struct {
+	Progressive int64    `json:"progressive"`
+	Article     string   `json:"article"`
+	Description string   `json:"description"`
+	Qty         *float64 `json:"qty"`
+	Price       *float64 `json:"price"`
+	Net         *float64 `json:"net"`
+	// Residual is the quantity not yet consumed by linked invoices; nil for
+	// invoice lines and for order lines without quantity.
+	Residual *float64 `json:"residual"`
+}
+
+func exportDocLines(lines []funnelDocLine, residual func(funnelDocLine) *float64) []MatchingFunnelDocLine {
+	out := make([]MatchingFunnelDocLine, 0, len(lines))
+	for _, l := range lines {
+		if !l.isAmountLine() {
+			continue
+		}
+		item := MatchingFunnelDocLine{Progressive: l.progressive, Article: l.article, Description: l.description, Qty: l.qty, Price: l.price, Net: l.net}
+		if residual != nil {
+			item.Residual = residual(l)
+		}
+		out = append(out, item)
+	}
+	return out
 }
 
 type MatchingFunnelOrderRuleResult struct {
-	// Rule: "" none, header, lines.
+	// Rule: "" none, lines, description, header.
 	Rule      string     `json:"rule"`
 	Proposals [][]string `json:"proposals"`
+	// keys are the Alyante order keys behind Proposals, for the residual
+	// checks.
+	keys [][]string
 	// Verdict vs the AFC link in Alyante: match, ambiguous, wrong, none,
 	// unlinked_proposal, unlinked_silent.
 	Verdict      string   `json:"verdict"`
@@ -592,6 +624,7 @@ func (idx funnelOrderIndex) export(o funnelOrder) MatchingFunnelOrder {
 		LineCount:    amountLines,
 		Residual:     residual,
 		Open:         idx.isOpen(o, nil),
+		Lines:        exportDocLines(o.lines, func(l funnelDocLine) *float64 { return idx.residual(o, l, nil) }),
 	}
 }
 
@@ -605,7 +638,10 @@ func applyOrderRules(invoice funnelInvoice, lines []funnelDocLine, idx funnelOrd
 	// Orders dated after the invoice stay candidates: AFC often loads the
 	// order in Alyante when the invoice arrives, so the order date is the
 	// loading date, not the origination date (101 of 953 AFC links in 2026).
-	candidates := idx.openCandidates(invoice.supplierID, own)
+	// Goods orders are loaded in Alyante at delivery, a couple of days before
+	// the invoice: they close the stock movement, they do not authorise the
+	// purchase, so they never confirm an invoice.
+	candidates := withoutGoodsOrders(idx.openCandidates(invoice.supplierID, own))
 	result.OpenCandidates = len(candidates)
 	for _, link := range links {
 		if o, ok := idx.byKey[link]; ok {
@@ -633,6 +669,16 @@ func applyOrderRules(invoice funnelInvoice, lines []funnelDocLine, idx funnelOrd
 			proposalKeys = [][]string{union}
 		}
 	}
+	if result.Rule == "" && len(lines) > 0 {
+		// Identifying description: a line whose article and text appear in
+		// one order only of the supplier names that order, whatever the
+		// price (indexed leasing instalments, renewed fees). Ancillary lines
+		// (bank charges, stamp duty) need not fit.
+		if union := descriptionProposal(lines, withoutGoodsOrders(idx.candidates(invoice.supplierID))); len(union) > 0 {
+			result.Rule = "description"
+			proposalKeys = [][]string{union}
+		}
+	}
 	if result.Rule == "" && invoice.taxableAmount != nil && len(candidates) > 0 {
 		amount := cents(*invoice.taxableAmount)
 		if amount != 0 {
@@ -648,6 +694,7 @@ func applyOrderRules(invoice funnelInvoice, lines []funnelDocLine, idx funnelOrd
 		}
 	}
 
+	result.keys = proposalKeys
 	for _, keys := range proposalKeys {
 		labels := make([]string, 0, len(keys))
 		for _, k := range keys {
@@ -697,6 +744,59 @@ func lineProposal(lines []funnelDocLine, candidates []funnelOrder, own map[order
 	}
 	sort.Strings(keys)
 	return keys, matched, ambiguous
+}
+
+// isGoodsOrder tells the goods orders (BGF-ORD) from the service and leasing
+// ones.
+func isGoodsOrder(o funnelOrder) bool {
+	return strings.HasPrefix(o.docCode, "BGF")
+}
+
+func withoutGoodsOrders(orders []funnelOrder) []funnelOrder {
+	out := make([]funnelOrder, 0, len(orders))
+	for _, o := range orders {
+		if !isGoodsOrder(o) {
+			out = append(out, o)
+		}
+	}
+	return out
+}
+
+// descriptionKey normalises article and description of a line.
+func descriptionKey(l funnelDocLine) string {
+	return strings.ToUpper(strings.TrimSpace(l.article)) + "|" + strings.ToUpper(strings.Join(strings.Fields(l.description), " "))
+}
+
+// descriptionProposal returns the orders named by the identifying
+// descriptions of the invoice lines: an article and text that, among every
+// order of the supplier, appear in one order only. Lines with a generic or
+// unknown text are ignored.
+func descriptionProposal(lines []funnelDocLine, orders []funnelOrder) []string {
+	owners := map[string]map[string]struct{}{}
+	for _, o := range orders {
+		for _, ol := range o.lines {
+			if !ol.isAmountLine() || strings.TrimSpace(ol.description) == "" {
+				continue
+			}
+			k := descriptionKey(ol)
+			if owners[k] == nil {
+				owners[k] = map[string]struct{}{}
+			}
+			owners[k][o.key] = struct{}{}
+		}
+	}
+	union := map[string]struct{}{}
+	for _, l := range lines {
+		if !l.isAmountLine() {
+			continue
+		}
+		if set := owners[descriptionKey(l)]; len(set) == 1 {
+			for k := range set {
+				union[k] = struct{}{}
+			}
+		}
+	}
+	return sortedKeys(union)
 }
 
 // orderHasLine tells whether an order row can absorb the invoice row: same

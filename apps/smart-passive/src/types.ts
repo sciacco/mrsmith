@@ -248,7 +248,7 @@ export type MatchingCascadeVerdict = 'match' | 'partial' | 'wrong' | 'no_truth' 
 
 export type MatchingCascadeSDIReason = '' | 'no_xml' | 'no_ref' | 'no_code' | 'unresolved' | 'truncated' | 'not_covered';
 
-export type MatchingCascadeOrdersReason = '' | 'no_orders' | 'no_open_orders' | 'no_match' | 'ambiguous';
+export type MatchingCascadeOrdersReason = '' | 'no_orders' | 'goods_only' | 'no_open_orders' | 'no_match' | 'ambiguous' | 'not_covered';
 
 export type MatchingCascadeFixedFeeReason = '' | 'no_series' | 'no_anchor';
 

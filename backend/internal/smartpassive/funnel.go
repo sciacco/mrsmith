@@ -282,6 +282,7 @@ type MatchingFunnelInvoice struct {
 	DocumentDate      *time.Time                    `json:"document_date"`
 	SupplierReference string                        `json:"supplier_reference"`
 	TaxableAmount     *float64                      `json:"taxable_amount"`
+	Lines             []MatchingFunnelDocLine       `json:"lines"`
 	Reference         MatchingFunnelReference       `json:"reference"`
 	Rules             MatchingFunnelRuleResult      `json:"rules"`
 	OrderRules        MatchingFunnelOrderRuleResult `json:"order_rules"`
@@ -756,6 +757,7 @@ func buildMatchingFunnel(invoices, seriesBase []funnelInvoice, rdas []funnelRDA,
 				DocumentDate:      invoice.documentDate,
 				SupplierReference: invoice.supplierReference,
 				TaxableAmount:     invoice.taxableAmount,
+				Lines:             exportDocLines(invoiceLines[invoice.key], nil),
 				Reference:         reference,
 				Rules:             rules,
 				OrderRules:        orderRules,

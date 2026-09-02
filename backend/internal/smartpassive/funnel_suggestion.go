@@ -14,8 +14,10 @@ import "sort"
 //     invoice amount. Orders found without these conditions are a hint.
 //  2. contracts: verified when one combination of fees sums exactly to the
 //     invoice.
-//  3. orders: verified when a single combination fits every line; a hint when
-//     the lines fit several orders.
+//  3. orders: verified when a single combination fits every line, or when a
+//     line names one order by its identifying text and the order's residual
+//     covers the amount; a hint when the lines fit several orders or the
+//     named order has no residual left.
 //  4. fixed_fee: the order confirmed on the previous invoice of the series is
 //     verified when it still has residual for the amount; otherwise a hint.
 //
@@ -37,7 +39,8 @@ type MatchingSuggestionCheck struct {
 	Outcome string `json:"outcome"`
 	// Reason tells why the level did not verify. sdi: no_xml, no_ref, no_code,
 	// unresolved, truncated, not_covered. contracts: no_contracts, no_match,
-	// ambiguous. orders: no_orders, no_open_orders, no_match, ambiguous.
+	// ambiguous. orders: no_orders, goods_only (only goods orders, loaded at
+	// delivery), no_open_orders, no_match, ambiguous, not_covered.
 	// fixed_fee: no_series, no_anchor, not_covered.
 	Reason    string   `json:"reason"`
 	Proposals []string `json:"proposals"`
@@ -136,7 +139,7 @@ func applySuggestion(invoice funnelInvoice, sdi MatchingFunnelSDIResult, contrac
 	checks := []MatchingSuggestionCheck{
 		suggestSDI(invoice, sdi, idx),
 		suggestContracts(contracts),
-		suggestOrders(orderRules, supplierOrders),
+		suggestOrders(invoice, orderRules, supplierOrders, idx),
 		suggestFixedFee(invoice, fixedFee, idx),
 	}
 	hint := -1
@@ -229,15 +232,27 @@ func suggestContracts(contracts contractResult) MatchingSuggestionCheck {
 	return check
 }
 
-func suggestOrders(orderRules MatchingFunnelOrderRuleResult, supplierOrders []funnelOrder) MatchingSuggestionCheck {
+func suggestOrders(invoice funnelInvoice, orderRules MatchingFunnelOrderRuleResult, supplierOrders []funnelOrder, idx funnelOrderIndex) MatchingSuggestionCheck {
 	check := MatchingSuggestionCheck{Level: cascadeLevelOrders, Outcome: suggestionNone, Proposals: []string{}}
 	switch {
 	case len(supplierOrders) == 0:
 		check.Reason = "no_orders"
-	case orderRules.OpenCandidates == 0:
+	case len(withoutGoodsOrders(supplierOrders)) == 0:
+		check.Reason = "goods_only"
+	case len(orderRules.Proposals) == 0 && orderRules.OpenCandidates == 0:
 		check.Reason = "no_open_orders"
 	case len(orderRules.Proposals) == 0:
 		check.Reason = "no_match"
+	case orderRules.Rule == "description":
+		// The order is named by its text; the amount is verified on the
+		// residual of the order.
+		check.Proposals = append(check.Proposals, orderRules.Proposals[0]...)
+		sort.Strings(check.Proposals)
+		if _, covered := orderCoverage(invoice, orderRules.keys[0], idx); covered {
+			check.Outcome = suggestionVerified
+		} else {
+			check.Outcome, check.Reason = suggestionHint, "not_covered"
+		}
 	case len(orderRules.Proposals) == 1 && orderRules.AmbiguousLines == 0:
 		check.Outcome = suggestionVerified
 		check.Proposals = append(check.Proposals, orderRules.Proposals[0]...)

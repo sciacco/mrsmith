@@ -87,6 +87,7 @@ function contractsReasonLabel(reason: string): string {
 function ordersReasonLabel(reason: string): string {
   switch (reason) {
     case 'no_orders': return 'Fornitore senza ordini';
+    case 'goods_only': return 'Solo ordini di beni, caricati alla consegna';
     case 'no_open_orders': return 'Nessun ordine aperto';
     case 'no_match': return 'Nessuna riga corrisponde';
     case 'ambiguous': return 'Più ordini possibili';
