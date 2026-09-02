@@ -115,6 +115,31 @@ function orderProposalsText(rules: MatchingFunnelInvoice['order_rules']): string
   return `${text} (${lines})`;
 }
 
+function sdiVerdictLabel(verdict: MatchingFunnelInvoice['sdi']['verdict']): string {
+  switch (verdict) {
+    case 'match': return 'Stessi ordini di AFC';
+    case 'partial': return 'Parte degli ordini di AFC';
+    case 'wrong': return 'Ordini diversi da AFC';
+    case 'none': return 'Riferimento non risolto';
+    case 'no_truth': return 'Senza collegamento AFC';
+  }
+}
+
+function sdiRefsText(sdi: MatchingFunnelInvoice['sdi']): string {
+  if (!sdi.linked) return 'XML non trovato';
+  if (sdi.order_refs.length === 0) return 'Nessun riferimento ordine';
+  return sdi.order_refs.slice(0, 4).map((ref) => {
+    const target = ref.orders.length > 0 ? ref.orders.join(' + ') : (ref.code ? 'nessun ordine' : '');
+    return target ? `${ref.declared} → ${target}` : ref.declared;
+  }).join(' · ');
+}
+
+function sdiPeriodText(sdi: MatchingFunnelInvoice['sdi']): string {
+  if (!sdi.period_start) return '—';
+  if (sdi.period_end && sdi.period_end !== sdi.period_start) return `${date(sdi.period_start)} – ${date(sdi.period_end)}`;
+  return date(sdi.period_start);
+}
+
 function noteExcerpt(note: string): string {
   const flat = note.replace(/\s+/g, ' ').trim();
   if (!flat) return '—';
@@ -345,6 +370,34 @@ export function MatchingFunnelPage() {
                 Candidati: solo ordini aperti del fornitore, valutati come se la fattura non fosse ancora collegata. Prima riga per riga (stesso articolo, stesso imponibile o stesso prezzo unitario, quantità entro il residuo), poi il totale imponibile dell'ordine.
               </p>
             </section>
+
+            <section className={styles.summaryPanel}>
+              <h2>Fattura elettronica (SDI)</h2>
+              <table className={styles.summaryTable}>
+                <tbody>
+                  <tr><th scope="row">Fatture con XML agganciato</th><td>{integer(query.data.sdi.invoices_linked)}</td></tr>
+                  <tr><th scope="row">di cui solo per numero e data</th><td>{integer(query.data.sdi.linked_number_only)}</td></tr>
+                  <tr><th scope="row">Fatture senza XML</th><td>{integer(query.data.sdi.invoices_not_linked)}</td></tr>
+                  <tr><th scope="row">Con riferimento ordine del fornitore</th><td>{integer(query.data.sdi.with_order_ref)}</td></tr>
+                  <tr><th scope="row">di cui con codice PO o PA</th><td>{integer(query.data.sdi.with_usable_code)}</td></tr>
+                  <tr><th scope="row">di cui risolto su un ordine Alyante</th><td>{integer(query.data.sdi.resolved_to_order)}</td></tr>
+                  <tr><th scope="row">di cui risolto su una RDA Arak</th><td>{integer(query.data.sdi.resolved_to_rda)}</td></tr>
+                  <tr><th scope="row">di cui con codice non trovato</th><td>{integer(query.data.sdi.unresolved_code)}</td></tr>
+                  <tr><th scope="row">Con riferimento contratto</th><td>{integer(query.data.sdi.with_contract_ref)}</td></tr>
+                  <tr><th scope="row">Con periodo di competenza</th><td>{integer(query.data.sdi.with_period)}</td></tr>
+                  <tr><th scope="row">Con codice articolo del fornitore</th><td>{integer(query.data.sdi.with_article_codes)}</td></tr>
+                  <tr><th scope="row">Confronto con AFC: fatture collegate</th><td>{integer(query.data.sdi.afc_linked_invoices)}</td></tr>
+                  <tr><th scope="row">Stessi ordini di AFC</th><td>{integer(query.data.sdi.match)}</td></tr>
+                  <tr><th scope="row">di cui prima ambigue per importo</th><td>{integer(query.data.sdi.order_rule_ambiguous_resolved)}</td></tr>
+                  <tr><th scope="row">Parte degli ordini di AFC</th><td>{integer(query.data.sdi.partial)}</td></tr>
+                  <tr><th scope="row">Ordini diversi da AFC</th><td>{integer(query.data.sdi.wrong)}</td></tr>
+                  <tr><th scope="row">Riferimento non risolto</th><td>{integer(query.data.sdi.none)}</td></tr>
+                </tbody>
+              </table>
+              <p className={styles.summaryNote}>
+                XML ricevuti dallo SDI, agganciati alla registrazione Alyante per partita IVA, numero e data. Il riferimento ordine scritto dal fornitore viene risolto sugli ordini Alyante tramite il codice RDA o PA nel numero originale.
+              </p>
+            </section>
           </div>
 
           <section className={styles.tablePanel}>
@@ -464,6 +517,9 @@ export function MatchingFunnelPage() {
                           <th>Regola ordini</th>
                           <th>Ordini proposti</th>
                           <th>Confronto ordini</th>
+                          <th>Riferimento ordine SDI</th>
+                          <th>Periodo SDI</th>
+                          <th>Confronto SDI</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -515,6 +571,17 @@ export function MatchingFunnelPage() {
                                   : undefined
                             }>
                               {orderVerdictLabel(invoice.order_rules.verdict)}
+                            </td>
+                            <td className={styles.codesCell}>{sdiRefsText(invoice.sdi)}</td>
+                            <td>{sdiPeriodText(invoice.sdi)}</td>
+                            <td className={
+                              invoice.sdi.verdict === 'match'
+                                ? styles.verdictGood
+                                : invoice.sdi.verdict === 'wrong'
+                                  ? styles.codeWarn
+                                  : undefined
+                            }>
+                              {invoice.sdi.linked ? sdiVerdictLabel(invoice.sdi.verdict) : '—'}
                             </td>
                           </tr>
                         ))}

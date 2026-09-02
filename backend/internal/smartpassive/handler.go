@@ -196,8 +196,9 @@ ORDER BY
     r.DO30_PROGRIGA;`
 
 type Handler struct {
-	alyanteDB *sql.DB
-	arakDB    *sql.DB
+	alyanteDB  *sql.DB
+	arakDB     *sql.DB
+	anisettaDB *sql.DB
 }
 
 // ArakRDARow is one row of the RDA Arak extraction: header fields are repeated
@@ -300,8 +301,8 @@ type AlyanteInvoiceRow struct {
 	DO30Importoiva   *float64   `json:"DO30_IMPORTOIVA"`
 }
 
-func RegisterRoutes(mux *http.ServeMux, alyanteDB, arakDB *sql.DB) {
-	h := &Handler{alyanteDB: alyanteDB, arakDB: arakDB}
+func RegisterRoutes(mux *http.ServeMux, alyanteDB, arakDB, anisettaDB *sql.DB) {
+	h := &Handler{alyanteDB: alyanteDB, arakDB: arakDB, anisettaDB: anisettaDB}
 	protect := acl.RequireRole(applaunch.SmartPassiveAccessRoles()...)
 	mux.Handle("GET /smart-passive/v1/alyante-invoices", protect(http.HandlerFunc(h.handleAlyanteInvoices)))
 	mux.Handle("GET /smart-passive/v1/arak-rdas", protect(http.HandlerFunc(h.handleArakRDAs)))

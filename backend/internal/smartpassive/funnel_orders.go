@@ -395,8 +395,21 @@ type funnelOrderIndex struct {
 	bySupplier map[int64][]funnelOrder
 	byKey      map[string]funnelOrder
 	rdaByOrder map[string]*int64
-	links      funnelOrderLinks
-	summary    MatchingFunnelOrdersSummary
+	// byArakNumber and byLegacyNumber index orders by the RDA or PA number
+	// written in their original document number.
+	byArakNumber   map[string][]funnelOrder
+	byLegacyNumber map[string][]funnelOrder
+	links          funnelOrderLinks
+	summary        MatchingFunnelOrdersSummary
+}
+
+// byCodeNumber returns the orders whose original number carries the given RDA
+// (or legacy PA) number.
+func (idx funnelOrderIndex) byCodeNumber(number string, legacy bool) []funnelOrder {
+	if legacy {
+		return idx.byLegacyNumber[number]
+	}
+	return idx.byArakNumber[number]
 }
 
 const qtyEpsilon = 0.0005
@@ -430,14 +443,23 @@ func (idx funnelOrderIndex) isOpen(o funnelOrder, own map[orderLineKey]float64) 
 
 func newFunnelOrderIndex(orders []funnelOrder, refs funnelReferenceIndex, links funnelOrderLinks) funnelOrderIndex {
 	idx := funnelOrderIndex{
-		bySupplier: make(map[int64][]funnelOrder),
-		byKey:      make(map[string]funnelOrder, len(orders)),
-		rdaByOrder: make(map[string]*int64, len(orders)),
-		links:      links,
-		summary:    MatchingFunnelOrdersSummary{OrderCount: len(orders), ByDocCode: make(map[string]int)},
+		bySupplier:     make(map[int64][]funnelOrder),
+		byKey:          make(map[string]funnelOrder, len(orders)),
+		rdaByOrder:     make(map[string]*int64, len(orders)),
+		byArakNumber:   make(map[string][]funnelOrder),
+		byLegacyNumber: make(map[string][]funnelOrder),
+		links:          links,
+		summary:        MatchingFunnelOrdersSummary{OrderCount: len(orders), ByDocCode: make(map[string]int)},
 	}
 	for _, o := range orders {
 		idx.byKey[o.key] = o
+		if o.rdaCode != nil {
+			if o.rdaLegacy {
+				idx.byLegacyNumber[o.rdaCode.number] = append(idx.byLegacyNumber[o.rdaCode.number], o)
+			} else {
+				idx.byArakNumber[o.rdaCode.number] = append(idx.byArakNumber[o.rdaCode.number], o)
+			}
+		}
 		idx.summary.ByDocCode[o.docCode]++
 		amountLines := 0
 		for _, l := range o.lines {

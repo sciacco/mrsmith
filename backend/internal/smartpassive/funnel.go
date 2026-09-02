@@ -48,7 +48,10 @@ const funnelInvoicesSelect = `SELECT
     t.DO11_DATADOC,
     t.DO11_NUMDOCORIG,
     t.DO11_NOTEDOCUM,
-    line_totals.IMPONIBILE
+    line_totals.IMPONIBILE,
+    a.CG16_PARTIVA,
+    a.CG16_PARTIVA_EST,
+    a.CG16_CODFISCALE
 FROM dbo.DO11_DOCTESTATA AS t
 INNER JOIN dbo.MG36_DOCUMENTI AS d
     ON d.MG36_CODDOCUM = t.DO11_DOCUM_MG36
@@ -149,6 +152,10 @@ type funnelInvoice struct {
 	supplierReference string
 	note              string
 	taxableAmount     *float64
+	// Alyante supplier identifiers, used to link the SDI document.
+	supplierVAT        string
+	supplierVATForeign string
+	fiscalCode         string
 }
 
 type funnelRDALine struct {
@@ -204,6 +211,7 @@ type MatchingFunnelInvoice struct {
 	Reference         MatchingFunnelReference       `json:"reference"`
 	Rules             MatchingFunnelRuleResult      `json:"rules"`
 	OrderRules        MatchingFunnelOrderRuleResult `json:"order_rules"`
+	SDI               MatchingFunnelSDIResult       `json:"sdi"`
 }
 
 type MatchingFunnelRDA struct {
@@ -241,6 +249,7 @@ type MatchingFunnelResponse struct {
 	Rules      MatchingFunnelRulesSummary      `json:"rules"`
 	Orders     MatchingFunnelOrdersSummary     `json:"orders"`
 	OrderRules MatchingFunnelOrderRulesSummary `json:"order_rules"`
+	SDI        MatchingFunnelSDISummary        `json:"sdi"`
 	Suppliers  []MatchingFunnelSupplier        `json:"suppliers"`
 }
 
@@ -286,7 +295,13 @@ func (h *Handler) handleMatchingFunnel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := buildMatchingFunnel(invoices, rdas, orders, invoiceLines, orderLinks)
+	sdiDocs, err := h.loadFunnelSDI(r, invoices)
+	if err != nil {
+		httputil.InternalError(w, r, err, "matching funnel sdi query failed", "component", component, "operation", "load_funnel_sdi")
+		return
+	}
+
+	response := buildMatchingFunnel(invoices, rdas, orders, invoiceLines, orderLinks, sdiDocs)
 	response.Scope = scope
 	httputil.JSON(w, http.StatusOK, response)
 }
@@ -309,6 +324,7 @@ func (h *Handler) loadFunnelInvoices(r *http.Request, scope funnelScope) ([]funn
 		var supplierReference sql.NullString
 		var note sql.NullString
 		var taxableAmount sql.NullFloat64
+		var vat, vatForeign, fiscalCode sql.NullString
 		if err := rows.Scan(
 			&ditta,
 			&registration,
@@ -319,20 +335,26 @@ func (h *Handler) loadFunnelInvoices(r *http.Request, scope funnelScope) ([]funn
 			&supplierReference,
 			&note,
 			&taxableAmount,
+			&vat,
+			&vatForeign,
+			&fiscalCode,
 		); err != nil {
 			return nil, err
 		}
 		key := strconv.FormatInt(ditta, 10) + ":" + strconv.FormatInt(registration, 10)
 		out = append(out, funnelInvoice{
-			key:               key,
-			registration:      registration,
-			supplierID:        int64Ptr(supplier),
-			supplierName:      supplierName.String,
-			documentNumber:    documentNumber.String,
-			documentDate:      timePtr(documentDate),
-			supplierReference: supplierReference.String,
-			note:              note.String,
-			taxableAmount:     float64Ptr(taxableAmount),
+			key:                key,
+			registration:       registration,
+			supplierID:         int64Ptr(supplier),
+			supplierName:       supplierName.String,
+			documentNumber:     documentNumber.String,
+			documentDate:       timePtr(documentDate),
+			supplierReference:  supplierReference.String,
+			note:               note.String,
+			taxableAmount:      float64Ptr(taxableAmount),
+			supplierVAT:        vat.String,
+			supplierVATForeign: vatForeign.String,
+			fiscalCode:         fiscalCode.String,
 		})
 	}
 	return out, rows.Err()
@@ -416,7 +438,7 @@ func (h *Handler) loadFunnelRDAs(r *http.Request) ([]funnelRDA, error) {
 	return out, nil
 }
 
-func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA, orders []funnelOrder, invoiceLines map[string][]funnelDocLine, orderLinks funnelOrderLinks) MatchingFunnelResponse {
+func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA, orders []funnelOrder, invoiceLines map[string][]funnelDocLine, orderLinks funnelOrderLinks, sdiDocs map[string][]*sdiDocument) MatchingFunnelResponse {
 	rdasBySupplier := make(map[int64][]funnelRDA)
 	profilesByRDA := make(map[int64]funnelProfile, len(rdas))
 	referenceIndex := newFunnelReferenceIndex(rdas)
@@ -529,6 +551,8 @@ func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA, orders []fu
 			}
 			orderRules := applyOrderRules(invoice, invoiceLines[invoice.key], orderIndex)
 			addOrderRuleResult(&response.OrderRules, orderRules)
+			sdi := applySDI(invoice, sdiDocs[normalizeDocNumber(invoice.supplierReference)], orderIndex, referenceIndex)
+			addSDIResult(&response.SDI, sdi, orderRules)
 			switch funnelOutcome(orderRules.OpenCandidates) {
 			case "none":
 				response.Orders.InvoicesNoOpen++
@@ -546,6 +570,7 @@ func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA, orders []fu
 				Reference:         reference,
 				Rules:             rules,
 				OrderRules:        orderRules,
+				SDI:               sdi,
 			})
 		}
 		for _, candidate := range candidates {

@@ -196,6 +196,49 @@ export interface MatchingFunnelOrderRulesSummary {
   unlinked_proposal: number;
 }
 
+export interface MatchingFunnelSDIRef {
+  declared: string;
+  code: string;
+  lines: string[];
+  orders: string[];
+  rda_id: number | null;
+  rda_code: string;
+}
+
+export type MatchingFunnelSDIVerdict = 'match' | 'partial' | 'wrong' | 'none' | 'no_truth';
+
+export interface MatchingFunnelSDIResult {
+  linked: boolean;
+  link_kind: '' | 'vat_number_date' | 'number_date';
+  source_id: number | null;
+  order_refs: MatchingFunnelSDIRef[];
+  contracts: string[];
+  period_start: string;
+  period_end: string;
+  articles: string[];
+  verdict: MatchingFunnelSDIVerdict;
+}
+
+export interface MatchingFunnelSDISummary {
+  invoices_linked: number;
+  invoices_not_linked: number;
+  linked_number_only: number;
+  with_order_ref: number;
+  with_usable_code: number;
+  with_contract_ref: number;
+  with_period: number;
+  with_article_codes: number;
+  resolved_to_order: number;
+  resolved_to_rda: number;
+  unresolved_code: number;
+  afc_linked_invoices: number;
+  match: number;
+  partial: number;
+  wrong: number;
+  none: number;
+  order_rule_ambiguous_resolved: number;
+}
+
 export interface MatchingFunnelInvoice {
   registration: number;
   document_number: string;
@@ -205,6 +248,7 @@ export interface MatchingFunnelInvoice {
   reference: MatchingFunnelReference;
   rules: MatchingFunnelRuleResult;
   order_rules: MatchingFunnelOrderRuleResult;
+  sdi: MatchingFunnelSDIResult;
 }
 
 export interface MatchingFunnelRDA {
@@ -253,6 +297,7 @@ export interface MatchingFunnelResponse {
   rules: MatchingFunnelRulesSummary;
   orders: MatchingFunnelOrdersSummary;
   order_rules: MatchingFunnelOrderRulesSummary;
+  sdi: MatchingFunnelSDISummary;
   suppliers: MatchingFunnelSupplier[];
 }
 
