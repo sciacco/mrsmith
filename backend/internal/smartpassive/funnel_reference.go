@@ -152,11 +152,13 @@ type MatchingFunnelReferenceSummary struct {
 	OneRDA           int `json:"one_rda"`
 	MultipleRDAs     int `json:"multiple_rdas"`
 	ArakAndLegacy    int `json:"arak_and_legacy"`
+	LegacyPromoted   int `json:"legacy_promoted"`
 	SupplierMismatch int `json:"supplier_mismatch"`
 }
 
 type MatchingFunnelReferencedRDA struct {
 	Code          string   `json:"code"`
+	LegacyCode    string   `json:"legacy_code"`
 	ID            *int64   `json:"id"`
 	State         string   `json:"state"`
 	SupplierERPID *int64   `json:"supplier_erp_id"`
@@ -177,6 +179,9 @@ type MatchingFunnelReference struct {
 type funnelReferenceIndex struct {
 	byCode   map[string][]funnelRDA
 	byNumber map[string][]funnelRDA
+	// byLegacy maps a legacy PA number quoted in an RDA object (e.g.
+	// "Rinnovo PA-7514") to the Arak RDAs that replaced it.
+	byLegacy map[string][]funnelRDA
 }
 
 var rdaCodeShape = regexp.MustCompile(`^PO-(\d+)/(\d{4})$`)
@@ -185,8 +190,12 @@ func newFunnelReferenceIndex(rdas []funnelRDA) funnelReferenceIndex {
 	idx := funnelReferenceIndex{
 		byCode:   make(map[string][]funnelRDA, len(rdas)),
 		byNumber: make(map[string][]funnelRDA, len(rdas)),
+		byLegacy: make(map[string][]funnelRDA),
 	}
 	for _, rda := range rdas {
+		for _, legacy := range uniqueCodes(collectChains(legacyChainPattern, rda.object)) {
+			idx.byLegacy[legacy.number] = append(idx.byLegacy[legacy.number], rda)
+		}
 		code := strings.ToUpper(strings.TrimSpace(rda.code))
 		if code == "" {
 			continue
@@ -197,6 +206,17 @@ func newFunnelReferenceIndex(rdas []funnelRDA) funnelReferenceIndex {
 		}
 	}
 	return idx
+}
+
+// rdasWithLegacyPredecessor counts RDAs whose object quotes a legacy PA code.
+func (idx funnelReferenceIndex) rdasWithLegacyPredecessor() int {
+	seen := make(map[int64]struct{})
+	for _, list := range idx.byLegacy {
+		for _, rda := range list {
+			seen[rda.id] = struct{}{}
+		}
+	}
+	return len(seen)
 }
 
 // lookup resolves a note code: with a year it must match the full RDA code;
@@ -223,11 +243,8 @@ func (idx funnelReferenceIndex) resolve(invoice funnelInvoice, note parsedNote) 
 	ref := MatchingFunnelReference{
 		Note:        strings.TrimSpace(invoice.note),
 		AFCStatus:   note.status,
-		RDAs:        make([]MatchingFunnelReferencedRDA, 0, len(note.arakCodes)),
+		RDAs:        make([]MatchingFunnelReferencedRDA, 0, len(note.arakCodes)+len(note.legacyCodes)),
 		LegacyCodes: make([]string, 0, len(note.legacyCodes)),
-	}
-	for _, code := range note.legacyCodes {
-		ref.LegacyCodes = append(ref.LegacyCodes, code.legacyCode())
 	}
 
 	if ref.Note == "" {
@@ -242,56 +259,69 @@ func (idx funnelReferenceIndex) resolve(invoice funnelInvoice, note parsedNote) 
 		}
 		return ref
 	}
-	if len(note.arakCodes) == 0 {
-		ref.Outcome = referenceLegacyOnly
-		return ref
-	}
 
 	hasUnresolved := false
 	hasAmbiguous := false
-	resolved := 0
-	for _, noteCode := range note.arakCodes {
-		code := noteCode.arakCode()
-		matches := idx.lookup(noteCode)
+	resolved := make(map[int64]struct{})
+	for _, code := range note.arakCodes {
+		matches := idx.lookup(code)
 		switch len(matches) {
 		case 0:
 			hasUnresolved = true
-			ref.RDAs = append(ref.RDAs, MatchingFunnelReferencedRDA{Code: code, Resolution: "unresolved"})
+			ref.RDAs = append(ref.RDAs, MatchingFunnelReferencedRDA{Code: code.arakCode(), Resolution: "unresolved"})
 		case 1:
-			resolved++
-			rda := matches[0]
-			id := rda.id
-			item := MatchingFunnelReferencedRDA{
-				Code:          strings.ToUpper(rda.code),
-				ID:            &id,
-				State:         rda.state,
-				SupplierERPID: rda.supplierID,
-				Resolution:    "resolved",
-				InCandidates:  false,
-				Total:         rda.total,
-			}
-			match := invoice.supplierID != nil && rda.supplierID != nil && *invoice.supplierID == *rda.supplierID
-			item.SupplierMatch = &match
-			item.InCandidates = match
-			ref.RDAs = append(ref.RDAs, item)
+			resolved[matches[0].id] = struct{}{}
+			ref.RDAs = append(ref.RDAs, idx.referencedRDA(invoice, matches[0], "resolved", ""))
 		default:
 			hasAmbiguous = true
-			ref.RDAs = append(ref.RDAs, MatchingFunnelReferencedRDA{Code: code, Resolution: "ambiguous"})
+			ref.RDAs = append(ref.RDAs, MatchingFunnelReferencedRDA{Code: code.arakCode(), Resolution: "ambiguous"})
+		}
+	}
+
+	// Legacy PA codes are promoted to the Arak RDAs that quote them in the
+	// object; the others stay listed as legacy codes without a successor.
+	for _, code := range note.legacyCodes {
+		successors := idx.byLegacy[code.number]
+		if len(successors) == 0 {
+			ref.LegacyCodes = append(ref.LegacyCodes, code.legacyCode())
+			continue
+		}
+		for _, rda := range successors {
+			resolved[rda.id] = struct{}{}
+			ref.RDAs = append(ref.RDAs, idx.referencedRDA(invoice, rda, "successor", code.legacyCode()))
 		}
 	}
 
 	switch {
+	case len(note.arakCodes) == 0 && len(resolved) == 0:
+		ref.Outcome = referenceLegacyOnly
 	case hasUnresolved:
 		ref.Outcome = referenceUnresolved
 	case hasAmbiguous:
 		ref.Outcome = referenceAmbiguous
-	case resolved == 1:
+	case len(resolved) == 1:
 		ref.Outcome = referenceOne
 	default:
 		ref.Outcome = referenceMultiple
 	}
 	sort.SliceStable(ref.RDAs, func(i, j int) bool { return ref.RDAs[i].Code < ref.RDAs[j].Code })
 	return ref
+}
+
+func (idx funnelReferenceIndex) referencedRDA(invoice funnelInvoice, rda funnelRDA, resolution, legacyCode string) MatchingFunnelReferencedRDA {
+	id := rda.id
+	match := invoice.supplierID != nil && rda.supplierID != nil && *invoice.supplierID == *rda.supplierID
+	return MatchingFunnelReferencedRDA{
+		Code:          strings.ToUpper(rda.code),
+		LegacyCode:    legacyCode,
+		ID:            &id,
+		State:         rda.state,
+		SupplierERPID: rda.supplierID,
+		Resolution:    resolution,
+		SupplierMatch: &match,
+		InCandidates:  match,
+		Total:         rda.total,
+	}
 }
 
 func addReferenceOutcome(summary *MatchingFunnelReferenceSummary, ref MatchingFunnelReference) {
@@ -317,10 +347,17 @@ func addReferenceOutcome(summary *MatchingFunnelReferenceSummary, ref MatchingFu
 		summary.ArakAndLegacy++
 	}
 	mismatch := false
+	promoted := false
 	for _, rda := range ref.RDAs {
 		if rda.SupplierMatch != nil && !*rda.SupplierMatch {
 			mismatch = true
 		}
+		if rda.Resolution == "successor" {
+			promoted = true
+		}
+	}
+	if promoted {
+		summary.LegacyPromoted++
 	}
 	if mismatch {
 		summary.SupplierMismatch++

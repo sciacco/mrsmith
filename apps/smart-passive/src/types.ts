@@ -58,10 +58,11 @@ export type MatchingFunnelReferenceOutcome =
 
 export interface MatchingFunnelReferencedRDA {
   code: string;
+  legacy_code: string;
   id: number | null;
   state: string;
   supplier_erp_id: number | null;
-  resolution: 'resolved' | 'unresolved' | 'ambiguous';
+  resolution: 'resolved' | 'successor' | 'unresolved' | 'ambiguous';
   supplier_match: boolean | null;
   in_candidates: boolean;
   total: number | null;
@@ -85,6 +86,7 @@ export interface MatchingFunnelReferenceSummary {
   one_rda: number;
   multiple_rdas: number;
   arak_and_legacy: number;
+  legacy_promoted: number;
   supplier_mismatch: number;
 }
 
@@ -130,6 +132,7 @@ export interface MatchingFunnelResponse {
     rda_count: number;
     rdas_without_erp_id: number;
     duplicate_rda_codes: number;
+    rdas_with_legacy_predecessor: number;
   };
   profiles: MatchingFunnelProfileCounts;
   reference: MatchingFunnelReferenceSummary;

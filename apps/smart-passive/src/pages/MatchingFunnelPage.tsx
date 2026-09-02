@@ -35,7 +35,7 @@ function referenceOutcomeLabel(outcome: MatchingFunnelInvoice['reference']['outc
     case 'no_note': return 'Nessuna nota';
     case 'no_code': return 'Nota senza codice';
     case 'no_rda_declared': return 'Nessuna RDA dichiarata';
-    case 'legacy_only': return 'Solo gestionale precedente';
+    case 'legacy_only': return 'Legacy senza successore Arak';
     case 'unresolved': return 'Codice non in Arak';
     case 'ambiguous': return 'Codice ambiguo';
     case 'one': return 'Una RDA';
@@ -46,11 +46,12 @@ function referenceOutcomeLabel(outcome: MatchingFunnelInvoice['reference']['outc
 function referencedRDALabel(rda: MatchingFunnelReferencedRDA): string {
   if (rda.resolution === 'unresolved') return `${rda.code} (non in Arak)`;
   if (rda.resolution === 'ambiguous') return `${rda.code} (ambiguo)`;
+  const base = rda.resolution === 'successor' ? `${rda.code} (da ${rda.legacy_code})` : rda.code;
   if (rda.supplier_match === false) {
     const erp = rda.supplier_erp_id === null ? 'senza codice ERP' : `ERP ${integer(rda.supplier_erp_id)}`;
-    return `${rda.code} (fornitore ${erp})`;
+    return `${base}, fornitore ${erp}`;
   }
-  return rda.code;
+  return base;
 }
 
 function noteExcerpt(note: string): string {
@@ -143,6 +144,7 @@ export function MatchingFunnelPage() {
                   <tr><th scope="row">RDA Arak</th><td>{integer(query.data.summary.rda_count)}</td></tr>
                   <tr><th scope="row">RDA senza codice ERP fornitore</th><td>{integer(query.data.summary.rdas_without_erp_id)}</td></tr>
                   <tr><th scope="row">Codici RDA condivisi da più RDA</th><td>{integer(query.data.summary.duplicate_rda_codes)}</td></tr>
+                  <tr><th scope="row">RDA con PA legacy nell'oggetto</th><td>{integer(query.data.summary.rdas_with_legacy_predecessor)}</td></tr>
                 </tbody>
               </table>
             </section>
@@ -181,8 +183,9 @@ export function MatchingFunnelPage() {
                   <tr><th scope="row">Più RDA indicate</th><td>{integer(query.data.reference.multiple_rdas)}</td></tr>
                   <tr><th scope="row">Codice non in Arak</th><td>{integer(query.data.reference.unresolved)}</td></tr>
                   <tr><th scope="row">Codice ambiguo</th><td>{integer(query.data.reference.ambiguous)}</td></tr>
-                  <tr><th scope="row">Solo gestionale precedente</th><td>{integer(query.data.reference.legacy_only)}</td></tr>
-                  <tr><th scope="row">Arak e gestionale precedente</th><td>{integer(query.data.reference.arak_and_legacy)}</td></tr>
+                  <tr><th scope="row">Legacy sostituito da RDA Arak</th><td>{integer(query.data.reference.legacy_promoted)}</td></tr>
+                  <tr><th scope="row">Legacy senza successore Arak</th><td>{integer(query.data.reference.legacy_only)}</td></tr>
+                  <tr><th scope="row">Arak e legacy insieme</th><td>{integer(query.data.reference.arak_and_legacy)}</td></tr>
                   <tr><th scope="row">Nessuna RDA dichiarata</th><td>{integer(query.data.reference.no_rda_declared)}</td></tr>
                   <tr><th scope="row">Nota senza codice</th><td>{integer(query.data.reference.no_code)}</td></tr>
                   <tr><th scope="row">Nessuna nota</th><td>{integer(query.data.reference.no_note)}</td></tr>
@@ -190,7 +193,7 @@ export function MatchingFunnelPage() {
                 </tbody>
               </table>
               <p className={styles.summaryNote}>
-                Codici PO e PA letti dalle note testata, con o senza anno. «Nessuna RDA dichiarata» = nota «PA mai creati».
+                Codici PO e PA letti dalle note testata. Un PA legacy citato nell'oggetto di una RDA Arak conta come quella RDA. «Nessuna RDA dichiarata» = nota «PA mai creati».
               </p>
             </section>
           </div>
@@ -321,7 +324,7 @@ export function MatchingFunnelPage() {
                                     ...invoice.reference.rdas.map((rda) => (
                                       <span
                                         key={rda.code}
-                                        className={rda.resolution !== 'resolved' || rda.supplier_match === false ? styles.codeWarn : undefined}
+                                        className={rda.resolution === 'unresolved' || rda.resolution === 'ambiguous' || rda.supplier_match === false ? styles.codeWarn : undefined}
                                       >
                                         {referencedRDALabel(rda)}
                                       </span>

@@ -140,6 +140,7 @@ type MatchingFunnelSummary struct {
 	RDACount           int `json:"rda_count"`
 	RDAsWithoutERPID   int `json:"rdas_without_erp_id"`
 	DuplicateRDACodes  int `json:"duplicate_rda_codes"`
+	RDAsWithLegacy     int `json:"rdas_with_legacy_predecessor"`
 }
 
 type MatchingFunnelProfileCounts struct {
@@ -343,6 +344,7 @@ func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA) MatchingFun
 			InvoiceCount:      len(invoices),
 			RDACount:          len(rdas),
 			DuplicateRDACodes: referenceIndex.duplicateCodes(),
+			RDAsWithLegacy:    referenceIndex.rdasWithLegacyPredecessor(),
 		},
 		Suppliers: make([]MatchingFunnelSupplier, 0),
 	}
