@@ -343,6 +343,8 @@ type MatchingFunnelSDIRef struct {
 	Orders   []string `json:"orders"`
 	RDAID    *int64   `json:"rda_id"`
 	RDACode  string   `json:"rda_code"`
+	// orderKeys are the Alyante keys of Orders, for the cascade checks.
+	orderKeys []string
 }
 
 type MatchingFunnelSDIResult struct {
@@ -431,6 +433,7 @@ func applySDI(invoice funnelInvoice, docs []*sdiDocument, orders funnelOrderInde
 			}
 			for _, o := range orders.byCodeNumber(code.number, false) {
 				item.Orders = append(item.Orders, o.label())
+				item.orderKeys = append(item.orderKeys, o.key)
 				proposed[o.key] = struct{}{}
 			}
 		}
@@ -444,6 +447,7 @@ func applySDI(invoice funnelInvoice, docs []*sdiDocument, orders funnelOrderInde
 				if orders.isOpen(o, own) {
 					openPA = true
 					item.Orders = append(item.Orders, o.label())
+					item.orderKeys = append(item.orderKeys, o.key)
 					proposed[o.key] = struct{}{}
 				}
 			}
@@ -454,6 +458,7 @@ func applySDI(invoice funnelInvoice, docs []*sdiDocument, orders funnelOrderInde
 				if m := rdaCodeShape.FindStringSubmatch(strings.ToUpper(rda.code)); m != nil {
 					for _, o := range orders.byCodeNumber(m[1], false) {
 						item.Orders = append(item.Orders, o.label())
+						item.orderKeys = append(item.orderKeys, o.key)
 						proposed[o.key] = struct{}{}
 					}
 				}
@@ -461,6 +466,7 @@ func applySDI(invoice funnelInvoice, docs []*sdiDocument, orders funnelOrderInde
 			if len(item.Orders) == 0 {
 				for _, o := range orders.byCodeNumber(code.number, true) {
 					item.Orders = append(item.Orders, o.label())
+					item.orderKeys = append(item.orderKeys, o.key)
 					proposed[o.key] = struct{}{}
 				}
 			}

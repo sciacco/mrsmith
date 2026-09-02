@@ -1,6 +1,7 @@
 package smartpassive
 
 import (
+	"net/url"
 	"database/sql"
 	"net/http"
 	"sort"
@@ -31,12 +32,64 @@ func parseFunnelScope(raw string) (funnelScope, bool) {
 	return "", false
 }
 
-// funnelInvoicesQuery assembles the invoice query for the requested scope.
-func funnelInvoicesQuery(scope funnelScope) string {
-	if scope == funnelScopeAll {
-		return funnelInvoicesSelect + funnelInvoicesWhere + ";"
+// funnelFilter selects the invoices to analyse: the scope and an optional
+// window of document dates, both ends included.
+type funnelFilter struct {
+	scope funnelScope
+	from  *time.Time
+	to    *time.Time
+}
+
+// parseFunnelFilter reads scope, from and to (YYYY-MM-DD) from the query.
+func parseFunnelFilter(q url.Values) (funnelFilter, string) {
+	scope, ok := parseFunnelScope(q.Get("scope"))
+	if !ok {
+		return funnelFilter{}, "Parametro scope non valido: usare open oppure all"
 	}
-	return funnelInvoicesSelect + funnelOpenBalanceJoin + funnelInvoicesWhere + funnelOpenBalanceWhere + ";"
+	f := funnelFilter{scope: scope}
+	for _, name := range []string{"from", "to"} {
+		raw := q.Get(name)
+		if raw == "" {
+			continue
+		}
+		day, err := time.Parse("2006-01-02", raw)
+		if err != nil {
+			return funnelFilter{}, "Parametro " + name + " non valido: usare AAAA-MM-GG"
+		}
+		if name == "from" {
+			f.from = &day
+		} else {
+			f.to = &day
+		}
+	}
+	if f.from != nil && f.to != nil && f.to.Before(*f.from) {
+		return funnelFilter{}, "Intervallo di date non valido: la fine precede l'inizio"
+	}
+	return f, ""
+}
+
+// where returns the invoice conditions for the filter. Dates are validated
+// by parsing, so they can be written into the statement.
+func (f funnelFilter) where() string {
+	w := funnelInvoicesWhere
+	if f.from != nil {
+		w += "\n  AND t.DO11_DATADOC >= '" + f.from.Format("2006-01-02") + "'"
+	}
+	if f.to != nil {
+		w += "\n  AND t.DO11_DATADOC < '" + f.to.AddDate(0, 0, 1).Format("2006-01-02") + "'"
+	}
+	if f.scope == funnelScopeAll {
+		return w
+	}
+	return w + funnelOpenBalanceWhere
+}
+
+// funnelInvoicesQuery assembles the invoice query for the requested filter.
+func funnelInvoicesQuery(f funnelFilter) string {
+	if f.scope == funnelScopeAll {
+		return funnelInvoicesSelect + f.where() + ";"
+	}
+	return funnelInvoicesSelect + funnelOpenBalanceJoin + f.where() + ";"
 }
 
 const funnelInvoicesSelect = `SELECT
@@ -234,6 +287,7 @@ type MatchingFunnelInvoice struct {
 	OrderRules        MatchingFunnelOrderRuleResult `json:"order_rules"`
 	SDI               MatchingFunnelSDIResult       `json:"sdi"`
 	Cascade           MatchingCascadeInvoice        `json:"cascade"`
+	Suggestion        MatchingSuggestionInvoice     `json:"suggestion"`
 }
 
 type MatchingFunnelRDA struct {
@@ -300,6 +354,8 @@ type MatchingFunnelChainSummary struct {
 
 type MatchingFunnelResponse struct {
 	Scope      funnelScope                     `json:"scope"`
+	From       *time.Time                      `json:"from"`
+	To         *time.Time                      `json:"to"`
 	Summary    MatchingFunnelSummary           `json:"summary"`
 	Chain      MatchingFunnelChainSummary      `json:"chain"`
 	Profiles   MatchingFunnelProfileCounts     `json:"profiles"`
@@ -310,6 +366,7 @@ type MatchingFunnelResponse struct {
 	Contracts  MatchingFunnelContractsSummary  `json:"contracts"`
 	SDI        MatchingFunnelSDISummary        `json:"sdi"`
 	Cascade    MatchingCascadeSummary          `json:"cascade"`
+	Suggestions MatchingSuggestionSummary      `json:"suggestions"`
 	Suppliers  []MatchingFunnelSupplier        `json:"suppliers"`
 }
 
@@ -323,13 +380,14 @@ func (h *Handler) handleMatchingFunnel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	scope, ok := parseFunnelScope(r.URL.Query().Get("scope"))
-	if !ok {
-		httputil.Error(w, http.StatusBadRequest, "Parametro scope non valido: usare open oppure all")
+	filter, problem := parseFunnelFilter(r.URL.Query())
+	if problem != "" {
+		httputil.Error(w, http.StatusBadRequest, problem)
 		return
 	}
+	scope := filter.scope
 
-	invoices, err := h.loadFunnelInvoices(r, scope)
+	invoices, err := h.loadFunnelInvoices(r, filter)
 	if err != nil {
 		httputil.InternalError(w, r, err, "matching funnel invoices query failed", "component", component, "operation", "load_funnel_invoices")
 		return
@@ -337,8 +395,8 @@ func (h *Handler) handleMatchingFunnel(w http.ResponseWriter, r *http.Request) {
 	// The fixed-fee series is read from every invoice of the supplier, settled
 	// ones included: in the open scope the earlier members are already paid.
 	seriesBase := invoices
-	if scope != funnelScopeAll {
-		if seriesBase, err = h.loadFunnelInvoices(r, funnelScopeAll); err != nil {
+	if scope != funnelScopeAll || filter.from != nil || filter.to != nil {
+		if seriesBase, err = h.loadFunnelInvoices(r, funnelFilter{scope: funnelScopeAll}); err != nil {
 			httputil.InternalError(w, r, err, "matching funnel series base query failed", "component", component, "operation", "load_funnel_series_base")
 			return
 		}
@@ -353,7 +411,7 @@ func (h *Handler) handleMatchingFunnel(w http.ResponseWriter, r *http.Request) {
 		httputil.InternalError(w, r, err, "matching funnel orders query failed", "component", component, "operation", "load_funnel_orders")
 		return
 	}
-	invoiceLines, err := h.loadFunnelInvoiceLines(r, scope)
+	invoiceLines, err := h.loadFunnelInvoiceLines(r, filter)
 	if err != nil {
 		httputil.InternalError(w, r, err, "matching funnel invoice lines query failed", "component", component, "operation", "load_funnel_invoice_lines")
 		return
@@ -387,12 +445,13 @@ func (h *Handler) handleMatchingFunnel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := buildMatchingFunnel(invoices, seriesBase, rdas, orders, invoiceLines, orderLinks, newFunnelContractIndex(contracts, contractLinks), sdiDocs, billing)
+	response.From, response.To = filter.from, filter.to
 	response.Scope = scope
 	httputil.JSON(w, http.StatusOK, response)
 }
 
-func (h *Handler) loadFunnelInvoices(r *http.Request, scope funnelScope) ([]funnelInvoice, error) {
-	rows, err := h.alyanteDB.QueryContext(r.Context(), funnelInvoicesQuery(scope))
+func (h *Handler) loadFunnelInvoices(r *http.Request, f funnelFilter) ([]funnelInvoice, error) {
+	rows, err := h.alyanteDB.QueryContext(r.Context(), funnelInvoicesQuery(f))
 	if err != nil {
 		return nil, err
 	}
@@ -540,6 +599,7 @@ func buildMatchingFunnel(invoices, seriesBase []funnelInvoice, rdas []funnelRDA,
 		Contracts: MatchingFunnelContractsSummary{ContractCount: contractIndex.count},
 		Chain:     buildChainSummary(rdas, orders, orderIndex),
 		Cascade:   newCascadeSummary(),
+		Suggestions: newSuggestionSummary(),
 		Summary: MatchingFunnelSummary{
 			InvoiceCount:      len(invoices),
 			RDACount:          len(rdas),
@@ -677,8 +737,11 @@ func buildMatchingFunnel(invoices, seriesBase []funnelInvoice, rdas []funnelRDA,
 			if len(contractTruth) > 0 {
 				response.Contracts.InvoicesLinked++
 			}
-			cascade := applyCascade(invoice, sdi, applyContracts(invoice, supplierContracts), contractTruth, orderRules, fixedFee, orderCandidates, candidates, orderIndex, rdaByID)
+			contractsResult := applyContracts(invoice, supplierContracts)
+			cascade := applyCascade(invoice, sdi, contractsResult, contractTruth, orderRules, fixedFee, orderCandidates, candidates, orderIndex, rdaByID)
 			addCascade(&response.Cascade, cascade)
+			suggestion := applySuggestion(invoice, sdi, contractsResult, contractTruth, orderRules, fixedFee, orderCandidates, candidates, orderIndex, rdaByID)
+			addSuggestion(&response.Suggestions, suggestion)
 			switch funnelOutcome(orderRules.OpenCandidates) {
 			case "none":
 				response.Orders.InvoicesNoOpen++
@@ -698,6 +761,7 @@ func buildMatchingFunnel(invoices, seriesBase []funnelInvoice, rdas []funnelRDA,
 				OrderRules:        orderRules,
 				SDI:               sdi,
 				Cascade:           cascade,
+				Suggestion:        suggestion,
 			})
 		}
 		for _, candidate := range candidates {

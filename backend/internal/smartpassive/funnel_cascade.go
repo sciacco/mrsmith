@@ -55,7 +55,9 @@ type MatchingCascadeInvoice struct {
 	ContractCandidates int `json:"contract_candidates"`
 	// SDIReason tells why level 1 did not close: no_xml, no_ref (no order
 	// reference in the XML), no_code (reference without a PO or PA code),
-	// unresolved (code not found).
+	// unresolved (a code not found), truncated (reference fills the 20
+	// characters of the field), not_covered (the orders found do not have
+	// enough residual for the invoice amount).
 	SDIReason string `json:"sdi_reason"`
 	// OrdersReason tells why level 2 did not close: no_orders, no_open_orders,
 	// no_match, ambiguous.
@@ -123,26 +125,44 @@ func applyCascade(invoice funnelInvoice, sdi MatchingFunnelSDIResult, contracts 
 	case len(sdi.OrderRefs) == 0:
 		out.SDIReason = "no_ref"
 	default:
-		set := map[string]struct{}{}
-		withCode := false
+		declared := map[string]struct{}{}
+		withCode, unresolved, truncated := false, false, false
 		for _, ref := range sdi.OrderRefs {
 			if ref.Code != "" {
 				withCode = true
 			}
-			for _, o := range ref.Orders {
-				set[o] = struct{}{}
+			// References without a PO or PA code are the supplier's own
+			// numbers (order, offer, charges): they do not count.
+			if ref.Code != "" && len(ref.orderKeys) == 0 {
+				unresolved = true
+			}
+			// IdDocumento holds 20 characters: a reference that fills them
+			// may have lost the tail of the list of codes.
+			if len(ref.Declared) >= sdiReferenceMaxLen {
+				truncated = true
+			}
+			for _, k := range ref.orderKeys {
+				declared[k] = struct{}{}
 			}
 		}
 		switch {
-		case len(set) > 0:
-		case !withCode:
+		case len(declared) == 0 && !withCode:
 			out.SDIReason = "no_code"
-		default:
+		case len(declared) == 0 || unresolved:
+			// Every declared code must resolve: one missing means the
+			// proposal is incomplete.
 			out.SDIReason = "unresolved"
-		}
-		if len(set) > 0 {
-			out.Level = cascadeLevelSDI
-			out.Proposals = sortedKeys(set)
+		case truncated:
+			out.SDIReason = "truncated"
+		default:
+			// The declared orders are only candidates: the invoice closes
+			// here when their residual covers the invoice amount.
+			if covered, ok := orderCoverage(invoice, sortedKeys(declared), idx); ok {
+				out.Level = cascadeLevelSDI
+				out.Proposals = covered
+			} else {
+				out.SDIReason = "not_covered"
+			}
 		}
 	}
 

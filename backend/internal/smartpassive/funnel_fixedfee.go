@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Level 3: fixed monthly fee recognised by repetition. A supplier billing a
+// Level 4: fixed monthly fee recognised by repetition. A supplier billing a
 // fixed fee sends, every month, one invoice with the same taxable amount
 // (Sparkle, Cogent, Arelion, leasing instalments). The series is a property of
 // the invoices themselves: same supplier, same taxable amount, at least three
@@ -24,6 +24,9 @@ type fixedFeeResult struct {
 	InSeries   bool
 	SeriesSize int
 	Proposals  []string
+	// OrderKeys are the Alyante keys of the proposed orders found in the
+	// index, for the residual check.
+	OrderKeys []string
 	// Reason tells why the level did not close: no_series, no_anchor.
 	Reason string
 }
@@ -97,6 +100,7 @@ func applyFixedFee(invoice funnelInvoice, series map[string][]funnelInvoice, idx
 	for _, key := range idx.links.ordersOf(anchor.key) {
 		if o, ok := idx.byKey[key]; ok {
 			result.Proposals = append(result.Proposals, o.label())
+			result.OrderKeys = append(result.OrderKeys, key)
 		} else {
 			result.Proposals = append(result.Proposals, "reg. "+strings.TrimPrefix(key, "1:"))
 		}

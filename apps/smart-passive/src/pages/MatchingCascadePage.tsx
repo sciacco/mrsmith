@@ -38,7 +38,7 @@ const levelTitles: Record<MatchingCascadeLevel['key'], string> = {
 };
 
 const levelNotes: Record<MatchingCascadeLevel['key'], string> = {
-  sdi: 'Il codice ordine scritto dal fornitore nella fattura elettronica, risolto sugli ordini Alyante tramite il codice RDA o PA nel numero originale.',
+  sdi: 'Il codice ordine scritto dal fornitore nella fattura elettronica, risolto sugli ordini Alyante tramite il codice RDA o PA nel numero originale. Gli ordini trovati sono candidati: la fattura chiude qui solo se ogni codice PO o PA è risolto, nessuno riempie i 20 caratteri del campo e il residuo degli ordini copre l’imponibile; altrimenti passa al livello successivo.',
   contracts: 'I contratti che AFC registra in Alyante per i canoni ricorrenti, uno per contratto con il suo canone. La fattura chiude sul contratto, o sulla combinazione di contratti, il cui canone somma esattamente all’imponibile. Esistono da luglio 2026: prima, e per i fornitori non censiti, valgono i livelli seguenti. Confronto con i contratti che AFC ha collegato alla fattura.',
   orders: 'Stesso articolo, stesso importo o prezzo unitario, quantità entro il residuo, fra gli ordini aperti dello stesso fornitore. Chiude solo se una combinazione sola regge.',
   fixed_fee: 'Serie di fatture dello stesso fornitore con lo stesso imponibile, una al mese per almeno tre mesi. La fattura prende l’ordine collegato da AFC sulla precedente della serie. La serie è letta su tutte le fatture 2026 del fornitore, saldate comprese.',
@@ -68,7 +68,9 @@ function sdiReasonLabel(reason: string): string {
     case 'no_xml': return 'Nessun XML agganciato';
     case 'no_ref': return 'XML senza riferimento ordine';
     case 'no_code': return 'Riferimento senza codice PO o PA';
-    case 'unresolved': return 'Codice non trovato';
+    case 'unresolved': return 'Un codice PO o PA non trovato';
+    case 'truncated': return 'Riferimento troncato a 20 caratteri';
+    case 'not_covered': return 'Ordini in fattura non coprono l\'importo';
     default: return '—';
   }
 }

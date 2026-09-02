@@ -48,7 +48,7 @@ WHERE d.MG36_TIPODOC = 22
 ORDER BY t.DO11_NUMREG_CO99, r.DO30_PROGRIGA;`
 
 // funnelInvoiceLinesQuery returns the body rows of the invoices in scope.
-func funnelInvoiceLinesQuery(scope funnelScope) string {
+func funnelInvoiceLinesQuery(f funnelFilter) string {
 	q := `SELECT
     t.DO11_DITTA_CG18,
     t.DO11_NUMREG_CO99,
@@ -66,10 +66,10 @@ INNER JOIN dbo.DO30_DOCCORPO AS r
     ON r.DO30_DITTA_CG18 = t.DO11_DITTA_CG18
    AND r.DO30_NUMREG_CO99 = t.DO11_NUMREG_CO99
 `
-	if scope == funnelScopeAll {
-		return q + funnelInvoicesWhere + ";"
+	if f.scope == funnelScopeAll {
+		return q + f.where() + ";"
 	}
-	return q + funnelOpenBalanceJoin + funnelInvoicesWhere + funnelOpenBalanceWhere + ";"
+	return q + funnelOpenBalanceJoin + f.where() + ";"
 }
 
 // funnelOrderLineLinksQuery returns every body reference from a document row
@@ -257,8 +257,8 @@ func orderRDACode(origRef string) (*noteCode, bool) {
 	return nil, false
 }
 
-func (h *Handler) loadFunnelInvoiceLines(r *http.Request, scope funnelScope) (map[string][]funnelDocLine, error) {
-	rows, err := h.alyanteDB.QueryContext(r.Context(), funnelInvoiceLinesQuery(scope))
+func (h *Handler) loadFunnelInvoiceLines(r *http.Request, f funnelFilter) (map[string][]funnelDocLine, error) {
+	rows, err := h.alyanteDB.QueryContext(r.Context(), funnelInvoiceLinesQuery(f))
 	if err != nil {
 		return nil, err
 	}
@@ -423,6 +423,27 @@ func (idx funnelOrderIndex) residual(o funnelOrder, l funnelDocLine, own map[ord
 	key := orderLineKey{order: o.key, row: l.progressive}
 	r := *l.qty - idx.links.consumed[key] + own[key]
 	return &r
+}
+
+// residualAmount is the value, in cents, of what the order still has to be
+// invoiced: every amount line weighted by its residual quantity.
+func (idx funnelOrderIndex) residualAmount(o funnelOrder, own map[orderLineKey]float64) int64 {
+	var sum int64
+	for _, l := range o.lines {
+		if !l.isAmountLine() {
+			continue
+		}
+		r := idx.residual(o, l, own)
+		if r == nil || l.qty == nil || *l.qty == 0 {
+			sum += cents(*l.net)
+			continue
+		}
+		if *r <= 0 {
+			continue
+		}
+		sum += cents(*l.net * *r / *l.qty)
+	}
+	return sum
 }
 
 // isOpen tells whether any amount line of the order still has residual.

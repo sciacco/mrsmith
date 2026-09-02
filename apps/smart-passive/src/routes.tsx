@@ -3,11 +3,13 @@ import { AlyanteInvoicesPage } from './pages/AlyanteInvoicesPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { MatchingCascadePage } from './pages/MatchingCascadePage';
 import { MatchingFunnelPage } from './pages/MatchingFunnelPage';
+import { MatchingSuggestionPage } from './pages/MatchingSuggestionPage';
 import { RdaArakPage } from './pages/RdaArakPage';
 
 export const routes: RouteObject[] = [
   { index: true, element: <Navigate to="/dashboard" replace /> },
   { path: 'dashboard', element: <DashboardPage /> },
+  { path: 'suggerimenti', element: <MatchingSuggestionPage /> },
   { path: 'abbinamento-livelli', element: <MatchingCascadePage /> },
   { path: 'funnel-dati', element: <MatchingFunnelPage /> },
   { path: 'fatture-alyante', element: <AlyanteInvoicesPage /> },

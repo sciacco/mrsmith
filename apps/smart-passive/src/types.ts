@@ -246,7 +246,7 @@ export type MatchingCascadeContractsReason = '' | 'no_contracts' | 'no_match' | 
 
 export type MatchingCascadeVerdict = 'match' | 'partial' | 'wrong' | 'no_truth' | 'afc_linked' | 'afc_unlinked';
 
-export type MatchingCascadeSDIReason = '' | 'no_xml' | 'no_ref' | 'no_code' | 'unresolved';
+export type MatchingCascadeSDIReason = '' | 'no_xml' | 'no_ref' | 'no_code' | 'unresolved' | 'truncated' | 'not_covered';
 
 export type MatchingCascadeOrdersReason = '' | 'no_orders' | 'no_open_orders' | 'no_match' | 'ambiguous';
 
@@ -295,6 +295,68 @@ export interface MatchingCascadeSummary {
   residual_by_family: MatchingCascadeReason[];
 }
 
+export type MatchingSuggestionLevelKey = 'sdi' | 'contracts' | 'orders' | 'fixed_fee';
+
+export type MatchingSuggestionOutcome = 'verified' | 'hint' | 'none';
+
+export interface MatchingSuggestionCheck {
+  level: MatchingSuggestionLevelKey;
+  outcome: MatchingSuggestionOutcome;
+  reason: string;
+  proposals: string[];
+}
+
+export interface MatchingSuggestionInvoice {
+  checks: MatchingSuggestionCheck[];
+  level: MatchingSuggestionLevelKey | 'residual';
+  verified: boolean;
+  proposals: string[];
+  verdict: MatchingCascadeVerdict;
+  family: '' | 'recurring_in_course' | 'goods_orders' | 'service_orders_expired' | 'rda_only' | 'unknown';
+}
+
+export interface MatchingSuggestionLevel {
+  key: MatchingSuggestionLevelKey;
+  tested: number;
+  verified: number;
+  hint: number;
+  match: number;
+  partial: number;
+  wrong: number;
+  no_truth: number;
+}
+
+export interface MatchingSuggestionFinal {
+  level: MatchingSuggestionLevelKey;
+  verified: number;
+  hint: number;
+  match: number;
+  partial: number;
+  wrong: number;
+  no_truth: number;
+}
+
+export interface MatchingSuggestionSummary {
+  invoices: number;
+  levels: MatchingSuggestionLevel[];
+  verified: number;
+  hint_only: number;
+  residual: number;
+  residual_with_afc_link: number;
+  final: MatchingSuggestionFinal[];
+  residual_by_sdi: MatchingCascadeReason[];
+  residual_by_contracts: MatchingCascadeReason[];
+  residual_by_orders: MatchingCascadeReason[];
+  residual_by_fixed_fee: MatchingCascadeReason[];
+  residual_by_family: MatchingCascadeReason[];
+}
+
+export interface MatchingFunnelFilter {
+  scope: MatchingFunnelScope;
+  from: string;
+  to: string;
+}
+
 export interface MatchingFunnelInvoice {
   registration: number;
   document_number: string;
@@ -306,6 +368,7 @@ export interface MatchingFunnelInvoice {
   order_rules: MatchingFunnelOrderRuleResult;
   sdi: MatchingFunnelSDIResult;
   cascade: MatchingCascadeInvoice;
+  suggestion: MatchingSuggestionInvoice;
 }
 
 export interface MatchingFunnelRDA {
@@ -387,6 +450,8 @@ export interface MatchingFunnelContractsSummary {
 
 export interface MatchingFunnelResponse {
   scope: MatchingFunnelScope;
+  from: string | null;
+  to: string | null;
   chain: MatchingFunnelChainSummary;
   summary: {
     invoice_count: number;
@@ -406,6 +471,7 @@ export interface MatchingFunnelResponse {
   contracts: MatchingFunnelContractsSummary;
   sdi: MatchingFunnelSDISummary;
   cascade: MatchingCascadeSummary;
+  suggestions: MatchingSuggestionSummary;
   suppliers: MatchingFunnelSupplier[];
 }
 
