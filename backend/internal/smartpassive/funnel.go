@@ -77,6 +77,11 @@ const funnelRDAsQuery = `SELECT
     p.company_name,
     por.id AS row_id,
     por."type" AS row_type,
+    por.qty,
+    por.nrc,
+    por.mrc,
+    por.price,
+    por.total,
     porp.is_recurrent,
     porp.month_recursion,
     porr.initial_subscription_months,
@@ -113,6 +118,11 @@ type funnelInvoice struct {
 
 type funnelRDALine struct {
 	rowType        sql.NullString
+	qty            sql.NullFloat64
+	nrc            sql.NullFloat64
+	mrc            sql.NullFloat64
+	price          sql.NullFloat64
+	total          sql.NullFloat64
 	isRecurrent    sql.NullBool
 	recurrence     sql.NullInt64
 	initialMonths  sql.NullInt64
@@ -151,12 +161,13 @@ type MatchingFunnelProfileCounts struct {
 }
 
 type MatchingFunnelInvoice struct {
-	Registration      int64                   `json:"registration"`
-	DocumentNumber    string                  `json:"document_number"`
-	DocumentDate      *time.Time              `json:"document_date"`
-	SupplierReference string                  `json:"supplier_reference"`
-	TaxableAmount     *float64                `json:"taxable_amount"`
-	Reference         MatchingFunnelReference `json:"reference"`
+	Registration      int64                    `json:"registration"`
+	DocumentNumber    string                   `json:"document_number"`
+	DocumentDate      *time.Time               `json:"document_date"`
+	SupplierReference string                   `json:"supplier_reference"`
+	TaxableAmount     *float64                 `json:"taxable_amount"`
+	Reference         MatchingFunnelReference  `json:"reference"`
+	Rules             MatchingFunnelRuleResult `json:"rules"`
 }
 
 type MatchingFunnelRDA struct {
@@ -187,6 +198,7 @@ type MatchingFunnelResponse struct {
 	Summary   MatchingFunnelSummary          `json:"summary"`
 	Profiles  MatchingFunnelProfileCounts    `json:"profiles"`
 	Reference MatchingFunnelReferenceSummary `json:"reference"`
+	Rules     MatchingFunnelRulesSummary     `json:"rules"`
 	Suppliers []MatchingFunnelSupplier       `json:"suppliers"`
 }
 
@@ -295,6 +307,11 @@ func (h *Handler) loadFunnelRDAs(r *http.Request) ([]funnelRDA, error) {
 			&providerName,
 			&rowID,
 			&line.rowType,
+			&line.qty,
+			&line.nrc,
+			&line.mrc,
+			&line.price,
+			&line.total,
 			&line.isRecurrent,
 			&line.recurrence,
 			&line.initialMonths,
@@ -419,6 +436,8 @@ func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA) MatchingFun
 			reference := referenceIndex.resolve(invoice, parseAFCNote(invoice.note))
 			addReferenceOutcome(&row.Reference, reference)
 			addReferenceOutcome(&response.Reference, reference)
+			rules := applyFunnelRules(invoice, candidates, reference)
+			addRuleResult(&response.Rules, rules)
 			row.Invoices = append(row.Invoices, MatchingFunnelInvoice{
 				Registration:      invoice.registration,
 				DocumentNumber:    invoice.documentNumber,
@@ -426,6 +445,7 @@ func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA) MatchingFun
 				SupplierReference: invoice.supplierReference,
 				TaxableAmount:     invoice.taxableAmount,
 				Reference:         reference,
+				Rules:             rules,
 			})
 		}
 		for _, candidate := range candidates {

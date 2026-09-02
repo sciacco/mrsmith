@@ -54,6 +54,34 @@ function referencedRDALabel(rda: MatchingFunnelReferencedRDA): string {
   return base;
 }
 
+function ruleLabel(rule: MatchingFunnelInvoice['rules']['rule']): string {
+  if (rule === 'full') return 'Importo intero';
+  if (rule === 'installment') return 'Rata';
+  if (rule === 'sum') return 'Somma di RDA';
+  return '—';
+}
+
+function verdictLabel(verdict: MatchingFunnelInvoice['rules']['verdict']): string {
+  switch (verdict) {
+    case 'match': return 'Stessa RDA di AFC';
+    case 'ambiguous': return 'Più proposte, una giusta';
+    case 'wrong': return 'RDA diversa da AFC';
+    case 'none': return 'Nessuna proposta';
+    case 'false_positive': return 'Proposta su fattura senza RDA';
+    case 'silent_ok': return 'Nessuna proposta, corretto';
+    case 'no_truth': return 'Senza riscontro AFC';
+  }
+}
+
+function proposalsText(rules: MatchingFunnelInvoice['rules']): string {
+  if (rules.proposals.length === 0) {
+    return rules.near_miss === null ? '—' : `Nessuna al centesimo, la più vicina a ${(rules.near_miss * 100).toFixed(1)}%`;
+  }
+  const shown = rules.proposals.slice(0, 3).map((proposal) => proposal.codes.join(' + '));
+  const rest = rules.proposals.length - shown.length;
+  return rest > 0 ? `${shown.join(' · ')} e altre ${integer(rest)}` : shown.join(' · ');
+}
+
 function noteExcerpt(note: string): string {
   const flat = note.replace(/\s+/g, ' ').trim();
   if (!flat) return '—';
@@ -196,6 +224,29 @@ export function MatchingFunnelPage() {
                 Codici PO e PA letti dalle note testata. Un PA legacy citato nell'oggetto di una RDA Arak conta come quella RDA. «Nessuna RDA dichiarata» = nota «PA mai creati».
               </p>
             </section>
+
+            <section className={styles.summaryPanel}>
+              <h2>Prova delle regole</h2>
+              <table className={styles.summaryTable}>
+                <tbody>
+                  <tr><th scope="row">Fatture con RDA indicata da AFC</th><td>{integer(query.data.rules.truth_invoices)}</td></tr>
+                  <tr><th scope="row">Stessa RDA di AFC</th><td>{integer(query.data.rules.match)}</td></tr>
+                  <tr><th scope="row">di cui per importo intero</th><td>{integer(query.data.rules.match_by_full)}</td></tr>
+                  <tr><th scope="row">di cui per rata</th><td>{integer(query.data.rules.match_by_installment)}</td></tr>
+                  <tr><th scope="row">di cui per somma di RDA</th><td>{integer(query.data.rules.match_by_sum)}</td></tr>
+                  <tr><th scope="row">Più proposte, una giusta</th><td>{integer(query.data.rules.ambiguous)}</td></tr>
+                  <tr><th scope="row">RDA diversa da AFC</th><td>{integer(query.data.rules.wrong)}</td></tr>
+                  <tr><th scope="row">Nessuna proposta</th><td>{integer(query.data.rules.none)}</td></tr>
+                  <tr><th scope="row">Fatture senza RDA (AFC)</th><td>{integer(query.data.rules.no_rda_invoices)}</td></tr>
+                  <tr><th scope="row">di cui con proposta sbagliata</th><td>{integer(query.data.rules.false_positive)}</td></tr>
+                  <tr><th scope="row">Fatture senza riscontro AFC con proposta</th><td>{integer(query.data.rules.no_truth_proposals)} / {integer(query.data.rules.no_truth_invoices)}</td></tr>
+                  <tr><th scope="row">Nessuna proposta ma RDA entro il 2%</th><td>{integer(query.data.rules.near_misses)}</td></tr>
+                </tbody>
+              </table>
+              <p className={styles.summaryNote}>
+                Confronto al centesimo fra imponibile e RDA dello stesso fornitore: importo intero, poi rata di un periodo, poi somma di due o tre RDA.
+              </p>
+            </section>
           </div>
 
           <section className={styles.tablePanel}>
@@ -306,6 +357,9 @@ export function MatchingFunnelPage() {
                           <th>Stato AFC</th>
                           <th>Riferimenti AFC</th>
                           <th>Esito riferimento</th>
+                          <th>Regola</th>
+                          <th>RDA proposte</th>
+                          <th>Confronto con AFC</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -335,6 +389,17 @@ export function MatchingFunnelPage() {
                                   ]}</div>}
                             </td>
                             <td>{referenceOutcomeLabel(invoice.reference.outcome)}</td>
+                            <td>{ruleLabel(invoice.rules.rule)}</td>
+                            <td className={styles.codesCell}>{proposalsText(invoice.rules)}</td>
+                            <td className={
+                              invoice.rules.verdict === 'match' || invoice.rules.verdict === 'silent_ok'
+                                ? styles.verdictGood
+                                : invoice.rules.verdict === 'wrong' || invoice.rules.verdict === 'false_positive'
+                                  ? styles.codeWarn
+                                  : undefined
+                            }>
+                              {verdictLabel(invoice.rules.verdict)}
+                            </td>
                           </tr>
                         ))}
                       </tbody>

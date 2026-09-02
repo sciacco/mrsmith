@@ -89,7 +89,7 @@
 
 .summaryGrid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
   gap: var(--space-4);
 }
 
@@ -351,17 +351,16 @@
   color: var(--color-text-muted);
 }
 
+.detailTable td.verdictGood {
+  color: var(--color-success-strong);
+  font-weight: 600;
+}
+
 .noCandidates {
   margin: 0;
   padding: var(--space-5) var(--space-4);
   color: var(--color-text-muted);
   font-size: 0.8125rem;
-}
-
-@media (max-width: 1200px) {
-  .summaryGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 1000px) {

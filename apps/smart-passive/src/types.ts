@@ -90,6 +90,44 @@ export interface MatchingFunnelReferenceSummary {
   supplier_mismatch: number;
 }
 
+export interface MatchingFunnelProposal {
+  codes: string[];
+  ids: number[];
+}
+
+export type MatchingFunnelRuleVerdict =
+  | 'match'
+  | 'ambiguous'
+  | 'wrong'
+  | 'none'
+  | 'false_positive'
+  | 'silent_ok'
+  | 'no_truth';
+
+export interface MatchingFunnelRuleResult {
+  rule: '' | 'full' | 'installment' | 'sum';
+  proposals: MatchingFunnelProposal[];
+  verdict: MatchingFunnelRuleVerdict;
+  near_miss: number | null;
+}
+
+export interface MatchingFunnelRulesSummary {
+  truth_invoices: number;
+  match: number;
+  ambiguous: number;
+  wrong: number;
+  none: number;
+  no_rda_invoices: number;
+  false_positive: number;
+  silent_ok: number;
+  no_truth_invoices: number;
+  no_truth_proposals: number;
+  match_by_full: number;
+  match_by_installment: number;
+  match_by_sum: number;
+  near_misses: number;
+}
+
 export interface MatchingFunnelInvoice {
   registration: number;
   document_number: string;
@@ -97,6 +135,7 @@ export interface MatchingFunnelInvoice {
   supplier_reference: string;
   taxable_amount: number | null;
   reference: MatchingFunnelReference;
+  rules: MatchingFunnelRuleResult;
 }
 
 export interface MatchingFunnelRDA {
@@ -136,6 +175,7 @@ export interface MatchingFunnelResponse {
   };
   profiles: MatchingFunnelProfileCounts;
   reference: MatchingFunnelReferenceSummary;
+  rules: MatchingFunnelRulesSummary;
   suppliers: MatchingFunnelSupplier[];
 }
 
