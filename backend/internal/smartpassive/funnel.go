@@ -18,13 +18,21 @@ const funnelInvoicesQuery = `SELECT
     t.DO11_NUMDOC,
     t.DO11_DATADOC,
     t.DO11_NUMDOCORIG,
-    tot.DO13_TOTDOCUMENTO
+    t.DO11_NOTEDOCUM,
+    line_totals.IMPONIBILE
 FROM dbo.DO11_DOCTESTATA AS t
 INNER JOIN dbo.MG36_DOCUMENTI AS d
     ON d.MG36_CODDOCUM = t.DO11_DOCUM_MG36
-LEFT JOIN dbo.DO13_DOCTOTALI AS tot
-    ON tot.DO13_DITTA_CG18 = t.DO11_DITTA_CG18
-   AND tot.DO13_NUMREG_CO99 = t.DO11_NUMREG_CO99
+LEFT JOIN (
+    SELECT
+        DO30_DITTA_CG18,
+        DO30_NUMREG_CO99,
+        SUM(ISNULL(DO30_IMPNETSCP, 0)) AS IMPONIBILE
+    FROM dbo.DO30_DOCCORPO
+    GROUP BY DO30_DITTA_CG18, DO30_NUMREG_CO99
+) AS line_totals
+    ON line_totals.DO30_DITTA_CG18 = t.DO11_DITTA_CG18
+   AND line_totals.DO30_NUMREG_CO99 = t.DO11_NUMREG_CO99
 LEFT JOIN dbo.CG44_CLIFOR AS cf
     ON cf.CG44_DITTA_CG18 = t.DO11_DITTACF_CG44
    AND cf.CG44_TIPOCF = t.DO11_TIPOCF_CG44
@@ -99,7 +107,8 @@ type funnelInvoice struct {
 	documentNumber    string
 	documentDate      *time.Time
 	supplierReference string
-	total             *float64
+	note              string
+	taxableAmount     *float64
 }
 
 type funnelRDALine struct {
@@ -130,6 +139,7 @@ type MatchingFunnelSummary struct {
 	MultipleCandidates int `json:"multiple_candidates"`
 	RDACount           int `json:"rda_count"`
 	RDAsWithoutERPID   int `json:"rdas_without_erp_id"`
+	DuplicateRDACodes  int `json:"duplicate_rda_codes"`
 }
 
 type MatchingFunnelProfileCounts struct {
@@ -140,11 +150,12 @@ type MatchingFunnelProfileCounts struct {
 }
 
 type MatchingFunnelInvoice struct {
-	Registration      int64      `json:"registration"`
-	DocumentNumber    string     `json:"document_number"`
-	DocumentDate      *time.Time `json:"document_date"`
-	SupplierReference string     `json:"supplier_reference"`
-	Total             *float64   `json:"total"`
+	Registration      int64                   `json:"registration"`
+	DocumentNumber    string                  `json:"document_number"`
+	DocumentDate      *time.Time              `json:"document_date"`
+	SupplierReference string                  `json:"supplier_reference"`
+	TaxableAmount     *float64                `json:"taxable_amount"`
+	Reference         MatchingFunnelReference `json:"reference"`
 }
 
 type MatchingFunnelRDA struct {
@@ -159,21 +170,23 @@ type MatchingFunnelRDA struct {
 }
 
 type MatchingFunnelSupplier struct {
-	SupplierERPID       *int64                      `json:"supplier_erp_id"`
-	AlyanteSupplierName *string                     `json:"alyante_supplier_name"`
-	ProviderName        *string                     `json:"provider_name"`
-	InvoiceCount        int                         `json:"invoice_count"`
-	CandidateCount      int                         `json:"candidate_count"`
-	Outcome             string                      `json:"outcome"`
-	Profiles            MatchingFunnelProfileCounts `json:"profiles"`
-	Invoices            []MatchingFunnelInvoice     `json:"invoices"`
-	Candidates          []MatchingFunnelRDA         `json:"candidates"`
+	SupplierERPID       *int64                         `json:"supplier_erp_id"`
+	AlyanteSupplierName *string                        `json:"alyante_supplier_name"`
+	ProviderName        *string                        `json:"provider_name"`
+	InvoiceCount        int                            `json:"invoice_count"`
+	CandidateCount      int                            `json:"candidate_count"`
+	Outcome             string                         `json:"outcome"`
+	Profiles            MatchingFunnelProfileCounts    `json:"profiles"`
+	Reference           MatchingFunnelReferenceSummary `json:"reference"`
+	Invoices            []MatchingFunnelInvoice        `json:"invoices"`
+	Candidates          []MatchingFunnelRDA            `json:"candidates"`
 }
 
 type MatchingFunnelResponse struct {
-	Summary   MatchingFunnelSummary       `json:"summary"`
-	Profiles  MatchingFunnelProfileCounts `json:"profiles"`
-	Suppliers []MatchingFunnelSupplier    `json:"suppliers"`
+	Summary   MatchingFunnelSummary          `json:"summary"`
+	Profiles  MatchingFunnelProfileCounts    `json:"profiles"`
+	Reference MatchingFunnelReferenceSummary `json:"reference"`
+	Suppliers []MatchingFunnelSupplier       `json:"suppliers"`
 }
 
 func (h *Handler) handleMatchingFunnel(w http.ResponseWriter, r *http.Request) {
@@ -217,7 +230,8 @@ func (h *Handler) loadFunnelInvoices(r *http.Request) ([]funnelInvoice, error) {
 		var documentNumber sql.NullString
 		var documentDate sql.NullTime
 		var supplierReference sql.NullString
-		var total sql.NullFloat64
+		var note sql.NullString
+		var taxableAmount sql.NullFloat64
 		if err := rows.Scan(
 			&ditta,
 			&registration,
@@ -226,7 +240,8 @@ func (h *Handler) loadFunnelInvoices(r *http.Request) ([]funnelInvoice, error) {
 			&documentNumber,
 			&documentDate,
 			&supplierReference,
-			&total,
+			&note,
+			&taxableAmount,
 		); err != nil {
 			return nil, err
 		}
@@ -239,7 +254,8 @@ func (h *Handler) loadFunnelInvoices(r *http.Request) ([]funnelInvoice, error) {
 			documentNumber:    documentNumber.String,
 			documentDate:      timePtr(documentDate),
 			supplierReference: supplierReference.String,
-			total:             float64Ptr(total),
+			note:              note.String,
+			taxableAmount:     float64Ptr(taxableAmount),
 		})
 	}
 	return out, rows.Err()
@@ -321,8 +337,13 @@ func (h *Handler) loadFunnelRDAs(r *http.Request) ([]funnelRDA, error) {
 func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA) MatchingFunnelResponse {
 	rdasBySupplier := make(map[int64][]funnelRDA)
 	profilesByRDA := make(map[int64]funnelProfile, len(rdas))
+	referenceIndex := newFunnelReferenceIndex(rdas)
 	response := MatchingFunnelResponse{
-		Summary:   MatchingFunnelSummary{InvoiceCount: len(invoices), RDACount: len(rdas)},
+		Summary: MatchingFunnelSummary{
+			InvoiceCount:      len(invoices),
+			RDACount:          len(rdas),
+			DuplicateRDACodes: referenceIndex.duplicateCodes(),
+		},
 		Suppliers: make([]MatchingFunnelSupplier, 0),
 	}
 
@@ -393,12 +414,16 @@ func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA) MatchingFun
 			row.AlyanteSupplierName = &name
 		}
 		for _, invoice := range acc.invoices {
+			reference := referenceIndex.resolve(invoice, parseAFCNote(invoice.note))
+			addReferenceOutcome(&row.Reference, reference)
+			addReferenceOutcome(&response.Reference, reference)
 			row.Invoices = append(row.Invoices, MatchingFunnelInvoice{
 				Registration:      invoice.registration,
 				DocumentNumber:    invoice.documentNumber,
 				DocumentDate:      invoice.documentDate,
 				SupplierReference: invoice.supplierReference,
-				Total:             invoice.total,
+				TaxableAmount:     invoice.taxableAmount,
+				Reference:         reference,
 			})
 		}
 		for _, candidate := range candidates {

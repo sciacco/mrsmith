@@ -46,12 +46,55 @@ export interface MatchingFunnelProfileCounts {
 
 export type MatchingFunnelProfile = 'one_time' | 'recurring' | 'mixed' | 'unknown';
 
+export type MatchingFunnelReferenceOutcome =
+  | 'no_note'
+  | 'no_code'
+  | 'no_rda_declared'
+  | 'legacy_only'
+  | 'unresolved'
+  | 'ambiguous'
+  | 'one'
+  | 'multiple';
+
+export interface MatchingFunnelReferencedRDA {
+  code: string;
+  id: number | null;
+  state: string;
+  supplier_erp_id: number | null;
+  resolution: 'resolved' | 'unresolved' | 'ambiguous';
+  supplier_match: boolean | null;
+  in_candidates: boolean;
+  total: number | null;
+}
+
+export interface MatchingFunnelReference {
+  note: string;
+  afc_status: string;
+  outcome: MatchingFunnelReferenceOutcome;
+  rdas: MatchingFunnelReferencedRDA[];
+  legacy_codes: string[];
+}
+
+export interface MatchingFunnelReferenceSummary {
+  no_note: number;
+  no_code: number;
+  no_rda_declared: number;
+  legacy_only: number;
+  unresolved: number;
+  ambiguous: number;
+  one_rda: number;
+  multiple_rdas: number;
+  arak_and_legacy: number;
+  supplier_mismatch: number;
+}
+
 export interface MatchingFunnelInvoice {
   registration: number;
   document_number: string;
   document_date: string | null;
   supplier_reference: string;
-  total: number | null;
+  taxable_amount: number | null;
+  reference: MatchingFunnelReference;
 }
 
 export interface MatchingFunnelRDA {
@@ -73,6 +116,7 @@ export interface MatchingFunnelSupplier {
   candidate_count: number;
   outcome: 'none' | 'one' | 'multiple';
   profiles: MatchingFunnelProfileCounts;
+  reference: MatchingFunnelReferenceSummary;
   invoices: MatchingFunnelInvoice[];
   candidates: MatchingFunnelRDA[];
 }
@@ -85,8 +129,10 @@ export interface MatchingFunnelResponse {
     multiple_candidates: number;
     rda_count: number;
     rdas_without_erp_id: number;
+    duplicate_rda_codes: number;
   };
   profiles: MatchingFunnelProfileCounts;
+  reference: MatchingFunnelReferenceSummary;
   suppliers: MatchingFunnelSupplier[];
 }
 

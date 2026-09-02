@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { formatCurrency, formatLocalDate, formatNumber } from '@mrsmith/format';
 import { Button, Drawer, Icon, SearchInput, Skeleton, VisuallyHidden } from '@mrsmith/ui';
 import { useMatchingFunnel } from '../api/queries';
-import type { MatchingFunnelSupplier } from '../types';
+import type { MatchingFunnelInvoice, MatchingFunnelReferencedRDA, MatchingFunnelSupplier } from '../types';
 import styles from './MatchingFunnelPage.module.css';
 
 function integer(value: number): string {
@@ -28,6 +28,39 @@ function outcomeLabel(outcome: MatchingFunnelSupplier['outcome']): string {
   if (outcome === 'none') return 'Nessuna candidata';
   if (outcome === 'one') return 'Una candidata';
   return 'Più candidate';
+}
+
+function referenceOutcomeLabel(outcome: MatchingFunnelInvoice['reference']['outcome']): string {
+  switch (outcome) {
+    case 'no_note': return 'Nessuna nota';
+    case 'no_code': return 'Nota senza codice';
+    case 'no_rda_declared': return 'Nessuna RDA dichiarata';
+    case 'legacy_only': return 'Solo gestionale precedente';
+    case 'unresolved': return 'Codice non in Arak';
+    case 'ambiguous': return 'Codice ambiguo';
+    case 'one': return 'Una RDA';
+    case 'multiple': return 'Più RDA';
+  }
+}
+
+function referencedRDALabel(rda: MatchingFunnelReferencedRDA): string {
+  if (rda.resolution === 'unresolved') return `${rda.code} (non in Arak)`;
+  if (rda.resolution === 'ambiguous') return `${rda.code} (ambiguo)`;
+  if (rda.supplier_match === false) {
+    const erp = rda.supplier_erp_id === null ? 'senza codice ERP' : `ERP ${integer(rda.supplier_erp_id)}`;
+    return `${rda.code} (fornitore ${erp})`;
+  }
+  return rda.code;
+}
+
+function noteExcerpt(note: string): string {
+  const flat = note.replace(/\s+/g, ' ').trim();
+  if (!flat) return '—';
+  return flat.length > 60 ? `${flat.slice(0, 57)}…` : flat;
+}
+
+function resolvedReferences(row: MatchingFunnelSupplier): number {
+  return row.reference.one_rda + row.reference.multiple_rdas;
 }
 
 function alyanteSupplierLabel(row: MatchingFunnelSupplier): string {
@@ -68,6 +101,8 @@ export function MatchingFunnelPage() {
           <p className={styles.description}>
             Prima misura del bacino di matching. Le fatture sono confrontate con le RDA esclusivamente
             tramite il codice fornitore condiviso, senza importi, date, scoring o interpretazioni AI.
+            Le note scritte da AFC sulle fatture già lavorate sono lette solo come verità di riferimento
+            per misurare il funnel, mai come ingresso del matching.
           </p>
         </div>
         <Button
@@ -107,6 +142,7 @@ export function MatchingFunnelPage() {
                   <tr><th scope="row">Fatture Alyante</th><td>{integer(query.data.summary.invoice_count)}</td></tr>
                   <tr><th scope="row">RDA Arak</th><td>{integer(query.data.summary.rda_count)}</td></tr>
                   <tr><th scope="row">RDA senza codice ERP fornitore</th><td>{integer(query.data.summary.rdas_without_erp_id)}</td></tr>
+                  <tr><th scope="row">Codici RDA condivisi da più RDA</th><td>{integer(query.data.summary.duplicate_rda_codes)}</td></tr>
                 </tbody>
               </table>
             </section>
@@ -134,6 +170,27 @@ export function MatchingFunnelPage() {
               </table>
               <p className={styles.summaryNote}>
                 Classificazione preliminare basata su tipo riga, ricorrenza, durata e rinnovo.
+              </p>
+            </section>
+
+            <section className={styles.summaryPanel}>
+              <h2>Verità di riferimento AFC</h2>
+              <table className={styles.summaryTable}>
+                <tbody>
+                  <tr><th scope="row">Una RDA indicata</th><td>{integer(query.data.reference.one_rda)}</td></tr>
+                  <tr><th scope="row">Più RDA indicate</th><td>{integer(query.data.reference.multiple_rdas)}</td></tr>
+                  <tr><th scope="row">Codice non in Arak</th><td>{integer(query.data.reference.unresolved)}</td></tr>
+                  <tr><th scope="row">Codice ambiguo</th><td>{integer(query.data.reference.ambiguous)}</td></tr>
+                  <tr><th scope="row">Solo gestionale precedente</th><td>{integer(query.data.reference.legacy_only)}</td></tr>
+                  <tr><th scope="row">Arak e gestionale precedente</th><td>{integer(query.data.reference.arak_and_legacy)}</td></tr>
+                  <tr><th scope="row">Nessuna RDA dichiarata</th><td>{integer(query.data.reference.no_rda_declared)}</td></tr>
+                  <tr><th scope="row">Nota senza codice</th><td>{integer(query.data.reference.no_code)}</td></tr>
+                  <tr><th scope="row">Nessuna nota</th><td>{integer(query.data.reference.no_note)}</td></tr>
+                  <tr><th scope="row">RDA indicata con fornitore diverso</th><td>{integer(query.data.reference.supplier_mismatch)}</td></tr>
+                </tbody>
+              </table>
+              <p className={styles.summaryNote}>
+                Codici PO e PA letti dalle note testata, con o senza anno. «Nessuna RDA dichiarata» = nota «PA mai creati».
               </p>
             </section>
           </div>
@@ -174,6 +231,8 @@ export function MatchingFunnelPage() {
                       <th className={styles.numeric}>Ricorrenti</th>
                       <th className={styles.numeric}>Miste</th>
                       <th className={styles.numeric}>Non class.</th>
+                      <th className={styles.numeric}>Rif. AFC risolti</th>
+                      <th className={styles.numeric}>Forn. diverso</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -199,6 +258,8 @@ export function MatchingFunnelPage() {
                         <td className={styles.numeric}>{integer(row.profiles.recurring)}</td>
                         <td className={styles.numeric}>{integer(row.profiles.mixed)}</td>
                         <td className={styles.numeric}>{integer(row.profiles.unknown)}</td>
+                        <td className={styles.numeric}>{integer(resolvedReferences(row))}</td>
+                        <td className={styles.numeric}>{integer(row.reference.supplier_mismatch)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -238,7 +299,10 @@ export function MatchingFunnelPage() {
                           <th>Numero</th>
                           <th>Rif. fornitore</th>
                           <th>Registrazione</th>
-                          <th className={styles.numeric}>Totale</th>
+                          <th className={styles.numeric}>Imponibile</th>
+                          <th>Stato AFC</th>
+                          <th>Riferimenti AFC</th>
+                          <th>Esito riferimento</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -247,8 +311,27 @@ export function MatchingFunnelPage() {
                             <td>{date(invoice.document_date)}</td>
                             <td>{invoice.document_number || '—'}</td>
                             <td>{invoice.supplier_reference || '—'}</td>
-                            <td>{integer(invoice.registration)}</td>
-                            <td className={styles.numeric}>{money(invoice.total)}</td>
+                            <td>{String(invoice.registration)}</td>
+                            <td className={styles.numeric}>{money(invoice.taxable_amount)}</td>
+                            <td>{invoice.reference.afc_status || '—'}</td>
+                            <td className={styles.codesCell}>
+                              {invoice.reference.rdas.length === 0 && invoice.reference.legacy_codes.length === 0
+                                ? <span className={styles.codeMuted} title={invoice.reference.note}>{noteExcerpt(invoice.reference.note)}</span>
+                                : <div className={styles.codes}>{[
+                                    ...invoice.reference.rdas.map((rda) => (
+                                      <span
+                                        key={rda.code}
+                                        className={rda.resolution !== 'resolved' || rda.supplier_match === false ? styles.codeWarn : undefined}
+                                      >
+                                        {referencedRDALabel(rda)}
+                                      </span>
+                                    )),
+                                    ...invoice.reference.legacy_codes.map((code) => (
+                                      <span key={code} className={styles.codeMuted}>{code}</span>
+                                    )),
+                                  ]}</div>}
+                            </td>
+                            <td>{referenceOutcomeLabel(invoice.reference.outcome)}</td>
                           </tr>
                         ))}
                       </tbody>
