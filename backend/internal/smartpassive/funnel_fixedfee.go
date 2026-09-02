@@ -15,8 +15,8 @@ import (
 // the nearest earlier member AFC linked in Alyante, or the nearest later one
 // when the invoice is the oldest of the series.
 //
-// The series is read from the invoices loaded for the scope: in the open
-// scope, where settled invoices are missing, it is seen only in part.
+// The series is read from every invoice of the supplier in the period, settled
+// ones included, whatever the scope of the invoices being matched.
 
 const fixedFeeMinMonths = 3
 

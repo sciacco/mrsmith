@@ -39,7 +39,7 @@ const levelTitles: Record<MatchingCascadeLevel['key'], string> = {
 const levelNotes: Record<MatchingCascadeLevel['key'], string> = {
   sdi: 'Il codice ordine scritto dal fornitore nella fattura elettronica, risolto sugli ordini Alyante tramite il codice RDA o PA nel numero originale.',
   orders: 'Stesso articolo, stesso importo o prezzo unitario, quantità entro il residuo, fra gli ordini aperti dello stesso fornitore. Chiude solo se una combinazione sola regge.',
-  fixed_fee: 'Serie di fatture dello stesso fornitore con lo stesso imponibile, una al mese per almeno tre mesi. La fattura prende l’ordine collegato da AFC sulla precedente della serie. Nel perimetro aperto la serie si vede solo in parte.',
+  fixed_fee: 'Serie di fatture dello stesso fornitore con lo stesso imponibile, una al mese per almeno tre mesi. La fattura prende l’ordine collegato da AFC sulla precedente della serie. La serie è letta su tutte le fatture 2026 del fornitore, saldate comprese.',
 };
 
 function levelLabel(level: MatchingCascadeInvoice['level']): string {

@@ -332,6 +332,15 @@ func (h *Handler) handleMatchingFunnel(w http.ResponseWriter, r *http.Request) {
 		httputil.InternalError(w, r, err, "matching funnel invoices query failed", "component", component, "operation", "load_funnel_invoices")
 		return
 	}
+	// The fixed-fee series is read from every invoice of the supplier, settled
+	// ones included: in the open scope the earlier members are already paid.
+	seriesBase := invoices
+	if scope != funnelScopeAll {
+		if seriesBase, err = h.loadFunnelInvoices(r, funnelScopeAll); err != nil {
+			httputil.InternalError(w, r, err, "matching funnel series base query failed", "component", component, "operation", "load_funnel_series_base")
+			return
+		}
+	}
 	rdas, err := h.loadFunnelRDAs(r)
 	if err != nil {
 		httputil.InternalError(w, r, err, "matching funnel rdas query failed", "component", component, "operation", "load_funnel_rdas")
@@ -365,7 +374,7 @@ func (h *Handler) handleMatchingFunnel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := buildMatchingFunnel(invoices, rdas, orders, invoiceLines, orderLinks, sdiDocs, billing)
+	response := buildMatchingFunnel(invoices, seriesBase, rdas, orders, invoiceLines, orderLinks, sdiDocs, billing)
 	response.Scope = scope
 	httputil.JSON(w, http.StatusOK, response)
 }
@@ -508,7 +517,7 @@ func (h *Handler) loadFunnelRDAs(r *http.Request) ([]funnelRDA, error) {
 	return out, nil
 }
 
-func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA, orders []funnelOrder, invoiceLines map[string][]funnelDocLine, orderLinks funnelOrderLinks, sdiDocs map[string][]*sdiDocument, billing map[string]MatchingSupplierBilling) MatchingFunnelResponse {
+func buildMatchingFunnel(invoices, seriesBase []funnelInvoice, rdas []funnelRDA, orders []funnelOrder, invoiceLines map[string][]funnelDocLine, orderLinks funnelOrderLinks, sdiDocs map[string][]*sdiDocument, billing map[string]MatchingSupplierBilling) MatchingFunnelResponse {
 	rdasBySupplier := make(map[int64][]funnelRDA)
 	rdaByID := make(map[int64]funnelRDA, len(rdas))
 	profilesByRDA := make(map[int64]funnelProfile, len(rdas))
@@ -567,7 +576,16 @@ func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA, orders []fu
 	}
 	response.Summary.InvoiceCount = len(seenInvoices)
 
-	for _, acc := range supplierInvoices {
+	seriesBySupplier := make(map[string][]funnelInvoice)
+	for _, invoice := range seriesBase {
+		key := "missing"
+		if invoice.supplierID != nil {
+			key = strconv.FormatInt(*invoice.supplierID, 10)
+		}
+		seriesBySupplier[key] = append(seriesBySupplier[key], invoice)
+	}
+
+	for supplierKey, acc := range supplierInvoices {
 		candidates := []funnelRDA(nil)
 		if acc.supplierID != nil {
 			candidates = rdasBySupplier[*acc.supplierID]
@@ -619,7 +637,7 @@ func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA, orders []fu
 				break
 			}
 		}
-		fixedFeeSeries := buildFixedFeeSeries(acc.invoices)
+		fixedFeeSeries := buildFixedFeeSeries(seriesBySupplier[supplierKey])
 		for _, invoice := range acc.invoices {
 			reference := referenceIndex.resolve(invoice, parseAFCNote(invoice.note))
 			addReferenceOutcome(&row.Reference, reference)
