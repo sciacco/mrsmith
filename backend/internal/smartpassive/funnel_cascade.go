@@ -12,18 +12,24 @@ import (
 //  1. sdi: the order reference the supplier wrote in the electronic invoice,
 //     resolved to Alyante orders through the RDA or PA code.
 //  2. orders: line by line against the open orders of the same supplier.
-//  3. residual: whatever is left, split by reason.
+//  3. fixed_fee: fixed monthly fee recognised by repetition, taking the order
+//     confirmed on the previous invoice of the series.
+//  4. residual: whatever is left, split by reason.
 //
 // Closed invoices are checked against the orders AFC linked in Alyante.
 
 const (
 	cascadeLevelSDI      = "sdi"
 	cascadeLevelOrders   = "orders"
+	cascadeLevelFixedFee = "fixed_fee"
 	cascadeLevelResidual = "residual"
 )
 
+// cascadeLevels lists the closing levels in order.
+var cascadeLevels = []string{cascadeLevelSDI, cascadeLevelOrders, cascadeLevelFixedFee}
+
 type MatchingCascadeInvoice struct {
-	// Level where the invoice stopped: sdi, orders, residual.
+	// Level where the invoice stopped: sdi, orders, fixed_fee, residual.
 	Level string `json:"level"`
 	// Proposals are the order labels proposed by the closing level.
 	Proposals []string `json:"proposals"`
@@ -37,6 +43,12 @@ type MatchingCascadeInvoice struct {
 	// OrdersReason tells why level 2 did not close: no_orders, no_open_orders,
 	// no_match, ambiguous.
 	OrdersReason string `json:"orders_reason"`
+	// FixedFeeReason tells why level 3 did not close: no_series (the invoice
+	// is not part of a monthly series with the same taxable amount), no_anchor
+	// (series without any member AFC linked).
+	FixedFeeReason string `json:"fixed_fee_reason"`
+	// SeriesSize is the number of invoices in the fixed-fee series, 0 outside.
+	SeriesSize int `json:"series_size"`
 	// Family classifies a residual invoice by what exists upstream for its
 	// supplier: recurring_in_course, goods_orders, service_orders_expired,
 	// rda_only, unknown.
@@ -68,19 +80,22 @@ type MatchingCascadeSummary struct {
 	ResidualBySDI       []MatchingCascadeReason `json:"residual_by_sdi"`
 	ResidualByOrders    []MatchingCascadeReason `json:"residual_by_orders"`
 	// ResidualByPair crosses the two reasons ("no_xml / ambiguous").
-	ResidualByPair   []MatchingCascadeReason `json:"residual_by_pair"`
-	ResidualByFamily []MatchingCascadeReason `json:"residual_by_family"`
+	ResidualByPair     []MatchingCascadeReason `json:"residual_by_pair"`
+	ResidualByFixedFee []MatchingCascadeReason `json:"residual_by_fixed_fee"`
+	ResidualByFamily   []MatchingCascadeReason `json:"residual_by_family"`
 }
 
 func newCascadeSummary() MatchingCascadeSummary {
-	return MatchingCascadeSummary{
-		Levels: []MatchingCascadeLevel{{Key: cascadeLevelSDI}, {Key: cascadeLevelOrders}},
+	levels := make([]MatchingCascadeLevel, 0, len(cascadeLevels))
+	for _, key := range cascadeLevels {
+		levels = append(levels, MatchingCascadeLevel{Key: key})
 	}
+	return MatchingCascadeSummary{Levels: levels}
 }
 
 // applyCascade derives the cascade outcome of one invoice from the level
 // results already computed, using the AFC links as the check.
-func applyCascade(invoice funnelInvoice, sdi MatchingFunnelSDIResult, orderRules MatchingFunnelOrderRuleResult, supplierOrders []funnelOrder, supplierRDAs []funnelRDA, idx funnelOrderIndex, rdaByID map[int64]funnelRDA) MatchingCascadeInvoice {
+func applyCascade(invoice funnelInvoice, sdi MatchingFunnelSDIResult, orderRules MatchingFunnelOrderRuleResult, fixedFee fixedFeeResult, supplierOrders []funnelOrder, supplierRDAs []funnelRDA, idx funnelOrderIndex, rdaByID map[int64]funnelRDA) MatchingCascadeInvoice {
 	out := MatchingCascadeInvoice{Proposals: []string{}}
 
 	// Level 1: order reference in the XML.
@@ -132,6 +147,21 @@ func applyCascade(invoice funnelInvoice, sdi MatchingFunnelSDIResult, orderRules
 		}
 	}
 
+	// Level 3: fixed monthly fee, order taken from the previous invoice of
+	// the series.
+	if out.Level == "" {
+		out.SeriesSize = fixedFee.SeriesSize
+		switch {
+		case !fixedFee.InSeries:
+			out.FixedFeeReason = "no_series"
+		case len(fixedFee.Proposals) == 0:
+			out.FixedFeeReason = "no_anchor"
+		default:
+			out.Level = cascadeLevelFixedFee
+			out.Proposals = append(out.Proposals, fixedFee.Proposals...)
+		}
+	}
+
 	truth := append([]string(nil), orderRules.AFCLinks...)
 	sort.Strings(truth)
 	if out.Level == "" {
@@ -172,28 +202,24 @@ func cascadeVerdict(proposals, truth []string) string {
 
 func addCascade(summary *MatchingCascadeSummary, result MatchingCascadeInvoice) {
 	summary.Invoices++
-	summary.Levels[0].Entered++
-	if result.Level != cascadeLevelSDI {
-		summary.Levels[0].Passed++
-		summary.Levels[1].Entered++
-	}
-	switch result.Level {
-	case cascadeLevelSDI:
-		closeLevel(&summary.Levels[0], result.Verdict)
-	case cascadeLevelOrders:
-		closeLevel(&summary.Levels[1], result.Verdict)
-	default:
-		summary.Levels[1].Passed++
-		summary.Residual++
-		linked := result.Verdict == "afc_linked"
-		if linked {
-			summary.ResidualWithAFCLink++
+	for i := range summary.Levels {
+		summary.Levels[i].Entered++
+		if summary.Levels[i].Key == result.Level {
+			closeLevel(&summary.Levels[i], result.Verdict)
+			return
 		}
-		summary.ResidualBySDI = addReason(summary.ResidualBySDI, result.SDIReason, linked)
-		summary.ResidualByOrders = addReason(summary.ResidualByOrders, result.OrdersReason, linked)
-		summary.ResidualByPair = addReason(summary.ResidualByPair, result.SDIReason+" / "+result.OrdersReason, linked)
-		summary.ResidualByFamily = addReason(summary.ResidualByFamily, result.Family, linked)
+		summary.Levels[i].Passed++
 	}
+	summary.Residual++
+	linked := result.Verdict == "afc_linked"
+	if linked {
+		summary.ResidualWithAFCLink++
+	}
+	summary.ResidualBySDI = addReason(summary.ResidualBySDI, result.SDIReason, linked)
+	summary.ResidualByOrders = addReason(summary.ResidualByOrders, result.OrdersReason, linked)
+	summary.ResidualByPair = addReason(summary.ResidualByPair, result.SDIReason+" / "+result.OrdersReason, linked)
+	summary.ResidualByFixedFee = addReason(summary.ResidualByFixedFee, result.FixedFeeReason, linked)
+	summary.ResidualByFamily = addReason(summary.ResidualByFamily, result.Family, linked)
 }
 
 func closeLevel(level *MatchingCascadeLevel, verdict string) {
@@ -319,7 +345,8 @@ func serviceOrderCovers(o funnelOrder, day time.Time) bool {
 }
 
 func recurringRDACovers(rda funnelRDA, day time.Time) bool {
-	if rda.created == nil || rda.created.After(day) {
+	start := rda.startDate()
+	if start == nil || start.After(day) {
 		return false
 	}
 	for _, l := range rda.lines {
@@ -329,7 +356,7 @@ func recurringRDACovers(rda funnelRDA, day time.Time) bool {
 		if l.automaticRenew.Valid && l.automaticRenew.Bool {
 			return true
 		}
-		if l.initialMonths.Valid && !day.After(rda.created.AddDate(0, int(l.initialMonths.Int64), 0)) {
+		if l.initialMonths.Valid && !day.After(start.AddDate(0, int(l.initialMonths.Int64), 0)) {
 			return true
 		}
 	}

@@ -112,6 +112,7 @@ const funnelRDAsQuery = `SELECT
     po.total_price,
     po.currency,
     po.created,
+    poh.delivered,
     p.erp_id,
     p.company_name,
     por.id AS row_id,
@@ -130,6 +131,12 @@ LEFT JOIN provider_qualifications.provider p ON p.id = po.provider_id
 LEFT JOIN rda.purchase_order_row por ON por.order_id = po.id
 LEFT JOIN rda.purchase_order_row_payment porp ON porp.purchase_order_row_id = por.id
 LEFT JOIN rda.purchase_order_row_renew_rule porr ON porr.purchase_order_row_id = por.id
+LEFT JOIN LATERAL (
+    SELECT min(h."timestamp") AS delivered
+    FROM rda.purchase_order_history h
+    WHERE h.order_id = po.id
+      AND h.next_state = 'DELIVERED_AND_COMPLIANT'
+) poh ON TRUE
 WHERE po."state" NOT IN ('DRAFT','CANCELED','REJECTED')
   AND po.deleted IS NULL
 ORDER BY po.id, por.id;`
@@ -173,17 +180,29 @@ type funnelRDALine struct {
 }
 
 type funnelRDA struct {
-	id           int64
-	code         string
-	state        string
-	rdaType      string
-	object       string
-	total        *float64
-	currency     string
-	created      *time.Time
+	id       int64
+	code     string
+	state    string
+	rdaType  string
+	object   string
+	total    *float64
+	currency string
+	created  *time.Time
+	// delivered is when the RDA first became "Erogata conforme" in Arak: the
+	// service starts there, not at creation.
+	delivered    *time.Time
 	supplierID   *int64
 	providerName string
 	lines        map[int64]funnelRDALine
+}
+
+// startDate is the day the RDA's service is taken to start: delivery when
+// known, creation otherwise.
+func (r funnelRDA) startDate() *time.Time {
+	if r.delivered != nil {
+		return r.delivered
+	}
+	return r.created
 }
 
 type MatchingFunnelSummary struct {
@@ -224,12 +243,14 @@ type MatchingFunnelRDA struct {
 	Type  string `json:"type"`
 	// HasOrder is true when an Alyante order carries this RDA code in its
 	// original document number.
-	HasOrder bool          `json:"has_order"`
-	Object   string        `json:"object"`
-	Total    *float64      `json:"total"`
-	Currency string        `json:"currency"`
-	Created  *time.Time    `json:"created"`
-	Profile  funnelProfile `json:"profile"`
+	HasOrder bool       `json:"has_order"`
+	Object   string     `json:"object"`
+	Total    *float64   `json:"total"`
+	Currency string     `json:"currency"`
+	Created  *time.Time `json:"created"`
+	// Delivered is the first "Erogata conforme" transition in the Arak history.
+	Delivered *time.Time    `json:"delivered"`
+	Profile   funnelProfile `json:"profile"`
 }
 
 type MatchingFunnelSupplier struct {
@@ -421,6 +442,7 @@ func (h *Handler) loadFunnelRDAs(r *http.Request) ([]funnelRDA, error) {
 		var total sql.NullFloat64
 		var currency sql.NullString
 		var created sql.NullTime
+		var delivered sql.NullTime
 		var supplier sql.NullInt64
 		var providerName sql.NullString
 		var rowID sql.NullInt64
@@ -434,6 +456,7 @@ func (h *Handler) loadFunnelRDAs(r *http.Request) ([]funnelRDA, error) {
 			&total,
 			&currency,
 			&created,
+			&delivered,
 			&supplier,
 			&providerName,
 			&rowID,
@@ -462,6 +485,7 @@ func (h *Handler) loadFunnelRDAs(r *http.Request) ([]funnelRDA, error) {
 				total:        float64Ptr(total),
 				currency:     currency.String,
 				created:      timePtr(created),
+				delivered:    timePtr(delivered),
 				supplierID:   int64Ptr(supplier),
 				providerName: providerName.String,
 				lines:        make(map[int64]funnelRDALine),
@@ -595,6 +619,7 @@ func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA, orders []fu
 				break
 			}
 		}
+		fixedFeeSeries := buildFixedFeeSeries(acc.invoices)
 		for _, invoice := range acc.invoices {
 			reference := referenceIndex.resolve(invoice, parseAFCNote(invoice.note))
 			addReferenceOutcome(&row.Reference, reference)
@@ -608,7 +633,8 @@ func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA, orders []fu
 			addOrderRuleResult(&response.OrderRules, orderRules)
 			sdi := applySDI(invoice, sdiDocs[normalizeDocNumber(invoice.supplierReference)], orderIndex, referenceIndex)
 			addSDIResult(&response.SDI, sdi, orderRules)
-			cascade := applyCascade(invoice, sdi, orderRules, orderCandidates, candidates, orderIndex, rdaByID)
+			fixedFee := applyFixedFee(invoice, fixedFeeSeries, orderIndex)
+			cascade := applyCascade(invoice, sdi, orderRules, fixedFee, orderCandidates, candidates, orderIndex, rdaByID)
 			addCascade(&response.Cascade, cascade)
 			switch funnelOutcome(orderRules.OpenCandidates) {
 			case "none":
@@ -635,16 +661,17 @@ func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA, orders []fu
 			profile := profilesByRDA[candidate.id]
 			addFunnelProfile(&row.Profiles, profile)
 			row.Candidates = append(row.Candidates, MatchingFunnelRDA{
-				ID:       candidate.id,
-				Code:     candidate.code,
-				State:    candidate.state,
-				Type:     candidate.rdaType,
-				HasOrder: orderIndex.hasOrderFor(candidate),
-				Object:   candidate.object,
-				Total:    candidate.total,
-				Currency: candidate.currency,
-				Created:  candidate.created,
-				Profile:  profile,
+				ID:        candidate.id,
+				Code:      candidate.code,
+				State:     candidate.state,
+				Type:      candidate.rdaType,
+				HasOrder:  orderIndex.hasOrderFor(candidate),
+				Object:    candidate.object,
+				Total:     candidate.total,
+				Currency:  candidate.currency,
+				Created:   candidate.created,
+				Delivered: candidate.delivered,
+				Profile:   profile,
 			})
 			if row.ProviderName == nil && candidate.providerName != "" {
 				name := candidate.providerName
@@ -663,6 +690,7 @@ func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA, orders []fu
 	sortReasons(response.Cascade.ResidualBySDI)
 	sortReasons(response.Cascade.ResidualByOrders)
 	sortReasons(response.Cascade.ResidualByPair)
+	sortReasons(response.Cascade.ResidualByFixedFee)
 	sortReasons(response.Cascade.ResidualByFamily)
 	sort.Slice(response.Suppliers, func(i, j int) bool {
 		if response.Suppliers[i].InvoiceCount != response.Suppliers[j].InvoiceCount {

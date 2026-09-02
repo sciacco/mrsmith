@@ -19,6 +19,10 @@ import (
 // the declared order references are resolved against Alyante orders and RDAs.
 
 // Header keys of the documents whose number matches an invoice in scope.
+// Alyante keeps only the last 15 characters of the supplier's document
+// number ("A89020261000054401" becomes "020261000054401"), so a document also
+// matches when its number ends with the registered reference ($2 carries the
+// references long enough to be a truncation).
 const funnelSDIHeadersQuery = `SELECT
     source_id,
     supplier_vat,
@@ -27,7 +31,17 @@ const funnelSDIHeadersQuery = `SELECT
     document_number,
     document_date
 FROM smartpassive.sdi_invoice
-WHERE document_number = ANY($1)`
+WHERE document_number = ANY($1)
+   OR EXISTS (
+        SELECT 1
+        FROM unnest($2::text[]) AS s(n)
+        WHERE right(upper(document_number), length(s.n)) = upper(s.n)
+   )`
+
+// sdiSuffixMinLength is the shortest registered reference tried as a suffix
+// of the SDI document number: shorter ones are too likely to end another
+// supplier's number by chance.
+const sdiSuffixMinLength = 10
 
 // XML of the documents not yet parsed in this process. Attachments (base64
 // PDFs) are stripped in SQL: they weigh most of the XML and carry nothing for
@@ -163,23 +177,27 @@ func (h *Handler) loadFunnelSDI(r *http.Request, invoices []funnelInvoice) (map[
 		return out, nil
 	}
 	numbers := make([]string, 0, len(invoices))
-	seen := map[string]struct{}{}
+	suffixes := make([]string, 0, len(invoices))
+	requested := map[string]struct{}{}
 	for _, inv := range invoices {
 		n := normalizeDocNumber(inv.supplierReference)
 		if n == "" {
 			continue
 		}
-		if _, ok := seen[inv.supplierReference]; ok {
+		if _, ok := requested[n]; ok {
 			continue
 		}
-		seen[inv.supplierReference] = struct{}{}
+		requested[n] = struct{}{}
 		numbers = append(numbers, strings.TrimSpace(inv.supplierReference))
+		if len(n) >= sdiSuffixMinLength {
+			suffixes = append(suffixes, n)
+		}
 	}
 	if len(numbers) == 0 {
 		return out, nil
 	}
 
-	rows, err := h.anisettaDB.QueryContext(r.Context(), funnelSDIHeadersQuery, numbers)
+	rows, err := h.anisettaDB.QueryContext(r.Context(), funnelSDIHeadersQuery, numbers, suffixes)
 	if err != nil {
 		return nil, err
 	}
@@ -226,7 +244,17 @@ func (h *Handler) loadFunnelSDI(r *http.Request, invoices []funnelInvoice) (map[
 		}
 	}
 	for _, doc := range headers {
-		out[normalizeDocNumber(doc.number)] = append(out[normalizeDocNumber(doc.number)], doc)
+		key := normalizeDocNumber(doc.number)
+		if _, ok := requested[key]; ok {
+			out[key] = append(out[key], doc)
+		}
+		// The registered reference may be a suffix of the full number.
+		for l := len(key) - 1; l >= sdiSuffixMinLength; l-- {
+			suffix := key[len(key)-l:]
+			if _, ok := requested[suffix]; ok {
+				out[suffix] = append(out[suffix], doc)
+			}
+		}
 	}
 	return out, nil
 }
@@ -291,6 +319,7 @@ type MatchingFunnelSDISummary struct {
 	InvoicesLinked       int `json:"invoices_linked"`
 	InvoicesNotLinked    int `json:"invoices_not_linked"`
 	LinkedByNumberOnly   int `json:"linked_number_only"`
+	LinkedBySuffix       int `json:"linked_suffix"`
 	WithOrderRef         int `json:"with_order_ref"`
 	WithUsableCode       int `json:"with_usable_code"`
 	WithContractRef      int `json:"with_contract_ref"`
@@ -336,17 +365,25 @@ func applySDI(invoice funnelInvoice, docs []*sdiDocument, orders funnelOrderInde
 	result := MatchingFunnelSDIResult{OrderRefs: []MatchingFunnelSDIRef{}, Contracts: []string{}, Articles: []string{}, Verdict: "no_truth"}
 	keys := fiscalKeys(invoice.supplierVAT, invoice.supplierVATForeign, invoice.fiscalCode)
 
+	// Same number, supplier and date first; then same number and date; then a
+	// number ending with the reference Alyante truncated, which needs the
+	// supplier too.
 	var doc *sdiDocument
+	number := normalizeDocNumber(invoice.supplierReference)
 	for _, d := range docs {
 		sameDate := d.date != nil && invoice.documentDate != nil && d.date.Format("2006-01-02") == invoice.documentDate.Format("2006-01-02")
 		_, sameSupplier := keys[fiscalKey(d.supplierVAT)]
+		sameNumber := normalizeDocNumber(d.number) == number
 		switch {
-		case sameDate && sameSupplier:
+		case sameDate && sameSupplier && sameNumber:
 			doc = d
 			result.LinkKind = "vat_number_date"
-		case sameDate && doc == nil:
+		case sameDate && sameNumber && (doc == nil || result.LinkKind == "vat_suffix_date"):
 			doc = d
 			result.LinkKind = "number_date"
+		case sameDate && sameSupplier && doc == nil:
+			doc = d
+			result.LinkKind = "vat_suffix_date"
 		}
 		if result.LinkKind == "vat_number_date" {
 			break
@@ -467,6 +504,9 @@ func addSDIResult(summary *MatchingFunnelSDISummary, result MatchingFunnelSDIRes
 	summary.InvoicesLinked++
 	if result.LinkKind == "number_date" {
 		summary.LinkedByNumberOnly++
+	}
+	if result.LinkKind == "vat_suffix_date" {
+		summary.LinkedBySuffix++
 	}
 	if len(result.OrderRefs) > 0 {
 		summary.WithOrderRef++

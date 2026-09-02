@@ -443,6 +443,7 @@ export function MatchingFunnelPage() {
                   </tr>
                   <tr><th scope="row">Fatture con XML agganciato</th><td>{integer(query.data.sdi.invoices_linked)}</td></tr>
                   <tr><th scope="row">di cui solo per numero e data</th><td>{integer(query.data.sdi.linked_number_only)}</td></tr>
+                  <tr><th scope="row">di cui per suffisso del numero (troncato da Alyante)</th><td>{integer(query.data.sdi.linked_suffix)}</td></tr>
                   <tr><th scope="row">Fatture senza XML</th><td>{integer(query.data.sdi.invoices_not_linked)}</td></tr>
                   <tr><th scope="row">Con riferimento ordine del fornitore</th><td>{integer(query.data.sdi.with_order_ref)}</td></tr>
                   <tr><th scope="row">di cui con codice PO o PA</th><td>{integer(query.data.sdi.with_usable_code)}</td></tr>
@@ -674,6 +675,7 @@ export function MatchingFunnelPage() {
                             <th>Ordine Alyante</th>
                             <th>Oggetto</th>
                             <th>Creazione</th>
+                            <th>Erogata conforme</th>
                             <th>Profilo</th>
                             <th className={styles.numeric}>Totale</th>
                           </tr>
@@ -687,6 +689,7 @@ export function MatchingFunnelPage() {
                               <td>{candidate.has_order ? 'sì' : <span className={styles.codeWarn}>no</span>}</td>
                               <td className={styles.objectCell}>{candidate.object || '—'}</td>
                               <td>{date(candidate.created)}</td>
+                              <td>{date(candidate.delivered)}</td>
                               <td>{profileLabel(candidate.profile)}</td>
                               <td className={styles.numeric}>{money(candidate.total, candidate.currency || 'EUR')}</td>
                             </tr>

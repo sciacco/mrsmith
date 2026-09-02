@@ -209,7 +209,7 @@ export type MatchingFunnelSDIVerdict = 'match' | 'partial' | 'wrong' | 'none' | 
 
 export interface MatchingFunnelSDIResult {
   linked: boolean;
-  link_kind: '' | 'vat_number_date' | 'number_date';
+  link_kind: '' | 'vat_number_date' | 'number_date' | 'vat_suffix_date';
   source_id: number | null;
   order_refs: MatchingFunnelSDIRef[];
   contracts: string[];
@@ -223,6 +223,7 @@ export interface MatchingFunnelSDISummary {
   invoices_linked: number;
   invoices_not_linked: number;
   linked_number_only: number;
+  linked_suffix: number;
   with_order_ref: number;
   with_usable_code: number;
   with_contract_ref: number;
@@ -239,7 +240,7 @@ export interface MatchingFunnelSDISummary {
   order_rule_ambiguous_resolved: number;
 }
 
-export type MatchingCascadeLevelKey = 'sdi' | 'orders' | 'residual';
+export type MatchingCascadeLevelKey = 'sdi' | 'orders' | 'fixed_fee' | 'residual';
 
 export type MatchingCascadeVerdict = 'match' | 'partial' | 'wrong' | 'no_truth' | 'afc_linked' | 'afc_unlinked';
 
@@ -247,17 +248,21 @@ export type MatchingCascadeSDIReason = '' | 'no_xml' | 'no_ref' | 'no_code' | 'u
 
 export type MatchingCascadeOrdersReason = '' | 'no_orders' | 'no_open_orders' | 'no_match' | 'ambiguous';
 
+export type MatchingCascadeFixedFeeReason = '' | 'no_series' | 'no_anchor';
+
 export interface MatchingCascadeInvoice {
   level: MatchingCascadeLevelKey;
   proposals: string[];
   verdict: MatchingCascadeVerdict;
   sdi_reason: MatchingCascadeSDIReason;
   orders_reason: MatchingCascadeOrdersReason;
+  fixed_fee_reason: MatchingCascadeFixedFeeReason;
+  series_size: number;
   family: '' | 'recurring_in_course' | 'goods_orders' | 'service_orders_expired' | 'rda_only' | 'unknown';
 }
 
 export interface MatchingCascadeLevel {
-  key: 'sdi' | 'orders';
+  key: 'sdi' | 'orders' | 'fixed_fee';
   entered: number;
   closed: number;
   passed: number;
@@ -281,6 +286,7 @@ export interface MatchingCascadeSummary {
   residual_by_sdi: MatchingCascadeReason[];
   residual_by_orders: MatchingCascadeReason[];
   residual_by_pair: MatchingCascadeReason[];
+  residual_by_fixed_fee: MatchingCascadeReason[];
   residual_by_family: MatchingCascadeReason[];
 }
 
@@ -307,6 +313,7 @@ export interface MatchingFunnelRDA {
   total: number | null;
   currency: string;
   created: string | null;
+  delivered: string | null;
   profile: MatchingFunnelProfile;
 }
 

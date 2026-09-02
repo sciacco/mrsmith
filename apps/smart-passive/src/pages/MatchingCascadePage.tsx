@@ -33,16 +33,19 @@ function money(value: number | null, currency = 'EUR'): string {
 const levelTitles: Record<MatchingCascadeLevel['key'], string> = {
   sdi: 'Riferimento ordine nell’XML',
   orders: 'Riga per riga sugli ordini aperti',
+  fixed_fee: 'Canone fisso per ripetizione',
 };
 
 const levelNotes: Record<MatchingCascadeLevel['key'], string> = {
   sdi: 'Il codice ordine scritto dal fornitore nella fattura elettronica, risolto sugli ordini Alyante tramite il codice RDA o PA nel numero originale.',
   orders: 'Stesso articolo, stesso importo o prezzo unitario, quantità entro il residuo, fra gli ordini aperti dello stesso fornitore. Chiude solo se una combinazione sola regge.',
+  fixed_fee: 'Serie di fatture dello stesso fornitore con lo stesso imponibile, una al mese per almeno tre mesi. La fattura prende l’ordine collegato da AFC sulla precedente della serie. Nel perimetro aperto la serie si vede solo in parte.',
 };
 
 function levelLabel(level: MatchingCascadeInvoice['level']): string {
   if (level === 'sdi') return '1 · XML';
   if (level === 'orders') return '2 · Ordini';
+  if (level === 'fixed_fee') return '3 · Canone';
   return 'Residuo';
 }
 
@@ -77,6 +80,18 @@ function ordersReasonLabel(reason: string): string {
   }
 }
 
+function fixedFeeReasonLabel(reason: string): string {
+  switch (reason) {
+    case 'no_series': return 'Nessuna serie mensile a importo fisso';
+    case 'no_anchor': return 'Canone fisso senza ordine collegato';
+    default: return '—';
+  }
+}
+
+function seriesText(cascade: MatchingCascadeInvoice): string {
+  return cascade.series_size > 0 ? `${integer(cascade.series_size)} fatture` : '—';
+}
+
 function familyLabel(family: string): string {
   switch (family) {
     case 'recurring_in_course': return 'Contratto ricorrente in corso';
@@ -95,7 +110,7 @@ function pairLabel(reason: string): string {
 
 function residualReason(cascade: MatchingCascadeInvoice): string {
   if (cascade.level !== 'residual') return '—';
-  return `${sdiReasonLabel(cascade.sdi_reason)} · ${ordersReasonLabel(cascade.orders_reason)}`;
+  return `${sdiReasonLabel(cascade.sdi_reason)} · ${ordersReasonLabel(cascade.orders_reason)} · ${fixedFeeReasonLabel(cascade.fixed_fee_reason)}`;
 }
 
 function proposalsText(cascade: MatchingCascadeInvoice): string {
@@ -112,17 +127,19 @@ function afcLinksText(invoice: MatchingFunnelInvoice): string {
 interface SupplierCounts {
   sdi: number;
   orders: number;
+  fixedFee: number;
   residual: number;
   residualLinked: number;
   wrong: number;
 }
 
 function supplierCounts(row: MatchingFunnelSupplier): SupplierCounts {
-  const counts: SupplierCounts = { sdi: 0, orders: 0, residual: 0, residualLinked: 0, wrong: 0 };
+  const counts: SupplierCounts = { sdi: 0, orders: 0, fixedFee: 0, residual: 0, residualLinked: 0, wrong: 0 };
   for (const invoice of row.invoices) {
     const c = invoice.cascade;
     if (c.level === 'sdi') counts.sdi++;
     else if (c.level === 'orders') counts.orders++;
+    else if (c.level === 'fixed_fee') counts.fixedFee++;
     else {
       counts.residual++;
       if (c.verdict === 'afc_linked') counts.residualLinked++;
@@ -288,6 +305,7 @@ export function MatchingCascadePage() {
             <ReasonTable title="Residuo per famiglia" rows={cascade.residual_by_family} label={familyLabel} />
             <ReasonTable title="Residuo per esito del livello 1" rows={cascade.residual_by_sdi} label={sdiReasonLabel} />
             <ReasonTable title="Residuo per esito del livello 2" rows={cascade.residual_by_orders} label={ordersReasonLabel} />
+            <ReasonTable title="Residuo per esito del livello 3" rows={cascade.residual_by_fixed_fee} label={fixedFeeReasonLabel} />
             <ReasonTable title="Residuo per coppia di esiti" rows={cascade.residual_by_pair} label={pairLabel} />
           </div>
 
@@ -322,6 +340,7 @@ export function MatchingCascadePage() {
                       <th className={base.numeric}>Fatture</th>
                       <th className={base.numeric}>Chiuse al livello 1</th>
                       <th className={base.numeric}>Chiuse al livello 2</th>
+                      <th className={base.numeric}>Chiuse al livello 3</th>
                       <th className={base.numeric}>Residuo</th>
                       <th className={base.numeric}>di cui collegate da AFC</th>
                       <th className={base.numeric}>Diverse da AFC</th>
@@ -349,6 +368,7 @@ export function MatchingCascadePage() {
                         <td className={base.numeric}>{integer(row.invoice_count)}</td>
                         <td className={base.numeric}>{integer(counts.sdi)}</td>
                         <td className={base.numeric}>{integer(counts.orders)}</td>
+                        <td className={base.numeric}>{integer(counts.fixedFee)}</td>
                         <td className={base.numeric}>{integer(counts.residual)}</td>
                         <td className={base.numeric}>{integer(counts.residualLinked)}</td>
                         <td className={`${base.numeric} ${counts.wrong > 0 ? base.codeWarn : ''}`}>{integer(counts.wrong)}</td>
@@ -388,6 +408,7 @@ export function MatchingCascadePage() {
                           <th>Numero</th>
                           <th className={base.numeric}>Imponibile</th>
                           <th>Fermata a</th>
+                          <th>Serie</th>
                           <th>Ordini proposti</th>
                           <th>Ordini collegati da AFC</th>
                           <th>Confronto</th>
@@ -405,6 +426,7 @@ export function MatchingCascadePage() {
                               <td>{invoice.document_number || '—'}</td>
                               <td className={base.numeric}>{money(invoice.taxable_amount)}</td>
                               <td><span className={styles.levelTag}>{levelLabel(c.level)}</span></td>
+                              <td>{seriesText(c)}</td>
                               <td className={base.codesCell}>{proposalsText(c)}</td>
                               <td className={base.codesCell}>{afcLinksText(invoice)}</td>
                               <td className={warn ? base.codeWarn : undefined}>{verdictLabel(c.verdict)}</td>
