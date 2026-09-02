@@ -196,13 +196,14 @@ type MatchingFunnelProfileCounts struct {
 }
 
 type MatchingFunnelInvoice struct {
-	Registration      int64                    `json:"registration"`
-	DocumentNumber    string                   `json:"document_number"`
-	DocumentDate      *time.Time               `json:"document_date"`
-	SupplierReference string                   `json:"supplier_reference"`
-	TaxableAmount     *float64                 `json:"taxable_amount"`
-	Reference         MatchingFunnelReference  `json:"reference"`
-	Rules             MatchingFunnelRuleResult `json:"rules"`
+	Registration      int64                         `json:"registration"`
+	DocumentNumber    string                        `json:"document_number"`
+	DocumentDate      *time.Time                    `json:"document_date"`
+	SupplierReference string                        `json:"supplier_reference"`
+	TaxableAmount     *float64                      `json:"taxable_amount"`
+	Reference         MatchingFunnelReference       `json:"reference"`
+	Rules             MatchingFunnelRuleResult      `json:"rules"`
+	OrderRules        MatchingFunnelOrderRuleResult `json:"order_rules"`
 }
 
 type MatchingFunnelRDA struct {
@@ -227,15 +228,20 @@ type MatchingFunnelSupplier struct {
 	Reference           MatchingFunnelReferenceSummary `json:"reference"`
 	Invoices            []MatchingFunnelInvoice        `json:"invoices"`
 	Candidates          []MatchingFunnelRDA            `json:"candidates"`
+	OrderCandidateCount int                            `json:"order_candidate_count"`
+	OrderOutcome        string                         `json:"order_outcome"`
+	Orders              []MatchingFunnelOrder          `json:"orders"`
 }
 
 type MatchingFunnelResponse struct {
-	Scope     funnelScope                    `json:"scope"`
-	Summary   MatchingFunnelSummary          `json:"summary"`
-	Profiles  MatchingFunnelProfileCounts    `json:"profiles"`
-	Reference MatchingFunnelReferenceSummary `json:"reference"`
-	Rules     MatchingFunnelRulesSummary     `json:"rules"`
-	Suppliers []MatchingFunnelSupplier       `json:"suppliers"`
+	Scope      funnelScope                     `json:"scope"`
+	Summary    MatchingFunnelSummary           `json:"summary"`
+	Profiles   MatchingFunnelProfileCounts     `json:"profiles"`
+	Reference  MatchingFunnelReferenceSummary  `json:"reference"`
+	Rules      MatchingFunnelRulesSummary      `json:"rules"`
+	Orders     MatchingFunnelOrdersSummary     `json:"orders"`
+	OrderRules MatchingFunnelOrderRulesSummary `json:"order_rules"`
+	Suppliers  []MatchingFunnelSupplier        `json:"suppliers"`
 }
 
 func (h *Handler) handleMatchingFunnel(w http.ResponseWriter, r *http.Request) {
@@ -264,8 +270,23 @@ func (h *Handler) handleMatchingFunnel(w http.ResponseWriter, r *http.Request) {
 		httputil.InternalError(w, r, err, "matching funnel rdas query failed", "component", component, "operation", "load_funnel_rdas")
 		return
 	}
+	orders, err := h.loadFunnelOrders(r)
+	if err != nil {
+		httputil.InternalError(w, r, err, "matching funnel orders query failed", "component", component, "operation", "load_funnel_orders")
+		return
+	}
+	invoiceLines, err := h.loadFunnelInvoiceLines(r, scope)
+	if err != nil {
+		httputil.InternalError(w, r, err, "matching funnel invoice lines query failed", "component", component, "operation", "load_funnel_invoice_lines")
+		return
+	}
+	orderLinks, err := h.loadFunnelOrderLinks(r)
+	if err != nil {
+		httputil.InternalError(w, r, err, "matching funnel order links query failed", "component", component, "operation", "load_funnel_order_links")
+		return
+	}
 
-	response := buildMatchingFunnel(invoices, rdas)
+	response := buildMatchingFunnel(invoices, rdas, orders, invoiceLines, orderLinks)
 	response.Scope = scope
 	httputil.JSON(w, http.StatusOK, response)
 }
@@ -395,11 +416,13 @@ func (h *Handler) loadFunnelRDAs(r *http.Request) ([]funnelRDA, error) {
 	return out, nil
 }
 
-func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA) MatchingFunnelResponse {
+func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA, orders []funnelOrder, invoiceLines map[string][]funnelDocLine, orderLinks funnelOrderLinks) MatchingFunnelResponse {
 	rdasBySupplier := make(map[int64][]funnelRDA)
 	profilesByRDA := make(map[int64]funnelProfile, len(rdas))
 	referenceIndex := newFunnelReferenceIndex(rdas)
+	orderIndex := newFunnelOrderIndex(orders, referenceIndex, orderLinks)
 	response := MatchingFunnelResponse{
+		Orders: orderIndex.summary,
 		Summary: MatchingFunnelSummary{
 			InvoiceCount:      len(invoices),
 			RDACount:          len(rdas),
@@ -463,14 +486,34 @@ func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA) MatchingFun
 			response.Summary.MultipleCandidates += len(acc.invoices)
 		}
 
-		row := MatchingFunnelSupplier{
-			SupplierERPID:  acc.supplierID,
-			InvoiceCount:   len(acc.invoices),
-			CandidateCount: len(candidates),
-			Outcome:        outcome,
-			Invoices:       make([]MatchingFunnelInvoice, 0, len(acc.invoices)),
-			Candidates:     make([]MatchingFunnelRDA, 0, len(candidates)),
+		orderCandidates := orderIndex.candidates(acc.supplierID)
+		orderOutcome := funnelOutcome(len(orderCandidates))
+		switch orderOutcome {
+		case "none":
+			response.Orders.InvoicesNoOrder += len(acc.invoices)
+		case "one":
+			response.Orders.InvoicesOneOrder += len(acc.invoices)
+		case "multiple":
+			response.Orders.InvoicesManyOrder += len(acc.invoices)
 		}
+
+		row := MatchingFunnelSupplier{
+			SupplierERPID:       acc.supplierID,
+			InvoiceCount:        len(acc.invoices),
+			CandidateCount:      len(candidates),
+			Outcome:             outcome,
+			Invoices:            make([]MatchingFunnelInvoice, 0, len(acc.invoices)),
+			Candidates:          make([]MatchingFunnelRDA, 0, len(candidates)),
+			OrderCandidateCount: len(orderCandidates),
+			OrderOutcome:        orderOutcome,
+			Orders:              make([]MatchingFunnelOrder, 0, len(orderCandidates)),
+		}
+		for _, o := range orderCandidates {
+			row.Orders = append(row.Orders, orderIndex.export(o))
+		}
+		sort.Slice(row.Orders, func(i, j int) bool {
+			return timeAfter(row.Orders[i].Date, row.Orders[j].Date)
+		})
 		if acc.alyanteName != "" {
 			name := acc.alyanteName
 			row.AlyanteSupplierName = &name
@@ -481,6 +524,19 @@ func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA) MatchingFun
 			addReferenceOutcome(&response.Reference, reference)
 			rules := applyFunnelRules(invoice, candidates, reference)
 			addRuleResult(&response.Rules, rules)
+			if len(orderLinks.byInvoice[invoice.key]) > 0 {
+				response.Orders.InvoicesLinked++
+			}
+			orderRules := applyOrderRules(invoice, invoiceLines[invoice.key], orderIndex)
+			addOrderRuleResult(&response.OrderRules, orderRules)
+			switch funnelOutcome(orderRules.OpenCandidates) {
+			case "none":
+				response.Orders.InvoicesNoOpen++
+			case "one":
+				response.Orders.InvoicesOneOpen++
+			case "multiple":
+				response.Orders.InvoicesManyOpen++
+			}
 			row.Invoices = append(row.Invoices, MatchingFunnelInvoice{
 				Registration:      invoice.registration,
 				DocumentNumber:    invoice.documentNumber,
@@ -489,6 +545,7 @@ func buildMatchingFunnel(invoices []funnelInvoice, rdas []funnelRDA) MatchingFun
 				TaxableAmount:     invoice.taxableAmount,
 				Reference:         reference,
 				Rules:             rules,
+				OrderRules:        orderRules,
 			})
 		}
 		for _, candidate := range candidates {

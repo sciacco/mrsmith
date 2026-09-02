@@ -82,6 +82,39 @@ function proposalsText(rules: MatchingFunnelInvoice['rules']): string {
   return rest > 0 ? `${shown.join(' · ')} e altre ${integer(rest)}` : shown.join(' · ');
 }
 
+function orderRuleLabel(rule: MatchingFunnelInvoice['order_rules']['rule']): string {
+  if (rule === 'header') return 'Totale ordine';
+  if (rule === 'lines') return 'Riga per riga';
+  return '—';
+}
+
+function orderVerdictLabel(verdict: MatchingFunnelInvoice['order_rules']['verdict']): string {
+  switch (verdict) {
+    case 'match': return 'Stesso ordine di AFC';
+    case 'ambiguous': return 'Più ordini, tra cui quelli di AFC';
+    case 'wrong': return 'Ordine diverso da AFC';
+    case 'none': return 'Nessuna proposta';
+    case 'unlinked_proposal': return 'Proposta, AFC non ha collegato';
+    case 'unlinked_silent': return 'Nessun collegamento AFC';
+  }
+}
+
+function orderProposalsText(rules: MatchingFunnelInvoice['order_rules']): string {
+  if (rules.proposals.length === 0) {
+    return rules.lines_total > 0 ? `— (righe trovate ${integer(rules.lines_matched)} su ${integer(rules.lines_total)})` : '—';
+  }
+  const shown = rules.proposals.slice(0, 2).map((proposal) => {
+    const labels = proposal.slice(0, 4).join(' + ');
+    const more = proposal.length - 4;
+    return more > 0 ? `${labels} e altri ${integer(more)} ordini` : labels;
+  });
+  const rest = rules.proposals.length - shown.length;
+  const text = rest > 0 ? `${shown.join(' · ')} e altre ${integer(rest)}` : shown.join(' · ');
+  if (rules.ambiguous_lines === 0) return text;
+  const lines = rules.ambiguous_lines === 1 ? '1 riga su più ordini' : `${integer(rules.ambiguous_lines)} righe su più ordini`;
+  return `${text} (${lines})`;
+}
+
 function noteExcerpt(note: string): string {
   const flat = note.replace(/\s+/g, ' ').trim();
   if (!flat) return '—';
@@ -263,6 +296,55 @@ export function MatchingFunnelPage() {
                 Confronto al centesimo fra imponibile e RDA dello stesso fornitore: importo intero, poi rata di un periodo, poi somma di due o tre RDA.
               </p>
             </section>
+
+            <section className={styles.summaryPanel}>
+              <h2>Ordini Alyante</h2>
+              <table className={styles.summaryTable}>
+                <tbody>
+                  <tr><th scope="row">Ordini a fornitore (tutti gli anni)</th><td>{integer(query.data.orders.order_count)}</td></tr>
+                  {Object.entries(query.data.orders.by_doc_code).sort().map(([code, count]) => (
+                    <tr key={code}><th scope="row">di cui {code}</th><td>{integer(count)}</td></tr>
+                  ))}
+                  <tr><th scope="row">Con codice RDA nel numero originale</th><td>{integer(query.data.orders.with_rda_code)}</td></tr>
+                  <tr><th scope="row">di cui RDA trovata in Arak</th><td>{integer(query.data.orders.rda_resolved)}</td></tr>
+                  <tr><th scope="row">di cui con fornitore diverso dalla RDA</th><td>{integer(query.data.orders.supplier_mismatch)}</td></tr>
+                  <tr><th scope="row">Con codice del gestionale precedente</th><td>{integer(query.data.orders.with_legacy_code)}</td></tr>
+                  <tr><th scope="row">Senza codice</th><td>{integer(query.data.orders.without_code)}</td></tr>
+                  <tr><th scope="row">Ordini aperti (residuo da fatturare)</th><td>{integer(query.data.orders.open_orders)}</td></tr>
+                  <tr><th scope="row">Ordini chiusi (tutto fatturato)</th><td>{integer(query.data.orders.closed_orders)}</td></tr>
+                  <tr><th scope="row">di cui fatturati oltre l'ordinato</th><td>{integer(query.data.orders.over_consumed_orders)}</td></tr>
+                  <tr><th scope="row">Ordini senza righe</th><td>{integer(query.data.orders.orders_without_lines)}</td></tr>
+                  <tr><th scope="row">Fatture senza ordine dello stesso fornitore</th><td>{integer(query.data.orders.invoices_no_candidates)}</td></tr>
+                  <tr><th scope="row">Fatture con un solo ordine aperto</th><td>{integer(query.data.orders.invoices_one_open_candidate)}</td></tr>
+                  <tr><th scope="row">Fatture con più ordini aperti</th><td>{integer(query.data.orders.invoices_multiple_open_candidates)}</td></tr>
+                  <tr><th scope="row">Fatture senza ordini aperti</th><td>{integer(query.data.orders.invoices_no_open_candidates)}</td></tr>
+                  <tr><th scope="row">Fatture collegate a un ordine da AFC</th><td>{integer(query.data.orders.invoices_with_afc_link)}</td></tr>
+                </tbody>
+              </table>
+              <p className={styles.summaryNote}>
+                Ordini di tipo 22 letti da Alyante, tutti gli anni. Il residuo di ogni riga è quantità ordinata meno quantità delle righe di fattura che AFC vi ha collegato. Un ordine è aperto se una riga ha residuo.
+              </p>
+            </section>
+
+            <section className={styles.summaryPanel}>
+              <h2>Prova delle regole sugli ordini</h2>
+              <table className={styles.summaryTable}>
+                <tbody>
+                  <tr><th scope="row">Fatture collegate a un ordine da AFC</th><td>{integer(query.data.order_rules.linked_invoices)}</td></tr>
+                  <tr><th scope="row">Stesso ordine di AFC</th><td>{integer(query.data.order_rules.match)}</td></tr>
+                  <tr><th scope="row">di cui riga per riga</th><td>{integer(query.data.order_rules.match_by_lines)}</td></tr>
+                  <tr><th scope="row">di cui per totale ordine</th><td>{integer(query.data.order_rules.match_by_header)}</td></tr>
+                  <tr><th scope="row">Più ordini, tra cui quelli di AFC</th><td>{integer(query.data.order_rules.ambiguous)}</td></tr>
+                  <tr><th scope="row">Ordine diverso da AFC</th><td>{integer(query.data.order_rules.wrong)}</td></tr>
+                  <tr><th scope="row">Nessuna proposta</th><td>{integer(query.data.order_rules.none)}</td></tr>
+                  <tr><th scope="row">Fatture non collegate da AFC</th><td>{integer(query.data.order_rules.unlinked_invoices)}</td></tr>
+                  <tr><th scope="row">di cui con una proposta</th><td>{integer(query.data.order_rules.unlinked_proposal)}</td></tr>
+                </tbody>
+              </table>
+              <p className={styles.summaryNote}>
+                Candidati: solo ordini aperti del fornitore, valutati come se la fattura non fosse ancora collegata. Prima riga per riga (stesso articolo, stesso imponibile o stesso prezzo unitario, quantità entro il residuo), poi il totale imponibile dell'ordine.
+              </p>
+            </section>
           </div>
 
           <section className={styles.tablePanel}>
@@ -303,6 +385,7 @@ export function MatchingFunnelPage() {
                       <th className={styles.numeric}>Non class.</th>
                       <th className={styles.numeric}>Rif. AFC risolti</th>
                       <th className={styles.numeric}>Forn. diverso</th>
+                      <th className={styles.numeric}>Ordini Alyante</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -330,6 +413,7 @@ export function MatchingFunnelPage() {
                         <td className={styles.numeric}>{integer(row.profiles.unknown)}</td>
                         <td className={styles.numeric}>{integer(resolvedReferences(row))}</td>
                         <td className={styles.numeric}>{integer(row.reference.supplier_mismatch)}</td>
+                        <td className={styles.numeric}>{integer(row.order_candidate_count)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -376,6 +460,10 @@ export function MatchingFunnelPage() {
                           <th>Regola</th>
                           <th>RDA proposte</th>
                           <th>Confronto con AFC</th>
+                          <th>Ordine collegato da AFC</th>
+                          <th>Regola ordini</th>
+                          <th>Ordini proposti</th>
+                          <th>Confronto ordini</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -416,6 +504,18 @@ export function MatchingFunnelPage() {
                             }>
                               {verdictLabel(invoice.rules.verdict)}
                             </td>
+                            <td className={styles.codesCell}>{invoice.order_rules.afc_links.length === 0 ? '—' : invoice.order_rules.afc_links.join(' · ')}</td>
+                            <td>{orderRuleLabel(invoice.order_rules.rule)}</td>
+                            <td className={styles.codesCell}>{orderProposalsText(invoice.order_rules)}</td>
+                            <td className={
+                              invoice.order_rules.verdict === 'match'
+                                ? styles.verdictGood
+                                : invoice.order_rules.verdict === 'wrong'
+                                  ? styles.codeWarn
+                                  : undefined
+                            }>
+                              {orderVerdictLabel(invoice.order_rules.verdict)}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -452,6 +552,49 @@ export function MatchingFunnelPage() {
                               <td>{date(candidate.created)}</td>
                               <td>{profileLabel(candidate.profile)}</td>
                               <td className={styles.numeric}>{money(candidate.total, candidate.currency || 'EUR')}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </section>
+
+                <section className={styles.detailSection}>
+                  <div className={styles.detailHeading}>
+                    <h3>Ordini Alyante dello stesso fornitore</h3>
+                    <span>{integer(activeSupplier.orders.filter((order) => order.open).length)} aperti su {integer(activeSupplier.orders.length)}</span>
+                  </div>
+                  {activeSupplier.orders.length === 0 ? (
+                    <p className={styles.noCandidates}>Nessun ordine a fornitore in Alyante con lo stesso codice fornitore.</p>
+                  ) : (
+                    <div className={styles.detailTableWrap}>
+                      <table className={styles.detailTable}>
+                        <thead>
+                          <tr>
+                            <th>Ordine</th>
+                            <th>Documento</th>
+                            <th>Data</th>
+                            <th>Codice RDA</th>
+                            <th>Stato</th>
+                            <th className={styles.numeric}>Righe</th>
+                            <th className={styles.numeric}>Residuo (q.tà)</th>
+                            <th className={styles.numeric}>Imponibile</th>
+                            <th className={styles.numeric}>Totale</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {activeSupplier.orders.map((order) => (
+                            <tr key={order.registration}>
+                              <td>{order.label}</td>
+                              <td>{order.doc_code}</td>
+                              <td>{date(order.date)}</td>
+                              <td>{order.rda_code ? `${order.rda_code}${order.rda_id === null ? ' (non in Arak)' : ''}` : '—'}</td>
+                              <td>{order.open ? 'Aperto' : 'Chiuso'}</td>
+                              <td className={styles.numeric}>{integer(order.line_count)}</td>
+                              <td className={styles.numeric}>{formatNumber(order.residual_qty, { format: { maximumFractionDigits: 2 } }) ?? String(order.residual_qty)}</td>
+                              <td className={styles.numeric}>{money(order.taxable)}</td>
+                              <td className={styles.numeric}>{money(order.total)}</td>
                             </tr>
                           ))}
                         </tbody>

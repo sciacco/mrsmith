@@ -128,6 +128,74 @@ export interface MatchingFunnelRulesSummary {
   near_misses: number;
 }
 
+export interface MatchingFunnelOrder {
+  registration: number;
+  doc_code: string;
+  label: string;
+  date: string | null;
+  rda_code: string;
+  rda_id: number | null;
+  total: number | null;
+  taxable: number;
+  line_count: number;
+  residual_qty: number;
+  open: boolean;
+}
+
+export type MatchingFunnelOrderVerdict =
+  | 'match'
+  | 'ambiguous'
+  | 'wrong'
+  | 'none'
+  | 'unlinked_proposal'
+  | 'unlinked_silent';
+
+export interface MatchingFunnelOrderRuleResult {
+  rule: '' | 'header' | 'lines';
+  proposals: string[][];
+  verdict: MatchingFunnelOrderVerdict;
+  afc_links: string[];
+  lines_total: number;
+  lines_matched: number;
+  ambiguous_lines: number;
+  open_candidates: number;
+}
+
+export interface MatchingFunnelOrdersSummary {
+  order_count: number;
+  by_doc_code: Record<string, number>;
+  with_rda_code: number;
+  rda_resolved: number;
+  rda_unresolved: number;
+  with_legacy_code: number;
+  without_code: number;
+  supplier_mismatch: number;
+  orders_without_supplier: number;
+  open_orders: number;
+  closed_orders: number;
+  over_consumed_orders: number;
+  orders_without_lines: number;
+  invoices_no_candidates: number;
+  invoices_one_candidate: number;
+  invoices_multiple_candidates: number;
+  invoices_no_open_candidates: number;
+  invoices_one_open_candidate: number;
+  invoices_multiple_open_candidates: number;
+  invoices_with_afc_link: number;
+}
+
+export interface MatchingFunnelOrderRulesSummary {
+  linked_invoices: number;
+  match: number;
+  ambiguous: number;
+  wrong: number;
+  none: number;
+  match_by_header: number;
+  match_by_lines: number;
+  unlinked_invoices: number;
+  unlinked_proposal: number;
+}
+
 export interface MatchingFunnelInvoice {
   registration: number;
   document_number: string;
@@ -136,6 +204,7 @@ export interface MatchingFunnelInvoice {
   taxable_amount: number | null;
   reference: MatchingFunnelReference;
   rules: MatchingFunnelRuleResult;
+  order_rules: MatchingFunnelOrderRuleResult;
 }
 
 export interface MatchingFunnelRDA {
@@ -160,6 +229,9 @@ export interface MatchingFunnelSupplier {
   reference: MatchingFunnelReferenceSummary;
   invoices: MatchingFunnelInvoice[];
   candidates: MatchingFunnelRDA[];
+  order_candidate_count: number;
+  order_outcome: 'none' | 'one' | 'multiple';
+  orders: MatchingFunnelOrder[];
 }
 
 export type MatchingFunnelScope = 'open' | 'all';
@@ -179,6 +251,8 @@ export interface MatchingFunnelResponse {
   profiles: MatchingFunnelProfileCounts;
   reference: MatchingFunnelReferenceSummary;
   rules: MatchingFunnelRulesSummary;
+  orders: MatchingFunnelOrdersSummary;
+  order_rules: MatchingFunnelOrderRulesSummary;
   suppliers: MatchingFunnelSupplier[];
 }
 
