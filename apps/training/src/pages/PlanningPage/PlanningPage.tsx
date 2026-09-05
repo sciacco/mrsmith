@@ -417,11 +417,16 @@ export function PlanningPage() {
         ) : list.isError && !list.data ? (
           <Error retry={() => list.refetch()} />
         ) : total === 0 ? (
-          <Empty
-            filtered={active}
-            onClear={() => updateList(defaults)}
-            onExternal={saveExternalContext}
-          />
+          <>
+            <Empty
+              filtered={active}
+              onClear={() => updateList(defaults)}
+              onExternal={saveExternalContext}
+            />
+            {list.isError && (
+              <StaleError onRetry={() => list.refetch()} />
+            )}
+          </>
         ) : (
           <>
             <div className={styles.tableWrap}>
@@ -442,6 +447,7 @@ export function PlanningPage() {
                     <CourseRow
                       key={course.id}
                       course={course}
+                      view={filters.view}
                       expanded={expanded === course.id}
                       detail={expandedDetail}
                       onExpand={() => {
@@ -461,16 +467,7 @@ export function PlanningPage() {
               </table>
             </div>
             {list.isError && (
-              <p className={styles.staleError} role="status">
-                Dati non aggiornati: impossibile aggiornare la pianificazione.{" "}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => list.refetch()}
-                >
-                  Riprova
-                </Button>
-              </p>
+              <StaleError onRetry={() => list.refetch()} />
             )}
             <div className={styles.pagination}>
               <span>
@@ -578,8 +575,25 @@ function FilterChips({
   );
 }
 
+// Contatore "Vedi tutti" per lente: mostra solo i promemoria pertinenti alla
+// lente attiva (issue §9). In Storico le attività escluse per sospensione non
+// vengono mostrate, quindi il contatore è zero.
+function lensReminderTotal(course: CourseSummary, view: PlanningView) {
+  switch (view) {
+    case "operative":
+      return course.operativeReminderCount;
+    case "reminders":
+      return course.dueReminderCount;
+    case "suspended":
+      return course.reminderCount - course.operativeReminderCount;
+    case "history":
+      return 0;
+  }
+}
+
 function CourseRow({
   course,
+  view,
   expanded,
   detail,
   onExpand,
@@ -589,6 +603,7 @@ function CourseRow({
   onExternal,
 }: {
   course: CourseSummary;
+  view: PlanningView;
   expanded: boolean;
   detail: ReturnType<typeof usePlanningCourseDetail>;
   onExpand: () => void;
@@ -598,6 +613,7 @@ function CourseRow({
   onExternal: (event: MouseEvent<HTMLAnchorElement>) => void;
 }) {
   const reminder = course.primaryReminder;
+  const reminderTotal = lensReminderTotal(course, view);
   const date = reminder && reminderMonthDay(reminder.date);
   return (
     <>
@@ -703,22 +719,22 @@ function CourseRow({
                 >
                   Modifica promemoria
                 </button>
-                {course.reminderCount > 1 && (
+                {reminderTotal > 1 && (
                   <button
                     className={styles.textButton}
                     onClick={() => onDrawer(course.id, "reminders")}
                   >
-                    Vedi tutti ({n(course.reminderCount)})
+                    Vedi tutti ({n(reminderTotal)})
                   </button>
                 )}
               </div>
             </div>
-          ) : course.reminderCount > 0 ? (
+          ) : reminderTotal > 0 ? (
             <button
               className={styles.textButton}
               onClick={() => onDrawer(course.id, "reminders")}
             >
-              Vedi tutti ({n(course.reminderCount)})
+              Vedi tutti ({n(reminderTotal)})
             </button>
           ) : (
             <span>Nessun promemoria</span>
@@ -850,6 +866,16 @@ function Preview({
   );
 }
 
+function StaleError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <p className={styles.staleError} role="status">
+      Dati non aggiornati: impossibile aggiornare la pianificazione.{" "}
+      <Button size="sm" variant="ghost" onClick={onRetry}>
+        Riprova
+      </Button>
+    </p>
+  );
+}
 function Error({ retry }: { retry: () => void }) {
   return (
     <div className={styles.empty}>
