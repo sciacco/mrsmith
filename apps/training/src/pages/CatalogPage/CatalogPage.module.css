@@ -1,0 +1,7 @@
+/* #170: gruppo filtri della vista Corsi — toggle "Da curare" + filtro per tag. */
+.filters {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}

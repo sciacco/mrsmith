@@ -51,7 +51,7 @@ LEFT JOIN training.vendor v ON v.id = c.vendor_id
 LEFT JOIN training.certification cert ON cert.id = c.leads_to_cert_id`
 
 func (s *SQLStore) ListCourses(ctx context.Context) ([]CourseListRow, error) {
-	q := "SELECT" + courseListColumns + courseListFrom + "\nORDER BY c.title\nLIMIT 1000"
+	q := "SELECT" + courseListColumns + courseListFrom + "\nORDER BY c.title"
 	rows, err := s.db.QueryContext(ctx, q)
 	if err != nil {
 		return nil, fmt.Errorf("list training courses: %w", err)

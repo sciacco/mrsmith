@@ -1,11 +1,11 @@
 // Catalogo (#158, §Catalogo 4-5): corsi (con filtro "Da curare" = corsi
-// inattivi importati dal sync formativo Factorial) e anagrafiche, in due
-// viste sullo stesso pattern query-param di FactorialPage.
+// inattivi importati dal sync formativo Factorial e, da #170, filtro per tag)
+// e anagrafiche, in due viste sullo stesso pattern query-param di FactorialPage.
 
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { formatCurrency } from '@mrsmith/format';
-import { Button, Icon, Skeleton, StatusBadge, ToggleSwitch } from '@mrsmith/ui';
+import { Button, Icon, SingleSelect, Skeleton, StatusBadge, ToggleSwitch } from '@mrsmith/ui';
 import { useTrainingCourses } from '../../api/queries';
 import type { CourseListRow } from '../../api/types';
 import { AnagraficheSection } from '../../components/catalog/AnagraficheSection';
@@ -18,6 +18,7 @@ import { PathsCatalogSection } from '../../components/catalog/PathsCatalogSectio
 import { DELIVERY_MODE_LABELS, PROVIDER_KIND_LABELS } from '../../lib/labels';
 import listStyles from '../RequestsPage/listPage.module.css';
 import viewStyles from '../FactorialPage.module.css';
+import styles from './CatalogPage.module.css';
 
 // Percorsi (#162, §Catalogo 5) e Certificazioni (#162, §Catalogo 4) sono
 // nuove sottosezioni allo stesso livello di Corsi/Anagrafiche: la seconda è
@@ -33,15 +34,48 @@ export function CatalogPage() {
   const selectedId = params.get('id');
   const selectedCertId = params.get('certId');
   const selectedPathId = params.get('pathId');
+  // #170: filtro per tag dei soli Corsi, persistito nell'URL ('tag' assente/vuoto = nessun filtro).
+  const selectedTag = params.get('tag') || null;
 
   const [showCreate, setShowCreate] = useState(false);
   const [onlyToCurate, setOnlyToCurate] = useState(false);
 
   const courses = useTrainingCourses();
+  // Opzioni dei tag calcolate su TUTTI i corsi caricati: non si restringono
+  // quando cambiano il filtro attivo o il tag selezionato. Dedup esatta,
+  // esclusi i tag vuoti/solo spazi, ordinamento con locale italiano; il tag
+  // nell'URL senza corrispondenze resta selezionabile per essere visibile e azzerabile.
+  const tagOptions = useMemo(() => {
+    const rows = courses.data ?? [];
+    const tags = [...new Set(rows.flatMap((c) => c.tags).filter((t) => t.trim().length > 0))];
+    tags.sort(new Intl.Collator('it').compare);
+    if (selectedTag && !tags.includes(selectedTag)) tags.unshift(selectedTag);
+    return tags.map((tag) => ({ value: tag, label: tag }));
+  }, [courses.data, selectedTag]);
+
   const filtered = useMemo(() => {
     const rows = courses.data ?? [];
-    return onlyToCurate ? rows.filter((c) => !c.active && c.factorialTrainingId) : rows;
-  }, [courses.data, onlyToCurate]);
+    return rows.filter((c) => {
+      if (onlyToCurate && !(!c.active && c.factorialTrainingId)) return false;
+      if (selectedTag && !c.tags.includes(selectedTag)) return false;
+      return true;
+    });
+  }, [courses.data, onlyToCurate, selectedTag]);
+
+  function setSelectedTag(next: string | null) {
+    const nextParams = new URLSearchParams(params);
+    if (next) nextParams.set('tag', next);
+    else nextParams.delete('tag');
+    setParams(nextParams, { replace: true });
+  }
+
+  // Azzera i filtri dei Corsi (tag + "Da curare") lasciando intatti gli altri parametri.
+  function resetCourseFilters() {
+    const nextParams = new URLSearchParams(params);
+    nextParams.delete('tag');
+    setOnlyToCurate(false);
+    setParams(nextParams, { replace: true });
+  }
 
   function setView(next: View) {
     const nextParams = new URLSearchParams(params);
@@ -131,12 +165,23 @@ export function CatalogPage() {
       {view === 'corsi' ? (
         <>
           <div className={listStyles.header}>
-            <ToggleSwitch
-              id="courses-to-curate"
-              checked={onlyToCurate}
-              onChange={setOnlyToCurate}
-              label="Solo da curare (importati dal sync)"
-            />
+            <div className={styles.filters}>
+              <ToggleSwitch
+                id="courses-to-curate"
+                checked={onlyToCurate}
+                onChange={setOnlyToCurate}
+                label="Solo da curare (importati dal sync)"
+              />
+              <SingleSelect
+                options={tagOptions}
+                selected={selectedTag}
+                onChange={setSelectedTag}
+                placeholder="Tutti i tag"
+                allowClear
+                clearLabel="Tutti i tag"
+                ariaLabel="Filtra per tag"
+              />
+            </div>
             <Button variant="primary" size="md" leftIcon={<Icon name="plus" size={16} />} onClick={() => setShowCreate(true)}>
               Nuovo corso
             </Button>
@@ -158,10 +203,23 @@ export function CatalogPage() {
               </Button>
             </div>
           ) : filtered.length === 0 ? (
-            <div className={listStyles.empty}>
-              <p className={listStyles.emptyTitle}>Nessun corso da curare</p>
-              <p className={listStyles.emptyDescription}>Nessun corso importato dal sync in attesa di attivazione.</p>
-            </div>
+            selectedTag ? (
+              <div className={listStyles.empty}>
+                <p className={listStyles.emptyTitle}>Nessun corso corrisponde ai filtri</p>
+                <p className={listStyles.emptyDescription}>Modifica o azzera i filtri per vedere altri corsi.</p>
+                <Button variant="secondary" size="md" onClick={resetCourseFilters}>
+                  Azzera filtri
+                </Button>
+              </div>
+            ) : (
+              <div className={listStyles.empty}>
+                <p className={listStyles.emptyTitle}>Nessun corso da curare</p>
+                <p className={listStyles.emptyDescription}>Nessun corso importato dal sync in attesa di attivazione.</p>
+                <Button variant="secondary" size="md" onClick={resetCourseFilters}>
+                  Mostra tutti i corsi
+                </Button>
+              </div>
+            )
           ) : (
             <div className={listStyles.tableWrap}>
               <table className={listStyles.table}>
