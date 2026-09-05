@@ -1,6 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ApiClient } from '@mrsmith/api-client';
-import { useApiClient } from './client';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { ApiClient } from "@mrsmith/api-client";
+import { useApiClient } from "./client";
 import type {
   ActionResponse,
   AssessmentInput,
@@ -46,6 +46,14 @@ import type {
   PathInput,
   PathListResponse,
   PathStepsInput,
+  PlanningCourseDetail,
+  PlanningFiltersResponse,
+  PlanningItemsParams,
+  PlanningItemsResponse,
+  PlanningListParams,
+  PlanningListResponse,
+  ReminderOwnerKind,
+  ReminderUpdateInput,
   PersonCreateInput,
   PersonDetail,
   PersonListResponse,
@@ -76,9 +84,9 @@ import type {
   UnfedPopulationResponse,
   VendorInput,
   VendorListResponse,
-} from './types';
+} from "./types";
 
-const TRAINING_PREFIX = '/training/v1';
+const TRAINING_PREFIX = "/training/v1";
 
 function withDaysParam(name: string, value: number): string {
   return `?${new URLSearchParams({ [name]: String(value) }).toString()}`;
@@ -87,15 +95,115 @@ function withDaysParam(name: string, value: number): string {
 export function useMe() {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'me'],
+    queryKey: ["training", "me"],
     queryFn: () => api.get<MeResponse>(`${TRAINING_PREFIX}/me`),
   });
+}
+
+function planningQuery(params: object) {
+  const query = new URLSearchParams();
+  Object.entries(params)
+    .filter(([, value]) => value !== "" && value !== 0)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .forEach(([key, value]) => query.set(key, String(value)));
+  const serialized = query.toString();
+  return serialized ? `?${serialized}` : "";
+}
+
+function planningListKey(params: PlanningListParams) {
+  return [
+    "training",
+    "planning",
+    "list",
+    params.view,
+    params.q,
+    params.tag,
+    params.employeeId,
+    params.teamId,
+    params.skillAreaId,
+    params.limit,
+    params.offset,
+  ] as const;
+}
+
+function planningItemsKey(courseId: string, params: PlanningItemsParams) {
+  return [
+    "training",
+    "planning",
+    "items",
+    courseId,
+    params.kind,
+    params.q,
+    params.teamId,
+    params.eventId,
+    params.status,
+    params.limit,
+    params.offset,
+  ] as const;
+}
+
+export function usePlanning(params: PlanningListParams) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: planningListKey(params),
+    queryFn: () =>
+      api.get<PlanningListResponse>(
+        `${TRAINING_PREFIX}/planning${planningQuery(params)}`,
+      ),
+  });
+}
+
+export function usePlanningFilters() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ["training", "planning", "filters"],
+    queryFn: () =>
+      api.get<PlanningFiltersResponse>(`${TRAINING_PREFIX}/planning/filters`),
+  });
+}
+
+export function usePlanningCourseDetail(id: string | undefined) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ["training", "planning", "course", id],
+    queryFn: () =>
+      api.get<PlanningCourseDetail>(
+        `${TRAINING_PREFIX}/planning/courses/${id}`,
+      ),
+    enabled: Boolean(id),
+  });
+}
+
+export function usePlanningItems(
+  courseId: string | undefined,
+  params: PlanningItemsParams,
+) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: courseId
+      ? planningItemsKey(courseId, params)
+      : ["training", "planning", "items", "closed"],
+    queryFn: () =>
+      api.get<PlanningItemsResponse>(
+        `${TRAINING_PREFIX}/planning/courses/${courseId}/items${planningQuery(params)}`,
+      ),
+    enabled: Boolean(courseId),
+  });
+}
+
+export function useUpdatePlanningReminder() {
+  return useTrainingMutation<
+    { kind: ReminderOwnerKind; id: string; input: ReminderUpdateInput },
+    ActionResponse
+  >((api, { kind, id, input }) =>
+    api.put(`${TRAINING_PREFIX}/reminders/${kind}/${id}`, input),
+  );
 }
 
 export function useTrainingLookups() {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'lookups'],
+    queryKey: ["training", "lookups"],
     queryFn: () => api.get<LookupResponse>(`${TRAINING_PREFIX}/lookups`),
   });
 }
@@ -105,84 +213,96 @@ export function useTrainingLookups() {
 export function useTrainingCourses() {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'courses'],
-    queryFn: async () => (await api.get<CourseListResponse>(`${TRAINING_PREFIX}/courses`)).courses,
+    queryKey: ["training", "courses"],
+    queryFn: async () =>
+      (await api.get<CourseListResponse>(`${TRAINING_PREFIX}/courses`)).courses,
   });
 }
 
 export function useTrainingPeople() {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'people'],
-    queryFn: async () => (await api.get<PersonListResponse>(`${TRAINING_PREFIX}/people`)).people,
+    queryKey: ["training", "people"],
+    queryFn: async () =>
+      (await api.get<PersonListResponse>(`${TRAINING_PREFIX}/people`)).people,
   });
 }
 
 export function useTrainingTeams() {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'teams'],
-    queryFn: async () => (await api.get<TeamListResponse>(`${TRAINING_PREFIX}/teams`)).teams,
+    queryKey: ["training", "teams"],
+    queryFn: async () =>
+      (await api.get<TeamListResponse>(`${TRAINING_PREFIX}/teams`)).teams,
   });
 }
 
 export function useTrainingSkillAreas() {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'skill-areas'],
-    queryFn: async () => (await api.get<SkillAreaListResponse>(`${TRAINING_PREFIX}/skill-areas`)).skillAreas,
+    queryKey: ["training", "skill-areas"],
+    queryFn: async () =>
+      (await api.get<SkillAreaListResponse>(`${TRAINING_PREFIX}/skill-areas`))
+        .skillAreas,
   });
 }
 
 export function useTrainingGroups() {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'groups'],
-    queryFn: async () => (await api.get<GroupListResponse>(`${TRAINING_PREFIX}/groups`)).groups,
+    queryKey: ["training", "groups"],
+    queryFn: async () =>
+      (await api.get<GroupListResponse>(`${TRAINING_PREFIX}/groups`)).groups,
   });
 }
 
 export function useTrainingVendors() {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'vendors'],
-    queryFn: async () => (await api.get<VendorListResponse>(`${TRAINING_PREFIX}/vendors`)).vendors,
+    queryKey: ["training", "vendors"],
+    queryFn: async () =>
+      (await api.get<VendorListResponse>(`${TRAINING_PREFIX}/vendors`)).vendors,
   });
 }
 
 export function useTrainingCertifications() {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'certifications'],
+    queryKey: ["training", "certifications"],
     queryFn: async () =>
-      (await api.get<CertificationCatalogResponse>(`${TRAINING_PREFIX}/certifications`)).certifications,
+      (
+        await api.get<CertificationCatalogResponse>(
+          `${TRAINING_PREFIX}/certifications`,
+        )
+      ).certifications,
   });
 }
 
 export function useCourseDetail(id: string | undefined) {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'courses', id],
+    queryKey: ["training", "courses", id],
     queryFn: () => api.get<CourseDetail>(`${TRAINING_PREFIX}/courses/${id}`),
-    enabled: id !== undefined && id !== '',
+    enabled: id !== undefined && id !== "",
   });
 }
 
 export function usePersonDetail(id: string | undefined) {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'people', 'detail', id],
+    queryKey: ["training", "people", "detail", id],
     queryFn: () => api.get<PersonDetail>(`${TRAINING_PREFIX}/people/${id}`),
-    enabled: id !== undefined && id !== '',
+    enabled: id !== undefined && id !== "",
   });
 }
 
 export function useCertificationDetail(id: string | undefined) {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'certifications', 'detail', id],
-    queryFn: () => api.get<CertificationDetail>(`${TRAINING_PREFIX}/certifications/${id}`),
-    enabled: id !== undefined && id !== '',
+    queryKey: ["training", "certifications", "detail", id],
+    queryFn: () =>
+      api.get<CertificationDetail>(`${TRAINING_PREFIX}/certifications/${id}`),
+    enabled: id !== undefined && id !== "",
   });
 }
 
@@ -191,41 +311,43 @@ export function useCertificationDetail(id: string | undefined) {
 export function useTrainingPaths() {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'paths'],
-    queryFn: async () => (await api.get<PathListResponse>(`${TRAINING_PREFIX}/paths`)).paths,
+    queryKey: ["training", "paths"],
+    queryFn: async () =>
+      (await api.get<PathListResponse>(`${TRAINING_PREFIX}/paths`)).paths,
   });
 }
 
 export function usePathDetail(id: string | undefined) {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'paths', 'detail', id],
+    queryKey: ["training", "paths", "detail", id],
     queryFn: () => api.get<PathDetail>(`${TRAINING_PREFIX}/paths/${id}`),
-    enabled: id !== undefined && id !== '',
+    enabled: id !== undefined && id !== "",
   });
 }
 
 export function useTrainingEvents() {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'events'],
-    queryFn: async () => (await api.get<EventListResponse>(`${TRAINING_PREFIX}/events`)).events,
+    queryKey: ["training", "events"],
+    queryFn: async () =>
+      (await api.get<EventListResponse>(`${TRAINING_PREFIX}/events`)).events,
   });
 }
 
 export function useEventDetail(id: string | undefined) {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'events', id],
+    queryKey: ["training", "events", id],
     queryFn: () => api.get<EventDetail>(`${TRAINING_PREFIX}/events/${id}`),
-    enabled: id !== undefined && id !== '',
+    enabled: id !== undefined && id !== "",
   });
 }
 
 export function useRequestsWithoutTLOpinion() {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'queues', 'requests-without-tl-opinion'],
+    queryKey: ["training", "queues", "requests-without-tl-opinion"],
     queryFn: async () =>
       (
         await api.get<RequestsWithoutTLOpinionResponse>(
@@ -238,7 +360,7 @@ export function useRequestsWithoutTLOpinion() {
 export function useRequestsAwaitingDecision() {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'queues', 'requests-awaiting-decision'],
+    queryKey: ["training", "queues", "requests-awaiting-decision"],
     queryFn: async () =>
       (
         await api.get<RequestsAwaitingDecisionResponse>(
@@ -251,19 +373,23 @@ export function useRequestsAwaitingDecision() {
 export function useSeatRuleCoverage() {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'queues', 'seat-rule-coverage'],
+    queryKey: ["training", "queues", "seat-rule-coverage"],
     queryFn: async () =>
-      (await api.get<SeatRuleCoverageResponse>(`${TRAINING_PREFIX}/queues/seat-rule-coverage`)).rules,
+      (
+        await api.get<SeatRuleCoverageResponse>(
+          `${TRAINING_PREFIX}/queues/seat-rule-coverage`,
+        )
+      ).rules,
   });
 }
 
 export function useExpiringCoverage(withinDays: number) {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'queues', 'expiring-coverage', withinDays],
+    queryKey: ["training", "queues", "expiring-coverage", withinDays],
     queryFn: () =>
       api.get<ExpiringCoverageResponse>(
-        `${TRAINING_PREFIX}/queues/expiring-coverage${withDaysParam('withinDays', withinDays)}`,
+        `${TRAINING_PREFIX}/queues/expiring-coverage${withDaysParam("withinDays", withinDays)}`,
       ),
   });
 }
@@ -271,19 +397,23 @@ export function useExpiringCoverage(withinDays: number) {
 export function useUnfedPopulation() {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'queues', 'unfed-population'],
+    queryKey: ["training", "queues", "unfed-population"],
     queryFn: async () =>
-      (await api.get<UnfedPopulationResponse>(`${TRAINING_PREFIX}/queues/unfed-population`)).rules,
+      (
+        await api.get<UnfedPopulationResponse>(
+          `${TRAINING_PREFIX}/queues/unfed-population`,
+        )
+      ).rules,
   });
 }
 
 export function useRoundsWithoutEvent(withinDays: number) {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'queues', 'rounds-without-event', withinDays],
+    queryKey: ["training", "queues", "rounds-without-event", withinDays],
     queryFn: () =>
       api.get<RoundsWithoutEventResponse>(
-        `${TRAINING_PREFIX}/queues/rounds-without-event${withDaysParam('withinDays', withinDays)}`,
+        `${TRAINING_PREFIX}/queues/rounds-without-event${withDaysParam("withinDays", withinDays)}`,
       ),
   });
 }
@@ -291,7 +421,7 @@ export function useRoundsWithoutEvent(withinDays: number) {
 export function useUnapprovedEventExpenses() {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'queues', 'unapproved-event-expenses'],
+    queryKey: ["training", "queues", "unapproved-event-expenses"],
     queryFn: async () =>
       (
         await api.get<UnapprovedEventExpensesResponse>(
@@ -304,10 +434,10 @@ export function useUnapprovedEventExpenses() {
 export function useStaleEnrollments(olderThanDays: number) {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'queues', 'stale-enrollments', olderThanDays],
+    queryKey: ["training", "queues", "stale-enrollments", olderThanDays],
     queryFn: () =>
       api.get<StaleEnrollmentsResponse>(
-        `${TRAINING_PREFIX}/queues/stale-enrollments${withDaysParam('olderThanDays', olderThanDays)}`,
+        `${TRAINING_PREFIX}/queues/stale-enrollments${withDaysParam("olderThanDays", olderThanDays)}`,
       ),
   });
 }
@@ -317,10 +447,10 @@ export function useStaleEnrollments(olderThanDays: number) {
 export function useExpiringCertifications(withinDays: number) {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'queues', 'expiring-certifications', withinDays],
+    queryKey: ["training", "queues", "expiring-certifications", withinDays],
     queryFn: () =>
       api.get<ExpiringCertificationsResponse>(
-        `${TRAINING_PREFIX}/queues/expiring-certifications${withDaysParam('withinDays', withinDays)}`,
+        `${TRAINING_PREFIX}/queues/expiring-certifications${withDaysParam("withinDays", withinDays)}`,
       ),
   });
 }
@@ -330,20 +460,25 @@ export function useExpiringCertifications(withinDays: number) {
 export function useEconomicReport() {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'reports', 'economic'],
-    queryFn: async () => (await api.get<EconomicReportResponse>(`${TRAINING_PREFIX}/reports/economic`)).rows,
+    queryKey: ["training", "reports", "economic"],
+    queryFn: async () =>
+      (
+        await api.get<EconomicReportResponse>(
+          `${TRAINING_PREFIX}/reports/economic`,
+        )
+      ).rows,
   });
 }
 
 export function useDeliveredReport(from: string, to: string) {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'reports', 'delivered', from, to],
+    queryKey: ["training", "reports", "delivered", from, to],
     queryFn: () =>
       api.get<DeliveredReportResponse>(
         `${TRAINING_PREFIX}/reports/delivered?${new URLSearchParams({ from, to }).toString()}`,
       ),
-    enabled: from !== '' && to !== '',
+    enabled: from !== "" && to !== "",
   });
 }
 
@@ -353,28 +488,31 @@ export function useDeliveredReport(from: string, to: string) {
 // pigra: il pannello abilita la query solo alla propria apertura (`enabled`).
 
 export type AuditSelector =
-  | { kind: 'entity'; entityType: string; entityId: string }
-  | { kind: 'employee'; employeeId: string }
-  | { kind: 'event'; eventId: string };
+  | { kind: "entity"; entityType: string; entityId: string }
+  | { kind: "employee"; employeeId: string }
+  | { kind: "event"; eventId: string };
 
 export function useAuditHistory(selector: AuditSelector, enabled: boolean) {
   const api = useApiClient();
   const params = new URLSearchParams(
-    selector.kind === 'employee'
+    selector.kind === "employee"
       ? { employeeId: selector.employeeId }
-      : selector.kind === 'event'
+      : selector.kind === "event"
         ? { eventId: selector.eventId }
         : { entityType: selector.entityType, entityId: selector.entityId },
   );
   const keyTail =
-    selector.kind === 'employee'
-      ? ['employee', selector.employeeId]
-      : selector.kind === 'event'
-        ? ['event', selector.eventId]
-        : ['entity', selector.entityType, selector.entityId];
+    selector.kind === "employee"
+      ? ["employee", selector.employeeId]
+      : selector.kind === "event"
+        ? ["event", selector.eventId]
+        : ["entity", selector.entityType, selector.entityId];
   return useQuery({
-    queryKey: ['training', 'audit', ...keyTail],
-    queryFn: () => api.get<AuditHistoryResponse>(`${TRAINING_PREFIX}/audit?${params.toString()}`),
+    queryKey: ["training", "audit", ...keyTail],
+    queryFn: () =>
+      api.get<AuditHistoryResponse>(
+        `${TRAINING_PREFIX}/audit?${params.toString()}`,
+      ),
     enabled,
   });
 }
@@ -383,14 +521,16 @@ export function useAuditHistory(selector: AuditSelector, enabled: boolean) {
 // dalle prossime slice lo richiamano invece di elencare le query key a mano.
 export function useInvalidateTrainingQueries() {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: ['training'] });
+  return () => queryClient.invalidateQueries({ queryKey: ["training"] });
 }
 
 // ── Mutazioni evento/sessione/iscrizione/partecipazione/spesa (#156) ──
 // Fabbrica comune: ogni mutazione invalida l'intera cache Training al
 // successo (lista eventi, dettaglio, code di lavoro derivate).
 
-function useTrainingMutation<TVars, TResult>(fn: (api: ApiClient, vars: TVars) => Promise<TResult>) {
+function useTrainingMutation<TVars, TResult>(
+  fn: (api: ApiClient, vars: TVars) => Promise<TResult>,
+) {
   const api = useApiClient();
   const invalidate = useInvalidateTrainingQueries();
   return useMutation({
@@ -406,13 +546,16 @@ export function useCreateEvent() {
 }
 
 export function useUpdateEvent() {
-  return useTrainingMutation<{ id: string; input: EventInput }, ActionResponse>((api, { id, input }) =>
-    api.put(`${TRAINING_PREFIX}/events/${id}`, input),
+  return useTrainingMutation<{ id: string; input: EventInput }, ActionResponse>(
+    (api, { id, input }) => api.put(`${TRAINING_PREFIX}/events/${id}`, input),
   );
 }
 
 export function useCancelEvent() {
-  return useTrainingMutation<{ id: string; input: ReasonInput }, ActionResponse>((api, { id, input }) =>
+  return useTrainingMutation<
+    { id: string; input: ReasonInput },
+    ActionResponse
+  >((api, { id, input }) =>
     api.post(`${TRAINING_PREFIX}/events/${id}/cancel`, input),
   );
 }
@@ -424,29 +567,43 @@ export function useFeedEvent() {
 }
 
 export function useCreateSession() {
-  return useTrainingMutation<{ eventId: string; input: SessionInput }, ActionResponse>((api, { eventId, input }) =>
+  return useTrainingMutation<
+    { eventId: string; input: SessionInput },
+    ActionResponse
+  >((api, { eventId, input }) =>
     api.post(`${TRAINING_PREFIX}/events/${eventId}/sessions`, input),
   );
 }
 
 export function useUpdateSession() {
-  return useTrainingMutation<{ id: string; input: SessionInput }, ActionResponse>((api, { id, input }) =>
+  return useTrainingMutation<
+    { id: string; input: SessionInput },
+    ActionResponse
+  >((api, { id, input }) =>
     api.put(`${TRAINING_PREFIX}/sessions/${id}`, input),
   );
 }
 
 export function useDeleteSession() {
-  return useTrainingMutation<string, ActionResponse>((api, id) => api.delete(`${TRAINING_PREFIX}/sessions/${id}`));
+  return useTrainingMutation<string, ActionResponse>((api, id) =>
+    api.delete(`${TRAINING_PREFIX}/sessions/${id}`),
+  );
 }
 
 export function useUpdateEnrollmentFacts() {
-  return useTrainingMutation<{ id: string; input: EnrollmentFactsInput }, ActionResponse>((api, { id, input }) =>
+  return useTrainingMutation<
+    { id: string; input: EnrollmentFactsInput },
+    ActionResponse
+  >((api, { id, input }) =>
     api.put(`${TRAINING_PREFIX}/enrollments/${id}`, input),
   );
 }
 
 export function useCancelEnrollment() {
-  return useTrainingMutation<{ id: string; input: ReasonInput }, ActionResponse>((api, { id, input }) =>
+  return useTrainingMutation<
+    { id: string; input: ReasonInput },
+    ActionResponse
+  >((api, { id, input }) =>
     api.post(`${TRAINING_PREFIX}/enrollments/${id}/cancel`, input),
   );
 }
@@ -458,22 +615,33 @@ export function useCompleteEnrollmentHistorical() {
 }
 
 export function useReopenEnrollment() {
-  return useTrainingMutation<{ id: string; input: ReasonInput }, ActionResponse>((api, { id, input }) =>
+  return useTrainingMutation<
+    { id: string; input: ReasonInput },
+    ActionResponse
+  >((api, { id, input }) =>
     api.post(`${TRAINING_PREFIX}/enrollments/${id}/reopen`, input),
   );
 }
 
 export function useAssignParticipation() {
-  return useTrainingMutation<{ enrollmentId: string; sessionId: string }, ActionResponse>(
-    (api, { enrollmentId, sessionId }) =>
-      api.post(`${TRAINING_PREFIX}/enrollments/${enrollmentId}/sessions/${sessionId}`),
+  return useTrainingMutation<
+    { enrollmentId: string; sessionId: string },
+    ActionResponse
+  >((api, { enrollmentId, sessionId }) =>
+    api.post(
+      `${TRAINING_PREFIX}/enrollments/${enrollmentId}/sessions/${sessionId}`,
+    ),
   );
 }
 
 export function useRemoveParticipation() {
-  return useTrainingMutation<{ enrollmentId: string; sessionId: string }, ActionResponse>(
-    (api, { enrollmentId, sessionId }) =>
-      api.delete(`${TRAINING_PREFIX}/enrollments/${enrollmentId}/sessions/${sessionId}`),
+  return useTrainingMutation<
+    { enrollmentId: string; sessionId: string },
+    ActionResponse
+  >((api, { enrollmentId, sessionId }) =>
+    api.delete(
+      `${TRAINING_PREFIX}/enrollments/${enrollmentId}/sessions/${sessionId}`,
+    ),
   );
 }
 
@@ -482,67 +650,99 @@ export function useUpdateParticipation() {
     { enrollmentId: string; sessionId: string; input: ParticipationInput },
     ActionResponse
   >((api, { enrollmentId, sessionId, input }) =>
-    api.patch(`${TRAINING_PREFIX}/enrollments/${enrollmentId}/sessions/${sessionId}`, input),
+    api.patch(
+      `${TRAINING_PREFIX}/enrollments/${enrollmentId}/sessions/${sessionId}`,
+      input,
+    ),
   );
 }
 
 export function useBulkAssignments() {
-  return useTrainingMutation<{ eventId: string; input: BulkAssignmentsInput }, BulkAssignmentsResponse>(
-    (api, { eventId, input }) => api.post(`${TRAINING_PREFIX}/events/${eventId}/bulk-assignments`, input),
+  return useTrainingMutation<
+    { eventId: string; input: BulkAssignmentsInput },
+    BulkAssignmentsResponse
+  >((api, { eventId, input }) =>
+    api.post(`${TRAINING_PREFIX}/events/${eventId}/bulk-assignments`, input),
   );
 }
 
 export function useBulkParticipation() {
-  return useTrainingMutation<{ sessionId: string; input: BulkParticipationInput }, BulkParticipationResponse>(
-    (api, { sessionId, input }) => api.post(`${TRAINING_PREFIX}/sessions/${sessionId}/bulk-participation`, input),
+  return useTrainingMutation<
+    { sessionId: string; input: BulkParticipationInput },
+    BulkParticipationResponse
+  >((api, { sessionId, input }) =>
+    api.post(
+      `${TRAINING_PREFIX}/sessions/${sessionId}/bulk-participation`,
+      input,
+    ),
   );
 }
 
 export function useBulkEnrollments() {
-  return useTrainingMutation<{ eventId: string; input: BulkEnrollInput }, BulkEnrollResponse>(
-    (api, { eventId, input }) => api.post(`${TRAINING_PREFIX}/events/${eventId}/enrollments/bulk`, input),
+  return useTrainingMutation<
+    { eventId: string; input: BulkEnrollInput },
+    BulkEnrollResponse
+  >((api, { eventId, input }) =>
+    api.post(`${TRAINING_PREFIX}/events/${eventId}/enrollments/bulk`, input),
   );
 }
 
 export function useCreateExpense() {
-  return useTrainingMutation<{ eventId: string; input: EventExpenseInput }, EventExpense>(
-    (api, { eventId, input }) => api.post(`${TRAINING_PREFIX}/events/${eventId}/expenses`, input),
+  return useTrainingMutation<
+    { eventId: string; input: EventExpenseInput },
+    EventExpense
+  >((api, { eventId, input }) =>
+    api.post(`${TRAINING_PREFIX}/events/${eventId}/expenses`, input),
   );
 }
 
 export function useReplaceExpensePO() {
-  return useTrainingMutation<{ id: string; input: EventExpenseReplaceInput }, EventExpense>((api, { id, input }) =>
+  return useTrainingMutation<
+    { id: string; input: EventExpenseReplaceInput },
+    EventExpense
+  >((api, { id, input }) =>
     api.put(`${TRAINING_PREFIX}/expenses/${id}`, input),
   );
 }
 
 export function useReplaceExpenseEnrollments() {
-  return useTrainingMutation<{ id: string; input: EventExpenseEnrollmentsInput }, ActionResponse>(
-    (api, { id, input }) => api.put(`${TRAINING_PREFIX}/expenses/${id}/enrollments`, input),
+  return useTrainingMutation<
+    { id: string; input: EventExpenseEnrollmentsInput },
+    ActionResponse
+  >((api, { id, input }) =>
+    api.put(`${TRAINING_PREFIX}/expenses/${id}/enrollments`, input),
   );
 }
 
 export function useDeleteExpense() {
-  return useTrainingMutation<string, ActionResponse>((api, id) => api.delete(`${TRAINING_PREFIX}/expenses/${id}`));
+  return useTrainingMutation<string, ActionResponse>((api, id) =>
+    api.delete(`${TRAINING_PREFIX}/expenses/${id}`),
+  );
 }
 
 // ── Richieste formative (#157) ──
 
-export function useTrainingRequests(state: 'open' | 'suspended' | 'closed' | 'all') {
+export function useTrainingRequests(
+  state: "open" | "suspended" | "closed" | "all",
+) {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'requests', state],
+    queryKey: ["training", "requests", state],
     queryFn: async () =>
-      (await api.get<RequestListResponse>(`${TRAINING_PREFIX}/requests?${new URLSearchParams({ state })}`)).requests,
+      (
+        await api.get<RequestListResponse>(
+          `${TRAINING_PREFIX}/requests?${new URLSearchParams({ state })}`,
+        )
+      ).requests,
   });
 }
 
 export function useRequestDetail(id: string | undefined) {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'requests', 'detail', id],
+    queryKey: ["training", "requests", "detail", id],
     queryFn: () => api.get<RequestDetail>(`${TRAINING_PREFIX}/requests/${id}`),
-    enabled: id !== undefined && id !== '',
+    enabled: id !== undefined && id !== "",
   });
 }
 
@@ -553,13 +753,19 @@ export function useCreateRequest() {
 }
 
 export function useRecordTLOpinion() {
-  return useTrainingMutation<{ id: string; input: TLOpinionInput }, ActionResponse>((api, { id, input }) =>
+  return useTrainingMutation<
+    { id: string; input: TLOpinionInput },
+    ActionResponse
+  >((api, { id, input }) =>
     api.post(`${TRAINING_PREFIX}/requests/${id}/tl-opinion`, input),
   );
 }
 
 export function useRecordRequestDecision() {
-  return useTrainingMutation<{ id: string; input: RequestDecisionInput }, ActionResponse>((api, { id, input }) =>
+  return useTrainingMutation<
+    { id: string; input: RequestDecisionInput },
+    ActionResponse
+  >((api, { id, input }) =>
     api.post(`${TRAINING_PREFIX}/requests/${id}/decision`, input),
   );
 }
@@ -571,19 +777,28 @@ export function useWithdrawRequest() {
 }
 
 export function useUpdateRequestAnnotations() {
-  return useTrainingMutation<{ id: string; input: RequestAnnotationsInput }, ActionResponse>((api, { id, input }) =>
+  return useTrainingMutation<
+    { id: string; input: RequestAnnotationsInput },
+    ActionResponse
+  >((api, { id, input }) =>
     api.put(`${TRAINING_PREFIX}/requests/${id}/annotations`, input),
   );
 }
 
 export function useUpdateRequestOriginal() {
-  return useTrainingMutation<{ id: string; input: RequestOriginalDataInput }, ActionResponse>((api, { id, input }) =>
+  return useTrainingMutation<
+    { id: string; input: RequestOriginalDataInput },
+    ActionResponse
+  >((api, { id, input }) =>
     api.put(`${TRAINING_PREFIX}/requests/${id}/original`, input),
   );
 }
 
 export function useSuspendRequest() {
-  return useTrainingMutation<{ id: string; input: ReasonInput }, ActionResponse>((api, { id, input }) =>
+  return useTrainingMutation<
+    { id: string; input: ReasonInput },
+    ActionResponse
+  >((api, { id, input }) =>
     api.post(`${TRAINING_PREFIX}/requests/${id}/suspend`, input),
   );
 }
@@ -599,33 +814,39 @@ export function useResumeRequest() {
 export function useTrainingRules() {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'rules'],
-    queryFn: async () => (await api.get<RuleListResponse>(`${TRAINING_PREFIX}/rules`)).rules,
+    queryKey: ["training", "rules"],
+    queryFn: async () =>
+      (await api.get<RuleListResponse>(`${TRAINING_PREFIX}/rules`)).rules,
   });
 }
 
 export function useRuleDetail(id: string | undefined) {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['training', 'rules', 'detail', id],
+    queryKey: ["training", "rules", "detail", id],
     queryFn: () => api.get<RuleDetail>(`${TRAINING_PREFIX}/rules/${id}`),
-    enabled: id !== undefined && id !== '',
+    enabled: id !== undefined && id !== "",
   });
 }
 
 export function useCreateRule() {
-  return useTrainingMutation<RuleInput, ActionResponse>((api, input) => api.post(`${TRAINING_PREFIX}/rules`, input));
+  return useTrainingMutation<RuleInput, ActionResponse>((api, input) =>
+    api.post(`${TRAINING_PREFIX}/rules`, input),
+  );
 }
 
 export function useUpdateRule() {
-  return useTrainingMutation<{ id: string; input: RuleInput }, ActionResponse>((api, { id, input }) =>
-    api.put(`${TRAINING_PREFIX}/rules/${id}`, input),
+  return useTrainingMutation<{ id: string; input: RuleInput }, ActionResponse>(
+    (api, { id, input }) => api.put(`${TRAINING_PREFIX}/rules/${id}`, input),
   );
 }
 
 export function useSetRuleActive() {
-  return useTrainingMutation<{ id: string; active: boolean }, ActionResponse>((api, { id, active }) =>
-    api.post(`${TRAINING_PREFIX}/rules/${id}/${active ? 'activate' : 'deactivate'}`),
+  return useTrainingMutation<{ id: string; active: boolean }, ActionResponse>(
+    (api, { id, active }) =>
+      api.post(
+        `${TRAINING_PREFIX}/rules/${id}/${active ? "activate" : "deactivate"}`,
+      ),
   );
 }
 
@@ -653,47 +874,73 @@ export function useCreatePerson() {
 }
 
 export function useUpdatePerson() {
-  return useTrainingMutation<{ id: string; input: PersonUpdateInput }, ActionResponse>((api, { id, input }) =>
+  return useTrainingMutation<
+    { id: string; input: PersonUpdateInput },
+    ActionResponse
+  >((api, { id, input }) =>
     api.patch(`${TRAINING_PREFIX}/people/${id}`, input),
   );
 }
 
 export function useUpsertGroup() {
-  return useTrainingMutation<{ id?: string; input: GroupInput }, ActionResponse>((api, { id, input }) =>
-    id ? api.put(`${TRAINING_PREFIX}/groups/${id}`, input) : api.post(`${TRAINING_PREFIX}/groups`, input),
+  return useTrainingMutation<
+    { id?: string; input: GroupInput },
+    ActionResponse
+  >((api, { id, input }) =>
+    id
+      ? api.put(`${TRAINING_PREFIX}/groups/${id}`, input)
+      : api.post(`${TRAINING_PREFIX}/groups`, input),
   );
 }
 
 export function useReplaceGroupMembers() {
-  return useTrainingMutation<{ id: string; input: GroupMembersInput }, ActionResponse>((api, { id, input }) =>
+  return useTrainingMutation<
+    { id: string; input: GroupMembersInput },
+    ActionResponse
+  >((api, { id, input }) =>
     api.put(`${TRAINING_PREFIX}/groups/${id}/members`, input),
   );
 }
 
 export function useDeleteGroup() {
-  return useTrainingMutation<string, ActionResponse>((api, id) => api.delete(`${TRAINING_PREFIX}/groups/${id}`));
+  return useTrainingMutation<string, ActionResponse>((api, id) =>
+    api.delete(`${TRAINING_PREFIX}/groups/${id}`),
+  );
 }
 
 export function useUpsertVendor() {
-  return useTrainingMutation<{ id?: string; input: VendorInput }, ActionResponse>((api, { id, input }) =>
-    id ? api.put(`${TRAINING_PREFIX}/vendors/${id}`, input) : api.post(`${TRAINING_PREFIX}/vendors`, input),
+  return useTrainingMutation<
+    { id?: string; input: VendorInput },
+    ActionResponse
+  >((api, { id, input }) =>
+    id
+      ? api.put(`${TRAINING_PREFIX}/vendors/${id}`, input)
+      : api.post(`${TRAINING_PREFIX}/vendors`, input),
   );
 }
 
 export function useUpsertTeam() {
-  return useTrainingMutation<{ id: string; input: TeamInput }, ActionResponse>((api, { id, input }) =>
-    api.put(`${TRAINING_PREFIX}/teams/${id}`, input),
+  return useTrainingMutation<{ id: string; input: TeamInput }, ActionResponse>(
+    (api, { id, input }) => api.put(`${TRAINING_PREFIX}/teams/${id}`, input),
   );
 }
 
 export function useUpsertSkillArea() {
-  return useTrainingMutation<{ id?: string; input: SkillAreaInput }, ActionResponse>((api, { id, input }) =>
-    id ? api.put(`${TRAINING_PREFIX}/skill-areas/${id}`, input) : api.post(`${TRAINING_PREFIX}/skill-areas`, input),
+  return useTrainingMutation<
+    { id?: string; input: SkillAreaInput },
+    ActionResponse
+  >((api, { id, input }) =>
+    id
+      ? api.put(`${TRAINING_PREFIX}/skill-areas/${id}`, input)
+      : api.post(`${TRAINING_PREFIX}/skill-areas`, input),
   );
 }
 
 export function useUpsertCertification() {
-  return useTrainingMutation<{ id?: string; input: CertificationInput }, ActionResponse>((api, { id, input }) =>
+  return useTrainingMutation<
+    { id?: string; input: CertificationInput },
+    ActionResponse
+  >((api, { id, input }) =>
     id
       ? api.put(`${TRAINING_PREFIX}/certifications/${id}`, input)
       : api.post(`${TRAINING_PREFIX}/certifications`, input),
@@ -701,9 +948,10 @@ export function useUpsertCertification() {
 }
 
 export function useUpdateCourse() {
-  return useTrainingMutation<{ id: string; input: CourseInput }, ActionResponse>((api, { id, input }) =>
-    api.put(`${TRAINING_PREFIX}/courses/${id}`, input),
-  );
+  return useTrainingMutation<
+    { id: string; input: CourseInput },
+    ActionResponse
+  >((api, { id, input }) => api.put(`${TRAINING_PREFIX}/courses/${id}`, input));
 }
 
 export function useArchiveCourse() {
@@ -713,7 +961,10 @@ export function useArchiveCourse() {
 }
 
 export function useSuspendCourse() {
-  return useTrainingMutation<{ id: string; input: ReasonInput }, ActionResponse>((api, { id, input }) =>
+  return useTrainingMutation<
+    { id: string; input: ReasonInput },
+    ActionResponse
+  >((api, { id, input }) =>
     api.post(`${TRAINING_PREFIX}/courses/${id}/suspend`, input),
   );
 }
@@ -733,9 +984,10 @@ export function useCreateAward() {
 }
 
 export function useUpdateAward() {
-  return useTrainingMutation<{ id: string; input: AwardUpdateInput }, ActionResponse>((api, { id, input }) =>
-    api.put(`${TRAINING_PREFIX}/awards/${id}`, input),
-  );
+  return useTrainingMutation<
+    { id: string; input: AwardUpdateInput },
+    ActionResponse
+  >((api, { id, input }) => api.put(`${TRAINING_PREFIX}/awards/${id}`, input));
 }
 
 export function useDeleteAward() {
@@ -745,11 +997,16 @@ export function useDeleteAward() {
 }
 
 export function useUploadAwardDocument() {
-  return useTrainingMutation<{ awardId: string; file: File }, DocumentMetadata>((api, { awardId, file }) => {
-    const form = new FormData();
-    form.append('file', file);
-    return api.postFormData(`${TRAINING_PREFIX}/awards/${awardId}/documents`, form);
-  });
+  return useTrainingMutation<{ awardId: string; file: File }, DocumentMetadata>(
+    (api, { awardId, file }) => {
+      const form = new FormData();
+      form.append("file", file);
+      return api.postFormData(
+        `${TRAINING_PREFIX}/awards/${awardId}/documents`,
+        form,
+      );
+    },
+  );
 }
 
 export function useValidateDocument() {
@@ -759,13 +1016,19 @@ export function useValidateDocument() {
 }
 
 export function useCreateAssessment() {
-  return useTrainingMutation<{ personId: string; input: AssessmentInput }, ActionResponse>(
-    (api, { personId, input }) => api.post(`${TRAINING_PREFIX}/people/${personId}/assessments`, input),
+  return useTrainingMutation<
+    { personId: string; input: AssessmentInput },
+    ActionResponse
+  >((api, { personId, input }) =>
+    api.post(`${TRAINING_PREFIX}/people/${personId}/assessments`, input),
   );
 }
 
 export function useUpdateAssessment() {
-  return useTrainingMutation<{ id: string; input: AssessmentUpdateInput }, ActionResponse>((api, { id, input }) =>
+  return useTrainingMutation<
+    { id: string; input: AssessmentUpdateInput },
+    ActionResponse
+  >((api, { id, input }) =>
     api.put(`${TRAINING_PREFIX}/assessments/${id}`, input),
   );
 }
@@ -777,20 +1040,29 @@ export function useDeleteAssessment() {
 }
 
 export function useUpsertPath() {
-  return useTrainingMutation<{ id?: string; input: PathInput }, ActionResponse>((api, { id, input }) =>
-    id ? api.put(`${TRAINING_PREFIX}/paths/${id}`, input) : api.post(`${TRAINING_PREFIX}/paths`, input),
+  return useTrainingMutation<{ id?: string; input: PathInput }, ActionResponse>(
+    (api, { id, input }) =>
+      id
+        ? api.put(`${TRAINING_PREFIX}/paths/${id}`, input)
+        : api.post(`${TRAINING_PREFIX}/paths`, input),
   );
 }
 
 export function useReplacePathSteps() {
-  return useTrainingMutation<{ pathId: string; input: PathStepsInput }, ActionResponse>((api, { pathId, input }) =>
+  return useTrainingMutation<
+    { pathId: string; input: PathStepsInput },
+    ActionResponse
+  >((api, { pathId, input }) =>
     api.put(`${TRAINING_PREFIX}/paths/${pathId}/steps`, input),
   );
 }
 
 export function useAssignPersonPath() {
-  return useTrainingMutation<{ personId: string; input: PathAssignmentInput }, ActionResponse>(
-    (api, { personId, input }) => api.post(`${TRAINING_PREFIX}/people/${personId}/paths`, input),
+  return useTrainingMutation<
+    { personId: string; input: PathAssignmentInput },
+    ActionResponse
+  >((api, { personId, input }) =>
+    api.post(`${TRAINING_PREFIX}/people/${personId}/paths`, input),
   );
 }
 
@@ -804,7 +1076,10 @@ export function useUpdatePersonPath() {
 }
 
 export function useRemovePersonPath() {
-  return useTrainingMutation<{ personId: string; pathId: string }, ActionResponse>((api, { personId, pathId }) =>
+  return useTrainingMutation<
+    { personId: string; pathId: string },
+    ActionResponse
+  >((api, { personId, pathId }) =>
     api.delete(`${TRAINING_PREFIX}/people/${personId}/paths/${pathId}`),
   );
 }

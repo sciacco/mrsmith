@@ -68,7 +68,7 @@ export interface RequestsWithoutTLOpinionResponse {
   requests: RequestWithoutTLOpinionRow[];
 }
 
-export type TLOpinion = 'favorable' | 'unfavorable';
+export type TLOpinion = "favorable" | "unfavorable";
 
 export interface RequestAwaitingDecisionRow {
   requestId: string;
@@ -91,7 +91,7 @@ export interface RequestsAwaitingDecisionResponse {
   requests: RequestAwaitingDecisionRow[];
 }
 
-export type QueueNeed = 'attendance' | 'certification';
+export type QueueNeed = "attendance" | "certification";
 
 export interface SeatRuleInTrainingRow {
   enrollmentId: string;
@@ -120,12 +120,12 @@ export interface SeatRuleCoverageResponse {
 }
 
 export type ExpiringPersonReason =
-  | 'uncovered'
-  | 'never_completed'
-  | 'personal_deadline'
-  | 'award_expiring'
-  | 'award_expired'
-  | 'never_awarded';
+  | "uncovered"
+  | "never_completed"
+  | "personal_deadline"
+  | "award_expiring"
+  | "award_expired"
+  | "never_awarded";
 
 export interface ExpiringPersonRow {
   ruleId: string;
@@ -194,7 +194,7 @@ export interface RoundsWithoutEventResponse {
   rules: RoundWithoutEventRow[];
 }
 
-export type EconomicState = 'approved' | 'pending' | 'rejected';
+export type EconomicState = "approved" | "pending" | "rejected";
 
 export interface EventExpenseBudget {
   id: number;
@@ -242,16 +242,24 @@ export interface StaleEnrollmentsResponse {
 // ── Eventi (letture event-centric; #155 usa solo i flag di condizione) ──
 
 export type DeliveryStatus =
-  | 'planned'
-  | 'in_progress'
-  | 'completed'
-  | 'partially_completed'
-  | 'not_attended'
-  | 'cancelled';
+  | "planned"
+  | "in_progress"
+  | "completed"
+  | "partially_completed"
+  | "not_attended"
+  | "cancelled";
 
-export type ParticipationStatus = 'assigned' | 'in_progress' | 'completed' | 'not_attended';
+export type ParticipationStatus =
+  | "assigned"
+  | "in_progress"
+  | "completed"
+  | "not_attended";
 
-export type LearningOutcome = 'passed' | 'failed' | 'not_taken' | 'not_required';
+export type LearningOutcome =
+  | "passed"
+  | "failed"
+  | "not_taken"
+  | "not_required";
 
 export interface EventFlags {
   cancelled: boolean;
@@ -317,7 +325,7 @@ export interface ReasonInput {
   reason: string;
 }
 
-export type ScheduleType = 'scheduled' | 'self_paced';
+export type ScheduleType = "scheduled" | "self_paced";
 
 // SessionInput copre creazione e modifica: sostituzione completa, il campo
 // omesso azzera (capienza compresa).
@@ -356,7 +364,7 @@ export interface EnrollmentFactsInput {
   actualStart?: string;
   actualEnd?: string;
   hoursActual?: number;
-  learningOutcome?: LearningOutcome | '';
+  learningOutcome?: LearningOutcome | "";
 }
 
 export interface EnrollmentDetail {
@@ -461,7 +469,7 @@ export interface FeedEventResponse {
 
 // ── Gesti massivi del workspace (#153) ──
 
-export type BulkAssignMode = 'all_to_all' | 'distribute' | 'fill_session';
+export type BulkAssignMode = "all_to_all" | "distribute" | "fill_session";
 
 export interface BulkAssignmentsInput {
   mode: BulkAssignMode;
@@ -496,7 +504,7 @@ export interface BulkEnrollCreatedRow {
   employeeId: string;
 }
 
-export type BulkEnrollSkipReason = 'already_enrolled' | 'inactive';
+export type BulkEnrollSkipReason = "already_enrolled" | "inactive";
 
 export interface BulkEnrollSkippedRow {
   employeeId: string;
@@ -562,7 +570,7 @@ export interface CourseEventRef {
 }
 
 export interface CourseVisibility {
-  kind: 'all' | 'team' | 'skill_area' | 'custom_group' | 'people';
+  kind: "all" | "team" | "skill_area" | "custom_group" | "people";
   id?: string;
   employeeIds?: string[];
 }
@@ -587,7 +595,7 @@ export interface CourseInput {
   skillAreaIds?: string[];
   leadsToCertId?: string;
   deliveryMode?: string;
-  providerKind?: 'internal' | 'external';
+  providerKind?: "internal" | "external";
   defaultHours?: number;
   defaultCost?: number;
   courseUrl?: string;
@@ -842,7 +850,7 @@ export interface RequestAnnotationsInput {
   priority?: number;
 }
 
-export type TLOpinionValue = 'favorable' | 'unfavorable';
+export type TLOpinionValue = "favorable" | "unfavorable";
 
 export interface TLOpinionInput {
   leadEmployeeId: string;
@@ -860,7 +868,7 @@ export interface RequestAcceptedInput {
   existingEnrollmentId?: string;
 }
 
-export type RequestDecisionValue = 'accepted' | 'rejected';
+export type RequestDecisionValue = "accepted" | "rejected";
 
 export interface RequestDecisionInput {
   decision: RequestDecisionValue;
@@ -987,7 +995,12 @@ export interface RequestDetail {
 
 // ── Regole formative (#140, #157) ──
 
-export type PopulationKind = 'all' | 'team' | 'skill_area' | 'custom_group' | 'people';
+export type PopulationKind =
+  | "all"
+  | "team"
+  | "skill_area"
+  | "custom_group"
+  | "people";
 
 export interface RulePopulationInput {
   kind: PopulationKind;
@@ -1003,7 +1016,7 @@ export interface RuleInput {
   isMandatory: boolean;
   deadline: string;
   recurrenceMonths?: number;
-  recurrenceAnchor?: 'calendar' | 'completion' | '';
+  recurrenceAnchor?: "calendar" | "completion" | "";
   notes?: string;
 }
 
@@ -1361,7 +1374,7 @@ export interface DeliveredReportRow {
   skillAreaNames: string[];
   eventId: string;
   deliveryStatus: DeliveryStatus;
-  learningOutcome?: LearningOutcome | '';
+  learningOutcome?: LearningOutcome | "";
   referenceDate: string;
   hours?: number;
 }
@@ -1389,4 +1402,186 @@ export interface AuditEntry {
 
 export interface AuditHistoryResponse {
   entries: AuditEntry[];
+}
+
+// ── Pianificazione operativa (#186) ──
+
+export interface PlanningRef {
+  id: string;
+  name: string;
+}
+
+export type ReminderOwnerKind = "course" | "request" | "event";
+export type PlanningView = "operative" | "reminders" | "suspended" | "history";
+export type PlanningItemKind =
+  | "requests"
+  | "enrollments"
+  | "events"
+  | "reminders";
+export type ReminderTiming = "overdue" | "today" | "future" | "undated";
+
+export interface PlanningReminder {
+  ownerKind: ReminderOwnerKind;
+  ownerId: string;
+  ownerLabel: string;
+  courseId: string;
+  text: string;
+  date: string | null;
+  operative: boolean;
+  timing: ReminderTiming;
+}
+
+export interface PlanningRequestArea extends PlanningRef {
+  levelCurrent: number | null;
+  levelTarget: number | null;
+}
+
+export interface PlanningRequestItem {
+  id: string;
+  employee: PlanningRef;
+  team: PlanningRef;
+  course: PlanningRef;
+  priority: number | null;
+  createdAt: string;
+  areas: PlanningRequestArea[];
+  tlOpinion: string | null;
+  peopleDecision: string | null;
+  outcome: string | null;
+  suspended: boolean;
+  operative: boolean;
+  acceptedCourse: PlanningRef | null;
+  acceptedEventId: string | null;
+  resultingEnrollmentId: string | null;
+}
+
+export interface PlanningEventItem {
+  id: string;
+  title: string;
+  courseId: string;
+  origin: string;
+  cancelled: boolean;
+  operative: boolean;
+  sessionsCount: number;
+  startsAt: string | null;
+  endsAt: string | null;
+  dueOn: string | null;
+  enrollmentsCount: number;
+  enrollmentsByStatus: Record<DeliveryStatus, number>;
+  withoutSessions: boolean;
+  unassignedEnrollments: boolean;
+  needsReconciliation: boolean;
+}
+
+export interface PlanningEnrollmentItem {
+  id: string;
+  employee: PlanningRef;
+  teams: PlanningRef[];
+  event: PlanningRef;
+  deliveryStatus: DeliveryStatus;
+  requestIds: string[];
+}
+
+export interface PlanningEconomic {
+  distinctPOCount: number;
+  approved: number;
+  pending: number;
+  rejected: number;
+  coveredEnrollments: number;
+  approvedCoveredEnrollments: number;
+}
+
+export interface CourseSummary {
+  id: string;
+  title: string;
+  tags: string[];
+  areas: PlanningRef[];
+  courseSuspended: boolean;
+  suspensionReason: string | null;
+  operative: boolean;
+  suspendedWork: boolean;
+  history: boolean;
+  reasons: Array<"requests" | "events" | "reminders" | "expenses">;
+  priority: number | null;
+  peopleCount: number;
+  enrolledPeopleCount: number;
+  requestsCount: number;
+  operativeRequestsCount: number;
+  suspendedRequestsCount: number;
+  eventsCount: number;
+  operativeEventsCount: number;
+  enrollmentsCount: number;
+  enrollmentsByStatus: Record<DeliveryStatus, number>;
+  economic: PlanningEconomic;
+  reminderCount: number;
+  operativeReminderCount: number;
+  dueReminderCount: number;
+  primaryReminder: PlanningReminder | null;
+}
+
+export interface PlanningListResponse {
+  today: string;
+  generatedAt: string;
+  items: CourseSummary[];
+  total: number;
+  limit: number;
+  offset: number;
+  dueCoursesTotal: number;
+}
+
+export interface PlanningFiltersResponse {
+  tags: string[];
+  people: PlanningRef[];
+  teams: PlanningRef[];
+  areas: PlanningRef[];
+}
+
+export interface PlanningCourseDetail {
+  today: string;
+  course: CourseSummary;
+  requestsPreview: PlanningRequestItem[];
+  eventsPreview: PlanningEventItem[];
+  eventOptions: PlanningRef[];
+  teamOptions: PlanningRef[];
+}
+
+interface PlanningItemsBase<K extends PlanningItemKind, T> {
+  today: string;
+  kind: K;
+  items: T[];
+  total: number;
+  unfilteredTotal: number;
+  limit: number;
+  offset: number;
+}
+
+export type PlanningItemsResponse =
+  | PlanningItemsBase<"requests", PlanningRequestItem>
+  | PlanningItemsBase<"enrollments", PlanningEnrollmentItem>
+  | PlanningItemsBase<"events", PlanningEventItem>
+  | PlanningItemsBase<"reminders", PlanningReminder>;
+
+export interface PlanningListParams {
+  view: PlanningView;
+  q: string;
+  tag: string;
+  employeeId: string;
+  teamId: string;
+  skillAreaId: string;
+  limit: 25 | 50;
+  offset: number;
+}
+
+export interface PlanningItemsParams {
+  kind: PlanningItemKind;
+  q: string;
+  teamId: string;
+  eventId: string;
+  status: string;
+  limit: 25 | 50;
+  offset: number;
+}
+
+export interface ReminderUpdateInput {
+  text: string;
+  date: string | null;
 }

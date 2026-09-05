@@ -9,9 +9,11 @@ import { PeoplePage } from './pages/PeoplePage/PeoplePage';
 import { PersonPage } from './pages/PersonPage/PersonPage';
 import { CatalogPage } from './pages/CatalogPage/CatalogPage';
 import { ReportPage } from './pages/ReportPage/ReportPage';
+import { PlanningPage } from './pages/PlanningPage/PlanningPage';
 
 export const routes: RouteObject[] = [
   { index: true, element: <WorkQueuePage /> },
+  { path: 'pianificazione', element: <PlanningPage /> },
   { path: 'richieste', element: <RequestsPage /> },
   { path: 'regole', element: <RulesPage /> },
   { path: 'eventi', element: <EventsPage /> },

@@ -192,6 +192,9 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	// Pannello storia: lettura di audit_log (#164, slice 5 del task 7):
 	// registrazione delegata al file dedicato.
 	h.registerAuditRoutes(mux, protect)
+
+	// Pianificazione operativa: letture aggregate e promemoria puntuali.
+	h.registerPlanningRoutes(mux, protect)
 }
 
 func (h *handler) requireStore(next http.Handler) http.Handler {

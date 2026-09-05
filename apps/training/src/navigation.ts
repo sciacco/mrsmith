@@ -14,6 +14,7 @@ export interface TrainingNavGroup {
 
 export const trainingNavGroups: TrainingNavGroup[] = [
   { label: 'Coda', items: [{ label: 'Coda', path: '/' }] },
+  { label: 'Pianificazione', items: [{ label: 'Pianificazione', path: '/pianificazione' }] },
   { label: 'Richieste', items: [{ label: 'Richieste', path: '/richieste' }] },
   { label: 'Regole', items: [{ label: 'Regole', path: '/regole' }] },
   { label: 'Eventi', items: [{ label: 'Eventi', path: '/eventi' }] },
