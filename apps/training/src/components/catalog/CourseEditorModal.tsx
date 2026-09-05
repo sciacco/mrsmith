@@ -124,7 +124,8 @@ export function CourseEditorModal({ mode, courseId, initial, open, onClose, onSa
 
   return (
     <Modal open={open} onClose={onClose} title={mode === 'create' ? 'Nuovo corso' : 'Modifica corso'} size="wide">
-      <div className={styles.body}>
+      <div className={`${styles.body} ${styles.bodyModal}`}>
+        <h4 className={styles.sectionTitle}>Informazioni corso</h4>
         <label className={styles.field}>
           <span className={styles.labelHead}>
             Titolo
@@ -246,13 +247,14 @@ export function CourseEditorModal({ mode, courseId, initial, open, onClose, onSa
           <span className={styles.hint}>Alla creazione di un evento diventano il valore di partenza dei suoi formatori.</span>
         </label>
 
+        <h4 className={styles.sectionTitle}>Pianificazione</h4>
         <div className={styles.row}>
           <label className={styles.field}>
-            Promemoria (in attesa di / prossimo passo)
-            <input className={styles.input} value={reminderText} onChange={(e) => setReminderText(e.target.value)} />
+            Promemoria
+            <input className={styles.input} value={reminderText} onChange={(e) => setReminderText(e.target.value)} placeholder="In attesa di / prossimo passo" />
           </label>
           <label className={styles.field}>
-            Data di richiamo
+            Data di richiamo (facoltativa)
             <input type="date" className={styles.input} value={reminderAt} onChange={(e) => setReminderAt(e.target.value)} />
           </label>
         </div>
@@ -262,6 +264,7 @@ export function CourseEditorModal({ mode, courseId, initial, open, onClose, onSa
           <textarea className={styles.textarea} value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
         </label>
 
+        <h4 className={styles.sectionTitle}>Visibilità e stato</h4>
         <div className={styles.row}>
           <label className={styles.field}>
             Visibilità (chi può scegliere il corso)
@@ -282,6 +285,7 @@ export function CourseEditorModal({ mode, courseId, initial, open, onClose, onSa
               placeholder="Riservato a People"
               allowClear
             />
+            <span className={styles.hint}>Riservata al futuro self-service. People vede tutti i corsi.</span>
           </label>
           {visibilityKind === 'team' && (
             <label className={styles.field}>

@@ -6,6 +6,7 @@ import { useCreateEvent, useTrainingEvents, useTrainingLookups } from '../../api
 import type { EventInput, EventListRow } from '../../api/types';
 import { EventConditionBadges } from '../../components/events/EventConditionBadges';
 import { EventFormModal } from '../../components/events/EventFormModal';
+import { ReminderBadge } from '../../components/reminders/ReminderBadge';
 import { describeApiError } from '../../components/events/apiErrors';
 import { formatInstantDate } from '../../components/events/eventFormat';
 import {
@@ -99,7 +100,7 @@ export function EventsPage() {
         <SearchInput
           value={filters.q}
           onChange={(q) => setFilters({ ...filters, q })}
-          placeholder="Cerca per corso o fornitore..."
+          placeholder="Cerca per titolo, corso o fornitore..."
         />
       </TableToolbar>
 
@@ -145,14 +146,17 @@ export function EventsPage() {
             <tbody>
               {filtered.map((row: EventListRow) => (
                 <tr key={row.id} className={styles.row} onClick={() => navigate(`/eventi/${row.id}`)}>
-                  <td>
-                    <Link
-                      to={`/eventi/${row.id}`}
-                      className={styles.rowLink}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {row.title}
-                    </Link>
+                  <td className={styles.wrapCell}>
+                    <span className={styles.inlineBadges}>
+                      <Link
+                        to={`/eventi/${row.id}`}
+                        className={styles.rowLink}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {row.title}
+                      </Link>
+                      <ReminderBadge text={row.reminderText} date={row.reminderAt} />
+                    </span>
                   </td>
                   <td>{row.courseTitle}</td>
                   <td>{row.vendorName || '—'}</td>

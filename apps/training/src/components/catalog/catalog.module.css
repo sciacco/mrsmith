@@ -22,3 +22,9 @@
   letter-spacing: -0.01em;
   color: var(--color-text);
 }
+
+/* Il titolo lungo dell'unico editor certificazioni può ridursi nel flex
+   header del Modal su 320px, senza intervenire sul componente condiviso. */
+.certificationModalTitle {
+  overflow-wrap: anywhere;
+}

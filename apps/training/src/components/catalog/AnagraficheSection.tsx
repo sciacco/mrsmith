@@ -27,6 +27,7 @@ import type {
   VendorInput,
   VendorListRow,
 } from '../../api/types';
+import { LEVEL_OPTIONS } from '../../lib/levels';
 import { describeApiError } from '../events/apiErrors';
 import { ErrorPanel } from '../events/ErrorPanel';
 import formStyles from '../requests/requestShared.module.css';
@@ -359,6 +360,12 @@ function CertificationEditorModal({
 
   async function submit() {
     if (code.trim() === '' || name.trim() === '') return;
+    // Un livello attestato richiede l'area: non inviamo senza area né azzeriamo
+    // silenziosamente il livello già scritto (il backend resta comunque autorevole).
+    if (attestedLevel !== '' && skillAreaId === '') {
+      setError('Indica l\'area di competenza per il livello attestato.');
+      return;
+    }
     setError(null);
     const input: CertificationInput = {
       code: code.trim(),
@@ -380,7 +387,11 @@ function CertificationEditorModal({
   }
 
   return (
-    <ModalShell title={certification ? 'Modifica certificazione' : 'Nuova certificazione'} onClose={onClose}>
+    <ModalShell
+      title={<span className={styles.certificationModalTitle}>{certification ? 'Modifica certificazione' : 'Nuova certificazione'}</span>}
+      onClose={onClose}
+      bodyModal
+    >
       <div className={formStyles.row}>
         <RequiredField label="Codice" value={code} onChange={setCode} />
         <RequiredField label="Nome" value={name} onChange={setName} />
@@ -397,18 +408,6 @@ function CertificationEditorModal({
           />
         </label>
         <label className={formStyles.field}>
-          Area di competenza
-          <SingleSelect
-            options={(skillAreas.data ?? []).map((a) => ({ value: a.id, label: a.name }))}
-            selected={skillAreaId || null}
-            onChange={(v) => setSkillAreaId(v ?? '')}
-            placeholder="Nessuna"
-            allowClear
-          />
-        </label>
-      </div>
-      <div className={formStyles.row}>
-        <label className={formStyles.field}>
           Validità tipica (mesi)
           <input
             type="number"
@@ -418,18 +417,29 @@ function CertificationEditorModal({
             onChange={(e) => setTypicalValidityMonths(e.target.value)}
           />
         </label>
-        <label className={formStyles.field}>
-          Livello attestato sull'area (0–5)
-          <input
-            type="number"
-            min={0}
-            max={5}
-            className={formStyles.input}
-            value={attestedLevel}
-            onChange={(e) => setAttestedLevel(e.target.value)}
-          />
-        </label>
       </div>
+      <label className={formStyles.field}>
+        Area di competenza
+        <SingleSelect
+          options={(skillAreas.data ?? []).map((a) => ({ value: a.id, label: a.name }))}
+          selected={skillAreaId || null}
+          onChange={(v) => setSkillAreaId(v ?? '')}
+          placeholder="Nessuna"
+          allowClear
+        />
+      </label>
+      <label className={formStyles.field}>
+        Livello attestato sull'area (0–5)
+        <SingleSelect<number>
+          options={LEVEL_OPTIONS}
+          selected={attestedLevel !== '' ? Number(attestedLevel) : null}
+          onChange={(v) => setAttestedLevel(v !== null ? String(v) : '')}
+          placeholder="Nessuno"
+          allowClear
+          clearLabel="Nessuno"
+        />
+        <span className={formStyles.hint}>Un esame superato su questa certificazione genera la valutazione dell'area scelta.</span>
+      </label>
       <label className={formStyles.field}>
         Descrizione
         <textarea className={formStyles.textarea} value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
@@ -579,10 +589,20 @@ function ModalActions({
   );
 }
 
-function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+function ModalShell({
+  title,
+  onClose,
+  children,
+  bodyModal = false,
+}: {
+  title: React.ReactNode;
+  onClose: () => void;
+  children: React.ReactNode;
+  bodyModal?: boolean;
+}) {
   return (
     <Modal open onClose={onClose} title={title} size="sm">
-      <div className={formStyles.body}>{children}</div>
+      <div className={bodyModal ? `${formStyles.body} ${formStyles.bodyModal}` : formStyles.body}>{children}</div>
     </Modal>
   );
 }

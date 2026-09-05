@@ -98,6 +98,20 @@
   white-space: nowrap;
 }
 
+/* #170.D — celle con testo lungo che devono andare a capo. */
+.table td.wrapCell {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* #170.D — badge/promemoria accanto al titolo con il giusto spazio. */
+.inlineBadges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
 .row {
   cursor: pointer;
   transition: background var(--duration-fast) var(--ease-out);

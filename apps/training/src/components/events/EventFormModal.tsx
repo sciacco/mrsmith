@@ -76,7 +76,7 @@ export function EventFormModal({
 
   return (
     <Modal open={open} onClose={onClose} title={mode === 'create' ? 'Nuovo evento' : 'Modifica evento'} size="md">
-      <div className={styles.body}>
+      <div className={`${formStyles.body} ${formStyles.bodyModal}`}>
         <label className={styles.field}>
           <span className={styles.labelHead}>
             Corso
@@ -122,11 +122,11 @@ export function EventFormModal({
         )}
         <div className={formStyles.row}>
           <label className={styles.field}>
-            Promemoria (in attesa di / prossimo passo)
-            <input className={formStyles.input} value={reminderText} onChange={(e) => setReminderText(e.target.value)} />
+            Promemoria
+            <input className={formStyles.input} value={reminderText} onChange={(e) => setReminderText(e.target.value)} placeholder="In attesa di / prossimo passo" />
           </label>
           <label className={styles.field}>
-            Data di richiamo
+            Data di richiamo (facoltativa)
             <input type="date" className={formStyles.input} value={reminderAt} onChange={(e) => setReminderAt(e.target.value)} />
           </label>
         </div>
@@ -145,7 +145,7 @@ export function EventFormModal({
           <textarea className={styles.textarea} value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
         </label>
         <ErrorPanel message={error ?? null} />
-        <div className={styles.actions}>
+        <div className={`${styles.actions} ${formStyles.actions}`}>
           <Button variant="ghost" size="md" onClick={onClose} disabled={pending}>
             Annulla
           </Button>

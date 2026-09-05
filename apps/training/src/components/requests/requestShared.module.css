@@ -89,3 +89,54 @@
   justify-content: flex-end;
   gap: var(--space-2);
 }
+
+/* #170.D — variante opt-in dei soli form in scope dentro un Modal condiviso
+   (packages/ui): il Modal fornisce già 32px di padding, quindi questo body
+   rimuove il doppio padding locale. Il Drawer usa drawerShared.module.css,
+   non questo foglio. Il form regole e gli altri editor di anagrafica
+   restano invariati. */
+.bodyModal {
+  padding: var(--space-5) 0 var(--space-6);
+}
+
+@media (max-width: 640px) {
+  .bodyModal {
+    padding: var(--space-4) 0 var(--space-5);
+  }
+  .bodyModal .row {
+    flex-direction: column;
+  }
+  .bodyModal .row > * {
+    flex: none;
+  }
+  .bodyModal .toggleGroup,
+  .bodyModal .actions {
+    flex-wrap: wrap;
+  }
+}
+
+/* Note e testi lunghi nelle celle/dettagli: preservano gli a capo e vanno a
+   capo invece di traboccare (usato dai dettagli richiesta/corso). */
+.preWrap {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Titolo di sezione sobrio per i form lunghi (corso, regole) — #170.D. Il
+   primo di un body non mostra la riga di separazione superiore. */
+.sectionTitle {
+  margin: var(--space-3) 0 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.bodyModal .sectionTitle:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}

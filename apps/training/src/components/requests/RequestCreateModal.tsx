@@ -6,6 +6,7 @@
 import { useMemo, useState } from 'react';
 import { Button, Modal, MultiSelect, SingleSelect, VisuallyHidden } from '@mrsmith/ui';
 import { useCreateRequest, useTrainingLookups, useTrainingPeople, useTrainingSkillAreas } from '../../api/queries';
+import { LEVEL_OPTIONS } from '../../lib/levels';
 import { describeApiError } from '../events/apiErrors';
 import { ErrorPanel } from '../events/ErrorPanel';
 import styles from './requestShared.module.css';
@@ -89,7 +90,7 @@ export function RequestCreateModal({ open, onClose, onCreated }: RequestCreateMo
 
   return (
     <Modal open={open} onClose={onClose} title="Registra richiesta" size="md">
-      <div className={styles.body}>
+      <div className={`${styles.body} ${styles.bodyModal}`}>
         <label className={styles.field}>
           <span className={styles.labelHead}>
             Persona
@@ -177,31 +178,37 @@ export function RequestCreateModal({ open, onClose, onCreated }: RequestCreateMo
         </label>
         {skillAreaIds.map((areaId) => {
           const area = (skillAreas.data ?? []).find((a) => a.id === areaId);
+          const areaName = area?.name ?? 'Area';
           const levels = areaLevels[areaId] ?? { current: '', target: '' };
           return (
-            <div className={styles.row} key={areaId}>
-              <label className={styles.field}>
-                {area?.name ?? 'Area'} — livello attuale (0–5)
-                <input
-                  type="number"
-                  min={0}
-                  max={5}
-                  className={styles.input}
-                  value={levels.current}
-                  onChange={(e) => setAreaLevels({ ...areaLevels, [areaId]: { ...levels, current: e.target.value } })}
-                />
-              </label>
-              <label className={styles.field}>
-                Livello atteso (0–5)
-                <input
-                  type="number"
-                  min={0}
-                  max={5}
-                  className={styles.input}
-                  value={levels.target}
-                  onChange={(e) => setAreaLevels({ ...areaLevels, [areaId]: { ...levels, target: e.target.value } })}
-                />
-              </label>
+            <div className={styles.field} key={areaId}>
+              <span className={styles.labelHead}>{areaName}</span>
+              <div className={styles.row}>
+                <label className={styles.field}>
+                  <span className={styles.labelHead}>Attuale</span>
+                  <SingleSelect<number>
+                    options={LEVEL_OPTIONS}
+                    selected={levels.current !== '' ? Number(levels.current) : null}
+                    onChange={(v) => setAreaLevels({ ...areaLevels, [areaId]: { ...levels, current: v !== null ? String(v) : '' } })}
+                    placeholder="Non indicato"
+                    allowClear
+                    clearLabel="Non indicato"
+                    ariaLabel={`${areaName} — livello attuale`}
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span className={styles.labelHead}>Atteso</span>
+                  <SingleSelect<number>
+                    options={LEVEL_OPTIONS}
+                    selected={levels.target !== '' ? Number(levels.target) : null}
+                    onChange={(v) => setAreaLevels({ ...areaLevels, [areaId]: { ...levels, target: v !== null ? String(v) : '' } })}
+                    placeholder="Non indicato"
+                    allowClear
+                    clearLabel="Non indicato"
+                    ariaLabel={`${areaName} — livello atteso`}
+                  />
+                </label>
+              </div>
             </div>
           );
         })}
@@ -215,6 +222,7 @@ export function RequestCreateModal({ open, onClose, onCreated }: RequestCreateMo
             value={priority}
             onChange={(e) => setPriority(e.target.value)}
           />
+          <span className={styles.hint}>Facoltativa: lascia vuoto se non è stata indicata.</span>
         </label>
 
         <label className={styles.field}>

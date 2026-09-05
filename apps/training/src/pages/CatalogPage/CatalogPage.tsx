@@ -13,6 +13,7 @@ import { CertificationDetailDrawer } from '../../components/catalog/Certificatio
 import { CertificationsSection } from '../../components/catalog/CertificationsSection';
 import { CourseDetailDrawer } from '../../components/catalog/CourseDetailDrawer';
 import { CourseEditorModal } from '../../components/catalog/CourseEditorModal';
+import { ReminderBadge } from '../../components/reminders/ReminderBadge';
 import { PathDetailDrawer } from '../../components/catalog/PathDetailDrawer';
 import { PathsCatalogSection } from '../../components/catalog/PathsCatalogSection';
 import { DELIVERY_MODE_LABELS, PROVIDER_KIND_LABELS } from '../../lib/labels';
@@ -238,17 +239,25 @@ export function CatalogPage() {
                 <tbody>
                   {filtered.map((row: CourseListRow) => (
                     <tr key={row.id} className={listStyles.row} onClick={() => openDetail(row.id)}>
-                      <td>
-                        <button
-                          type="button"
-                          className={listStyles.rowLink}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openDetail(row.id);
-                          }}
-                        >
-                          {row.title}
-                        </button>
+                      <td className={listStyles.wrapCell}>
+                        <span className={listStyles.inlineBadges}>
+                          <button
+                            type="button"
+                            className={listStyles.rowLink}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openDetail(row.id);
+                            }}
+                          >
+                            {row.title}
+                          </button>
+                          {row.suspendedAt && <StatusBadge value="suspended" label="Sospeso" variant="warning" />}
+                          <ReminderBadge
+                            text={row.reminderText}
+                            date={row.reminderAt}
+                            neutral={Boolean(row.suspendedAt)}
+                          />
+                        </span>
                       </td>
                       <td>{row.skillAreas.length > 0 ? row.skillAreas.map((a) => a.name).join(', ') : '—'}</td>
                       <td>{row.vendorName || PROVIDER_KIND_LABELS[row.providerKind] || '—'}</td>

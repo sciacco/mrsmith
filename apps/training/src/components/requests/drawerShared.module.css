@@ -67,3 +67,14 @@
   gap: var(--space-2);
   flex-wrap: wrap;
 }
+
+/* #170.D — item a tutta larghezza nella griglia del dettaglio e testi che
+   preservano gli a capo e vanno a capo invece di traboccare (note, promemoria). */
+.full {
+  grid-column: 1 / -1;
+}
+
+.preWrap {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

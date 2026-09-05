@@ -1,0 +1,15 @@
+/* Il testo resta separato dal badge data: StatusBadge non può andare a capo. */
+.reminder {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  min-width: 0;
+}
+
+.text {
+  min-width: 0;
+  color: var(--color-text);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

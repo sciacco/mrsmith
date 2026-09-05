@@ -10,7 +10,8 @@ import { useTrainingRequests } from '../../api/queries';
 import type { RequestListRow } from '../../api/types';
 import { RequestCreateModal } from '../../components/requests/RequestCreateModal';
 import { RequestDetailDrawer } from '../../components/requests/RequestDetailDrawer';
-import { formatDateOnly, formatInstantDate } from '../../components/events/eventFormat';
+import { formatInstantDate } from '../../components/events/eventFormat';
+import { ReminderBadge } from '../../components/reminders/ReminderBadge';
 import { outcomeVariant, tlOpinionVariant } from '../../components/requests/requestVariants';
 import { REQUEST_OUTCOME_LABELS, REQUEST_STATE_LABELS, TL_OPINION_LABELS } from '../../lib/labels';
 import styles from './listPage.module.css';
@@ -150,13 +151,22 @@ export function RequestsPage() {
                       {row.employeeName}
                     </button>
                   </td>
-                  <td>{row.courseTitle || '—'}</td>
+                  <td className={styles.wrapCell}>
+                    <span className={styles.inlineBadges}>
+                      {row.courseTitle || '—'}
+                      {row.suspendedAt && <StatusBadge value="suspended" label="Sospesa" variant="warning" />}
+                    </span>
+                  </td>
                   <td>{row.selectedTeamName}</td>
-                  <td>{row.priority ?? '—'}</td>
                   <td>
-                    {row.reminderText
-                      ? `${row.reminderText}${row.reminderAt ? ` · ${formatDateOnly(row.reminderAt)}` : ''}`
-                      : '—'}
+                    {row.priority != null ? (
+                      <StatusBadge value="priority" label={`P${row.priority}`} variant="neutral" />
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                  <td className={styles.wrapCell}>
+                    <ReminderBadge text={row.reminderText} date={row.reminderAt} fallback="—" neutral={Boolean(row.suspendedAt)} />
                   </td>
                   <td>
                     {row.tlOpinion ? (

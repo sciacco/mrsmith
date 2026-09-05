@@ -68,7 +68,7 @@ export function matchesEventFilters(row: EventListRow, state: EventFiltersState)
   if (state.courseId !== '' && row.courseId !== state.courseId) return false;
   const q = state.q.trim().toLowerCase();
   if (q === '') return true;
-  const haystack = `${row.courseTitle} ${row.vendorName ?? ''}`.toLowerCase();
+  const haystack = `${row.title} ${row.courseTitle} ${row.vendorName ?? ''}`.toLowerCase();
   return haystack.includes(q);
 }
 

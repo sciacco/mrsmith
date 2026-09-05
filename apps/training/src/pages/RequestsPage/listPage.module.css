@@ -104,6 +104,22 @@
   background: var(--color-accent-subtle);
 }
 
+/* #170.D — celle con testo lungo/note che devono andare a capo e non
+   traboccare, mantenendo lo scroll orizzontale della tabella. */
+.table td.wrapCell {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* #170.D — gruppi di badge/testi accanto al titolo (sospeso, promemoria)
+   con il giusto spazio tra loro e a capo quando non c'è spazio. */
+.inlineBadges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
 .rowLink {
   padding: 0;
   border: none;

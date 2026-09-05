@@ -39,6 +39,7 @@ import { describeApiError } from '../events/apiErrors';
 import { ErrorPanel } from '../events/ErrorPanel';
 import { formatDateOnly, formatInstantDate } from '../events/eventFormat';
 import { REQUEST_OUTCOME_LABELS, TL_OPINION_LABELS } from '../../lib/labels';
+import { LEVEL_OPTIONS } from '../../lib/levels';
 import { outcomeVariant, tlOpinionVariant } from './requestVariants';
 import formStyles from './requestShared.module.css';
 import styles from './drawerShared.module.css';
@@ -222,23 +223,24 @@ export function RequestDetailDrawer({ id, onClose }: RequestDetailDrawerProps) {
                     <dt>Priorità</dt>
                     <dd>{request.priority ?? '—'}</dd>
                   </div>
-                  <div className={styles.item}>
+                  <div className={`${styles.item} ${styles.full}`}>
                     <dt>Promemoria</dt>
-                    <dd>
+                    <dd className={styles.preWrap}>
                       {request.reminderText
                         ? `${request.reminderText}${request.reminderAt ? ` · richiamo ${formatDateOnly(request.reminderAt)}` : ''}`
                         : '—'}
                     </dd>
                   </div>
-                  <div className={styles.item}>
+                  <div className={`${styles.item} ${styles.full}`}>
                     <dt>Nota</dt>
-                    <dd>{request.notes || '—'}</dd>
+                    <dd className={styles.preWrap}>{request.notes || '—'}</dd>
                   </div>
                   {isSuspended && (
-                    <div className={styles.item}>
+                    <div className={`${styles.item} ${styles.full}`}>
                       <dt>Sospesa</dt>
                       <dd>
-                        {formatInstantDate(request.suspendedAt)}
+                        <StatusBadge value="suspended" label="Sospesa" variant="warning" />
+                        {` ${formatInstantDate(request.suspendedAt)}`}
                         {request.suspendedByName ? ` · ${request.suspendedByName}` : ''}
                         {request.suspensionReason ? ` · ${request.suspensionReason}` : ''}
                       </dd>
@@ -360,7 +362,7 @@ export function RequestDetailDrawer({ id, onClose }: RequestDetailDrawerProps) {
       {request && showOriginal && <OriginalDataForm request={request} onClose={() => setShowOriginal(false)} />}
       {showSuspend && (
         <Modal open onClose={() => setShowSuspend(false)} title="Sospendi richiesta" size="sm">
-          <div className={formStyles.body}>
+          <div className={`${formStyles.body} ${formStyles.bodyModal}`}>
             <p>L'esigenza resta aperta ma esce dalle viste operative finché non viene riattivata.</p>
             <label className={formStyles.field}>
               Motivo (facoltativo)
@@ -442,7 +444,7 @@ function AnnotationsForm({ request, onClose }: { request: RequestDetail; onClose
 
   return (
     <Modal open onClose={onClose} title="Annotazioni di pianificazione" size="sm">
-      <div className={formStyles.body}>
+      <div className={`${formStyles.body} ${formStyles.bodyModal}`}>
         <label className={formStyles.field}>
           Priorità (1 = più importante)
           <input
@@ -1025,7 +1027,7 @@ function OriginalDataForm({ request, onClose }: { request: RequestDetail; onClos
 
   return (
     <Modal open onClose={onClose} title="Modifica richiesta originale" size="md">
-      <div className={formStyles.body}>
+      <div className={`${formStyles.body} ${formStyles.bodyModal}`}>
         <label className={formStyles.field}>
           Persona
           <input className={formStyles.input} value={requested.employeeName} disabled readOnly />
@@ -1100,31 +1102,37 @@ function OriginalDataForm({ request, onClose }: { request: RequestDetail; onClos
         </label>
         {skillAreaIds.map((areaId) => {
           const area = (skillAreas.data ?? []).find((a) => a.id === areaId);
+          const areaName = area?.name ?? 'Area';
           const levels = areaLevels[areaId] ?? { current: '', target: '' };
           return (
-            <div className={formStyles.row} key={areaId}>
-              <label className={formStyles.field}>
-                {area?.name ?? 'Area'} — livello attuale (0–5)
-                <input
-                  type="number"
-                  min={0}
-                  max={5}
-                  className={formStyles.input}
-                  value={levels.current}
-                  onChange={(e) => setAreaLevels({ ...areaLevels, [areaId]: { ...levels, current: e.target.value } })}
-                />
-              </label>
-              <label className={formStyles.field}>
-                Livello atteso (0–5)
-                <input
-                  type="number"
-                  min={0}
-                  max={5}
-                  className={formStyles.input}
-                  value={levels.target}
-                  onChange={(e) => setAreaLevels({ ...areaLevels, [areaId]: { ...levels, target: e.target.value } })}
-                />
-              </label>
+            <div className={formStyles.field} key={areaId}>
+              <span className={formStyles.labelHead}>{areaName}</span>
+              <div className={formStyles.row}>
+                <label className={formStyles.field}>
+                  <span className={formStyles.labelHead}>Attuale</span>
+                  <SingleSelect<number>
+                    options={LEVEL_OPTIONS}
+                    selected={levels.current !== '' ? Number(levels.current) : null}
+                    onChange={(v) => setAreaLevels({ ...areaLevels, [areaId]: { ...levels, current: v !== null ? String(v) : '' } })}
+                    placeholder="Non indicato"
+                    allowClear
+                    clearLabel="Non indicato"
+                    ariaLabel={`${areaName} — livello attuale`}
+                  />
+                </label>
+                <label className={formStyles.field}>
+                  <span className={formStyles.labelHead}>Atteso</span>
+                  <SingleSelect<number>
+                    options={LEVEL_OPTIONS}
+                    selected={levels.target !== '' ? Number(levels.target) : null}
+                    onChange={(v) => setAreaLevels({ ...areaLevels, [areaId]: { ...levels, target: v !== null ? String(v) : '' } })}
+                    placeholder="Non indicato"
+                    allowClear
+                    clearLabel="Non indicato"
+                    ariaLabel={`${areaName} — livello atteso`}
+                  />
+                </label>
+              </div>
             </div>
           );
         })}

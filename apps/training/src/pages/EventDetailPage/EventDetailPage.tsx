@@ -9,7 +9,7 @@ import { describeApiError } from '../../components/events/apiErrors';
 import { ErrorPanel } from '../../components/events/ErrorPanel';
 import { EventConditionBadges } from '../../components/events/EventConditionBadges';
 import { EventFormModal } from '../../components/events/EventFormModal';
-import { formatInstantDate } from '../../components/events/eventFormat';
+import { formatDateOnly, formatInstantDate } from '../../components/events/eventFormat';
 import { ReasonDialog } from '../../components/events/ReasonDialog';
 import { EVENT_ORIGIN_LABELS } from '../../lib/labels';
 import { EnrollmentsSection } from './EnrollmentsSection';
@@ -172,13 +172,13 @@ export function EventDetailPage() {
             <dt>Promemoria</dt>
             <dd>
               {event.reminderText
-                ? `${event.reminderText}${event.reminderAt ? ` · richiamo ${formatInstantDate(event.reminderAt)}` : ''}`
+                ? `${event.reminderText}${event.reminderAt ? ` · richiamo ${formatDateOnly(event.reminderAt)}` : ''}`
                 : '—'}
             </dd>
           </div>
           <div className={styles.detailItem}>
             <dt>Note</dt>
-            <dd>{event.notes || '—'}</dd>
+            <dd className={styles.preWrap}>{event.notes || '—'}</dd>
           </div>
         </dl>
         {event.flags.cancelled && (
