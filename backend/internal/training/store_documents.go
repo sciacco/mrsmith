@@ -22,7 +22,10 @@ func (s *SQLStore) CreateAward(ctx context.Context, principal Principal, input A
 				return err
 			}
 		}
-		if strings.TrimSpace(input.CertificationID) == "" || strings.TrimSpace(input.Outcome) == "" || strings.TrimSpace(input.AwardedOn) == "" {
+		certID := strings.TrimSpace(input.CertificationID)
+		outcome := strings.TrimSpace(input.Outcome)
+		awardedOn := strings.TrimSpace(input.AwardedOn)
+		if certID == "" || outcome == "" || awardedOn == "" {
 			return validationError("missing_required_fields", "certificazione, esito e data sono obbligatori")
 		}
 		if strings.TrimSpace(input.EnrollmentID) != "" {
@@ -34,9 +37,33 @@ func (s *SQLStore) CreateAward(ctx context.Context, principal Principal, input A
 				return validationError("enrollment_employee_mismatch", "iscrizione e certificazione devono riferirsi alla stessa persona")
 			}
 		}
-		if !validAwardOutcome(input.Outcome) {
+		if !validAwardOutcome(outcome) {
 			return validationError("invalid_outcome", "esito non valido")
 		}
+
+		var (
+			skillAreaID   sql.NullString
+			attestedLevel sql.NullInt16
+		)
+		err := tx.QueryRowContext(ctx, `
+SELECT skill_area_id::text, attested_level
+FROM training.certification
+WHERE id = $1::uuid`, certID).Scan(&skillAreaID, &attestedLevel)
+		if errors.Is(err, sql.ErrNoRows) {
+			return validationError("certification_not_found", "certificazione non trovata")
+		}
+		if err != nil {
+			return fmt.Errorf("load training certification: %w", err)
+		}
+		if attestedLevel.Valid {
+			if !skillAreaID.Valid || strings.TrimSpace(skillAreaID.String) == "" {
+				return validationError("attested_level_requires_area", "il livello attestato richiede l'area della certificazione")
+			}
+			if attestedLevel.Int16 < 0 || attestedLevel.Int16 > 5 {
+				return validationError("invalid_level", "livello non valido: 0-5")
+			}
+		}
+
 		source := strings.TrimSpace(input.ValidationSource)
 		if source == "" {
 			source = "document_verified"
@@ -69,10 +96,10 @@ INSERT INTO training.certification_award (
 			ctx,
 			stmt,
 			employeeID,
-			input.CertificationID,
+			certID,
 			nullableUUID(input.EnrollmentID),
-			input.Outcome,
-			input.AwardedOn,
+			outcome,
+			awardedOn,
 			strings.TrimSpace(input.ExpiresOn),
 			source,
 			input.ExternalCredentialID,
@@ -87,6 +114,36 @@ INSERT INTO training.certification_award (
 		}
 		if err := s.audit(ctx, tx, principal, "certification_award", response.ID, "create", nil, after); err != nil {
 			return err
+		}
+
+		if outcome == "passed_exam" && attestedLevel.Valid {
+			var assessmentID string
+			const assessmentStmt = `
+INSERT INTO training.skill_assessment (employee_id, skill_area_id, level, assessed_on, source, notes)
+VALUES ($1::uuid, $2::uuid, $3, $4::date, $5::training.validation_source, NULLIF($6, ''))
+RETURNING id::text`
+			if err := tx.QueryRowContext(
+				ctx,
+				assessmentStmt,
+				employeeID,
+				skillAreaID.String,
+				attestedLevel.Int16,
+				awardedOn,
+				"document_verified",
+				"",
+			).Scan(&assessmentID); err != nil {
+				if isUniqueViolation(err, "") {
+					return conflictError("assessment_duplicate", "esiste gia una valutazione per questa persona, area e data")
+				}
+				return fmt.Errorf("create training skill assessment: %w", err)
+			}
+			assessmentAfter, err := entitySnapshot(ctx, tx, "skill_assessment", assessmentID)
+			if err != nil {
+				return err
+			}
+			if err := s.audit(ctx, tx, principal, "skill_assessment", assessmentID, "create", nil, assessmentAfter); err != nil {
+				return err
+			}
 		}
 		response.OK = true
 		return nil
