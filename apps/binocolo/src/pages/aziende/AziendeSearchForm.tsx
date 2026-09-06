@@ -1,7 +1,16 @@
-import { Button, Icon, MoneyInput, MultiSelect, ToggleSwitch } from '@mrsmith/ui';
+import { Button, Icon, MoneyInput, MultiSelect, SingleSelect, ToggleSwitch } from '@mrsmith/ui';
 import { useState } from 'react';
 import type { MACompanySearchAreas } from '../../api/types';
 import styles from './AziendePage.module.css';
+
+export type CompanySearchNDA = '' | 'any' | 'active' | 'expired_only' | 'none';
+
+const NDA_OPTIONS: { value: CompanySearchNDA; label: string }[] = [
+  { value: 'any', label: 'Con NDA registrato' },
+  { value: 'active', label: 'Con NDA non scaduto' },
+  { value: 'expired_only', label: 'Solo NDA scaduti' },
+  { value: 'none', label: 'Senza NDA registrato' },
+];
 
 export interface CompanySearchDraft {
   name: string;
@@ -16,10 +25,11 @@ export interface CompanySearchDraft {
   employeesMax: string;
   turnoverMissing: boolean;
   employeesMissing: boolean;
+  nda: CompanySearchNDA;
 }
 
 export function emptyCompanySearch(): CompanySearchDraft {
-  return { name: '', vat: '', tax: '', annotation: '', include: [], exclude: [], turnoverMin: '', turnoverMax: '', employeesMin: '', employeesMax: '', turnoverMissing: false, employeesMissing: false };
+  return { name: '', vat: '', tax: '', annotation: '', include: [], exclude: [], turnoverMin: '', turnoverMax: '', employeesMin: '', employeesMax: '', turnoverMissing: false, employeesMissing: false, nda: '' };
 }
 
 export function companySearchParams(draft: CompanySearchDraft): string {
@@ -141,6 +151,11 @@ export function AziendeSearchForm({ draft, onChange, onSearch, onReset, areas, a
       <div className={styles.field}>
         <label htmlFor="company-annotation">Testo nelle annotazioni</label>
         <input id="company-annotation" value={draft.annotation} maxLength={500} onChange={(event) => set('annotation', event.target.value)} placeholder="Es. passaggio generazionale" />
+      </div>
+      <div className={styles.field}>
+        <span className={styles.fieldLabel}>NDA</span>
+        <SingleSelect options={NDA_OPTIONS} selected={draft.nda || null} onChange={(value) => set('nda', value ?? '')} placeholder="Qualsiasi" allowClear clearLabel="Qualsiasi" searchable={false} ariaLabel="NDA" />
+        <p className={styles.hint}>Si basa sugli accordi registrati nella scheda azienda, non sulla fase delle card.</p>
       </div>
       <div className={styles.formActions}>
         <Button type="button" onClick={validateAndSearch} leftIcon={<Icon name="search" size={16} />}>Cerca</Button>

@@ -27,27 +27,28 @@ import (
 )
 
 var (
-	errMAStoreUnavailable       = errors.New("ma store unavailable")
-	errMAOpenAPIITUnavailable   = errors.New("openapiit unavailable")
-	errMAOpenRouterUnavailable  = errors.New("openrouter unavailable")
-	errMABraveUnavailable       = errors.New("brave unavailable")
-	errMALLMConfigUnavailable   = errors.New("ma llm config unavailable")
-	errMAEstimateTooLarge       = errors.New("estimate too large")
-	errMAEstimateOverBudget     = errors.New("estimate over budget")
-	errMAVisibilityInvalid      = errors.New("ma session visibility invalid")
-	errMASessionArchived        = errors.New("ma session archived")
-	errMASessionDeleted         = errors.New("ma session deleted")
-	errMAInitiativeArchived     = errors.New("ma initiative archived")
-	errMAInitiativeDeleted      = errors.New("ma initiative deleted")
-	errMAInitiativePurged       = errors.New("ma initiative purged")
-	errMAInitiativeNotFound     = errors.New("ma initiative not found")
-	errMATargetAlreadyPresent   = errors.New("Azienda già presente nella ricerca")
-	errMAManualAddInFlight      = errors.New("Inserimento manuale già in corso per questa ricerca")
-	errMAVATNotFound            = errors.New("P.IVA non trovata nel registro")
-	errMAInvalidVAT             = errors.New("P.IVA o codice fiscale non valido")
-	errMACardAlreadyPresent     = errors.New("Azienda già presente in questa iniziativa")
-	errMAAnnotationNotFound     = errors.New("ma annotation not found")
-	errMACompanyContactNotFound = errors.New("ma company contact not found")
+	errMAStoreUnavailable         = errors.New("ma store unavailable")
+	errMAOpenAPIITUnavailable     = errors.New("openapiit unavailable")
+	errMAOpenRouterUnavailable    = errors.New("openrouter unavailable")
+	errMABraveUnavailable         = errors.New("brave unavailable")
+	errMALLMConfigUnavailable     = errors.New("ma llm config unavailable")
+	errMAEstimateTooLarge         = errors.New("estimate too large")
+	errMAEstimateOverBudget       = errors.New("estimate over budget")
+	errMAVisibilityInvalid        = errors.New("ma session visibility invalid")
+	errMASessionArchived          = errors.New("ma session archived")
+	errMASessionDeleted           = errors.New("ma session deleted")
+	errMAInitiativeArchived       = errors.New("ma initiative archived")
+	errMAInitiativeDeleted        = errors.New("ma initiative deleted")
+	errMAInitiativePurged         = errors.New("ma initiative purged")
+	errMAInitiativeNotFound       = errors.New("ma initiative not found")
+	errMATargetAlreadyPresent     = errors.New("Azienda già presente nella ricerca")
+	errMAManualAddInFlight        = errors.New("Inserimento manuale già in corso per questa ricerca")
+	errMAVATNotFound              = errors.New("P.IVA non trovata nel registro")
+	errMAInvalidVAT               = errors.New("P.IVA o codice fiscale non valido")
+	errMACardAlreadyPresent       = errors.New("Azienda già presente in questa iniziativa")
+	errMAAnnotationNotFound       = errors.New("ma annotation not found")
+	errMACompanyContactNotFound   = errors.New("ma company contact not found")
+	errMACompanyAgreementNotFound = errors.New("ma company agreement not found")
 	// errMAEstimateSuperseded is returned by ReplaceMAEstimates when the active
 	// strategy version changed mid-estimate (the user re-submitted). The estimate
 	// worker loops on it to re-run against the now-active version, so the latest
@@ -929,6 +930,179 @@ func (s *maService) deleteCompanyContact(ctx context.Context, companyKey, contac
 		return err
 	}
 	return s.store.SoftDeleteMACompanyContact(ctx, companyKey, contactID, subject, email)
+}
+
+func (s *maService) listCompanyAgreements(ctx context.Context, companyKey string) ([]MACompanyAgreement, error) {
+	if s.store == nil {
+		return nil, errMAStoreUnavailable
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey == "" {
+		return nil, fmt.Errorf("%w: companyKey", errMAStrategyInvalid)
+	}
+	if err := s.requireKnownMACompany(ctx, companyKey); err != nil {
+		return nil, err
+	}
+	return s.store.ListMACompanyAgreements(ctx, companyKey)
+}
+
+func (s *maService) createCompanyAgreement(ctx context.Context, companyKey string, input MACompanyAgreementWrite, subject, email string) (MACompanyAgreement, error) {
+	if s.store == nil {
+		return MACompanyAgreement{}, errMAStoreUnavailable
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey == "" {
+		return MACompanyAgreement{}, fmt.Errorf("%w: companyKey", errMAStrategyInvalid)
+	}
+	clean, err := validateMACompanyAgreement(input)
+	if err != nil {
+		return MACompanyAgreement{}, err
+	}
+	if err := s.requireKnownMACompany(ctx, companyKey); err != nil {
+		return MACompanyAgreement{}, err
+	}
+	agreement, err := s.store.CreateMACompanyAgreement(ctx, companyKey, clean, subject, email)
+	if err != nil {
+		return MACompanyAgreement{}, err
+	}
+	payload := map[string]any{
+		"action":      "created",
+		"agreementId": agreement.ID,
+		"kind":        agreement.Kind,
+		"signedOn":    agreement.SignedOn,
+		"expiresOn":   maAgreementExpiresOnJSON(agreement.ExpiresOn),
+	}
+	if err := s.store.InsertMATargetOutcome(ctx, MATargetOutcome{
+		ID: uuid.NewString(), CompanyKey: companyKey, Event: maEventAccordo,
+		Payload:          maTraceJSON(payload),
+		CreatedBySubject: subject, CreatedByEmail: email, CreatedAt: s.now(),
+	}); err != nil {
+		return MACompanyAgreement{}, err
+	}
+	return agreement, nil
+}
+
+func (s *maService) updateCompanyAgreement(ctx context.Context, companyKey, agreementID string, input MACompanyAgreementReplaceRequest, subject, email string) (MACompanyAgreement, error) {
+	if s.store == nil {
+		return MACompanyAgreement{}, errMAStoreUnavailable
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey == "" {
+		return MACompanyAgreement{}, fmt.Errorf("%w: companyKey", errMAStrategyInvalid)
+	}
+	agreementID = strings.TrimSpace(agreementID)
+	if _, err := uuid.Parse(agreementID); err != nil {
+		return MACompanyAgreement{}, errMACompanyAgreementNotFound
+	}
+	if input.Kind == nil || input.SignedOn == nil || input.ExpiresOn == nil {
+		return MACompanyAgreement{}, fmt.Errorf("%w: PUT requires all agreement fields", errMAStrategyInvalid)
+	}
+	clean, err := validateMACompanyAgreement(MACompanyAgreementWrite{Kind: *input.Kind, SignedOn: *input.SignedOn, ExpiresOn: *input.ExpiresOn})
+	if err != nil {
+		return MACompanyAgreement{}, err
+	}
+	if err := s.requireKnownMACompany(ctx, companyKey); err != nil {
+		return MACompanyAgreement{}, err
+	}
+	updated, previous, err := s.store.UpdateMACompanyAgreement(ctx, companyKey, agreementID, clean, subject, email)
+	if err != nil {
+		return MACompanyAgreement{}, err
+	}
+	var changes []map[string]any
+	if previous.Kind != updated.Kind {
+		changes = append(changes, map[string]any{"field": "kind", "from": previous.Kind, "to": updated.Kind})
+	}
+	if previous.SignedOn != updated.SignedOn {
+		changes = append(changes, map[string]any{"field": "signedOn", "from": previous.SignedOn, "to": updated.SignedOn})
+	}
+	if previous.ExpiresOn != updated.ExpiresOn {
+		changes = append(changes, map[string]any{"field": "expiresOn", "from": maAgreementExpiresOnJSON(previous.ExpiresOn), "to": maAgreementExpiresOnJSON(updated.ExpiresOn)})
+	}
+	if len(changes) == 0 {
+		return updated, nil
+	}
+	payload := map[string]any{
+		"action":      "updated",
+		"agreementId": updated.ID,
+		"kind":        updated.Kind,
+		"signedOn":    updated.SignedOn,
+		"expiresOn":   maAgreementExpiresOnJSON(updated.ExpiresOn),
+		"changes":     changes,
+	}
+	if err := s.store.InsertMATargetOutcome(ctx, MATargetOutcome{
+		ID: uuid.NewString(), CompanyKey: companyKey, Event: maEventAccordo,
+		Payload:          maTraceJSON(payload),
+		CreatedBySubject: subject, CreatedByEmail: email, CreatedAt: s.now(),
+	}); err != nil {
+		return MACompanyAgreement{}, err
+	}
+	return updated, nil
+}
+
+func (s *maService) deleteCompanyAgreement(ctx context.Context, companyKey, agreementID, subject, email string) error {
+	if s.store == nil {
+		return errMAStoreUnavailable
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey == "" {
+		return fmt.Errorf("%w: companyKey", errMAStrategyInvalid)
+	}
+	agreementID = strings.TrimSpace(agreementID)
+	if _, err := uuid.Parse(agreementID); err != nil {
+		return errMACompanyAgreementNotFound
+	}
+	if err := s.requireKnownMACompany(ctx, companyKey); err != nil {
+		return err
+	}
+	agreement, err := s.store.SoftDeleteMACompanyAgreement(ctx, companyKey, agreementID, subject, email)
+	if err != nil {
+		return err
+	}
+	payload := map[string]any{
+		"action":      "removed",
+		"agreementId": agreement.ID,
+		"kind":        agreement.Kind,
+		"signedOn":    agreement.SignedOn,
+		"expiresOn":   maAgreementExpiresOnJSON(agreement.ExpiresOn),
+	}
+	return s.store.InsertMATargetOutcome(ctx, MATargetOutcome{
+		ID: uuid.NewString(), CompanyKey: companyKey, Event: maEventAccordo,
+		Payload:          maTraceJSON(payload),
+		CreatedBySubject: subject, CreatedByEmail: email, CreatedAt: s.now(),
+	})
+}
+
+// maAgreementExpiresOnJSON restituisce la scadenza opzionale per il payload
+// di diario: nil (JSON null) se manca la scadenza, altrimenti la stringa
+// YYYY-MM-DD.
+func maAgreementExpiresOnJSON(expiresOn string) any {
+	if expiresOn == "" {
+		return nil
+	}
+	return expiresOn
+}
+
+// validateMACompanyAgreement normalizza e valida un accordo azienda (migrazione
+// 146): kind nel vocabolario chiuso, signedOn obbligatoria, expiresOn
+// facoltativa ma non precedente a signedOn.
+func validateMACompanyAgreement(input MACompanyAgreementWrite) (MACompanyAgreementWrite, error) {
+	input.Kind = strings.TrimSpace(input.Kind)
+	input.SignedOn = strings.TrimSpace(input.SignedOn)
+	input.ExpiresOn = strings.TrimSpace(input.ExpiresOn)
+	if input.Kind != maAgreementKindNDA {
+		return input, fmt.Errorf("%w: kind", errMAStrategyInvalid)
+	}
+	signedOn, err := time.Parse("2006-01-02", input.SignedOn)
+	if err != nil {
+		return input, fmt.Errorf("%w: signedOn", errMAStrategyInvalid)
+	}
+	if input.ExpiresOn != "" {
+		expiresOn, err := time.Parse("2006-01-02", input.ExpiresOn)
+		if err != nil || expiresOn.Before(signedOn) {
+			return input, fmt.Errorf("%w: expiresOn", errMAStrategyInvalid)
+		}
+	}
+	return input, nil
 }
 
 func (s *maService) listCompanyActivity(ctx context.Context, companyKey string, includeDeleted bool) (MACompanyActivity, error) {

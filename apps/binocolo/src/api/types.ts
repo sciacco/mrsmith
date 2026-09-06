@@ -509,6 +509,26 @@ export interface MACompanyContactWrite {
   isPrimary: boolean;
 }
 
+// Agreements signed with the company (NDA only today). Dates are civil
+// dates (YYYY-MM-DD): absent expiresOn = no expiry.
+export interface MACompanyAgreement {
+  id: string;
+  companyKey: string;
+  kind: 'nda';
+  signedOn: string;
+  expiresOn?: string;
+  createdAt: string;
+  createdByEmail?: string;
+  updatedAt?: string;
+  updatedByEmail?: string;
+}
+
+export interface MACompanyAgreementWrite {
+  kind: 'nda';
+  signedOn: string;
+  expiresOn: string;
+}
+
 // Google Drive documents (issue #98). Drive is the source of truth; the
 // backend lists the company folder's direct children, already sorted
 // (folders first, then by name) and with trashed children filtered out.

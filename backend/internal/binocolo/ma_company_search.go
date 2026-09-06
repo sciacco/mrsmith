@@ -78,6 +78,7 @@ type maCompanySearchOptions struct {
 	VAT              string   `json:"vat"`
 	Tax              string   `json:"tax"`
 	Annotation       string   `json:"annotation"`
+	NDA              string   `json:"nda"`
 	Include          []string `json:"include"`
 	Exclude          []string `json:"exclude"`
 	TurnoverMin      *float64 `json:"turnoverMin"`
@@ -128,6 +129,12 @@ func parseMACompanySearch(values url.Values) (maCompanySearchOptions, error) {
 		}
 		if o.Tax != "" && !((len(o.Tax) == 11 && isMACompanySearchDigits(o.Tax)) || (len(o.Tax) == 16 && isMACompanySearchAlphanumeric(o.Tax))) {
 			return invalid("tax")
+		}
+		o.NDA = strings.TrimSpace(values.Get("nda"))
+		switch o.NDA {
+		case "", "any", "active", "expired_only", "none":
+		default:
+			return invalid("nda")
 		}
 		for key, dest := range map[string]*[]string{"include": &o.Include, "exclude": &o.Exclude} {
 			for _, value := range values[key] {
@@ -345,6 +352,32 @@ const maCompanySearchFilterSQL = `,
    WHERE k.stable_key = c.stable_key AND note.event = 'nota' AND note.deleted_at IS NULL
     AND note.note ILIKE ('%' || (f->>'annotation') || '%') ESCAPE '\'
   ))
+  AND (f->>'nda' = '' OR (
+   -- expires_on inclusivo: un accordo è ancora attivo se scade oggi o non scade mai.
+   CASE f->>'nda'
+    WHEN 'any' THEN EXISTS (
+     SELECT 1 FROM binocolo.ma_company_agreement a JOIN company_keys k ON k.company_key = upper(btrim(a.company_key))
+     WHERE k.stable_key = c.stable_key AND a.kind = 'nda' AND a.deleted_at IS NULL
+    )
+    WHEN 'active' THEN EXISTS (
+     SELECT 1 FROM binocolo.ma_company_agreement a JOIN company_keys k ON k.company_key = upper(btrim(a.company_key))
+     WHERE k.stable_key = c.stable_key AND a.kind = 'nda' AND a.deleted_at IS NULL
+      AND (a.expires_on IS NULL OR a.expires_on >= current_date)
+    )
+    WHEN 'expired_only' THEN EXISTS (
+     SELECT 1 FROM binocolo.ma_company_agreement a JOIN company_keys k ON k.company_key = upper(btrim(a.company_key))
+     WHERE k.stable_key = c.stable_key AND a.kind = 'nda' AND a.deleted_at IS NULL
+    ) AND NOT EXISTS (
+     SELECT 1 FROM binocolo.ma_company_agreement a JOIN company_keys k ON k.company_key = upper(btrim(a.company_key))
+     WHERE k.stable_key = c.stable_key AND a.kind = 'nda' AND a.deleted_at IS NULL
+      AND (a.expires_on IS NULL OR a.expires_on >= current_date)
+    )
+    WHEN 'none' THEN NOT EXISTS (
+     SELECT 1 FROM binocolo.ma_company_agreement a JOIN company_keys k ON k.company_key = upper(btrim(a.company_key))
+     WHERE k.stable_key = c.stable_key AND a.kind = 'nda' AND a.deleted_at IS NULL
+    )
+    ELSE false
+   END))
   AND (jsonb_array_length(f->'include') = 0 OR EXISTS (
    SELECT 1 FROM jsonb_array_elements_text(f->'include') area WHERE area IN ('region:' || lower(c.region), 'province:' || c.province)
   ))

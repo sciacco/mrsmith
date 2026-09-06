@@ -1,5 +1,24 @@
+import { formatLocalDate } from '@mrsmith/format';
 import type { MATargetOutcome } from '../../../api/types';
 import { esitoLabel, stateLabel } from '../../../lib/cardStates';
+
+const AGREEMENT_KIND_LABELS: Record<string, string> = { nda: 'NDA' };
+const AGREEMENT_FIELD_LABELS: Record<string, string> = { kind: 'Tipo', signedOn: 'Sottoscrizione', expiresOn: 'Scadenza' };
+
+const dateLabel = (value?: string | null) => formatLocalDate(value) ?? '';
+
+function agreementKindLabel(kind: unknown): string {
+  return typeof kind === 'string' ? AGREEMENT_KIND_LABELS[kind] ?? kind : 'Accordo';
+}
+
+function agreementFieldValueLabel(field: unknown, value: unknown): string {
+  if (field === 'kind') return agreementKindLabel(value);
+  if (value === null || value === undefined) return field === 'expiresOn' ? 'Senza scadenza' : '—';
+  if (typeof value !== 'string') return '—';
+  const formatted = formatLocalDate(value);
+  if (formatted) return formatted;
+  return value !== '' ? value : '—';
+}
 
 /** Human label for persisted activity payloads. Historical payload keys are
  * resolved at presentation time and are never rewritten. */
@@ -34,6 +53,36 @@ export function eventLabel(event: MATargetOutcome, sessionMap: Map<string, strin
     case 'contattato': return event.note ? `Contattata — ${event.note}` : 'Contattata';
     case 'buon_lead': return event.note ? `Buon lead — ${event.note}` : 'Buon lead';
     case 'no_go': return event.note ? `No-go — ${event.note}` : 'No-go';
+    case 'accordo': {
+      const action = payload && typeof payload.action === 'string' ? payload.action : '';
+      const kind = agreementKindLabel(payload?.kind);
+      const signedOn = payload && typeof payload.signedOn === 'string' ? dateLabel(payload.signedOn) : '';
+      const signedOnFragment = signedOn ? ` il ${signedOn}` : '';
+      if (action === 'created') {
+        const expiresOn = payload?.expiresOn;
+        const expiryText = expiresOn && typeof expiresOn === 'string' ? `scade il ${dateLabel(expiresOn)}` : 'senza scadenza';
+        return `${kind} sottoscritto${signedOnFragment} · ${expiryText}`;
+      }
+      if (action === 'updated') {
+        const changes = Array.isArray(payload?.changes) ? payload.changes : [];
+        const validChanges = changes.filter((change) => {
+          const raw = (change && typeof change === 'object' ? change : {}) as Record<string, unknown>;
+          return typeof raw.field === 'string' && raw.field !== '';
+        });
+        if (validChanges.length === 0) return `${kind} modificato`;
+        const parts = validChanges.map((change) => {
+          const raw = change as Record<string, unknown>;
+          const field = raw.field as string;
+          const label = AGREEMENT_FIELD_LABELS[field] ?? field;
+          const from = agreementFieldValueLabel(field, raw.from);
+          const to = agreementFieldValueLabel(field, raw.to);
+          return `${label}: ${from} → ${to}`;
+        });
+        return `${kind} modificato — ${parts.join(' · ')}`;
+      }
+      if (action === 'removed') return signedOn ? `${kind} rimosso (sottoscritto il ${signedOn})` : `${kind} rimosso`;
+      return 'Accordo';
+    }
     case 'nota': return event.note ?? 'Annotazione';
     default: return event.note ? `${event.event} — ${event.note}` : event.event;
   }

@@ -32,6 +32,7 @@ import { ThesisReadingPanel } from '../../components/ThesisReadingPanel/ThesisRe
 import { CompanyRegistrySection } from '../iniziative/CompanyRegistrySection';
 import { CompanyActivityPanel } from '../../components/company/activity/CompanyActivityPanel';
 import { CompanyContactsPanel } from '../../components/company/contacts/CompanyContactsPanel';
+import { CompanyAgreementsPanel } from '../../components/company/agreements/CompanyAgreementsPanel';
 import { DocumentiPanel } from '../../components/company/documenti/DocumentiPanel';
 import { bucketLabelWithSuppressionHistory, dateLabel, errorLabel, sessionStatusLabel } from '../ricerche/helpers';
 import styles from './SchedaAziendaPage.module.css';
@@ -936,11 +937,14 @@ export function SchedaAziendaPage() {
           <span className={styles.blockIndex}>4</span>
           <div>
             <h2 id="scheda-storia-title">Cosa ne sappiamo e cosa ne abbiamo fatto</h2>
-            <p>Registro azienda, ricerche e iniziative collegate.</p>
+            <p>Registro azienda, accordi sottoscritti, ricerche e iniziative collegate.</p>
           </div>
         </div>
         <div className={styles.registryWrap}>
           <CompanyRegistrySection companyKey={identity.companyKey} vatCode={identity.vatCode} companyName={identity.companyName} readOnly={false} />
+        </div>
+        <div className={styles.subSection}>
+          <CompanyAgreementsPanel companyKey={identity.companyKey} />
         </div>
         <CompanyActivityPanel companyKey={identity.companyKey} companyName={identity.companyName || identity.companyKey} vatCode={identity.vatCode} />
         {showIRL ? (

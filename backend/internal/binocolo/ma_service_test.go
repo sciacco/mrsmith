@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/sciacco/mrsmith/internal/platform/llm"
 	"github.com/sciacco/mrsmith/internal/platform/logging"
 	"github.com/sciacco/mrsmith/internal/platform/openapiit"
@@ -1407,6 +1408,7 @@ type fakeMAWorkspaceStore struct {
 	outcomes            []MATargetOutcome
 	updateAnnotationErr error
 	deleteAnnotationErr error
+	agreements          []MACompanyAgreement
 }
 
 func (f *fakeMAWorkspaceStore) ListMASessions(context.Context, string) ([]MASessionSummary, error) {
@@ -1590,6 +1592,53 @@ func (f *fakeMAWorkspaceStore) UpdateMACompanyContact(context.Context, string, s
 
 func (f *fakeMAWorkspaceStore) SoftDeleteMACompanyContact(context.Context, string, string, string, string) error {
 	return nil
+}
+
+func (f *fakeMAWorkspaceStore) ListMACompanyAgreements(_ context.Context, companyKey string) ([]MACompanyAgreement, error) {
+	active := make([]MACompanyAgreement, 0)
+	for _, item := range f.agreements {
+		if item.CompanyKey == companyKey {
+			active = append(active, item)
+		}
+	}
+	return active, nil
+}
+
+func (f *fakeMAWorkspaceStore) CreateMACompanyAgreement(_ context.Context, companyKey string, input MACompanyAgreementWrite, subject, email string) (MACompanyAgreement, error) {
+	item := MACompanyAgreement{
+		ID: uuid.NewString(), CompanyKey: companyKey, Kind: input.Kind, SignedOn: input.SignedOn, ExpiresOn: input.ExpiresOn,
+		CreatedAt: time.Now(), CreatedByEmail: email,
+	}
+	f.agreements = append(f.agreements, item)
+	return item, nil
+}
+
+func (f *fakeMAWorkspaceStore) UpdateMACompanyAgreement(_ context.Context, companyKey, agreementID string, input MACompanyAgreementWrite, subject, email string) (MACompanyAgreement, MACompanyAgreement, error) {
+	for i, item := range f.agreements {
+		if item.CompanyKey == companyKey && item.ID == agreementID {
+			previous := item
+			updated := item
+			updated.Kind = input.Kind
+			updated.SignedOn = input.SignedOn
+			updated.ExpiresOn = input.ExpiresOn
+			now := time.Now()
+			updated.UpdatedAt = &now
+			updated.UpdatedByEmail = email
+			f.agreements[i] = updated
+			return updated, previous, nil
+		}
+	}
+	return MACompanyAgreement{}, MACompanyAgreement{}, errMACompanyAgreementNotFound
+}
+
+func (f *fakeMAWorkspaceStore) SoftDeleteMACompanyAgreement(_ context.Context, companyKey, agreementID, subject, email string) (MACompanyAgreement, error) {
+	for i, item := range f.agreements {
+		if item.CompanyKey == companyKey && item.ID == agreementID {
+			f.agreements = append(f.agreements[:i], f.agreements[i+1:]...)
+			return item, nil
+		}
+	}
+	return MACompanyAgreement{}, errMACompanyAgreementNotFound
 }
 
 // Google Drive folder bindings (issue #98). Unreachable in these tests — the

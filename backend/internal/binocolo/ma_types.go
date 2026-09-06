@@ -437,6 +437,10 @@ const (
 	maEventNota              = "nota"
 	maEventChiusura          = "chiusura"
 	maEventDominioVerificato = "dominio_verificato"
+	maEventAccordo           = "accordo"
+
+	// Vocabolario `kind` di ma_company_agreement (migrazione 146): oggi solo NDA.
+	maAgreementKindNDA = "nda"
 
 	maCardOriginSearch = "search"
 	maCardOriginDirect = "direct"
@@ -808,6 +812,33 @@ type MACompanyContactReplaceRequest struct {
 	ContactDetails *string `json:"contactDetails"`
 	Note           *string `json:"note"`
 	IsPrimary      *bool   `json:"isPrimary"`
+}
+
+// MACompanyAgreement è un accordo sottoscritto dall'azienda (migrazione 146,
+// primo tipo: NDA). Le date viaggiano come stringhe 'YYYY-MM-DD' sul wire,
+// mai time.Time (vedi maDateArg/maDateValue in ma_filing_store.go).
+type MACompanyAgreement struct {
+	ID             string     `json:"id"`
+	CompanyKey     string     `json:"companyKey"`
+	Kind           string     `json:"kind"`
+	SignedOn       string     `json:"signedOn"`            // YYYY-MM-DD
+	ExpiresOn      string     `json:"expiresOn,omitempty"` // YYYY-MM-DD; empty = nessuna scadenza
+	CreatedAt      time.Time  `json:"createdAt"`
+	CreatedByEmail string     `json:"createdByEmail,omitempty"`
+	UpdatedAt      *time.Time `json:"updatedAt,omitempty"`
+	UpdatedByEmail string     `json:"updatedByEmail,omitempty"`
+}
+
+type MACompanyAgreementWrite struct {
+	Kind      string `json:"kind"`
+	SignedOn  string `json:"signedOn"`
+	ExpiresOn string `json:"expiresOn"`
+}
+
+type MACompanyAgreementReplaceRequest struct {
+	Kind      *string `json:"kind"`
+	SignedOn  *string `json:"signedOn"`
+	ExpiresOn *string `json:"expiresOn"`
 }
 
 // MACardMarker names one Iniziativa where the company has an ACTIVE card

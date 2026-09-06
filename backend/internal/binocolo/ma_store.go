@@ -92,6 +92,10 @@ type maWorkspaceStore interface {
 	CreateMACompanyContact(ctx context.Context, companyKey string, input MACompanyContactWrite, subject, email string) (MACompanyContact, error)
 	UpdateMACompanyContact(ctx context.Context, companyKey, contactID string, input MACompanyContactWrite, subject, email string) (MACompanyContact, error)
 	SoftDeleteMACompanyContact(ctx context.Context, companyKey, contactID, subject, email string) error
+	ListMACompanyAgreements(ctx context.Context, companyKey string) ([]MACompanyAgreement, error)
+	CreateMACompanyAgreement(ctx context.Context, companyKey string, input MACompanyAgreementWrite, subject, email string) (MACompanyAgreement, error)
+	UpdateMACompanyAgreement(ctx context.Context, companyKey, agreementID string, input MACompanyAgreementWrite, subject, email string) (updated MACompanyAgreement, previous MACompanyAgreement, err error)
+	SoftDeleteMACompanyAgreement(ctx context.Context, companyKey, agreementID, subject, email string) (MACompanyAgreement, error)
 	// Google Drive folder bindings (migration 127, issue #98). The orchestration
 	// type-asserts to *SQLStore for the lock-spanning transaction; these accessors
 	// are the documented binding surface for read/simple-write paths.

@@ -173,6 +173,10 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/contacts", h.handleCreateMACompanyContact)
 	handle("PUT /binocolo/v1/ma/companies/{companyKey}/contacts/{contactId}", h.handleUpdateMACompanyContact)
 	handle("DELETE /binocolo/v1/ma/companies/{companyKey}/contacts/{contactId}", h.handleDeleteMACompanyContact)
+	handle("GET /binocolo/v1/ma/companies/{companyKey}/agreements", h.handleListMACompanyAgreements)
+	handle("POST /binocolo/v1/ma/companies/{companyKey}/agreements", h.handleCreateMACompanyAgreement)
+	handle("PUT /binocolo/v1/ma/companies/{companyKey}/agreements/{agreementId}", h.handleUpdateMACompanyAgreement)
+	handle("DELETE /binocolo/v1/ma/companies/{companyKey}/agreements/{agreementId}", h.handleDeleteMACompanyAgreement)
 	// Google Drive documents (issue #98, executing PRD #85). Company-scoped
 	// listing (lazy-ensures the folder) and the idempotent card subfolder ensure.
 	handle("GET /binocolo/v1/ma/companies/{companyKey}/documents", h.handleListMACompanyDocuments)
@@ -1301,6 +1305,72 @@ func (h *Handler) handleDeleteMACompanyContact(w http.ResponseWriter, r *http.Re
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *Handler) handleListMACompanyAgreements(w http.ResponseWriter, r *http.Request) {
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	agreements, err := h.ma.listCompanyAgreements(r.Context(), companyKey)
+	if err != nil {
+		h.maFailure(w, r, "ma_company_agreements_list", err, "company_key", companyKey)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, agreements)
+}
+
+func (h *Handler) handleCreateMACompanyAgreement(w http.ResponseWriter, r *http.Request) {
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	var body MACompanyAgreementWrite
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	agreement, err := h.ma.createCompanyAgreement(r.Context(), companyKey, body, subject, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_company_agreement_create", err, "company_key", companyKey)
+		return
+	}
+	httputil.JSON(w, http.StatusCreated, agreement)
+}
+
+func (h *Handler) handleUpdateMACompanyAgreement(w http.ResponseWriter, r *http.Request) {
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	agreementID := strings.TrimSpace(r.PathValue("agreementId"))
+	var body MACompanyAgreementReplaceRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	subject, email := companySearchRefreshActor(r.Context())
+	agreement, err := h.ma.updateCompanyAgreement(r.Context(), companyKey, agreementID, body, subject, email)
+	if err != nil {
+		h.maFailure(w, r, "ma_company_agreement_update", err, "company_key", companyKey, "agreement_id", agreementID)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, agreement)
+}
+
+func (h *Handler) handleDeleteMACompanyAgreement(w http.ResponseWriter, r *http.Request) {
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	agreementID := strings.TrimSpace(r.PathValue("agreementId"))
+	subject, email := companySearchRefreshActor(r.Context())
+	if err := h.ma.deleteCompanyAgreement(r.Context(), companyKey, agreementID, subject, email); err != nil {
+		h.maFailure(w, r, "ma_company_agreement_delete", err, "company_key", companyKey, "agreement_id", agreementID)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // handleListMACompanyDocuments lists the company's Drive folder children (lazy-
 // ensuring the folder on first access). Drive is the source of truth; Binocolo
 // owns only the binding. Folders sort first, then by name. The optional
@@ -2205,6 +2275,9 @@ func maHTTPError(err error) (int, string, string) {
 	}
 	if errors.Is(err, errMACompanyContactNotFound) {
 		return http.StatusNotFound, "ma_company_contact_not_found", "warn"
+	}
+	if errors.Is(err, errMACompanyAgreementNotFound) {
+		return http.StatusNotFound, "ma_company_agreement_not_found", "warn"
 	}
 	// Deposited-filing endpoints (issue #78, Fase 8).
 	if errors.Is(err, errMAFilingIdentityUnresolved) {

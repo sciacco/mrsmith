@@ -1,6 +1,8 @@
 package binocolo
 
 import (
+	"errors"
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -40,6 +42,44 @@ func TestNormalizeMACompanySearch(t *testing.T) {
 			}
 			if kind != tc.wantKind || value != tc.wantValue {
 				t.Fatalf("got kind=%q value=%q, want kind=%q value=%q", kind, value, tc.wantKind, tc.wantValue)
+			}
+		})
+	}
+}
+
+func TestParseMACompanySearchNDA(t *testing.T) {
+	cases := []struct {
+		name    string
+		query   string
+		wantNDA string
+		wantErr bool
+	}{
+		{name: "no filter", query: "mode=advanced&nda=", wantNDA: ""},
+		{name: "any", query: "mode=advanced&nda=any", wantNDA: "any"},
+		{name: "active", query: "mode=advanced&nda=active", wantNDA: "active"},
+		{name: "expired only", query: "mode=advanced&nda=expired_only", wantNDA: "expired_only"},
+		{name: "none", query: "mode=advanced&nda=none", wantNDA: "none"},
+		{name: "bogus value rejected", query: "mode=advanced&nda=bogus", wantErr: true},
+		{name: "advanced-only field ignored in simple mode", query: "mode=simple&nda=any", wantNDA: ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			values, err := url.ParseQuery(tc.query)
+			if err != nil {
+				t.Fatalf("parse query: %v", err)
+			}
+			o, err := parseMACompanySearch(values)
+			if tc.wantErr {
+				if err == nil || !errors.Is(err, errMAStrategyInvalid) {
+					t.Fatalf("expected errMAStrategyInvalid, got %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if o.NDA != tc.wantNDA {
+				t.Fatalf("got NDA=%q, want %q", o.NDA, tc.wantNDA)
 			}
 		})
 	}

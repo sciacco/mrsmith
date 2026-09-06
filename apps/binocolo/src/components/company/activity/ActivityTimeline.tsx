@@ -49,6 +49,7 @@ function eventKindLabel(item: MATargetOutcome) {
     case 'card_riaperta': return 'Riapertura';
     case 'card_rimossa': return 'Rimozione';
     case 'dominio_verificato': return 'Verifica';
+    case 'accordo': return 'Accordo';
     default: return 'Attività';
   }
 }
