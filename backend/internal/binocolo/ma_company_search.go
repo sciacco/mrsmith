@@ -131,7 +131,7 @@ func parseMACompanySearch(values url.Values) (maCompanySearchOptions, error) {
 		}
 		for key, dest := range map[string]*[]string{"include": &o.Include, "exclude": &o.Exclude} {
 			for _, value := range values[key] {
-				if len(value) > 300 || !(strings.HasPrefix(value, "region:") || strings.HasPrefix(value, "province:") || strings.HasPrefix(value, "town:")) {
+				if len(value) > 300 || !(strings.HasPrefix(value, "region:") || strings.HasPrefix(value, "province:")) {
 					return invalid(key)
 				}
 				*dest = append(*dest, value)
@@ -346,10 +346,10 @@ const maCompanySearchFilterSQL = `,
     AND note.note ILIKE ('%' || (f->>'annotation') || '%') ESCAPE '\'
   ))
   AND (jsonb_array_length(f->'include') = 0 OR EXISTS (
-   SELECT 1 FROM jsonb_array_elements_text(f->'include') area WHERE area IN ('region:' || lower(c.region), 'province:' || c.province, 'town:' || c.province || ':' || lower(c.town))
+   SELECT 1 FROM jsonb_array_elements_text(f->'include') area WHERE area IN ('region:' || lower(c.region), 'province:' || c.province)
   ))
   AND NOT EXISTS (
-   SELECT 1 FROM jsonb_array_elements_text(f->'exclude') area WHERE area IN ('region:' || lower(c.region), 'province:' || c.province, 'town:' || c.province || ':' || lower(c.town))
+   SELECT 1 FROM jsonb_array_elements_text(f->'exclude') area WHERE area IN ('region:' || lower(c.region), 'province:' || c.province)
   )
   AND ((f->>'turnoverMin' IS NULL AND f->>'turnoverMax' IS NULL)
    OR (c.turnover IS NULL AND (f->>'turnoverMissing')::boolean)
@@ -371,8 +371,6 @@ func (s *SQLStore) ListMACompanySearchAreas(ctx context.Context) (MACompanySearc
   SELECT 'province:' || province, 'Provincia di ' || COALESCE(NULLIF(province_name, ''), province) || ' (' || province || ')' FROM province_catalog WHERE province <> ''
   UNION
   SELECT 'province:' || province, 'Provincia di ' || province FROM company_locations WHERE province <> '' AND province NOT IN (SELECT province FROM province_catalog)
-  UNION
-  SELECT 'town:' || province || ':' || lower(town), 'Comune di ' || town || CASE WHEN province <> '' THEN ' (' || province || ')' ELSE '' END FROM company_locations WHERE town <> ''
  ) areas ORDER BY label, value`)
 	if err != nil {
 		return out, fmt.Errorf("list company search areas: %w", err)

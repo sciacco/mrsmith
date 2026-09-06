@@ -1,5 +1,5 @@
 import { Button, Icon, MoneyInput, MultiSelect, ToggleSwitch } from '@mrsmith/ui';
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
 import type { MACompanySearchAreas } from '../../api/types';
 import styles from './AziendePage.module.css';
 
@@ -38,7 +38,6 @@ export function territorySummary(draft: Pick<CompanySearchDraft, 'include' | 'ex
   if (!draft.exclude.length) return included;
   if (draft.exclude.length > 1) return `${included}, escluse le aree: ${join(draft.exclude)}`;
   const excluded = join(draft.exclude);
-  if (draft.exclude[0]?.startsWith('town:')) return `${included}, escluso il ${excluded.charAt(0).toLowerCase()}${excluded.slice(1)}`;
   if (draft.exclude[0]?.startsWith('province:')) return `${included}, esclusa la ${excluded.charAt(0).toLowerCase()}${excluded.slice(1)}`;
   return `${included}, esclusa ${excluded}`;
 }
@@ -70,8 +69,7 @@ export function AziendeSearchForm({ draft, onChange, onSearch, onReset, areas, a
       errors[metric] = metric === 'employees' ? 'Inserisci un numero intero di dipendenti, maggiore o uguale a zero.' : 'Inserisci un importo valido, maggiore o uguale a zero.';
     }
   }
-  function submit(event: FormEvent) {
-    event.preventDefault();
+  function validateAndSearch() {
     setSubmitted(true);
     if (Object.keys(errors).length) return;
     onSearch();
@@ -79,7 +77,15 @@ export function AziendeSearchForm({ draft, onChange, onSearch, onReset, areas, a
   const fieldError = (key: string) => submitted ? errors[key] : undefined;
 
   return (
-    <form className={styles.advancedForm} onSubmit={submit} noValidate>
+    <form
+      className={styles.advancedForm}
+      onSubmit={(event) => event.preventDefault()}
+      onKeyDown={(event) => {
+        // Implicit submission can click the original picker's first chip button.
+        if (event.key === 'Enter' && event.target instanceof HTMLInputElement) event.preventDefault();
+      }}
+      noValidate
+    >
       <div className={styles.identityFields}>
         {([['name', 'Ragione sociale'], ['vat', 'P.IVA'], ['tax', 'Codice fiscale']] as const).map(([key, label]) => (
           <div className={styles.field} key={key}>
@@ -92,21 +98,20 @@ export function AziendeSearchForm({ draft, onChange, onSearch, onReset, areas, a
 
       <fieldset className={styles.territory}>
         <legend>Territorio</legend>
-        <MultiSelect options={areas?.items ?? []} selected={draft.include} onChange={(value) => set('include', value)} placeholder="Includi regioni, province o comuni" ariaLabel="Aree incluse" />
+        <MultiSelect options={areas?.items ?? []} selected={draft.include} onChange={(value) => set('include', value)} placeholder="Includi regioni o province" />
         {showExclusions || draft.exclude.length ? (
           <div className={styles.exclusions}>
             <span className={styles.fieldLabel}>Aree escluse</span>
-            <MultiSelect options={areas?.items ?? []} selected={draft.exclude} onChange={(value) => set('exclude', value)} placeholder="Escludi regioni, province o comuni" ariaLabel="Aree escluse" />
+            <MultiSelect options={areas?.items ?? []} selected={draft.exclude} onChange={(value) => set('exclude', value)} placeholder="Escludi regioni o province" />
             <Button type="button" variant="ghost" onClick={() => { set('exclude', []); setShowExclusions(false); }}>Rimuovi esclusioni</Button>
           </div>
         ) : (
           <Button type="button" variant="ghost" leftIcon={<Icon name="plus" size={16} />} onClick={() => setShowExclusions(true)}>Escludi aree</Button>
         )}
         <p className={styles.territorySummary}>{territorySummary(draft, areas?.items ?? [])}</p>
-        <p className={styles.hint}>I comuni disponibili sono quelli presenti nel corpus.</p>
         {areasLoading && <p className={styles.hint}>Caricamento delle aree…</p>}
         {areasError && <div className={styles.fieldError} role="alert">Aree non disponibili. <Button type="button" variant="ghost" onClick={onRetryAreas}>Riprova</Button></div>}
-        {areas && !areas.regionsAvailable && <p className={styles.fieldError} role="status">Il repertorio regionale non è disponibile nel corpus. Puoi selezionare le province e i comuni presenti.</p>}
+        {areas && !areas.regionsAvailable && <p className={styles.fieldError} role="status">Il repertorio regionale non è disponibile nel corpus. Puoi selezionare le province presenti.</p>}
       </fieldset>
 
       <div className={styles.metricsFields}>
@@ -138,7 +143,7 @@ export function AziendeSearchForm({ draft, onChange, onSearch, onReset, areas, a
         <input id="company-annotation" value={draft.annotation} maxLength={500} onChange={(event) => set('annotation', event.target.value)} placeholder="Es. passaggio generazionale" />
       </div>
       <div className={styles.formActions}>
-        <Button type="submit" leftIcon={<Icon name="search" size={16} />}>Cerca</Button>
+        <Button type="button" onClick={validateAndSearch} leftIcon={<Icon name="search" size={16} />}>Cerca</Button>
         <Button type="button" variant="ghost" onClick={() => { setSubmitted(false); setShowExclusions(false); onReset(); }}>Azzera filtri</Button>
         <p className={styles.hint}>I criteri compilati devono essere tutti soddisfatti.</p>
       </div>

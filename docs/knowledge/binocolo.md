@@ -65,17 +65,6 @@ Part of the Implementation Knowledge Handbook — see [docs/IMPLEMENTATION-KNOWL
 - Used by: `apps/binocolo` `/aziende`; reusable contract for direct initiative-card creation.
 - Open questions: none. Issue #86 (below) turned the derived key into an owned one; this entry describes how the finder groups, which is unchanged.
 
-### Binocolo Company Search Uses Independent Latest Metrics and Local Territory
-
-- Context: the simple/advanced internal finder on `/aziende` (issue #188).
-- Discovery: the paginated finder preserves fiscal identity grouping and opaque navigation keys. Numeric observations come from saved target facts/payloads, IT-full payloads and their vintages. Revenue and employees must be selected independently by reference year, then observation recency: a newer row with no revenue must not hide older available revenue. Undated observations are fallback values and retain a missing year; acquisition year is not a reference year.
-- Practical rule: use `balanceSheets.last/all` for dated counts and `employees.employee` for the IT-full headcount. `employees.employeeRange.code` is a range identifier, **never a count**, including when a legacy normalized target column contains its numeric-looking code. Do not borrow `ecofin.turnoverYear` for an undated headcount. The company finder does not refresh vendor facts.
-- Practical rule: the search-area catalog reads already-saved `province_cache` reference data without refreshing it (even when expired), and municipalities from the current internal company locations. Municipality keys include the province. If the regional catalog is absent, report that absence rather than calling the vendor. A newer province-only observation may reuse an older town only within the same province.
-- Practical rule: annotation matching is literal case-insensitive substring matching on non-deleted `ma_target_outcome` rows with `event='nota'`, across the identity's company keys. Identity criteria are aggregated once across aliases, not evaluated by rescanning the corpus for every company. Count and page use the same read-only snapshot; ordering precedes pagination and has a fiscal identity tie-breaker.
-- Evidence: `backend/internal/binocolo/ma_company_search.go`, `apps/binocolo/docs/company.openapi.json` (`employees`, `BalanceSheets`), `apps/binocolo/src/pages/aziende/AziendePage.tsx`.
-- Used by: Binocolo `/aziende`.
-- Open questions: none.
-
 ### Binocolo `company_key` Is An Owned Identifier, Never A Derivation
 
 - Context: any Binocolo write that creates, persists, or looks up a company — search runs, manual add, direct initiative cards, the verified-domain registry, deep dossiers.

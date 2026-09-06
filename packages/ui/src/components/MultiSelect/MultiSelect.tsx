@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Icon } from '../Icon/Icon';
 import styles from './MultiSelect.module.css';
 
 interface Option<T extends number | string = number> {
@@ -13,7 +12,6 @@ interface MultiSelectProps<T extends number | string = number> {
   selected: T[];
   onChange: (selected: T[]) => void;
   placeholder?: string;
-  ariaLabel?: string;
 }
 
 const DROPDOWN_GAP = 6;
@@ -25,13 +23,11 @@ export function MultiSelect<T extends number | string = number>({
   selected,
   onChange,
   placeholder = 'Seleziona...',
-  ariaLabel,
 }: MultiSelectProps<T>) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [coords, setCoords] = useState({ top: 0, left: 0, width: 0, placeTop: false });
   const triggerRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -89,10 +85,7 @@ export function MultiSelect<T extends number | string = number>({
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setOpen(false);
-        buttonRef.current?.focus();
-      }
+      if (e.key === 'Escape') setOpen(false);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -126,29 +119,23 @@ export function MultiSelect<T extends number | string = number>({
                 {o.label}
                 <button
                   className={styles.chipRemove}
-                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     toggle(o.value);
                   }}
                   aria-label={`Rimuovi ${o.label}`}
                 >
-                  <Icon name="x" size={14} />
+                  &times;
                 </button>
               </span>
             ))}
           </div>
-        ) : null}
-        <button
-          ref={buttonRef}
-          type="button"
-          className={styles.toggle}
-          aria-label={ariaLabel ?? placeholder}
-          aria-expanded={open}
-        >
-          {selectedOptions.length === 0 && <span className={styles.placeholder}>{placeholder}</span>}
-          <Icon name="chevron-down" size={14} className={`${styles.arrow} ${open ? styles.arrowOpen : ''}`} />
-        </button>
+        ) : (
+          <span className={styles.placeholder}>{placeholder}</span>
+        )}
+        <span className={`${styles.arrow} ${open ? styles.arrowOpen : ''}`}>
+          &#9660;
+        </span>
       </div>
       {open &&
         createPortal(
@@ -165,7 +152,6 @@ export function MultiSelect<T extends number | string = number>({
             <input
               className={styles.search}
               type="text"
-              aria-label={`Cerca: ${ariaLabel ?? placeholder}`}
               placeholder="Cerca..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
