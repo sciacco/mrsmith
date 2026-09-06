@@ -118,35 +118,60 @@ async function chartImage(spec: KWReportChartSpec): Promise<HTMLCanvasElement> {
     const theme = getComputedStyle(document.documentElement);
     const font = theme.getPropertyValue('--font-sans');
     // Wrap all identifying text without clipping long customer/room/rack names.
-    context.font = `24px ${font}`;
-    const lines: string[] = [];
+    const lines: { text: string; font: string; y: number; color: string }[] =
+      [];
     const captions = [
-      spec.title,
-      spec.customer,
-      `${spec.period} · Potenza media (kW)`,
+      { text: spec.title, size: 32, weight: 700, color: '--color-text' },
+      {
+        text: spec.customer,
+        size: 22,
+        weight: 400,
+        color: '--color-text-secondary',
+      },
+      {
+        text: `${spec.period} · Potenza media (kW)`,
+        size: 18,
+        weight: 400,
+        color: '--color-text-muted',
+      },
     ];
     if (!spec.series.some((point) => point.kilowatt !== null))
-      captions.push('Nessuna lettura disponibile');
-    for (const text of captions) {
+      captions.push({
+        text: 'Nessuna lettura disponibile',
+        size: 18,
+        weight: 400,
+        color: '--color-text-muted',
+      });
+    let cursor = 24;
+    for (const caption of captions) {
+      const lineFont = `${caption.weight} ${caption.size}px ${font}`;
+      context.font = lineFont;
+      const addLine = (text: string) => {
+        cursor += caption.size + 8;
+        lines.push({ text, font: lineFont, y: cursor, color: caption.color });
+      };
       let line = '';
-      for (const character of text) {
+      for (const character of caption.text) {
         if (context.measureText(line + character).width > 1036 && line) {
-          lines.push(line);
+          addLine(line);
           line = '';
         }
         line += character;
       }
-      lines.push(line);
+      addLine(line);
+      cursor += 8;
     }
-    const headingHeight = 48 + lines.length * 32;
+    const headingHeight = cursor + 16;
     canvas.width = 2200;
     canvas.height = (headingHeight + 420) * 2;
     context.scale(2, 2);
     context.fillStyle = theme.getPropertyValue('--color-bg-elevated').trim();
     context.fillRect(0, 0, 1100, headingHeight + 420);
-    context.fillStyle = theme.getPropertyValue('--color-text').trim();
-    context.font = `24px ${font}`;
-    lines.forEach((line, index) => context.fillText(line, 32, 40 + index * 32));
+    lines.forEach((line) => {
+      context.fillStyle = theme.getPropertyValue(line.color).trim();
+      context.font = line.font;
+      context.fillText(line.text, 32, line.y);
+    });
     context.drawImage(image, 0, headingHeight, 1100, 420);
     return canvas;
   } finally {
