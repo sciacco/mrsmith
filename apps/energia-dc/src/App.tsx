@@ -10,6 +10,7 @@ import styles from './App.module.css';
 const navItems = [
   { label: 'Situazione rack', path: '/situazione-rack' },
   { label: 'Consumi kW', path: '/consumi-kw' },
+  { label: 'Grafici cliente', path: '/grafici-cliente' },
   { label: 'Addebiti', path: '/addebiti' },
   { label: 'Senza variabile', path: '/senza-variabile' },
   { label: 'Consumi < 1 A', path: '/consumi-bassi' },

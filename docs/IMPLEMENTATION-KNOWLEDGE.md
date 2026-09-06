@@ -150,6 +150,10 @@ Use this format for new knowledge entries:
 - [Quotes Pending Approval Status Is Finalized From HubSpot](knowledge/quotes.md#quotes-pending-approval-status-is-finalized-from-hubspot)
 - [Quotes Order Conversion Uses Vodka Bridge Plus HubSpot Note Attachment](knowledge/quotes.md#quotes-order-conversion-uses-vodka-bridge-plus-hubspot-note-attachment)
 
+### Energia in DC — [`knowledge/energia-dc.md`](knowledge/energia-dc.md)
+
+- [Customer kW Reports Follow the Daily-Summary Source Aggregation](knowledge/energia-dc.md#customer-kw-reports-follow-the-daily-summary-source-aggregation)
+
 ### Grappa DCIM — [`knowledge/grappa-dcim.md`](knowledge/grappa-dcim.md)
 
 - [Grappa Rack Customer Display Uses `cli_fatturazione.intestazione`](knowledge/grappa-dcim.md#grappa-rack-customer-display-uses-cli_fatturazioneintestazione)

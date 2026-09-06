@@ -4,6 +4,8 @@ import type {
   BillingCharge,
   CustomerKWParams,
   KWPoint,
+  KWReport,
+  KWReportParams,
   LookupItem,
   LowConsumptionParams,
   LowConsumptionRow,
@@ -122,6 +124,19 @@ export function useCustomerKWSeries(params: CustomerKWParams | null) {
           cosfi: params?.cosfi,
         }),
       ),
+    enabled: params !== null,
+  });
+}
+
+export function useKWReport(params: KWReportParams | null) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ['energia-dc', 'kw-report', params],
+    queryFn: () => api.get<KWReport>(withSearch(`/energia-dc/v1/customers/${params?.customerId}/kw-report`, {
+      year: params?.year,
+      month: params?.month,
+      cosfi: params?.cosfi,
+    })),
     enabled: params !== null,
   });
 }

@@ -37,6 +37,7 @@ func RegisterRoutes(mux *http.ServeMux, db *sql.DB, cfg ModuleConfig) {
 	handle("GET /energia-dc/v1/racks/{rackId}/power-readings", h.handleListPowerReadings)
 	handle("GET /energia-dc/v1/racks/{rackId}/stats-last-days", h.handleListRackStatsLastDays)
 	handle("GET /energia-dc/v1/customers/{customerId}/kw", h.handleListCustomerKW)
+	handle("GET /energia-dc/v1/customers/{customerId}/kw-report", h.handleCustomerKWReport)
 	handle("GET /energia-dc/v1/customers/{customerId}/addebiti", h.handleListBillingCharges)
 	handle("GET /energia-dc/v1/no-variable-billing/customers", h.handleListNoVariableCustomers)
 	handle("GET /energia-dc/v1/no-variable-billing/customers/{customerId}/racks", h.handleListNoVariableRacks)

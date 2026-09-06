@@ -1,5 +1,31 @@
 package energiadc
 
+type kwReportPoint struct {
+	Bucket   string   `json:"bucket"`
+	Kilowatt *float64 `json:"kilowatt"`
+}
+
+type kwReportRack struct {
+	ID     int             `json:"id"`
+	Name   string          `json:"name"`
+	Series []kwReportPoint `json:"series"`
+}
+
+type kwReportRoom struct {
+	ID     int             `json:"id"`
+	Name   string          `json:"name"`
+	Series []kwReportPoint `json:"series"`
+	Racks  []kwReportRack  `json:"racks"`
+}
+
+type kwReportResponse struct {
+	Customer lookupItem      `json:"customer"`
+	Year     int             `json:"year"`
+	Month    *int            `json:"month"`
+	Series   []kwReportPoint `json:"series"`
+	Rooms    []kwReportRoom  `json:"rooms"`
+}
+
 type lookupItem struct {
 	ID   int    `json:"id"`
 	Name string `json:"name"`

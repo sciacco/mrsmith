@@ -1,3 +1,33 @@
+export interface KWReportPoint {
+  bucket: string;
+  kilowatt: number | null;
+}
+
+export interface KWReportRack {
+  id: number;
+  name: string;
+  series: KWReportPoint[];
+}
+
+export interface KWReportRoom extends KWReportRack {
+  racks: KWReportRack[];
+}
+
+export interface KWReport {
+  customer: LookupItem;
+  year: number;
+  month: number | null;
+  series: KWReportPoint[];
+  rooms: KWReportRoom[];
+}
+
+export interface KWReportParams {
+  customerId: number;
+  year: number;
+  month?: number;
+  cosfi: number;
+}
+
 export interface LookupItem {
   id: number;
   name: string;

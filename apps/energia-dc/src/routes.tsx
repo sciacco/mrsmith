@@ -4,6 +4,9 @@ import { Navigate, type RouteObject } from 'react-router-dom';
 const SituazioneRackPage = lazy(() =>
   import('./pages/SituazioneRackPage').then((module) => ({ default: module.SituazioneRackPage })),
 );
+const GraficiClientePage = lazy(() =>
+  import('./pages/GraficiClientePage').then((module) => ({ default: module.GraficiClientePage })),
+);
 const ConsumiKwPage = lazy(() =>
   import('./pages/ConsumiKwPage').then((module) => ({ default: module.ConsumiKwPage })),
 );
@@ -21,6 +24,7 @@ export const routes: RouteObject[] = [
   { index: true, element: <Navigate to="/situazione-rack" replace /> },
   { path: 'situazione-rack', element: <SituazioneRackPage /> },
   { path: 'consumi-kw', element: <ConsumiKwPage /> },
+  { path: 'grafici-cliente', element: <GraficiClientePage /> },
   { path: 'addebiti', element: <AddebitiPage /> },
   { path: 'senza-variabile', element: <SenzaVariabilePage /> },
   { path: 'consumi-bassi', element: <ConsumiBassiPage /> },
