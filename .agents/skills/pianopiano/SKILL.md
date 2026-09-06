@@ -1,123 +1,100 @@
 ---
 name: piano-piano
-description: Produce implementation plans anchored to verified repository facts and rules, with two mandatory verification passes. Use when the user asks for an implementation plan, a plan-backed issue, or wants a plan reviewed before execution.
+description: Produce proportionate implementation plans grounded in verified repository facts, with a factual review and a subtractive review before delivery. Use when the user asks for an implementation plan, a plan-backed issue, or wants a plan reviewed before execution.
 user-invocable: true
 allowed-tools: Read Grep Glob Bash Edit Write
 ---
 
 # Piano-Piano
 
-Use this skill for implementation planning in this repository. Its purpose is to prevent plans from presenting inferred repository details as facts.
+Produce the smallest plan that lets an implementer deliver the requested behavior correctly. Ground it in repository facts without turning ordinary implementation work into an exhaustive specification.
 
 The skill is **planning-only** unless the user explicitly also asks to create or update a tracking issue. Do not edit production code, configuration, migrations, or tests while preparing a plan.
 
-## Non-negotiable outcome
+## Core rules
 
-A plan is not ready until both passes below are complete. Every repository-specific claim in the plan must be one of:
+- **Proportion before completeness.** A new page in an existing app does not need the same investigation or document as a new application. Length and detail must follow demonstrated complexity, not hypothetical risks.
+- **No implicit scope expansion.** Include functionality only when the user requested it or it is indispensable to satisfy a requested requirement. Do not add features to address hypothetical risks. Ordinary defensive engineering does not become a separate feature or workstream.
+- **Preserve implementer autonomy.** A delegable plan clarifies the goal, affected files, non-obvious constraints and sequence. It does not prescribe every routine engineering choice, even for a mid-level agent.
+- **Separate preparation from delivery.** Evidence notes and audit checklists support planning; they are not mandatory sections of the delivered plan.
+- **Keep product and implementation distinct.** Preserve confirmed product decisions. Apply safe repository-consistent defaults without manufacturing questions. Ask only when the project working contract's conditions for a genuine product decision are met.
 
-- **Verified** — backed by an inspected repository source, cited with path and relevant symbol/section;
-- **Product decision** — explicitly supplied or confirmed by the user;
-- **Proposal / assumption** — clearly labelled as such, never phrased as an existing fact.
+## Pass 1 — Scope, evidence and draft
 
-If a claim cannot receive one of these labels, remove it from the plan and investigate or ask a product question only when the project working contract actually requires one.
+### Establish scope and applicable rules
 
-Do not invent component names, API methods, routes, schema fields, environment variables, service behavior, or established UX patterns.
+1. Identify what actually changes and what remains unchanged before investigating.
+2. Read applicable `AGENTS.md` files, `docs/IMPLEMENTATION-PLANNING.md` and `docs/IMPLEMENTATION-KNOWLEDGE.md`; load only relevant handbook entries.
+3. For UI work, read `docs/UI-UX.md` and the matching skill. For a scoped change in an existing mini-app, use `.agents/skills/tintoretto/SKILL.md`.
+4. Follow database safety: never connect to a database configured in an env file. Use versioned schemas/specifications and source code; ask the user for a data inspection only when genuinely necessary.
 
-## Pass 1 — Evidence and draft
+### Investigate only the affected chain
 
-### 1. Establish the applicable rules
+For a page in an existing app, start with a comparable page/handler, the required data, endpoint and route. Check actual shared-component exports/props and client capabilities where the plan relies on them.
 
-1. Read all relevant `AGENTS.md` files from the current directory up to the repository root.
-2. Read `docs/IMPLEMENTATION-PLANNING.md` and `docs/IMPLEMENTATION-KNOWLEDGE.md`, then only the handbook entries relevant to the affected domain.
-3. For frontend/UI work, read `docs/UI-UX.md` and the matching skill instructions. For scoped work in an existing mini-app, this means `.agents/skills/tintoretto/SKILL.md`.
-4. For database work, follow the repository database-safety instructions. Never connect to a database configured in an env file. Use versioned schemas/specifications and source code as evidence; ask the user to inspect live data if that is genuinely needed.
+Investigate bootstrap, dependency injection, hosting, proxies, deployment, credentials or migrations **only when the change affects them or concrete evidence exposes an integration problem**. Do not re-audit unchanged infrastructure merely to complete a checklist. Apply the same relevance filter to the planning reference's broader checklist.
 
-### 2. Build an evidence ledger before drafting
+Concentrate analysis on demonstrated difficulties. One uncertain data calculation does not justify escalating scrutiny across every other part of the feature. Treat an uncertainty as a blocker only when it prevents correct implementation of a requested requirement; state exactly what evidence would resolve it.
 
-Investigate the actual codebase. At minimum, verify the chain affected by the request:
+Keep working evidence notes as needed: `path — symbol/section — observed fact`. Open relevant sources; search snippets alone are not evidence. Do not invent component names, API methods, routes, schema fields, dependencies or established behavior.
 
-| Area | What must be checked |
-|---|---|
-| Comparable behavior | One or two screens/handlers that already perform the closest task |
-| UI | Actual `packages/ui` exports and their props; existing app usage; do not infer from a design-system narrative |
-| Frontend runtime | Routes, navigation, app bootstrap, API client capabilities, Vite/base/proxy only if the feature affects them |
-| Backend | Handler registration, dependency structs, startup injection, auth middleware, error/logging patterns |
-| Data | Authoritative versioned schema/specification, table keys, nullable fields, date/time semantics, and query ownership |
-| External transport | Existing authenticated client and the exact source-supported request/response behavior |
-| Deployment | Env/config, Docker/static serving, and migrations only when the proposed change actually touches them |
+Every repository claim in the draft must be supported by an inspected source. Distinguish existing facts from user decisions and proposed additions using plain wording; a formal label system is not required. Cite paths where they help the implementer, not to publish an evidence catalogue.
 
-Record each fact as `path — symbol/section — observed fact`. A search-result snippet is a lead, not evidence: open the referenced file before treating it as verified.
+### Draft an actionable plan
 
-### 3. Draft the plan from the ledger
+- Start with the result and scope boundaries, without repeating a product specification already present in the issue.
+- Give ordered implementation steps and relevant file paths. Mark new files, routes or contracts as proposed, not existing.
+- Explain non-obvious calculations, ownership rules or integration constraints when needed for correctness. Leave routine validation, cleanup and code structure to the implementer unless there is a concrete trap.
+- Use the existing architecture and conventions rather than introducing abstractions, services or dependencies for anticipated future needs.
+- For exports/downloads, verify the actual transport and auth needs. Do not automatically introduce streaming, jobs, progress, cancellation or a new renderer service.
+- Include a few decisive checks tied directly to requested behavior, plus applicable type-check/build and smoke commands. Do not expand every possible edge case into a mandatory checklist item.
+- Respect the repository test rule: no new automated tests without user approval. A planning request does not grant that approval.
 
-- Start with the user-visible behavior and scope, separating it from implementation mechanics.
-- State product decisions already given by the user. Apply safe repository-consistent defaults without creating speculative product questions.
-- Name only verified files, symbols, components, API methods and dependencies.
-- For proposed new routes/types/files, label them as proposed additions rather than existing artifacts.
-- Cover the four required planning layers: product behavior; runtime/repository integration; data/auth contract; verification strategy.
-- Respect the repository test rule: do not add automated tests unless the user has approved them. Still state meaningful type-check, build, and manual verification steps.
-- For authenticated download/export flows, use an auth-capable client path and explicitly account for timeout, streaming/blob behavior, and server-side credential boundaries.
+## Pass 2 — Factual and subtractive review
 
-## Pass 2 — Adversarial verification
+Both reviews are required before delivery, but their reports are not deliverables.
 
-Review the complete draft sentence by sentence before showing it or placing it in an issue.
+### Factual review
 
-### Fact audit
+Check the draft against inspected sources and applicable rules. Reopen sources when support is uncertain. Confirm the files, APIs, components, data semantics and affected integration points actually support the proposed work. Replace unsupported claims with explicit proposals, investigate consequential uncertainties, or remove the claims.
 
-For every repository-specific noun or assertion, reopen the cited source and verify:
+Apply relevant repo-fit checks and, for UI work, `docs/UI-UX.md` §19. Do not turn these internal checks into new project scope or mandatory sections about unchanged systems.
 
-- the component is actually exported and has the cited props;
-- the comparable screen really uses the claimed pattern;
-- the route is registered and does not collide with an existing route;
-- the dependency is actually constructed and injectable at startup;
-- the API client actually exposes the required transport method;
-- table/column/type/nullability and timestamp semantics match the versioned schema;
-- external endpoint shape and authorization pattern are supported by source/specification;
-- env, Docker, Vite, and deployment statements are included only when their source proves they are affected.
+### Subtractive review
 
-Change any failed assertion to a labelled proposal, replace it with the verified equivalent, or remove it. Never preserve a convenient but unverified detail merely because it sounds conventional.
+For each proposed activity, constraint and verification, ask:
 
-### Repo-fit audit
+- Which requested requirement does this serve?
+- Is it necessary now, or does it address a hypothetical risk?
+- Can a competent implementer resolve it as ordinary engineering work?
+- Is it already stated elsewhere?
 
-Run the relevant parts of `docs/IMPLEMENTATION-PLANNING.md`'s checklist explicitly:
+**Remove unnecessary material even when it is technically correct.** Remove unrequested functionality, duplicate requirements, speculative blockers and routine prescriptions. Keep detail where omission would materially risk the requested behavior.
 
-1. runtime/deep-link fit;
-2. dev and proxy fit;
-3. role and bearer-auth fit;
-4. identifiers, ownership and date/data-contract fit;
-5. deployment/config/migration fit;
-6. verification, sanitised failures, logging and timeout fit.
+A plan is not ready merely because its claims are accurate. It must also remain within scope and be proportionate. Do not hide consequential unresolved assumptions behind a claim of readiness.
 
-For UI screens, also apply `docs/UI-UX.md` §19. In particular, confirm component availability rather than assuming a desired component exists.
+## Default deliverable
 
-### Deliverable gate
+For a scoped change, use a short plan containing:
 
-Do not call the result “verified”, “ready”, or “approved” until both audits pass. The final plan must include:
+1. Result and boundaries, only if not already clear from the accompanying specification.
+2. Ordered implementation steps with affected files.
+3. A concrete difficulty or dependency, if one actually exists.
+4. A small set of requirement-driven verification steps.
 
-1. **Verified facts** — concise evidence ledger with paths and symbols;
-2. **Product behavior and decisions**;
-3. **Implementation plan** — ordered, file-level where the target is verified;
-4. **Verification plan**;
-5. **Pass-2 outcome** — either “all repository claims rechecked” or a short list of explicitly labelled unresolved assumptions.
+Expand only for demonstrated complexity or an explicit user request for additional detail. There are no mandatory evidence-ledger, architecture-layer, audit-outcome or exhaustive acceptance-checklist sections. Do not add headings with no useful content.
 
 ## GitHub issue handling
 
-Only create or edit an issue when the user explicitly asks for it.
+Only create or edit an issue when explicitly requested.
 
-When an issue is requested:
-
-1. Complete both planning passes first.
-2. Put the reviewed plan, evidence section, scope, and acceptance criteria in the issue body.
+1. Complete both planning passes before publishing.
+2. Preserve the product specification and add the concise implementation plan without duplicating it.
 3. Search for duplicates before creating a new issue.
-4. Use the configured GitHub repository and `gh` CLI only after confirming authentication/repository context.
-5. Re-read or query the created issue when network access allows; if verification fails, report that fact rather than claiming it was checked.
-6. Do not create a branch, commit, or edit implementation files merely because an issue was created.
+4. Confirm GitHub repository/auth context and use `gh`.
+5. Re-read the updated issue to verify the intended content; report verification failure rather than claiming success.
+6. Do not create a branch, commit or edit implementation files merely because an issue was updated.
 
-## Required final response
+## Final response
 
-Be concise and state:
-
-- whether Pass 1 and Pass 2 completed;
-- the tracking issue URL, if one was requested;
-- any remaining labelled assumption or genuine product decision;
-- that no implementation changes were made while planning, unless the user explicitly requested another action.
+State the outcome concisely, with the issue URL if relevant. Mention only material unresolved dependencies or limitations. Do not routinely narrate the planning passes, evidence gathering or internal checklists.
