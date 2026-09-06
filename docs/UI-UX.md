@@ -283,7 +283,7 @@ Reuse these before writing anything new. NEVER re-implement a listed component i
 | `Icon` | lucide-react registry behind typed `IconName` — the **only** icon source for mini-apps |
 | `Modal` | Native `<dialog>` + `showModal()`; `size` `sm 400px \| md 480px (default) \| lg 640px \| wide 860px \| xwide 80vw \| fluid 90vw` (`wide` boolean prop is deprecated); mobile `100vw − 32px`; close button rotates 90° on hover |
 | `MoneyInput` | Currency field; `value` is the canonical wire string (`"1500.00"`, `""` = empty); `onChange` always emits canonical; `label`/`error`/`required` |
-| `MultiSelect` | Searchable multi picker (`string \| number`), chip display with remove |
+| `MultiSelect` | Searchable multi picker (`string \| number`), chip display with remove; optional `ariaLabel`, keyboard trigger and Escape focus restoration |
 | `NotificationBell` | Header bell with unread polling and per-app counts |
 | `PhoneInput` | Phone field storing E.164 (`"+39333…"`), country prefix picker |
 | `SearchInput` | Controlled search box, default placeholder `"Cerca..."` |

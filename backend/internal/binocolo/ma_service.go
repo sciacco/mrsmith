@@ -1015,26 +1015,11 @@ func isMACompanySearchAlphanumeric(value string) bool {
 	return true
 }
 
-func (s *maService) searchCompanies(ctx context.Context, query string) (MACompanySearchResponse, error) {
+func (s *maService) searchCompanies(ctx context.Context, options maCompanySearchOptions) (MACompanySearchResponse, error) {
 	if s.store == nil {
 		return MACompanySearchResponse{}, errMAStoreUnavailable
 	}
-	kind, value, err := normalizeMACompanySearch(query)
-	if err != nil {
-		return MACompanySearchResponse{}, err
-	}
-	limit := 50
-	if kind == maCompanySearchRecent {
-		limit = 25
-	}
-	items, err := s.store.SearchMACompanies(ctx, kind, value, limit)
-	if err != nil {
-		return MACompanySearchResponse{}, err
-	}
-	if items == nil {
-		items = []MACompanySearchRow{}
-	}
-	return MACompanySearchResponse{Items: items}, nil
+	return s.store.SearchMACompanies(ctx, options)
 }
 
 func (s *maService) getCompanyOverview(ctx context.Context, companyKey string) (MACompanyOverview, error) {

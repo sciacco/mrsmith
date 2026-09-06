@@ -270,10 +270,11 @@ export function MoneyInput({
           autoFocus={autoFocus}
           placeholder={placeholder ?? defaultPlaceholder(locale, fractionDigits)}
           aria-invalid={error ? 'true' : undefined}
+          aria-describedby={error && id ? `${id}-error` : undefined}
         />
       </div>
       {name && <input type="hidden" name={name} value={value} />}
-      {error && <span className={styles.errorText}>{error}</span>}
+      {error && <span id={id ? `${id}-error` : undefined} className={styles.errorText}>{error}</span>}
     </div>
   );
 }

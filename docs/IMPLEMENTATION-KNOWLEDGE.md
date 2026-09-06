@@ -132,6 +132,7 @@ Use this format for new knowledge entries:
 - [Binocolo M&A Long Session Work Uses `ma_job`](knowledge/binocolo.md#binocolo-ma-long-session-work-uses-ma_job)
 - [Binocolo `/azienda` Is A Standalone Quick-Review Tool, Never The MA Dossier Destination](knowledge/binocolo.md#binocolo-azienda-is-a-standalone-quick-review-tool-never-the-ma-dossier-destination)
 - [Binocolo Internal Company Finder Uses Fiscal Identity Groups](knowledge/binocolo.md#binocolo-internal-company-finder-uses-fiscal-identity-groups)
+- [Binocolo Company Search Uses Independent Latest Metrics and Local Territory](knowledge/binocolo.md#binocolo-company-search-uses-independent-latest-metrics-and-local-territory)
 - [Binocolo `company_key` Is An Owned Identifier, Never A Derivation](knowledge/binocolo.md#binocolo-company_key-is-an-owned-identifier-never-a-derivation)
 - [Binocolo Company Annotations Live in `ma_target_outcome`](knowledge/binocolo.md#binocolo-company-annotations-live-in-ma_target_outcome)
 - [Binocolo ATECO 2025 Codes Are Resolver-Gated](knowledge/binocolo.md#binocolo-ateco-2025-codes-are-resolver-gated)

@@ -991,9 +991,21 @@ export interface MABriefRegenerateResponse {
 
 export interface MACompanySearchResponse {
   items: MACompanySearchRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface MACompanySearchAreas {
+  items: { value: string; label: string }[];
+  regionsAvailable: boolean;
 }
 
 export interface MACompanySearchRow {
+  turnover: number | null;
+  turnoverYear: number | null;
+  employees: number | null;
+  employeesYear: number | null;
   companyName: string;
   vatCode?: string;
   taxCode?: string;

@@ -668,10 +668,27 @@ type MACompanyOverview struct {
 // MACompanySearchResponse is the read-only index of companies already seen by
 // Binocolo. Rows are grouped by stable fiscal identity rather than company_key.
 type MACompanySearchResponse struct {
-	Items []MACompanySearchRow `json:"items"`
+	Items    []MACompanySearchRow `json:"items"`
+	Total    int                  `json:"total"`
+	Page     int                  `json:"page"`
+	PageSize int                  `json:"pageSize"`
+}
+
+type MACompanySearchArea struct {
+	Value string `json:"value"`
+	Label string `json:"label"`
+}
+
+type MACompanySearchAreas struct {
+	Items            []MACompanySearchArea `json:"items"`
+	RegionsAvailable bool                  `json:"regionsAvailable"`
 }
 
 type MACompanySearchRow struct {
+	Turnover          *float64                `json:"turnover"`
+	TurnoverYear      *int                    `json:"turnoverYear"`
+	Employees         *int                    `json:"employees"`
+	EmployeesYear     *int                    `json:"employeesYear"`
 	CompanyName       string                  `json:"companyName"`
 	VATCode           string                  `json:"vatCode,omitempty"`
 	TaxCode           string                  `json:"taxCode,omitempty"`

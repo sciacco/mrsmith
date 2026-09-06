@@ -1886,8 +1886,12 @@ func (f *fakeMAWorkspaceStore) GetMACompanyRegistry(context.Context, string) (MA
 	return MACompanyRegistry{}, nil
 }
 
-func (f *fakeMAWorkspaceStore) SearchMACompanies(context.Context, string, string, int) ([]MACompanySearchRow, error) {
-	return []MACompanySearchRow{}, nil
+func (f *fakeMAWorkspaceStore) SearchMACompanies(context.Context, maCompanySearchOptions) (MACompanySearchResponse, error) {
+	return MACompanySearchResponse{Items: []MACompanySearchRow{}}, nil
+}
+
+func (f *fakeMAWorkspaceStore) ListMACompanySearchAreas(context.Context) (MACompanySearchAreas, error) {
+	return MACompanySearchAreas{Items: []MACompanySearchArea{}}, nil
 }
 
 func (f *fakeMAWorkspaceStore) GetMACompanyOverviewIdentity(context.Context, string) (*MACompanyOverviewIdentity, error) {
