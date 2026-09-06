@@ -36,11 +36,15 @@ export function parseMistraMoney(value?: string | number | null): number {
 }
 
 export function formatMoney(value?: string | number | null, currency?: string | null): string {
+  const normalized = parseMistraMoney(value).toFixed(5);
+  const fractionDigits = normalized.endsWith('000') ? 2 : 5;
   return new Intl.NumberFormat('it-IT', {
     style: 'currency',
     currency: normalizeCurrency(currency),
     currencyDisplay: 'narrowSymbol',
-  }).format(parseMistraMoney(value));
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).format(Number(normalized));
 }
 
 export function extractApproverList(approvers?: PoApprover[]): string {

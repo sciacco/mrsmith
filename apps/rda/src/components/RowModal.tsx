@@ -164,7 +164,7 @@ export function RowModal({
             {selectedType === 'good' ? (
               <div className="field">
                 <label>Costo unitario</label>
-                <input type="number" min="0" step="0.01" value={draft.price} onChange={(event) => updateDraft('price', Number(event.target.value))} />
+                <input type="number" min="0" step="any" value={draft.price} onChange={(event) => updateDraft('price', Number(event.target.value))} />
                 {validation.fieldErrors.price ? <p className="fieldError">{validation.fieldErrors.price}</p> : null}
               </div>
             ) : (
@@ -193,13 +193,13 @@ export function RowModal({
                 </div>
                 <div className="field">
                   <label>NRC</label>
-                  <input type="number" min="0" step="0.01" value={draft.nrc} onChange={(event) => updateDraft('nrc', Number(event.target.value))} />
+                  <input type="number" min="0" step="any" value={draft.nrc} onChange={(event) => updateDraft('nrc', Number(event.target.value))} />
                 </div>
                 {!oneShotService ? (
                   <>
                     <div className="field">
                       <label>MRC</label>
-                      <input type="number" min="0" step="0.01" value={draft.mrc} onChange={(event) => updateDraft('mrc', Number(event.target.value))} />
+                      <input type="number" min="0" step="any" value={draft.mrc} onChange={(event) => updateDraft('mrc', Number(event.target.value))} />
                     </div>
                     <div className="field">
                       <label>Durata mesi</label>
