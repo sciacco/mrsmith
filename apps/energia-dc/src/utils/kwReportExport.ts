@@ -20,6 +20,7 @@ export function reportCharts(report: KWReport): KWReportChartSpec[] {
   const context = {
     customer: report.customer.name,
     period: reportPeriod(report),
+    unit: report.unit,
   };
   return [
     {
@@ -79,7 +80,7 @@ async function chartImage(spec: KWReportChartSpec): Promise<HTMLCanvasElement> {
     await document.fonts.ready;
     flushSync(() =>
       root.render(
-        createElement(KWReportChart, { series: spec.series, fixed: true }),
+        createElement(KWReportChart, { series: spec.series, fixed: true, unit: spec.unit }),
       ),
     );
     const svg = host.querySelector('svg');
@@ -131,7 +132,7 @@ async function chartImage(spec: KWReportChartSpec): Promise<HTMLCanvasElement> {
         color: '--color-text-secondary',
       },
       {
-        text: `${spec.period} · Potenza media (kW)`,
+        text: `${spec.period} · Valore medio (${spec.unit})`,
         size: 18,
         weight: 400,
         color: '--color-text-muted',
@@ -149,7 +150,7 @@ async function chartImage(spec: KWReportChartSpec): Promise<HTMLCanvasElement> {
       captions.push({
         text: `Media periodo: ${formatNumber(mean, {
           format: { maximumFractionDigits: 1 },
-        })} kW`,
+        })} ${spec.unit}`,
         size: 18,
         weight: 400,
         color: '--color-text-muted',
@@ -217,7 +218,7 @@ export async function exportReportPDF(report: KWReport) {
   const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   pdf.setProperties({
     title: `Grafici cliente - ${report.customer.name} - ${reportPeriod(report)}`,
-    subject: 'Potenza media (kW)',
+    subject: `Valore medio (${report.unit})`,
     creator: 'Energia in DC',
   });
   const charts = reportCharts(report);

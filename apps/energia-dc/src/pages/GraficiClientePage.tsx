@@ -35,6 +35,7 @@ export function GraficiClientePage() {
   );
   const [month, setMonth] = useState<number | null>(null);
   const [cosfi, setCosfi] = useState(95);
+  const [unit, setUnit] = useState<'kW' | 'A'>('kW');
   const [submitted, setSubmitted] = useState<KWReportParams | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(false);
@@ -54,6 +55,7 @@ export function GraficiClientePage() {
       year: Number(year),
       month: month ?? undefined,
       cosfi,
+      unit,
     };
     setExportError(false);
     if (
@@ -61,7 +63,8 @@ export function GraficiClientePage() {
       submitted.customerId === params.customerId &&
       submitted.year === params.year &&
       submitted.month === params.month &&
-      submitted.cosfi === params.cosfi
+      submitted.cosfi === params.cosfi &&
+      submitted.unit === params.unit
     )
       void query.refetch();
     else setSubmitted(params);
@@ -92,7 +95,7 @@ export function GraficiClientePage() {
           <div>
             <h2 className={styles.sectionTitle}>{spec.title}</h2>
             <p className={styles.meta}>
-              {spec.customer} · {spec.period} · kW medi
+              {spec.customer} · {spec.period} · {spec.unit} medi
             </p>
           </div>
           <Button
@@ -105,7 +108,7 @@ export function GraficiClientePage() {
           </Button>
         </div>
         {spec.series.some((point) => point.kilowatt !== null) ? (
-          <KWReportChart series={spec.series} />
+          <KWReportChart series={spec.series} unit={spec.unit} />
         ) : (
           <ViewState
             title="Nessuna lettura disponibile"
@@ -197,6 +200,19 @@ export function GraficiClientePage() {
             value={cosfi}
             onChange={(event) => setCosfi(Number(event.target.value))}
             aria-valuetext={(cosfi / 100).toFixed(2).replace('.', ',')}
+          />
+        </div>
+        <div className={styles.field}>
+          <label htmlFor="kw-report-unit">Unità</label>
+          <SingleSelect
+            ariaLabel="Unità"
+            options={[
+              { value: 'kW', label: 'kW' },
+              { value: 'A', label: 'A' },
+            ]}
+            selected={unit}
+            onChange={(value) => setUnit(value as 'kW' | 'A')}
+            placeholder="kW"
           />
         </div>
         <Button

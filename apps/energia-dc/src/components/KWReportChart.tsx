@@ -18,6 +18,7 @@ export interface KWReportChartSpec {
   title: string;
   customer: string;
   period: string;
+  unit: 'kW' | 'A';
   series: KWReportPoint[];
 }
 
@@ -64,11 +65,13 @@ function KWTooltip({
   payload,
   label,
   mean,
+  unit,
 }: {
   active?: boolean;
   payload?: Array<{ value?: number | string | null }>;
   label?: string | number;
   mean: number | null;
+  unit: 'kW' | 'A';
 }) {
   if (!active || !payload?.length) return null;
   const raw = payload[0]?.value;
@@ -78,12 +81,12 @@ function KWTooltip({
   return (
     <div className={styles.tooltip}>
       <div className={styles.tooltipTitle}>{label}</div>
-      <div className={styles.tooltipValue}>{formatKw2(raw)} kW</div>
-      <div className={styles.tooltipMeta}>Potenza media</div>
+      <div className={styles.tooltipValue}>{formatKw2(raw)} {unit}</div>
+      <div className={styles.tooltipMeta}>Valore medio</div>
       {delta !== null && (
         <div className={styles.tooltipMeta}>
           {deltaSign}
-          {formatKw2(delta)} kW vs media periodo
+          {formatKw2(delta)} {unit} vs media periodo
         </div>
       )}
     </div>
@@ -93,9 +96,11 @@ function KWTooltip({
 export function KWReportChart({
   series,
   fixed = false,
+  unit = 'kW',
 }: {
   series: KWReportPoint[];
   fixed?: boolean;
+  unit?: 'kW' | 'A';
 }) {
   const data = series.map((point) => ({
     ...point,
@@ -181,13 +186,13 @@ export function KWReportChart({
       {!fixed && (
         <Tooltip
           cursor={{ stroke: 'var(--color-border)' }}
-          content={<KWTooltip mean={mean} />}
+          content={<KWTooltip mean={mean} unit={unit} />}
         />
       )}
       <Area
         type="monotone"
         dataKey="kilowatt"
-        name="kW medi"
+        name={`${unit} medi`}
         stroke="var(--color-accent)"
         strokeWidth={2}
         fill="var(--color-accent)"
@@ -213,11 +218,11 @@ export function KWReportChart({
         <div className={styles.legend}>
           <span className={styles.legendItem}>
             <i className={styles.legendLine} aria-hidden="true" />
-            kW medi
+            {unit} medi
           </span>
           <span className={styles.legendItem}>
             <i className={styles.legendDash} aria-hidden="true" />
-            media periodo {formatKw1(mean)} kW
+            media periodo {formatKw1(mean)} {unit}
           </span>
         </div>
       )}
@@ -225,7 +230,7 @@ export function KWReportChart({
         className={styles.scroller}
         role="region"
         tabIndex={0}
-        aria-label="Andamento della potenza media in kW; gli intervalli senza letture non hanno valore."
+        aria-label={`Andamento del valore medio in ${unit}; gli intervalli senza letture non hanno valore.`}
       >
       <div
         className={styles.chart}

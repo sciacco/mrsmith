@@ -22,6 +22,7 @@ type kwReportResponse struct {
 	Customer lookupItem      `json:"customer"`
 	Year     int             `json:"year"`
 	Month    *int            `json:"month"`
+	Unit     string          `json:"unit"`
 	Series   []kwReportPoint `json:"series"`
 	Rooms    []kwReportRoom  `json:"rooms"`
 }

@@ -17,6 +17,7 @@ export interface KWReport {
   customer: LookupItem;
   year: number;
   month: number | null;
+  unit: 'kW' | 'A';
   series: KWReportPoint[];
   rooms: KWReportRoom[];
 }
@@ -26,6 +27,7 @@ export interface KWReportParams {
   year: number;
   month?: number;
   cosfi: number;
+  unit?: 'kW' | 'A';
 }
 
 export interface LookupItem {

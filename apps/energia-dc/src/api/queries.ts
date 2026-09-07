@@ -136,6 +136,7 @@ export function useKWReport(params: KWReportParams | null) {
       year: params?.year,
       month: params?.month,
       cosfi: params?.cosfi,
+      unit: params?.unit,
     })),
     enabled: params !== null,
   });
