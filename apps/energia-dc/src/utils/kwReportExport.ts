@@ -3,8 +3,10 @@ import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import {
   KWReportChart,
+  kwSeriesMean,
   type KWReportChartSpec,
 } from '../components/KWReportChart';
+import { formatNumber } from '@mrsmith/format';
 import type { KWReport } from '../api/types';
 
 export function reportPeriod(report: Pick<KWReport, 'year' | 'month'>) {
@@ -138,6 +140,16 @@ async function chartImage(spec: KWReportChartSpec): Promise<HTMLCanvasElement> {
     if (!spec.series.some((point) => point.kilowatt !== null))
       captions.push({
         text: 'Nessuna lettura disponibile',
+        size: 18,
+        weight: 400,
+        color: '--color-text-muted',
+      });
+    const mean = kwSeriesMean(spec.series);
+    if (mean !== null)
+      captions.push({
+        text: `Media periodo: ${formatNumber(mean, {
+          format: { maximumFractionDigits: 1 },
+        })} kW`,
         size: 18,
         weight: 400,
         color: '--color-text-muted',
