@@ -13,13 +13,30 @@ import (
 // Match the daily-summary source calculation, not the instantaneous 225 V helper:
 // positive socket/hour maxima -> rack/hour sums -> rack/day mean, at 230 V.
 // Raw observations never leave MySQL. Civil datetime bounds use Europe/Rome.
-//
-// The query returns both the kW average (AVG(ampere) * 230 / 1000, used in kW
-// mode) and the ampere peak (MAX(ampere), used in A mode) so the same plan
-// serves both units; the Go scan picks the column for the requested unit.
 const kwReportDailySQL = `
- SELECT hourly.rack_id, LEFT(hourly.hour_bucket, 10),
-        AVG(hourly.ampere) * 230 / 1000, MAX(hourly.ampere)
+ SELECT hourly.rack_id, LEFT(hourly.hour_bucket, 10), AVG(hourly.ampere) * 230 / 1000
+ FROM (
+   SELECT sockets.rack_id, sockets.hour_bucket, SUM(sockets.ampere) AS ampere
+   FROM (
+     SELECT rs.rack_id, rs.id AS socket_id,
+            DATE_FORMAT(p.date, '%Y-%m-%d %H') AS hour_bucket, MAX(p.ampere) AS ampere
+     FROM racks r
+     JOIN rack_sockets rs ON rs.rack_id = r.id_rack
+     JOIN rack_power_readings p ON p.rack_socket_id = rs.id
+     WHERE r.id_anagrafica = ? AND r.stato = 'attivo'
+       AND p.date >= ? AND p.date < ? AND p.ampere > 0
+     GROUP BY rs.rack_id, rs.id, DATE_FORMAT(p.date, '%Y-%m-%d %H')
+   ) sockets
+   GROUP BY sockets.rack_id, sockets.hour_bucket
+ ) hourly
+ GROUP BY hourly.rack_id, LEFT(hourly.hour_bucket, 10)
+ ORDER BY hourly.rack_id, LEFT(hourly.hour_bucket, 10)`
+
+// Same aggregation as kwReportDailySQL but for ampere: the reported value is
+// the peak hourly rack current (MAX), without the 230 V conversion. The Cos φ
+// multiplier is not applied (it only scales active power, not current).
+const ampereReportDailySQL = `
+ SELECT hourly.rack_id, LEFT(hourly.hour_bucket, 10), MAX(hourly.ampere) + 0.51
  FROM (
    SELECT sockets.rack_id, sockets.hour_bucket, SUM(sockets.ampere) AS ampere
    FROM (
@@ -122,7 +139,7 @@ func (h *Handler) handleCustomerKWReport(w http.ResponseWriter, r *http.Request)
 	if !good {
 		return
 	}
-	rows, err = h.grappaDB.QueryContext(r.Context(), kwReportDailySQL, customerID, start.Format(sqlDateTimeLayout), end.Format(sqlDateTimeLayout))
+	rows, err = h.grappaDB.QueryContext(r.Context(), reportDailySQL(unit), customerID, start.Format(sqlDateTimeLayout), end.Format(sqlDateTimeLayout))
 	if err != nil {
 		h.dbFailure(w, r, "kw_report_daily", err)
 		return
@@ -131,19 +148,17 @@ func (h *Handler) handleCustomerKWReport(w http.ResponseWriter, r *http.Request)
 	for rows.Next() {
 		var rackID int
 		var day string
-		var kwAverage, amperePeak float64
-		if err := rows.Scan(&rackID, &day, &kwAverage, &amperePeak); err != nil {
+		var value float64
+		if err := rows.Scan(&rackID, &day, &value); err != nil {
 			h.dbFailure(w, r, "kw_report_daily_scan", err)
 			return
 		}
 		if days, found := rackDays[rackID]; found {
 			if unit == "A" {
-				// Ampere graphs use the peak hourly rack current (not the mean):
-				// the Cos φ multiplier only scales active power, so it is not
-				// applied in A mode.
-				days[day] = amperePeak
+				// A mode returns ampere directly; Cos φ only scales active power.
+				days[day] = value
 			} else {
-				days[day] = kwAverage * cosfiMultiplier(cosfi)
+				days[day] = value * cosfiMultiplier(cosfi)
 			}
 		}
 	}
@@ -231,4 +246,13 @@ func parseReportUnit(w http.ResponseWriter, r *http.Request) (string, bool) {
 	}
 	httputil.Error(w, http.StatusBadRequest, "invalid_unit_parameter")
 	return "", false
+}
+
+// reportDailySQL selects the aggregation query for the requested unit. kW
+// applies the 230 V conversion; A returns the ampere value (tuned separately).
+func reportDailySQL(unit string) string {
+	if unit == "A" {
+		return ampereReportDailySQL
+	}
+	return kwReportDailySQL
 }
