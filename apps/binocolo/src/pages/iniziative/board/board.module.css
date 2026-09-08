@@ -96,6 +96,12 @@
   color: var(--color-text);
   width: 100%;
 }
+/* azione a sola icona in top bar: quadrata, alta come il campo di ricerca */
+.topbarIconBtn {
+  width: 44px;
+  padding: 0;
+  flex: none;
+}
 .search kbd {
   font: 600 0.625rem/1 var(--font-mono);
   color: var(--color-text-muted);

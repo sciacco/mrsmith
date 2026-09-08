@@ -49,7 +49,6 @@ export function SegnalazioneModal({ open, onClose, onCreated }: {
   return (
     <Modal open={open} onClose={close} title="Nuova segnalazione" size="lg" dismissible={!submitting}>
       <form className={styles.form} onSubmit={(event) => void submit(event)} noValidate>
-        <p className={styles.copy}>Registra un’azienda o un’opportunità con le informazioni che conosci. Gli utenti di Binocolo la ritroveranno in Segnalazioni e potranno integrarla.</p>
         <SegnalazioneFields
           idPrefix="segnalazione-new"
           value={value}

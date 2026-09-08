@@ -1,7 +1,7 @@
 import { useMemo, useState, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Drawer, Icon, MultiSelect, Skeleton } from '@mrsmith/ui';
+import { Button, Drawer, Icon, MultiSelect, Skeleton, Tooltip } from '@mrsmith/ui';
 import { useApiClient } from '../../api/client';
 import type { MAInitiativeCardView, MAPipelineCardView, MAPipelineResponse } from '../../api/types';
 import { ACTIVE_STATES, CARD_STATES, MACROFASI, TERMINAL_STATES, stateLabel, esitoLabel, stateVars } from '../../lib/cardStates';
@@ -171,9 +171,11 @@ export function PipelinePage() {
             <Icon name="search" size={14} />
             <input placeholder="Cerca azienda…" value={search} onChange={(e) => setSearch(e.target.value)} />
           </label>
-          <Button leftIcon={<Icon name="plus" />} onClick={() => setSegnalazioneOpen(true)}>
-            Nuova segnalazione
-          </Button>
+          <Tooltip content="Nuova segnalazione">
+            <Button variant="secondary" className={styles.topbarIconBtn} aria-label="Nuova segnalazione" onClick={() => setSegnalazioneOpen(true)}>
+              <Icon name="lightbulb" size={18} />
+            </Button>
+          </Tooltip>
         </div>
 
         {layout !== 'table' ? (

@@ -16,8 +16,8 @@ interface FieldMeta {
 export const SEGNALAZIONE_FIELDS: FieldMeta[] = [
   { key: 'name', label: 'Nome azienda o opportunità', span2: true, autoComplete: 'organization' },
   { key: 'website', label: 'Sito web', inputMode: 'url', autoComplete: 'url' },
-  { key: 'location', label: 'Località' },
-  { key: 'fiscalId', label: 'Identificativo fiscale', span2: true },
+  { key: 'fiscalId', label: 'Identificativo fiscale' },
+  { key: 'location', label: 'Località', span2: true },
   { key: 'contacts', label: 'Interlocutori o recapiti', multiline: true, span2: true },
   { key: 'notes', label: 'Note addizionali', multiline: true, span2: true },
 ];

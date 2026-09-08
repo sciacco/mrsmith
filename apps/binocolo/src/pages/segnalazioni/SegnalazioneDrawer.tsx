@@ -18,27 +18,35 @@ import { SegnalazioneFields, SegnalazioneReadonly } from '../../components/segna
 import form from '../../components/segnalazioni/segnalazioni.module.css';
 import styles from './Segnalazioni.module.css';
 
-/** Corpo modificabile. Rimontato dal padre (chiave id+stato) così la bozza
- *  parte sempre dai contenuti persistiti quando la segnalazione cambia. */
-function EditableBody({ item, onSaved }: { item: Segnalazione; onSaved: () => void }) {
+/** Corpo modificabile. Rimontato dal padre quando cambiano id o stato: la
+ *  bozza parte dall'ultima bozza non salvata (se c'è) o dai contenuti
+ *  persistiti. Bozza ed errore risalgono al padre, così sopravvivono al
+ *  passaggio in sola lettura se un altro utente chiude la segnalazione. */
+function EditableBody({ item, initial, error, onDraft, onError, onSaved }: {
+  item: Segnalazione;
+  initial: SegnalazioneWrite;
+  error: string;
+  onDraft: (draft: SegnalazioneWrite) => void;
+  onError: (message: string) => void;
+  onSaved: () => void;
+}) {
   const { updateContent } = useSegnalazioneMutations();
-  const [value, setValue] = useState<SegnalazioneWrite>(() => toSegnalazioneWrite(item));
-  const [error, setError] = useState('');
+  const [value, setValue] = useState<SegnalazioneWrite>(initial);
   const saving = updateContent.isPending;
   const dirty = JSON.stringify(value) !== JSON.stringify(toSegnalazioneWrite(item));
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!segnalazioneHasContent(value)) {
-      setError(SEGNALAZIONE_EMPTY_RULE);
+      onError(SEGNALAZIONE_EMPTY_RULE);
       return;
     }
-    setError('');
+    onError('');
     try {
       await updateContent.mutateAsync({ id: item.id, body: value });
       onSaved();
     } catch (cause) {
-      setError(errorLabel(cause));
+      onError(errorLabel(cause));
     }
   }
 
@@ -47,7 +55,7 @@ function EditableBody({ item, onSaved }: { item: Segnalazione; onSaved: () => vo
       <SegnalazioneFields
         idPrefix="segnalazione-edit"
         value={value}
-        onChange={(next) => { setValue(next); if (error && segnalazioneHasContent(next)) setError(''); }}
+        onChange={(next) => { setValue(next); onDraft(next); if (error && segnalazioneHasContent(next)) onError(''); }}
         disabled={saving}
         invalid={error === SEGNALAZIONE_EMPTY_RULE}
         describedBy={error ? 'segnalazione-edit-error' : 'segnalazione-edit-hint'}
@@ -68,7 +76,12 @@ export function SegnalazioneDrawer({ item, onClose, onSaved }: {
 }) {
   const { setState } = useSegnalazioneMutations();
   const [stateError, setStateError] = useState('');
+  // Bozza ed errore di salvataggio, legati alla segnalazione aperta.
+  const [draft, setDraft] = useState<{ id: string; value: SegnalazioneWrite } | null>(null);
+  const [saveError, setSaveError] = useState<{ id: string; message: string } | null>(null);
   const editable = segnalazioneEditable(item.state);
+  const currentDraft = draft?.id === item.id ? draft.value : null;
+  const currentError = saveError?.id === item.id ? saveError.message : '';
   const vars = segnalazioneStateVars(item.state) as CSSProperties;
 
   async function move(target: SegnalazioneState) {
@@ -76,6 +89,8 @@ export function SegnalazioneDrawer({ item, onClose, onSaved }: {
     setStateError('');
     try {
       await setState.mutateAsync({ id: item.id, state: target });
+      // Il cambio di stato supera l'errore di salvataggio precedente (es. 409 chiusa).
+      setSaveError(null);
     } catch (cause) {
       setStateError(errorLabel(cause));
     }
@@ -118,10 +133,19 @@ export function SegnalazioneDrawer({ item, onClose, onSaved }: {
     >
       <div className={styles.drawerBody}>
         {editable ? (
-          <EditableBody key={`${item.id}:${item.state}:${item.updatedAt}`} item={item} onSaved={onSaved} />
+          <EditableBody
+            key={`${item.id}:${item.state}`}
+            item={item}
+            initial={currentDraft ?? toSegnalazioneWrite(item)}
+            error={currentError}
+            onDraft={(value) => setDraft({ id: item.id, value })}
+            onError={(message) => setSaveError(message ? { id: item.id, message } : null)}
+            onSaved={() => { setDraft(null); setSaveError(null); onSaved(); }}
+          />
         ) : (
           <>
-            <div className={form.lockNote}><Icon name="lock" size={16} /><span>Contenuti bloccati: la segnalazione è chiusa. Cambia stato per modificarli.</span></div>
+            {currentError ? <div className={form.formError} role="alert"><Icon name="triangle-alert" size={16} /><span>{currentError}</span></div> : null}
+            <div className={form.lockNote}><Icon name="lock" size={16} /><span>Contenuti bloccati: la segnalazione è chiusa. Cambia stato per modificarli{currentDraft ? ': le modifiche non salvate verranno ripristinate' : ''}.</span></div>
             <SegnalazioneReadonly value={toSegnalazioneWrite(item)} />
           </>
         )}
