@@ -17,7 +17,14 @@ import {
 import { Icon } from '@mrsmith/ui';
 import { formatInstant } from '@mrsmith/format';
 import type { Segnalazione, SegnalazioneState } from '../../api/types';
-import { SEGNALAZIONE_STATES, segnalazioneStateLabel, segnalazioneStateVars, segnalazioneTitle } from '../../lib/segnalazioneStates';
+import {
+  SEGNALAZIONE_STATES,
+  SEGNALAZIONE_TERMINAL_PREVIEW,
+  isSegnalazioneTerminal,
+  segnalazioneStateLabel,
+  segnalazioneStateVars,
+  segnalazioneTitle,
+} from '../../lib/segnalazioneStates';
 import board from '../iniziative/board/board.module.css';
 import styles from './Segnalazioni.module.css';
 
@@ -83,18 +90,67 @@ function DraggableCard({ item, onOpen }: { item: Segnalazione; onOpen: (item: Se
   );
 }
 
-function Column({ state, items, onOpen }: { state: SegnalazioneState; items: Segnalazione[]; onOpen: (item: Segnalazione) => void }) {
+interface ColumnProps {
+  state: SegnalazioneState;
+  items: Segnalazione[];
+  collapsed: boolean;
+  /** Ricerca attiva: le colonne terminali mostrano tutte le corrispondenze. */
+  searching: boolean;
+  onToggle: (state: SegnalazioneState) => void;
+  onOpen: (item: Segnalazione) => void;
+  onShowAll: (state: SegnalazioneState) => void;
+}
+
+/** Colonna della lavagna. Gli stati terminali partono compressi a barra (che
+ *  resta bersaglio del rilascio) e, espansi, mostrano solo le più recenti con
+ *  un rimando alla tabella per lo storico completo. */
+function Column({ state, items, collapsed, searching, onToggle, onOpen, onShowAll }: ColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: `${DROP_PREFIX}${state}` });
   const vars = segnalazioneStateVars(state) as CSSProperties;
+  const label = segnalazioneStateLabel(state);
+  const terminal = isSegnalazioneTerminal(state);
+
+  if (collapsed) {
+    return (
+      <button
+        ref={setNodeRef}
+        type="button"
+        className={[board.krail, isOver ? board.dropTarget : ''].filter(Boolean).join(' ')}
+        style={vars}
+        onClick={() => onToggle(state)}
+        aria-label={`Espandi ${label}, ${items.length} segnalazioni`}
+      >
+        <span className={board.rcount}>{items.length}</span>
+        <span className={board.rlabel}>{label}</span>
+        <Icon name="chevron-right" size={14} className={board.rchev} />
+      </button>
+    );
+  }
+
+  const limited = terminal && !searching && items.length > SEGNALAZIONE_TERMINAL_PREVIEW;
+  const visible = limited ? items.slice(0, SEGNALAZIONE_TERMINAL_PREVIEW) : items;
+
   return (
     <div ref={setNodeRef} className={[board.kcol, isOver ? board.dropTarget : ''].filter(Boolean).join(' ')} style={vars}>
       <div className={board.kcolHead}>
         <span className={board.dot} />
-        <span className={board.nm}>{segnalazioneStateLabel(state)}</span>
-        <span className={board.cnt}>{items.length}</span>
+        <span className={board.nm}>{label}</span>
+        <span className={board.cnt} aria-label={limited ? `${visible.length} di ${items.length}` : undefined}>
+          {limited ? `${visible.length} di ${items.length}` : items.length}
+        </span>
+        {terminal ? (
+          <button type="button" className={board.railBtn} onClick={() => onToggle(state)} aria-label={`Comprimi ${label}`}>
+            <Icon name="chevron-left" size={14} />
+          </button>
+        ) : null}
       </div>
       <div className={board.kcolBody}>
-        {items.map((item) => <DraggableCard key={item.id} item={item} onOpen={onOpen} />)}
+        {limited ? (
+          <button type="button" className={styles.showAll} onClick={() => onShowAll(state)}>
+            Vedi tutte le {items.length} in tabella
+          </button>
+        ) : null}
+        {visible.map((item) => <DraggableCard key={item.id} item={item} onOpen={onOpen} />)}
         {items.length === 0 ? <div className={board.colEmpty}>Nessuna segnalazione</div> : null}
       </div>
     </div>
@@ -103,16 +159,29 @@ function Column({ state, items, onOpen }: { state: SegnalazioneState; items: Seg
 
 /** Kanban a quattro colonne con trascinamento libero fra tutte. Nessuno stato
  *  ottimistico: `onMove` chiama l'API e la lista invalidata riallinea la vista. */
-export function SegnalazioniBoard({ items, onOpen, onMove }: {
+export function SegnalazioniBoard({ items, searching, onOpen, onMove, onShowAll }: {
   items: Segnalazione[];
+  searching: boolean;
   onOpen: (item: Segnalazione) => void;
   onMove: (item: Segnalazione, state: SegnalazioneState) => void;
+  onShowAll: (state: SegnalazioneState) => void;
 }) {
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<SegnalazioneState>>(
+    () => new Set(SEGNALAZIONE_STATES.filter((s) => s.terminal).map((s) => s.key)),
+  );
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor),
   );
+
+  const toggle = (state: SegnalazioneState) =>
+    setCollapsed((current) => {
+      const next = new Set(current);
+      if (next.has(state)) next.delete(state);
+      else next.add(state);
+      return next;
+    });
 
   const byState = useMemo(() => {
     const map = new Map<SegnalazioneState, Segnalazione[]>(SEGNALAZIONE_STATES.map((s) => [s.key, []]));
@@ -157,7 +226,16 @@ export function SegnalazioniBoard({ items, onOpen, onMove }: {
     <DndContext sensors={sensors} accessibility={a11y} collisionDetection={pointerWithin} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setActiveId(null)}>
       <div className={board.cols}>
         {SEGNALAZIONE_STATES.map((state) => (
-          <Column key={state.key} state={state.key} items={byState.get(state.key) ?? []} onOpen={onOpen} />
+          <Column
+            key={state.key}
+            state={state.key}
+            items={byState.get(state.key) ?? []}
+            collapsed={collapsed.has(state.key)}
+            searching={searching}
+            onToggle={toggle}
+            onOpen={onOpen}
+            onShowAll={onShowAll}
+          />
         ))}
       </div>
       <DragOverlay dropAnimation={null}>

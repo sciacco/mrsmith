@@ -1,14 +1,34 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Button, Icon, Skeleton, useToast } from '@mrsmith/ui';
+import { Button, Icon, MultiSelect, Skeleton, useToast } from '@mrsmith/ui';
 import type { Segnalazione, SegnalazioneState } from '../../api/types';
 import { useSegnalazioneMutations, useSegnalazioni } from '../../hooks/useSegnalazioni';
+import { SEGNALAZIONE_STATES } from '../../lib/segnalazioneStates';
 import { errorLabel } from '../ricerche/helpers';
 import { SegnalazioneModal } from '../../components/segnalazioni/SegnalazioneModal';
 import { SegnalazioniBoard } from './SegnalazioniBoard';
+import { SegnalazioniTable } from './SegnalazioniTable';
 import { SegnalazioneDrawer } from './SegnalazioneDrawer';
 import board from '../iniziative/board/board.module.css';
 import styles from './Segnalazioni.module.css';
+
+type Layout = 'board' | 'table';
+const LAYOUT_KEY = 'binocolo.segnalazioni.layout';
+
+function readLayout(): Layout {
+  try {
+    return localStorage.getItem(LAYOUT_KEY) === 'table' ? 'table' : 'board';
+  } catch {
+    return 'board';
+  }
+}
+function writeLayout(layout: Layout) {
+  try {
+    localStorage.setItem(LAYOUT_KEY, layout);
+  } catch {
+    /* best-effort */
+  }
+}
 
 function matches(item: Segnalazione, needle: string): boolean {
   if (!needle) return true;
@@ -24,7 +44,14 @@ export function SegnalazioniPage() {
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
+  const [layout, setLayoutState] = useState<Layout>(readLayout);
+  const [stateFilter, setStateFilter] = useState<SegnalazioneState[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
+
+  const setLayout = (next: Layout) => {
+    setLayoutState(next);
+    writeLayout(next);
+  };
 
   const items = query.data ?? [];
   const selectedId = searchParams.get('id');
@@ -41,13 +68,27 @@ export function SegnalazioniPage() {
   const open = (item: Segnalazione) => setSearchParams((current) => { current.set('id', item.id); return current; });
   const close = () => setSearchParams((current) => { current.delete('id'); return current; });
 
-  const visible = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    return items.filter((item) => matches(item, needle));
-  }, [items, search]);
+  const needle = search.trim().toLowerCase();
+  const searched = useMemo(() => items.filter((item) => matches(item, needle)), [items, needle]);
+  // Il filtro per stato vale solo in tabella: sulla lavagna gli stati sono le colonne.
+  const tabled = useMemo(
+    () => (stateFilter.length ? searched.filter((item) => stateFilter.includes(item.state)) : searched),
+    [searched, stateFilter],
+  );
+  const visible = layout === 'table' ? tabled : searched;
 
   const move = (item: Segnalazione, state: SegnalazioneState) => {
     setState.mutate({ id: item.id, state }, { onError: (error) => toast(errorLabel(error), 'error') });
+  };
+
+  const showAllInTable = (state: SegnalazioneState) => {
+    setStateFilter([state]);
+    setLayout('table');
+  };
+
+  const clearFilters = () => {
+    setSearch('');
+    setStateFilter([]);
   };
 
   return (
@@ -59,6 +100,24 @@ export function SegnalazioniPage() {
             <h1 className={board.title}>Segnalazioni</h1>
           </div>
           <div className={board.viewMatrix}>
+            <div className={board.seg} role="group" aria-label="Disposizione">
+              <button type="button" className={`${board.segIcon} ${layout === 'board' ? board.segOn : ''}`} aria-pressed={layout === 'board'} onClick={() => setLayout('board')} title="Lavagna" aria-label="Lavagna">
+                <Icon name="kanban-square" size={15} />
+              </button>
+              <button type="button" className={`${board.segIcon} ${layout === 'table' ? board.segOn : ''}`} aria-pressed={layout === 'table'} onClick={() => setLayout('table')} title="Tabella" aria-label="Tabella">
+                <Icon name="table" size={15} />
+              </button>
+            </div>
+            {layout === 'table' ? (
+              <div style={{ width: 200 }}>
+                <MultiSelect<SegnalazioneState>
+                  options={SEGNALAZIONE_STATES.map((s) => ({ value: s.key, label: s.label }))}
+                  selected={stateFilter}
+                  onChange={setStateFilter}
+                  placeholder="Tutti gli stati"
+                />
+              </div>
+            ) : null}
             <label className={board.search}>
               <Icon name="search" size={14} />
               <input placeholder="Cerca nelle segnalazioni…" value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Cerca nelle segnalazioni" />
@@ -82,15 +141,17 @@ export function SegnalazioniPage() {
             <p className={styles.emptyText}>Registra la prima azienda o opportunità con le informazioni che conosci.</p>
             <Button leftIcon={<Icon name="plus" />} onClick={() => setCreateOpen(true)}>Nuova segnalazione</Button>
           </div>
+        ) : layout === 'table' ? (
+          <SegnalazioniTable items={visible} onRowClick={open} />
         ) : visible.length === 0 ? (
           <div className={board.colEmpty} style={{ padding: 'var(--space-16) 0' }}>
             Nessuna segnalazione corrisponde alla ricerca.{' '}
-            <button type="button" className={board.actionLink} style={{ border: 'none', background: 'none', cursor: 'pointer' }} onClick={() => setSearch('')}>
+            <button type="button" className={board.actionLink} style={{ border: 'none', background: 'none', cursor: 'pointer' }} onClick={clearFilters}>
               Azzera ricerca
             </button>
           </div>
         ) : (
-          <SegnalazioniBoard items={visible} onOpen={open} onMove={move} />
+          <SegnalazioniBoard items={visible} searching={needle !== ''} onOpen={open} onMove={move} onShowAll={showAllInTable} />
         )}
       </div>
 

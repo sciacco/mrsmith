@@ -5,15 +5,25 @@ export interface SegnalazioneStateMeta {
   label: string;
   /** Prefisso dei token `--kanban-<ramp>-*` riusati per la colonna; null = grigio neutro. */
   ramp: string | null;
+  /** Stato terminale: la colonna cresce per sempre, sulla lavagna parte compressa
+   *  e da espansa mostra solo le più recenti. */
+  terminal: boolean;
 }
 
 /** Le quattro colonne della Kanban, nell'ordine di visualizzazione. */
 export const SEGNALAZIONE_STATES: SegnalazioneStateMeta[] = [
-  { key: 'da_gestire', label: 'Da gestire', ramp: 'approfondimento' },
-  { key: 'in_gestione', label: 'In gestione', ramp: 'primo-incontro' },
-  { key: 'chiusa', label: 'Chiusa', ramp: 'won' },
-  { key: 'annullata', label: 'Annullata', ramp: null },
+  { key: 'da_gestire', label: 'Da gestire', ramp: 'approfondimento', terminal: false },
+  { key: 'in_gestione', label: 'In gestione', ramp: 'primo-incontro', terminal: false },
+  { key: 'chiusa', label: 'Chiusa', ramp: 'won', terminal: true },
+  { key: 'annullata', label: 'Annullata', ramp: null, terminal: true },
 ];
+
+/** Card mostrate in una colonna terminale espansa quando la ricerca è vuota. */
+export const SEGNALAZIONE_TERMINAL_PREVIEW = 10;
+
+export function isSegnalazioneTerminal(key: SegnalazioneState): boolean {
+  return BY_KEY.get(key)?.terminal ?? false;
+}
 
 const BY_KEY = new Map(SEGNALAZIONE_STATES.map((s) => [s.key, s]));
 
