@@ -89,6 +89,10 @@ export function errorLabel(error: unknown): string {
     if (code === 'ma_session_not_found') return 'Ricerca non trovata.';
     if (code === 'ma_session_archived') return 'La ricerca e archiviata: ripristinala prima di modificarla.';
     if (code === 'ma_session_deleted') return 'La ricerca e nel cestino: ripristinala prima di aprirla.';
+    if (code === 'segnalazione_not_found') return 'Segnalazione non trovata.';
+    if (code === 'segnalazione_chiusa') return 'La segnalazione è chiusa: riaprila per modificarne i contenuti.';
+    if (code === 'segnalazione_vuota') return 'Compila almeno uno tra nome, sito web, identificativo fiscale e note.';
+    if (code === 'invalid_segnalazione_state') return 'Stato della segnalazione non valido.';
     if (error.status === 401) return 'Sessione non valida.';
     if (error.status === 403) return 'Non hai accesso a Binocolo.';
     return 'Operazione non riuscita.';

@@ -14,6 +14,7 @@ import { FunnelStrip } from '../iniziative/board/FunnelStrip';
 import { StatesView } from '../iniziative/board/StatesView';
 import { MacroView } from '../iniziative/board/MacroView';
 import { BoardTable } from '../iniziative/board/BoardTable';
+import { SegnalazioneModal } from '../../components/segnalazioni/SegnalazioneModal';
 import styles from '../iniziative/board/board.module.css';
 
 type Layout = 'macro' | 'states' | 'table';
@@ -51,6 +52,7 @@ export function PipelinePage() {
   const [funnelFilter, setFunnelFilter] = useState<string | null>(null);
   const [initFilter, setInitFilter] = useState<string[]>([]);
   const [selected, setSelected] = useState<MAPipelineCardView | null>(null);
+  const [segnalazioneOpen, setSegnalazioneOpen] = useState(false);
 
   const setLayout = (l: Layout) => {
     setLayoutState(l);
@@ -169,6 +171,9 @@ export function PipelinePage() {
             <Icon name="search" size={14} />
             <input placeholder="Cerca azienda…" value={search} onChange={(e) => setSearch(e.target.value)} />
           </label>
+          <Button leftIcon={<Icon name="plus" />} onClick={() => setSegnalazioneOpen(true)}>
+            Nuova segnalazione
+          </Button>
         </div>
 
         {layout !== 'table' ? (
@@ -217,6 +222,7 @@ export function PipelinePage() {
           }}
         />
       ) : null}
+      <SegnalazioneModal open={segnalazioneOpen} onClose={() => setSegnalazioneOpen(false)} />
     </main>
   );
 }

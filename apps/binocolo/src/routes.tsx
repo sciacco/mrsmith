@@ -12,6 +12,7 @@ import { IniziativaBoardPage } from './pages/iniziative/IniziativaBoardPage';
 import { PipelinePage } from './pages/pipeline/PipelinePage';
 import { AziendePage } from './pages/aziende/AziendePage';
 import { SchedaAziendaPage } from './pages/aziende/SchedaAziendaPage';
+import { SegnalazioniPage } from './pages/segnalazioni/SegnalazioniPage';
 
 // Il card-dossier è stato assorbito dalla Scheda azienda (FUSIONE F5): i
 // vecchi URL restano validi e atterrano sulla scheda con lente iniziativa.
@@ -32,6 +33,7 @@ export const routes: RouteObject[] = [
   { path: 'iniziative/:id/dossier/:companyKey', element: <CardDossierRedirect /> },
   { path: 'aziende', element: <AziendePage /> },
   { path: 'aziende/:companyKey', element: <SchedaAziendaPage /> },
+  { path: 'segnalazioni', element: <SegnalazioniPage /> },
   { path: 'azienda', element: <CompanyDossierPage /> },
   { path: 'ricerca-web', element: <WebSearchPage /> },
   { path: 'config', element: <ConfigPage /> },

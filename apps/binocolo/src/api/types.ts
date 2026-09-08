@@ -529,6 +529,30 @@ export interface MACompanyAgreementWrite {
   expiresOn: string;
 }
 
+// Segnalazioni: quick free-text reports of a company or an opportunity,
+// shared on their own Kanban. No link to companies or initiatives. Every
+// field is optional on its own; the backend requires at least one of name,
+// website, fiscalId, notes. Contents are read-only while state is 'chiusa'.
+export type SegnalazioneState = 'da_gestire' | 'in_gestione' | 'chiusa' | 'annullata';
+
+export interface SegnalazioneWrite {
+  name: string;
+  website: string;
+  location: string;
+  fiscalId: string;
+  contacts: string;
+  notes: string;
+}
+
+export interface Segnalazione extends SegnalazioneWrite {
+  id: string;
+  state: SegnalazioneState;
+  createdAt: string;
+  createdByEmail?: string;
+  updatedAt: string;
+  updatedByEmail?: string;
+}
+
 // Google Drive documents (issue #98). Drive is the source of truth; the
 // backend lists the company folder's direct children, already sorted
 // (folders first, then by name) and with trashed children filtered out.

@@ -48,6 +48,7 @@ type Handler struct {
 	provinceCache      provinceCacheStore
 	ateco              atecoStore
 	ma                 *maService
+	segnalazioni       *segnalazioneService
 }
 
 // RegisterRoutes wires the binocolo HTTP routes and returns the deep-dive worker
@@ -77,6 +78,14 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	}
 	h.ma.brave = deps.Brave
 	h.ma.owner = deps.InstanceOwner
+	// Segnalazioni: standalone entity on the same Anisetta store. Without a
+	// database the service answers errMAStoreUnavailable (503) like the rest of
+	// the workspace; the explicit branch avoids storing a typed-nil *SQLStore
+	// in the interface field.
+	h.segnalazioni = newSegnalazioneService(nil)
+	if sqlStore != nil {
+		h.segnalazioni = newSegnalazioneService(sqlStore)
+	}
 	// Guard the assignment: a nil *scrape.Client stored in the interface field would
 	// be a non-nil interface (typed-nil), defeating the s.scrape == nil fallback.
 	if deps.Scrape != nil {
@@ -177,6 +186,11 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/agreements", h.handleCreateMACompanyAgreement)
 	handle("PUT /binocolo/v1/ma/companies/{companyKey}/agreements/{agreementId}", h.handleUpdateMACompanyAgreement)
 	handle("DELETE /binocolo/v1/ma/companies/{companyKey}/agreements/{agreementId}", h.handleDeleteMACompanyAgreement)
+	handle("GET /binocolo/v1/segnalazioni", h.handleListSegnalazioni)
+	handle("POST /binocolo/v1/segnalazioni", h.handleCreateSegnalazione)
+	handle("GET /binocolo/v1/segnalazioni/{id}", h.handleGetSegnalazione)
+	handle("PUT /binocolo/v1/segnalazioni/{id}", h.handleUpdateSegnalazioneContent)
+	handle("POST /binocolo/v1/segnalazioni/{id}/state", h.handleSetSegnalazioneState)
 	// Google Drive documents (issue #98, executing PRD #85). Company-scoped
 	// listing (lazy-ensures the folder) and the idempotent card subfolder ensure.
 	handle("GET /binocolo/v1/ma/companies/{companyKey}/documents", h.handleListMACompanyDocuments)
@@ -2278,6 +2292,18 @@ func maHTTPError(err error) (int, string, string) {
 	}
 	if errors.Is(err, errMACompanyAgreementNotFound) {
 		return http.StatusNotFound, "ma_company_agreement_not_found", "warn"
+	}
+	if errors.Is(err, errSegnalazioneNotFound) {
+		return http.StatusNotFound, "segnalazione_not_found", "warn"
+	}
+	if errors.Is(err, errSegnalazioneChiusa) {
+		return http.StatusConflict, "segnalazione_chiusa", "warn"
+	}
+	if errors.Is(err, errSegnalazioneVuota) {
+		return http.StatusUnprocessableEntity, "segnalazione_vuota", "warn"
+	}
+	if errors.Is(err, errSegnalazioneStateInvalid) {
+		return http.StatusBadRequest, "invalid_segnalazione_state", "warn"
 	}
 	// Deposited-filing endpoints (issue #78, Fase 8).
 	if errors.Is(err, errMAFilingIdentityUnresolved) {

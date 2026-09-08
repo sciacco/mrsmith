@@ -1,0 +1,174 @@
+/* Segnalazioni — quanto non arriva da board.module.css (colonne, card, topbar
+   sono riusate da lì). Token-only. */
+
+.cardSub {
+  margin-top: 6px;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.cardSub span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.cardFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: 0.6875rem;
+  color: var(--color-text-muted);
+  min-width: 0;
+}
+.cardFoot .who {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.cardFoot .when {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Stato vuoto pagina (UI-UX §14.5) */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--space-16) var(--space-8);
+}
+.emptyIcon {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  color: var(--color-text-faint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--space-5);
+}
+.emptyTitle {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  letter-spacing: -0.01em;
+}
+.emptyText {
+  margin: var(--space-1) 0 var(--space-5);
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+.errorBox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-danger-hover);
+}
+
+/* Drawer */
+.drawerMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: center;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+.statePill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  background: var(--tint);
+  color: var(--strong);
+  border: 1px solid color-mix(in srgb, var(--c) 30%, transparent);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.statePill::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--c);
+}
+.drawerBody {
+  display: grid;
+  gap: var(--space-5);
+  padding: var(--space-5) var(--space-6) var(--space-6);
+}
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+}
+.stateGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+.stateGroupLabel {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-right: var(--space-1);
+}
+.stateBtn {
+  border: 1.5px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-full);
+  min-height: 36px;
+  padding: 0 14px;
+  font: 600 0.8125rem/1 var(--font-sans);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: border-color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+}
+.stateBtn::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--c);
+}
+.stateBtn:hover:not(:disabled) {
+  border-color: var(--c);
+  color: var(--strong);
+}
+.stateBtn:focus-visible {
+  outline: 2px solid transparent;
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
+}
+.stateBtn[aria-pressed='true'] {
+  background: var(--tint);
+  border-color: var(--c);
+  color: var(--strong);
+  cursor: default;
+}
+.stateBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
