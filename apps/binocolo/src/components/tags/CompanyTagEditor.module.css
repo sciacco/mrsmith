@@ -1,0 +1,79 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Errore PERSISTENTE della rimozione di un tag (UI-UX §14.3): il toast è solo
+   la conferma immediata, qui resta messaggio + «Riprova» finché l'utente non
+   risolve o dismissa. Schema cromatico danger della scala (§4.2: il testo usa
+   la variante strong/hover, mai il rosso base). */
+.error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-md);
+  background: var(--color-danger-subtle);
+  color: var(--color-danger-hover);
+}
+
+.error p {
+  flex: 1;
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.errorActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: none;
+}
+
+.errorDismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-6);
+  height: var(--space-6);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-danger-hover);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.errorDismiss:hover:not(:disabled),
+.errorDismiss:focus-visible {
+  background: var(--color-surface-hover);
+}
+
+.errorDismiss:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.errorDismiss:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .error {
+    flex-wrap: wrap;
+  }
+}

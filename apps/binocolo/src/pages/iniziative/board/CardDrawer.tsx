@@ -5,6 +5,7 @@ import type { MAInitiativeCardView } from '../../../api/types';
 import { errorLabel } from '../../ricerche/helpers';
 import { ActivityTimeline } from '../../../components/company/activity/ActivityTimeline';
 import { CompanyContactsPanel } from '../../../components/company/contacts/CompanyContactsPanel';
+import { CompanyTagEditor } from '../../../components/tags/CompanyTagEditor';
 import { useAnnotationMutations, useCompanyActivity } from '../../../hooks/useCompanyActivity';
 import { useEnsureMACardDriveFolder } from '../../../hooks/useCompanyDocumenti';
 import { writeCohort } from '../../../components/scheda/cohort';
@@ -77,6 +78,7 @@ export function CardDrawer({
   onRemove,
   onDeepDive,
   onOpenDossier,
+  onAddTag,
 }: {
   initiativeId: string;
   initiativeTitle: string;
@@ -90,6 +92,7 @@ export function CardDrawer({
   onRemove: (card: MAInitiativeCardView) => void;
   onDeepDive: (companyKey: string) => Promise<void>;
   onOpenDossier: (card: MAInitiativeCardView) => void;
+  onAddTag: () => void;
 }) {
   const activity = useCompanyActivity(card.companyKey);
   const annotations = useAnnotationMutations(card.companyKey, initiativeId);
@@ -164,10 +167,15 @@ export function CardDrawer({
       }}
       title={card.companyName}
       subtitle={
-        <div className={styles.drawerMeta}>
-          {card.vatCode ? <span>P.IVA {card.vatCode}</span> : null}
-          {card.province ? <span> · {card.province}</span> : null}
-          {card.origin === 'direct' ? <span> · Diretta</span> : null}
+        <div className={styles.drawerMetaWrap}>
+          {card.vatCode || card.province || card.origin === 'direct' ? (
+            <div className={styles.drawerMeta}>
+              {card.vatCode ? <span>P.IVA {card.vatCode}</span> : null}
+              {card.province ? <span> · {card.province}</span> : null}
+              {card.origin === 'direct' ? <span> · Diretta</span> : null}
+            </div>
+          ) : null}
+          <CompanyTagEditor companyKey={card.companyKey} tags={card.tags ?? []} onAddTag={onAddTag} compact />
         </div>
       }
       headerExtra={

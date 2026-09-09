@@ -35,9 +35,9 @@ import { CompanyContactsPanel } from '../../components/company/contacts/CompanyC
 import { CompanyAgreementsPanel } from '../../components/company/agreements/CompanyAgreementsPanel';
 import { DocumentiPanel } from '../../components/company/documenti/DocumentiPanel';
 import { bucketLabelWithSuppressionHistory, dateLabel, errorLabel, sessionStatusLabel } from '../ricerche/helpers';
-import { MATagChips } from '../../components/tags/MATagChips';
 import { AddCompanyTagModal } from '../../components/tags/AddCompanyTagModal';
-import { maTagErrorMessage, maTagQueryPolicy, useMATagCompanyMutations } from '../../hooks/useMATags';
+import { CompanyTagEditor } from '../../components/tags/CompanyTagEditor';
+import { maTagQueryPolicy } from '../../hooks/useMATags';
 import styles from './SchedaAziendaPage.module.css';
 
 type Lens =
@@ -302,16 +302,6 @@ export function SchedaAziendaPage() {
   const [excludeReason, setExcludeReason] = useState('');
   const [excludeOpen, setExcludeOpen] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(false);
-  const [removingTagId, setRemovingTagId] = useState<string | null>(null);
-  // Errore PERSISTENTE della rimozione (UI-UX §14.3: il toast da solo non
-  // basta): conserva tag e messaggio per «Riprova» e resta in vista finché
-  // una nuova azione non riesce o l'utente non lo dismissa esplicitamente.
-  const [unassignError, setUnassignError] = useState<{ tagId: string; message: string } | null>(null);
-  const tagsRowRef = useRef<HTMLDivElement | null>(null);
-  const addTagButtonRef = useRef<HTMLButtonElement | null>(null);
-  // Rimozione riuscita di cui attendere la sparizione dall'elenco per
-  // riposizionare il focus da tastiera (useEffect più sotto).
-  const pendingTagFocusRef = useRef<{ tagId: string; index: number } | null>(null);
 
   const encodedCompanyKey = encodeURIComponent(companyKey ?? '');
   const overviewKey = ['ma-company-overview', companyKey];
@@ -324,32 +314,6 @@ export function SchedaAziendaPage() {
     // al ritorno sulla finestra (politica centralizzata, issue #198).
     ...maTagQueryPolicy,
   });
-
-  const tagMutations = useMATagCompanyMutations(companyKey ?? '');
-
-  // Rimozione della SOLA associazione: il tag resta nel catalogo e sulle altre
-  // aziende. Rinomina/eliminazione globale non esistono in scheda (Gestione tag).
-  const unassignTag = async (tagId: string) => {
-    if (!companyKey) return;
-    // Posizione della chip da rimuovere: la chip subentrata alla stessa
-    // posizione riceverà il focus dopo il successo (uso da tastiera).
-    const tagIndex = companyTags.findIndex((tag) => tag.id === tagId);
-    setRemovingTagId(tagId);
-    try {
-      await tagMutations.unassign.mutateAsync(tagId);
-      setUnassignError(null); // pulizia a azione riuscita
-      pendingTagFocusRef.current = { tagId, index: tagIndex };
-      toast('Tag rimosso.', 'success');
-    } catch (error) {
-      const message = maTagErrorMessage(error);
-      // Superficie persistente accanto alla riga tag; il toast resta come
-      // conferma immediata ma non è l'unica superficie (UI-UX §14.3).
-      setUnassignError({ tagId, message });
-      toast(message, 'error');
-    } finally {
-      setRemovingTagId(null);
-    }
-  };
 
   const overview = overviewQuery.data;
   const identity = overview?.identity;
@@ -432,31 +396,6 @@ export function SchedaAziendaPage() {
     const handle = window.setTimeout(() => setDeepArrivedPulse(false), 1500);
     return () => window.clearTimeout(handle);
   }, [deepArrivedPulse]);
-
-  // Focus da tastiera dopo una rimozione RIUSCITA: il bottone della chip viene
-  // smontato e il focus cadrebbe su <body>. Quando il tag sparisce dall'elenco,
-  // il focus va alla chip subentrata (stessa posizione) o, se non c'è, a
-  // «Aggiungi tag». Solo se è davvero caduto su <body>: se l'utente lo ha già
-  // spostato altrove durante l'attesa, non glielo rubiamo. Con errore la chip
-  // resta in elenco e qui non si entra (nessun redirect del focus).
-  useEffect(() => {
-    const pending = pendingTagFocusRef.current;
-    if (!pending) return;
-    if (companyTags.some((tag) => tag.id === pending.tagId)) return; // aggiornamento non ancora arrivato
-    pendingTagFocusRef.current = null;
-    if (document.activeElement !== document.body) return;
-    const container = tagsRowRef.current;
-    const removeButtons = container
-      ? Array.from(container.querySelectorAll<HTMLButtonElement>('button[data-tag-remove]'))
-      : [];
-    const nextButton =
-      pending.index >= 0 && pending.index < removeButtons.length ? removeButtons[pending.index] : undefined;
-    if (nextButton && !nextButton.disabled) {
-      nextButton.focus();
-      return;
-    }
-    addTagButtonRef.current?.focus();
-  }, [companyTags]);
 
   const contentReady = Boolean(overview && identity);
   const { activeId: activeSpineId, scrollTo: scrollToSection } = useSectionSpy(SPINE_IDS, contentReady);
@@ -637,7 +576,6 @@ export function SchedaAziendaPage() {
   const financialSheetsCount = vendorFinancialSheetsCount(target);
   const showIRL = lens.type === 'iniziativa' && Boolean(initiativeCard && identity.companyKey);
   const companyName = identity.companyName || identity.companyKey;
-  const failedTagName = unassignError ? companyTags.find((tag) => tag.id === unassignError.tagId)?.name : undefined;
 
   const lensOptions: LensOption[] = [];
   const seenSessions = new Set<string>();
@@ -796,52 +734,9 @@ export function SchedaAziendaPage() {
           </div>
           {/* Tag condivisi del team: in tutte le lenti (globale, ricerca, iniziativa),
               perché l'associazione appartiene all'azienda, non alla vista. */}
-          <div ref={tagsRowRef} className={styles.tagsRow} role="group" aria-label="Tag dell’azienda">
-            <MATagChips
-              tags={companyTags}
-              onRemove={(tagId) => void unassignTag(tagId)}
-              removeDisabled={tagMutations.unassign.isPending}
-              removingTagId={removingTagId}
-            />
-            <Button
-              ref={addTagButtonRef}
-              size="sm"
-              variant="secondary"
-              onClick={() => setTagsOpen(true)}
-              disabled={tagMutations.unassign.isPending}
-              leftIcon={<Icon name="plus" size={14} />}
-            >
-              Aggiungi tag
-            </Button>
+          <div className={styles.tagsBlock}>
+            <CompanyTagEditor companyKey={companyKey ?? ''} tags={companyTags} onAddTag={() => setTagsOpen(true)} />
           </div>
-          {unassignError ? (
-            <div className={styles.tagsError} role="alert">
-              <Icon name="triangle-alert" size={16} aria-hidden="true" />
-              <p>
-                Rimozione del tag{failedTagName ? ` «${failedTagName}»` : ''} non riuscita: {unassignError.message}
-              </p>
-              <div className={styles.tagsErrorActions}>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => void unassignTag(unassignError.tagId)}
-                  loading={tagMutations.unassign.isPending && removingTagId === unassignError.tagId}
-                  disabled={tagMutations.unassign.isPending}
-                >
-                  Riprova
-                </Button>
-                <button
-                  type="button"
-                  className={styles.tagsErrorDismiss}
-                  aria-label="Nascondi l’errore"
-                  disabled={tagMutations.unassign.isPending}
-                  onClick={() => setUnassignError(null)}
-                >
-                  <Icon name="x" size={14} aria-hidden="true" />
-                </button>
-              </div>
-            </div>
-          ) : null}
         </div>
       </header>
 

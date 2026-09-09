@@ -25,6 +25,7 @@ import {
   isTerminalState,
 } from '../../../lib/cardStates';
 import { DirectCompanyModal } from '../../../components/company/DirectCompanyModal';
+import { AddCompanyTagModal } from '../../../components/tags/AddCompanyTagModal';
 import { useBoardData } from './useBoardData';
 import { useFlip } from './flip';
 import { useBoardKeyboard } from './useBoardKeyboard';
@@ -79,6 +80,7 @@ export function BoardPage() {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [terminal, setTerminal] = useState<{ card: MAInitiativeCardView; target: TerminalTarget } | null>(null);
   const [removeCard, setRemoveCard] = useState<MAInitiativeCardView | null>(null);
+  const [tagsOpen, setTagsOpen] = useState(false);
   const [addState, setAddState] = useState<string | null>(null);
   const [directOpen, setDirectOpen] = useState(false);
   const [directSubmitting, setDirectSubmitting] = useState(false);
@@ -433,7 +435,7 @@ export function BoardPage() {
           initiativeTitle={board.initiative.title}
           card={selected}
           cohortKeys={cohortKeys}
-          onClose={() => setSelectedKey(null)}
+          onClose={() => { setSelectedKey(null); setTagsOpen(false); }}
           onChanged={() => void data.refetch()}
           onSetState={(companyKey, state, recontactOn) => data.setState.mutate({ companyKey, state, recontactOn })}
           onOpenTerminal={openTerminal}
@@ -441,6 +443,16 @@ export function BoardPage() {
           onRemove={(card) => setRemoveCard(card)}
           onDeepDive={(companyKey) => data.startDeepDive.mutateAsync(companyKey).then(() => undefined)}
           onOpenDossier={openDossier}
+          onAddTag={() => setTagsOpen(true)}
+        />
+      ) : null}
+
+      {selected && tagsOpen ? (
+        <AddCompanyTagModal
+          open
+          onClose={() => setTagsOpen(false)}
+          companyKey={selected.companyKey}
+          currentTags={selected.tags ?? []}
         />
       ) : null}
 
