@@ -9,6 +9,8 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 // The corpus and fiscal grouping are shared by the search and its local area
@@ -81,6 +83,7 @@ type maCompanySearchOptions struct {
 	NDA              string   `json:"nda"`
 	Include          []string `json:"include"`
 	Exclude          []string `json:"exclude"`
+	TagIDs           []string `json:"tagIds"`
 	TurnoverMin      *float64 `json:"turnoverMin"`
 	TurnoverMax      *float64 `json:"turnoverMax"`
 	EmployeesMin     *int     `json:"employeesMin"`
@@ -94,13 +97,30 @@ type maCompanySearchOptions struct {
 }
 
 func parseMACompanySearch(values url.Values) (maCompanySearchOptions, error) {
-	o := maCompanySearchOptions{Page: 1, PageSize: 25, Sort: "name", Direction: "asc", Include: []string{}, Exclude: []string{}}
+	o := maCompanySearchOptions{Page: 1, PageSize: 25, Sort: "name", Direction: "asc", Include: []string{}, Exclude: []string{}, TagIDs: []string{}}
 	invalid := func(field string) (maCompanySearchOptions, error) {
 		return o, fmt.Errorf("%w: %s", errMAStrategyInvalid, field)
 	}
 	mode := values.Get("mode")
 	if mode != "" && mode != "simple" && mode != "advanced" {
 		return invalid("mode")
+	}
+	// tagId è ripetibile e vale in ENTRAMBE le modalità (PRD #198: il filtro
+	// AND non è un criterio avanzato). Ogni valore deve essere un UUID valido e
+	// viene conservato in forma canonica (parsed.String()), così forme diverse
+	// dello stesso UUID deduplicano; un UUID malformato è richiesta invalida,
+	// non un filtro ignorato.
+	tagIDs := map[string]bool{}
+	for _, value := range values["tagId"] {
+		parsed, err := uuid.Parse(strings.TrimSpace(value))
+		if err != nil {
+			return invalid("tagId")
+		}
+		canonical := parsed.String()
+		if !tagIDs[canonical] {
+			tagIDs[canonical] = true
+			o.TagIDs = append(o.TagIDs, canonical)
+		}
 	}
 	var err error
 	o.Kind, o.Query, err = normalizeMACompanySearch(values.Get("query"))
@@ -390,6 +410,22 @@ const maCompanySearchFilterSQL = `,
   AND ((f->>'employeesMin' IS NULL AND f->>'employeesMax' IS NULL)
    OR (c.employees IS NULL AND (f->>'employeesMissing')::boolean)
    OR (c.employees IS NOT NULL AND (f->>'employeesMin' IS NULL OR c.employees >= (f->>'employeesMin')::integer) AND (f->>'employeesMax' IS NULL OR c.employees <= (f->>'employeesMax')::integer)))
+  -- Filtro AND sui tag aziendali (PRD #198). I tag sono persistiti sulla
+  -- company_key posseduta, mai sulla chiave fiscale: il raggruppamento usa il
+  -- mapping company_keys del corpus, quindi un gruppo soddisfa il filtro se
+  -- OGNI tag richiesto compare su ALCUNA company_key del gruppo. Nessuna
+  -- selezione non restringe; un ID valido ma privo di righe in
+  -- ma_company_tag (tag eliminato o mai assegnato) NON è ignorato: fallisce
+  -- il conteggio per quel tag ed esclude l'azienda.
+  AND (jsonb_array_length(f->'tagIds') = 0 OR NOT EXISTS (
+   SELECT 1 FROM jsonb_array_elements_text(f->'tagIds') AS wanted(tag_id)
+   WHERE NOT EXISTS (
+    SELECT 1
+    FROM binocolo.ma_company_tag association
+    JOIN company_keys k ON k.company_key = upper(btrim(association.company_key))
+    WHERE k.stable_key = c.stable_key AND association.tag_id = wanted.tag_id::uuid
+   )
+  ))
  )`
 
 func (s *SQLStore) ListMACompanySearchAreas(ctx context.Context) (MACompanySearchAreas, error) {

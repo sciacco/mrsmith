@@ -658,6 +658,11 @@ type MACompanyOverview struct {
 	Deep        *MADeepAnalysis               `json:"deep,omitempty"`
 	Appearances []MACompanyOverviewAppearance `json:"appearances"`
 	Cards       []MACompanyOverviewCard       `json:"cards"`
+	// Tag aziendali condivisi (issue #198): associazioni della company_key,
+	// ordinate per nome come il catalogo. Sempre un array JSON (vuoto senza
+	// tag, mai null): la scheda li mostra identici in ogni lente (ricerca,
+	// iniziativa), perché l'associazione vive sulla company_key.
+	Tags []MATag `json:"tags"`
 	// Deposited-filing extension (issue #78, Fase 8). Additive only — the fields above are
 	// unchanged (the production scheda depends on them). Adjusted is the on-read adjusted
 	// valuation (nil when no deep analysis exists for the fiscal identity); BriefStale is true
@@ -841,6 +846,22 @@ type MACompanyAgreementReplaceRequest struct {
 	ExpiresOn *string `json:"expiresOn"`
 }
 
+// MATag è un tag del catalogo condiviso del team (issue #198, migrazione
+// 148). {id, name} è il contratto condiviso Go/TypeScript: l'id è l'UUID e
+// sopravvive alla rinomina; l'associazione alle aziende vive in
+// ma_company_tag e non viaggia in questo tipo.
+type MATag struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// MATagNameRequest è il payload di creazione (POST .../tags) e rinomina
+// (PUT /tags/{tagId}): il nome viene ripulito dagli spazi esterni e
+// validato non vuoto dal servizio.
+type MATagNameRequest struct {
+	Name string `json:"name"`
+}
+
 // MACardMarker names one Iniziativa where the company has an ACTIVE card
 // (PRD §6.1: collision marker, derived from the cards, no new data).
 type MACardMarker struct {
@@ -871,6 +892,10 @@ type MAInitiativeCardView struct {
 	RegistryFacts []string           `json:"registryFacts,omitempty"`
 	Provenances   []MACardProvenance `json:"provenances,omitempty"`
 	LastEvent     string             `json:"lastEvent,omitempty"`
+	// Tag dell'azienda della card (issue #198): le stesse associazioni viste
+	// in scheda, ordinate per nome. Sempre un array JSON (vuoto senza tag,
+	// mai null); alimentato in batch per company_key da board e pipeline.
+	Tags []MATag `json:"tags"`
 }
 
 // MAInitiativeBoard is the response of GET .../initiatives/{id}: the

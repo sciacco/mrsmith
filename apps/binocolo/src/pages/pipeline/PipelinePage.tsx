@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Button, Drawer, Icon, MultiSelect, Skeleton, Tooltip } from '@mrsmith/ui';
 import { useApiClient } from '../../api/client';
 import type { MAInitiativeCardView, MAPipelineCardView, MAPipelineResponse } from '../../api/types';
+import { maTagQueryPolicy } from '../../hooks/useMATags';
 import { ACTIVE_STATES, CARD_STATES, MACROFASI, TERMINAL_STATES, stateLabel, esitoLabel, stateVars } from '../../lib/cardStates';
 import { errorLabel } from '../ricerche/helpers';
 import { writeCohort } from '../../components/scheda/cohort';
@@ -42,6 +43,9 @@ export function PipelinePage() {
   const query = useQuery({
     queryKey: ['ma-pipeline'],
     queryFn: () => api.get<MAPipelineResponse>('/binocolo/v1/ma/pipeline'),
+    // I tag sulle card sono condivisi tra utenti: riletti a apertura e focus
+    // (politica centralizzata, issue #198).
+    ...maTagQueryPolicy,
   });
   const data = query.data;
 

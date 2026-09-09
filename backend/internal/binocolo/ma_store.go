@@ -96,6 +96,16 @@ type maWorkspaceStore interface {
 	CreateMACompanyAgreement(ctx context.Context, companyKey string, input MACompanyAgreementWrite, subject, email string) (MACompanyAgreement, error)
 	UpdateMACompanyAgreement(ctx context.Context, companyKey, agreementID string, input MACompanyAgreementWrite, subject, email string) (updated MACompanyAgreement, previous MACompanyAgreement, err error)
 	SoftDeleteMACompanyAgreement(ctx context.Context, companyKey, agreementID, subject, email string) (MACompanyAgreement, error)
+	// Tag aziendali condivisi (migrazione 148, issue #198): catalogo
+	// condiviso + associazioni per company_key. Le scritture sono
+	// idempotenti o risolte con riuso; vedi ma_tags.go.
+	ListMATags(ctx context.Context) ([]MATag, error)
+	RenameMATag(ctx context.Context, tagID, name string) (MATag, error)
+	DeleteMATag(ctx context.Context, tagID string) error
+	CreateAndAssignMATag(ctx context.Context, companyKey, name string) (MATag, error)
+	AssignMATag(ctx context.Context, companyKey, tagID string) error
+	UnassignMATag(ctx context.Context, companyKey, tagID string) error
+	ListMATagsByCompanyKeys(ctx context.Context, companyKeys []string) (map[string][]MATag, error)
 	// Google Drive folder bindings (migration 127, issue #98). The orchestration
 	// type-asserts to *SQLStore for the lock-spanning transaction; these accessors
 	// are the documented binding surface for read/simple-write paths.

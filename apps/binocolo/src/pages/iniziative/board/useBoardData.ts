@@ -7,6 +7,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@mrsmith/ui';
 import { useApiClient } from '../../../api/client';
+import { maTagQueryPolicy } from '../../../hooks/useMATags';
 import { errorLabel } from '../../ricerche/helpers';
 import type {
   MACardCloseResponse,
@@ -63,6 +64,9 @@ export function useBoardData(initiativeId: string) {
     queryFn: () => api.get<MAInitiativeBoard>(`/binocolo/v1/ma/initiatives/${initiativeId}`),
     // Polling condizionale: solo mentre un dossier è in elaborazione.
     refetchInterval: (q) => (boardHasWorking(q.state.data) ? 5000 : false),
+    // I tag sulle card sono condivisi tra utenti: riletti a apertura e focus
+    // (politica centralizzata, issue #198); i default dell'app restano per il resto.
+    ...maTagQueryPolicy,
   });
 
   const cardsUrl = (companyKey: string) =>

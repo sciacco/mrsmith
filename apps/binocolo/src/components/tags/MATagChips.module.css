@@ -1,0 +1,95 @@
+.list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+
+/* Neutra per contratto: nessun colore semantico/accent, solo superfici e testo
+   secondario — i colori di stati ed esiti restano gli unici segnali cromatici
+   di card e scheda (docs/UI-UX.md §4.2, §14.6). */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.name {
+  min-width: 0;
+}
+
+.remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.remove:hover:not(:disabled),
+.remove:focus-visible {
+  background: var(--color-surface-hover);
+  color: var(--color-danger-hover);
+}
+
+.remove:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.remove:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Variante compatta (BoardCard compact): scala dei chip di stato (0.65rem).
+   Il verticale dimezza lo spazio base (cal sulla scala token, §0.2). */
+.sm .chip {
+  gap: var(--space-1);
+  padding: calc(var(--space-1) / 2) var(--space-2);
+  font-size: 0.65rem;
+}
+
+.sm .remove {
+  width: 14px;
+  height: 14px;
+}
+
+/* Attesa della rimozione sulla singola chip. */
+@keyframes matagSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: matagSpin 0.9s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}

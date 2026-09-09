@@ -1,10 +1,11 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Button, Icon, SearchInput, Skeleton, StatusBadge, VisuallyHidden, type StatusBadgeVariant } from '@mrsmith/ui';
+import { Button, Icon, MultiSelect, SearchInput, Skeleton, StatusBadge, VisuallyHidden, type StatusBadgeVariant } from '@mrsmith/ui';
 import { formatCurrency, formatNumber } from '@mrsmith/format';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApiClient } from '../../api/client';
 import type { MACompanySearchAreas, MACompanySearchResponse, MACompanySearchRow } from '../../api/types';
+import { maTagQueryPolicy, useMATagCatalog, withMATagFilter } from '../../hooks/useMATags';
 import { bucketLabel } from '../ricerche/helpers';
 import { stateLabel, esitoLabel } from '../../lib/cardStates';
 import { AziendeSearchForm, companySearchParams, emptyCompanySearch, territorySummary, type CompanySearchDraft } from './AziendeSearchForm';
@@ -66,13 +67,20 @@ export function AziendePage() {
   const [draft, setDraft] = useState(emptyCompanySearch);
   const [appliedDraft, setAppliedDraft] = useState<CompanySearchDraft | null>(null);
   const [request, setRequest] = useState({ filters: 'mode=simple&query=', page: 1, sort: 'name' as Sort, direction: 'asc' as Direction });
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const catalog = useMATagCatalog();
   const queryReady = query.trim().length === 0 || query.trim().length >= 2;
 
   useEffect(() => {
     if (mode !== 'simple' || !queryReady) return;
     const timeout = window.setTimeout(() => {
-      const filters = new URLSearchParams({ mode: 'simple', query: query.trim() }).toString();
-      setRequest((previous) => previous.filters === filters ? previous : { ...previous, filters, page: 1 });
+      setRequest((previous) => {
+        // Il filtro tag vale in entrambe le modalità: riformulare la query
+        // semplice conserva i tag dell'ultima ricerca eseguita.
+        const tags = new URLSearchParams(previous.filters).getAll('tagId');
+        const filters = withMATagFilter(new URLSearchParams({ mode: 'simple', query: query.trim() }).toString(), tags);
+        return previous.filters === filters ? previous : { ...previous, filters, page: 1 };
+      });
       setAppliedDraft(null);
     }, 300);
     return () => window.clearTimeout(timeout);
@@ -83,6 +91,9 @@ export function AziendePage() {
     queryKey: ['ma-companies-search', params],
     queryFn: () => api.get<MACompanySearchResponse>(`/binocolo/v1/ma/companies?${params}`),
     placeholderData: keepPreviousData,
+    // L'elenco è toccato dai tag (filtro e rinomine globali): rilettura a
+    // apertura vista e ritorno sulla finestra come dalle altre viste.
+    ...maTagQueryPolicy,
   });
   const areas = useQuery({
     queryKey: ['ma-company-search-areas'],
@@ -91,6 +102,20 @@ export function AziendePage() {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Le selezioni di tag eliminati dal catalogo (globalmente, anche da un altro
+  // utente) cadono solo dopo una lettura RIUSCITA del catalogo: mai durante
+  // caricamento o errore, né su dati in attesa di refetch. La caduta aggiorna
+  // anche l'ultima ricerca eseguita (pagina 1): un tagId inesistente non deve
+  // continuare a filtrare all'insaputa dell'utente.
+  useEffect(() => {
+    if (!catalog.isSuccess || catalog.isFetching) return;
+    const available = new Set(catalog.data?.map((tag) => tag.id) ?? []);
+    const next = selectedTags.filter((id) => available.has(id));
+    if (next.length === selectedTags.length) return;
+    setSelectedTags(next);
+    setRequest((previous) => ({ ...previous, filters: withMATagFilter(previous.filters, next), page: 1 }));
+  }, [catalog.data, catalog.isSuccess, catalog.isFetching, selectedTags]);
+
   const items = companies.data?.items ?? [];
   const total = companies.data?.total;
   const page = companies.data?.page ?? request.page;
@@ -98,17 +123,29 @@ export function AziendePage() {
   const appliedQuery = new URLSearchParams(request.filters).get('query') ?? '';
   const pendingSimple = mode === 'simple' && (query.trim() !== appliedQuery || appliedDraft !== null);
   const searching = companies.isFetching || (pendingSimple && queryReady);
-  const pendingAdvanced = mode === 'advanced' && request.filters !== companySearchParams(draft);
-  const hasFilters = appliedDraft !== null ? companySearchParams(appliedDraft) !== 'mode=advanced' : appliedQuery !== '';
+  // Il confronto ignora i tagId (applicati subito): l'avviso riguarda solo i
+  // criteri avanzati compilati e non ancora eseguiti con «Cerca».
+  const pendingAdvanced = mode === 'advanced' && withMATagFilter(request.filters, []) !== companySearchParams(draft);
+  const hasFilters = (appliedDraft !== null ? companySearchParams(appliedDraft) !== 'mode=advanced' : appliedQuery !== '') || selectedTags.length > 0;
 
+  // I tag si applicano subito all'ultima ricerca ESEGUITA (pagina 1); le bozze
+  // avanzate non toccate restano subordinate a «Cerca».
+  function applyTags(tags: string[]) {
+    setSelectedTags(tags);
+    setRequest((previous) => {
+      const filters = withMATagFilter(previous.filters, tags);
+      return previous.filters === filters && previous.page === 1 ? previous : { ...previous, filters, page: 1 };
+    });
+  }
   function applySearch() {
     setAppliedDraft(draft);
-    setRequest((previous) => ({ ...previous, filters: companySearchParams(draft), page: 1 }));
+    setRequest((previous) => ({ ...previous, filters: withMATagFilter(companySearchParams(draft), selectedTags), page: 1 }));
   }
   function resetSearch() {
     const empty = emptyCompanySearch();
     setDraft(empty);
     setQuery('');
+    setSelectedTags([]);
     setAppliedDraft(mode === 'advanced' ? empty : null);
     setRequest((previous) => ({ ...previous, filters: mode === 'advanced' ? companySearchParams(empty) : 'mode=simple&query=', page: 1 }));
   }
@@ -133,6 +170,21 @@ export function AziendePage() {
         <div className={styles.searchMode} role="group" aria-label="Modalità di ricerca">
           <Button variant={mode === 'simple' ? 'primary' : 'ghost'} aria-pressed={mode === 'simple'} onClick={() => setMode('simple')}>Ricerca semplice</Button>
           <Button variant={mode === 'advanced' ? 'primary' : 'ghost'} aria-pressed={mode === 'advanced'} onClick={() => setMode('advanced')}>Ricerca avanzata</Button>
+        </div>
+        <div className={styles.tagFilter}>
+          <div className={styles.tagFilterHead}>
+            <span className={styles.fieldLabel} id="aziende-tag-filter">Tag aziendali</span>
+            {selectedTags.length > 0 && <Button type="button" variant="ghost" onClick={() => applyTags([])}>Azzera tag</Button>}
+          </div>
+          {/* Il MultiSelect condiviso non espone un'etichetta accessibile: il
+              gruppo con aria-labelledby è ciò che il consumer può aggiungere
+              senza toccare il componente. */}
+          <div role="group" aria-labelledby="aziende-tag-filter">
+            {catalog.isLoading ? <div className={styles.tagFilterSkeleton}><Skeleton rows={1} /></div>
+              : catalog.isError ? <div className={styles.tagCatalogError} role="alert">Tag non disponibili. <Button type="button" variant="ghost" onClick={() => void catalog.refetch()}>Riprova</Button></div>
+              : <MultiSelect options={(catalog.data ?? []).map((tag) => ({ value: tag.id, label: tag.name }))} selected={selectedTags} onChange={applyTags} placeholder="Filtra per tag aziendali" />}
+          </div>
+          <p className={styles.hint}>Mostra solo le aziende che hanno tutti i tag selezionati.</p>
         </div>
         {mode === 'simple' ? <div className={styles.simpleSearch}>
           <SearchInput value={query} onChange={setQuery} placeholder="Ragione sociale, P.IVA o codice fiscale" ariaLabel="Cerca un’azienda nel corpus analizzato" autoFocus />

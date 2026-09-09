@@ -2,6 +2,7 @@ import { forwardRef, useLayoutEffect, useRef, useState, type CSSProperties, type
 import { useDraggable } from '@dnd-kit/core';
 import { Icon, Tooltip } from '@mrsmith/ui';
 import type { MAInitiativeCardView, MACardProvenance } from '../../../api/types';
+import { MATagChips } from '../../../components/tags/MATagChips';
 import { stateVars, esitoLabel, isTerminalState } from '../../../lib/cardStates';
 import { dateLabel } from '../../ricerche/helpers';
 import { dossierState } from './useBoardData';
@@ -107,6 +108,10 @@ export const BoardCard = forwardRef<HTMLDivElement, BoardCardProps>(function Boa
             <Stars rating={prov.rating} />
           </span>
         ) : null}
+        {/* Tag aziendali: chip neutre, distinte dai colori di stato/esito; le
+            stesse associazioni della scheda, anche su card compatte e in
+            PipelinePage (le associazioni appartengono all'azienda). */}
+        <MATagChips tags={card.tags ?? []} size="sm" />
         {card.origin === 'direct' ? <span className={`${styles.chip} ${styles.chipDiretta}`}>Diretta</span> : null}
         {facts.map((kind) => {
           const info = registryLabel(kind);

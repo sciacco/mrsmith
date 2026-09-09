@@ -1641,6 +1641,37 @@ func (f *fakeMAWorkspaceStore) SoftDeleteMACompanyAgreement(_ context.Context, c
 	return MACompanyAgreement{}, errMACompanyAgreementNotFound
 }
 
+// Tag aziendali condivisi (issue #198, slice 1). Nessun test li esercita in
+// questa slice: stub minimi che soddisfano l'interfaccia, come per i binding
+// Drive qui sotto.
+func (f *fakeMAWorkspaceStore) ListMATags(context.Context) ([]MATag, error) {
+	return nil, nil
+}
+
+func (f *fakeMAWorkspaceStore) RenameMATag(context.Context, string, string) (MATag, error) {
+	return MATag{}, nil
+}
+
+func (f *fakeMAWorkspaceStore) DeleteMATag(context.Context, string) error {
+	return nil
+}
+
+func (f *fakeMAWorkspaceStore) CreateAndAssignMATag(context.Context, string, string) (MATag, error) {
+	return MATag{}, nil
+}
+
+func (f *fakeMAWorkspaceStore) AssignMATag(context.Context, string, string) error {
+	return nil
+}
+
+func (f *fakeMAWorkspaceStore) UnassignMATag(context.Context, string, string) error {
+	return nil
+}
+
+func (f *fakeMAWorkspaceStore) ListMATagsByCompanyKeys(context.Context, []string) (map[string][]MATag, error) {
+	return map[string][]MATag{}, nil
+}
+
 // Google Drive folder bindings (issue #98). Unreachable in these tests — the
 // drive client is nil, so the orchestration returns not_configured before the
 // store is touched. Stubs satisfy the interface so the package compiles.

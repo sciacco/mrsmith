@@ -1,0 +1,243 @@
+/* Strumenti → Gestione tag (issue #198, slice 6). Layout riconducibile alla
+   pagina Strumenti di riferimento (ConfigPage): testata con eyebrow + titolo +
+   descrizione, card unica con elenco a righe. Solo token del tema clean;
+   l'animazione usa le keyframes pageEnter globali (nessun duplicato). */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-6);
+  max-width: 860px;
+  animation: pageEnter 0.5s var(--ease-out) both;
+}
+
+.header h1 {
+  margin: var(--space-1) 0 var(--space-2);
+}
+
+.header p {
+  margin: 0;
+  color: var(--color-text-muted);
+  max-width: 60ch;
+}
+
+.eyebrow {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+}
+
+.card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  padding: var(--space-2) var(--space-4);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5);
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+.tagName {
+  min-width: 0;
+  font-weight: 700;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.rowActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+/* Modifica in linea: il form sostituisce il contenuto della riga. */
+.renameForm {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.fieldLabel {
+  display: grid;
+  gap: var(--space-1);
+}
+
+/* Campo obbligatorio (UI-UX §14.1): punto rosso aria-hidden + testo per lettori
+   di schermo; `required` nativo resta sul controllo (form noValidate, la
+   validazione inline comanda). Stessa ricetta di AddCompanyTagModal. */
+.labelText {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.requiredDot {
+  width: 0.42rem;
+  height: 0.42rem;
+  flex: 0 0 auto;
+  border-radius: var(--radius-full);
+  background: var(--color-danger);
+  box-shadow: 0 0 0 3px var(--color-danger-subtle);
+  transform: translateY(-1px);
+}
+
+.fieldLabel input {
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.fieldLabel input:focus-visible {
+  border-color: var(--color-accent);
+  outline: 1px solid transparent;
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
+}
+
+.fieldLabel input[aria-invalid='true'] {
+  border-color: var(--color-danger);
+}
+
+.formError {
+  margin: 0;
+  color: var(--color-danger-hover);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+/* Errore del catalogo: box persistente con Riprova (UI-UX §14.3). */
+.errorBox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-lg);
+  background: var(--color-danger-subtle);
+  color: var(--color-danger-hover);
+  font-size: 0.875rem;
+}
+
+.errorBox span {
+  flex: 1;
+}
+
+/* Stato vuoto (UI-UX §14.5): invito all'azione con un solo comando primario,
+   la creazione vive nella scheda azienda. */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-2);
+  padding: var(--space-16) var(--space-8);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+}
+
+.emptyIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  margin-bottom: var(--space-3);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  color: var(--color-text-faint);
+}
+
+.emptyState h2 {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.emptyState p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  max-width: 46ch;
+}
+
+.emptyAction {
+  margin-top: var(--space-3);
+}
+
+.modalBody {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.modalBody p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.modalConsequence {
+  color: var(--color-text-secondary);
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: var(--space-4);
+  }
+
+  .row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+
+  .rowActions {
+    width: 100%;
+  }
+
+  .modalActions {
+    flex-direction: column-reverse;
+  }
+
+  .modalActions button {
+    width: 100%;
+  }
+}

@@ -29,6 +29,10 @@
 
 .searchPanel { padding: var(--space-5); }
 .searchMode { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-5); }
+.tagFilter { display: grid; gap: var(--space-2); max-width: 48rem; margin-bottom: var(--space-5); }
+.tagFilterHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.tagFilterSkeleton { display: grid; align-items: center; min-height: 44px; }
+.tagCatalogError { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1) var(--space-2); min-height: 44px; color: var(--color-danger-hover); font-size: 0.8125rem; }
 .simpleSearch { display: grid; gap: var(--space-2); max-width: 48rem; }
 .advancedForm { display: grid; gap: var(--space-5); }
 .identityFields { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: var(--space-4); }

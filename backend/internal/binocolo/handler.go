@@ -186,6 +186,14 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) func(context.Context) {
 	handle("POST /binocolo/v1/ma/companies/{companyKey}/agreements", h.handleCreateMACompanyAgreement)
 	handle("PUT /binocolo/v1/ma/companies/{companyKey}/agreements/{agreementId}", h.handleUpdateMACompanyAgreement)
 	handle("DELETE /binocolo/v1/ma/companies/{companyKey}/agreements/{agreementId}", h.handleDeleteMACompanyAgreement)
+	// Tag aziendali condivisi (issue #198): catalogo + associazioni; le
+	// letture che li espongono (overview, board, pipeline) stanno nel servizio.
+	handle("GET /binocolo/v1/ma/tags", h.handleListMATags)
+	handle("PUT /binocolo/v1/ma/tags/{tagId}", h.handleRenameMATag)
+	handle("DELETE /binocolo/v1/ma/tags/{tagId}", h.handleDeleteMATag)
+	handle("POST /binocolo/v1/ma/companies/{companyKey}/tags", h.handleCreateMACompanyTag)
+	handle("PUT /binocolo/v1/ma/companies/{companyKey}/tags/{tagId}", h.handleAssignMACompanyTag)
+	handle("DELETE /binocolo/v1/ma/companies/{companyKey}/tags/{tagId}", h.handleUnassignMACompanyTag)
 	handle("GET /binocolo/v1/segnalazioni", h.handleListSegnalazioni)
 	handle("POST /binocolo/v1/segnalazioni", h.handleCreateSegnalazione)
 	handle("GET /binocolo/v1/segnalazioni/{id}", h.handleGetSegnalazione)
@@ -1070,6 +1078,20 @@ func maFactID(w http.ResponseWriter, r *http.Request) (string, bool) {
 	return id, true
 }
 
+// maTagID estrae e valida il {tagId} di percorso: un tag è un UUID, quindi
+// un segmento non-UUID è una richiesta malformata (400), non un 404. Si
+// inoltra la forma canonica di uuid.Parse, così forme accettate dal parser
+// ma rifiutate dal cast PostgreSQL (es. «urn:uuid:…») non raggiungono le query.
+func maTagID(w http.ResponseWriter, r *http.Request) (string, bool) {
+	id := strings.TrimSpace(r.PathValue("tagId"))
+	parsed, err := uuid.Parse(id)
+	if err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_ma_tag_id")
+		return "", false
+	}
+	return parsed.String(), true
+}
+
 func (h *Handler) handleDeepDiveMACompany(w http.ResponseWriter, r *http.Request) {
 	companyKey, ok := maCompanyKeyPath(w, r)
 	if !ok {
@@ -1380,6 +1402,97 @@ func (h *Handler) handleDeleteMACompanyAgreement(w http.ResponseWriter, r *http.
 	subject, email := companySearchRefreshActor(r.Context())
 	if err := h.ma.deleteCompanyAgreement(r.Context(), companyKey, agreementID, subject, email); err != nil {
 		h.maFailure(w, r, "ma_company_agreement_delete", err, "company_key", companyKey, "agreement_id", agreementID)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// --- Tag aziendali condivisi (issue #198, slice 1). ---
+
+func (h *Handler) handleListMATags(w http.ResponseWriter, r *http.Request) {
+	tags, err := h.ma.listMATags(r.Context())
+	if err != nil {
+		h.maFailure(w, r, "ma_tags_list", err)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, tags)
+}
+
+func (h *Handler) handleRenameMATag(w http.ResponseWriter, r *http.Request) {
+	tagID, ok := maTagID(w, r)
+	if !ok {
+		return
+	}
+	var body MATagNameRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	tag, err := h.ma.renameMATag(r.Context(), tagID, body.Name)
+	if err != nil {
+		h.maFailure(w, r, "ma_tag_rename", err, "tag_id", tagID)
+		return
+	}
+	httputil.JSON(w, http.StatusOK, tag)
+}
+
+func (h *Handler) handleDeleteMATag(w http.ResponseWriter, r *http.Request) {
+	tagID, ok := maTagID(w, r)
+	if !ok {
+		return
+	}
+	if err := h.ma.deleteMATag(r.Context(), tagID); err != nil {
+		h.maFailure(w, r, "ma_tag_delete", err, "tag_id", tagID)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) handleCreateMACompanyTag(w http.ResponseWriter, r *http.Request) {
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	var body MATagNameRequest
+	if err := decodeMABody(r, &body); err != nil {
+		httputil.Error(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	tag, err := h.ma.createAndAssignMATag(r.Context(), companyKey, body.Name)
+	if err != nil {
+		h.maFailure(w, r, "ma_company_tag_create", err, "company_key", companyKey)
+		return
+	}
+	httputil.JSON(w, http.StatusCreated, tag)
+}
+
+func (h *Handler) handleAssignMACompanyTag(w http.ResponseWriter, r *http.Request) {
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	tagID, ok := maTagID(w, r)
+	if !ok {
+		return
+	}
+	if err := h.ma.assignMATag(r.Context(), companyKey, tagID); err != nil {
+		h.maFailure(w, r, "ma_company_tag_assign", err, "company_key", companyKey, "tag_id", tagID)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) handleUnassignMACompanyTag(w http.ResponseWriter, r *http.Request) {
+	companyKey, ok := maCompanyKeyPath(w, r)
+	if !ok {
+		return
+	}
+	tagID, ok := maTagID(w, r)
+	if !ok {
+		return
+	}
+	if err := h.ma.unassignMATag(r.Context(), companyKey, tagID); err != nil {
+		h.maFailure(w, r, "ma_company_tag_unassign", err, "company_key", companyKey, "tag_id", tagID)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -2292,6 +2405,12 @@ func maHTTPError(err error) (int, string, string) {
 	}
 	if errors.Is(err, errMACompanyAgreementNotFound) {
 		return http.StatusNotFound, "ma_company_agreement_not_found", "warn"
+	}
+	if errors.Is(err, errMATagNotFound) {
+		return http.StatusNotFound, "ma_tag_not_found", "warn"
+	}
+	if errors.Is(err, errMATagNameConflict) {
+		return http.StatusConflict, "ma_tag_name_conflict", "warn"
 	}
 	if errors.Is(err, errSegnalazioneNotFound) {
 		return http.StatusNotFound, "segnalazione_not_found", "warn"

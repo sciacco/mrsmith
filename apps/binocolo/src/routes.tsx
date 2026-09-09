@@ -13,6 +13,7 @@ import { PipelinePage } from './pages/pipeline/PipelinePage';
 import { AziendePage } from './pages/aziende/AziendePage';
 import { SchedaAziendaPage } from './pages/aziende/SchedaAziendaPage';
 import { SegnalazioniPage } from './pages/segnalazioni/SegnalazioniPage';
+import { GestioneTagPage } from './pages/GestioneTagPage';
 
 // Il card-dossier è stato assorbito dalla Scheda azienda (FUSIONE F5): i
 // vecchi URL restano validi e atterrano sulla scheda con lente iniziativa.
@@ -36,6 +37,7 @@ export const routes: RouteObject[] = [
   { path: 'segnalazioni', element: <SegnalazioniPage /> },
   { path: 'azienda', element: <CompanyDossierPage /> },
   { path: 'ricerca-web', element: <WebSearchPage /> },
+  { path: 'gestione-tag', element: <GestioneTagPage /> },
   { path: 'config', element: <ConfigPage /> },
   { path: 'test', element: <TestPage /> },
   { path: '*', element: <Navigate to="/pipeline" replace /> },

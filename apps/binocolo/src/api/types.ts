@@ -398,6 +398,9 @@ export interface MAInitiativeCardView extends MAInitiativeCard {
   registryFacts?: string[];
   provenances?: MACardProvenance[];
   lastEvent?: string;
+  // Tag dell'azienda della card (issue #198): le stesse associazioni viste in
+  // scheda; MAPipelineCardView le eredita, quindi copre anche la pipeline.
+  tags: MATag[];
 }
 
 export interface MAInitiativeBoard {
@@ -810,6 +813,14 @@ export interface MACompanyRegistry {
   facts: MACompanyFact[];
 }
 
+// Tag del catalogo condiviso del team (issue #198, mig 148). L'id è l'UUID
+// stabile del backend: sopravvive alla rinomina, quindi selezioni e filtri
+// referenziano l'id e risolvono il nome solo in presentazione.
+export interface MATag {
+  id: string;
+  name: string;
+}
+
 export interface MACompanyOverview {
   identity: MACompanyOverviewIdentity;
   deep?: MADeepAnalysis;
@@ -822,6 +833,9 @@ export interface MACompanyOverview {
   briefStale: boolean;
   briefGeneratedAt?: string;
   filingsCount: number;
+  // Tag condivisi della company_key (issue #198): ordinate per nome come il
+  // catalogo, sempre array (mai null), identici in ogni lente della scheda.
+  tags: MATag[];
 }
 
 // --- Deposited filings (issue #78, Fase 9) ---

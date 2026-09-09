@@ -30,6 +30,7 @@ const navGroups: TabGroup[] = [
     items: [
       { label: 'Dossier azienda', path: '/azienda' },
       { label: 'Ricerca web', path: '/ricerca-web' },
+      { label: 'Gestione tag', path: '/gestione-tag' },
       { label: 'Configurazione', path: '/config' },
       { label: 'Test', path: '/test' },
     ],

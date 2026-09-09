@@ -49,6 +49,8 @@ var (
 	errMAAnnotationNotFound       = errors.New("ma annotation not found")
 	errMACompanyContactNotFound   = errors.New("ma company contact not found")
 	errMACompanyAgreementNotFound = errors.New("ma company agreement not found")
+	errMATagNotFound              = errors.New("ma tag not found")
+	errMATagNameConflict          = errors.New("Esiste già un tag con questo nome")
 	// errMAEstimateSuperseded is returned by ReplaceMAEstimates when the active
 	// strategy version changed mid-estimate (the user re-submitted). The estimate
 	// worker loops on it to re-run against the now-active version, so the latest
@@ -1082,6 +1084,127 @@ func maAgreementExpiresOnJSON(expiresOn string) any {
 	return expiresOn
 }
 
+// validateMATagName normalizza il nome di un tag (issue #198, migrazione
+// 148): spazi esterni rimossi, non vuoto. L'equivalenza case/space-insensitive
+// è garantita dall'indice univoco su lower(btrim(name)) nel database, non qui.
+func validateMATagName(name string) (string, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "", fmt.Errorf("%w: name", errMAStrategyInvalid)
+	}
+	return name, nil
+}
+
+// listMATags restituisce il catalogo condiviso, ordinato per nome. Nessuna
+// validazione azienda: è una lettura globale.
+func (s *maService) listMATags(ctx context.Context) ([]MATag, error) {
+	if s.store == nil {
+		return nil, errMAStoreUnavailable
+	}
+	return s.store.ListMATags(ctx)
+}
+
+// renameMATag rinomina un tag preservandone l'UUID (PRD #198: il nuovo nome
+// vale ovunque). Un nome equivalente a quello di un ALTRO tag è un conflitto
+// (409); rinominare con lo stesso nome del tag stesso è un no-op.
+func (s *maService) renameMATag(ctx context.Context, tagID, name string) (MATag, error) {
+	if s.store == nil {
+		return MATag{}, errMAStoreUnavailable
+	}
+	tagID = strings.TrimSpace(tagID)
+	parsed, err := uuid.Parse(tagID)
+	if err != nil {
+		return MATag{}, errMATagNotFound
+	}
+	tagID = parsed.String()
+	clean, err := validateMATagName(name)
+	if err != nil {
+		return MATag{}, err
+	}
+	return s.store.RenameMATag(ctx, tagID, clean)
+}
+
+// deleteMATag elimina globalmente il tag: via anche le associazioni (CASCADE
+// lato database), mai le aziende.
+func (s *maService) deleteMATag(ctx context.Context, tagID string) error {
+	if s.store == nil {
+		return errMAStoreUnavailable
+	}
+	tagID = strings.TrimSpace(tagID)
+	parsed, err := uuid.Parse(tagID)
+	if err != nil {
+		return errMATagNotFound
+	}
+	return s.store.DeleteMATag(ctx, parsed.String())
+}
+
+// createAndAssignMATag crea il tag e lo assegna all'azienda atomicamente
+// (PRD #198: «crea e assegna subito»). Se il nome è equivalente a un tag
+// esistente — anche creato concorrentemente — si riusa quello senza
+// modificarne il nome e lo si assegna.
+func (s *maService) createAndAssignMATag(ctx context.Context, companyKey, name string) (MATag, error) {
+	if s.store == nil {
+		return MATag{}, errMAStoreUnavailable
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey == "" {
+		return MATag{}, fmt.Errorf("%w: companyKey", errMAStrategyInvalid)
+	}
+	clean, err := validateMATagName(name)
+	if err != nil {
+		return MATag{}, err
+	}
+	if err := s.requireKnownMACompany(ctx, companyKey); err != nil {
+		return MATag{}, err
+	}
+	return s.store.CreateAndAssignMATag(ctx, companyKey, clean)
+}
+
+// assignMATag assegna un tag del catalogo a un'azienda. Idempotente:
+// assegnare un tag già presente è un successo, non un errore.
+func (s *maService) assignMATag(ctx context.Context, companyKey, tagID string) error {
+	if s.store == nil {
+		return errMAStoreUnavailable
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey == "" {
+		return fmt.Errorf("%w: companyKey", errMAStrategyInvalid)
+	}
+	tagID = strings.TrimSpace(tagID)
+	parsed, err := uuid.Parse(tagID)
+	if err != nil {
+		return errMATagNotFound
+	}
+	tagID = parsed.String()
+	if err := s.requireKnownMACompany(ctx, companyKey); err != nil {
+		return err
+	}
+	return s.store.AssignMATag(ctx, companyKey, tagID)
+}
+
+// unassignMATag rimuove la sola associazione azienda/tag: il tag resta nel
+// catalogo e sulle altre aziende. Idempotente come l'assegnazione; un
+// riferimento a tag inesistente è errMATagNotFound.
+func (s *maService) unassignMATag(ctx context.Context, companyKey, tagID string) error {
+	if s.store == nil {
+		return errMAStoreUnavailable
+	}
+	companyKey = normalizeMACompanyKey(companyKey)
+	if companyKey == "" {
+		return fmt.Errorf("%w: companyKey", errMAStrategyInvalid)
+	}
+	tagID = strings.TrimSpace(tagID)
+	parsed, err := uuid.Parse(tagID)
+	if err != nil {
+		return errMATagNotFound
+	}
+	tagID = parsed.String()
+	if err := s.requireKnownMACompany(ctx, companyKey); err != nil {
+		return err
+	}
+	return s.store.UnassignMATag(ctx, companyKey, tagID)
+}
+
 // validateMACompanyAgreement normalizza e valida un accordo azienda (migrazione
 // 146): kind nel vocabolario chiuso, signedOn obbligatoria, expiresOn
 // facoltativa ma non precedente a signedOn.
@@ -1232,6 +1355,14 @@ func (s *maService) getCompanyOverview(ctx context.Context, companyKey string) (
 	if err != nil {
 		return MACompanyOverview{}, err
 	}
+	// Tag aziendali (issue #198): letti per company_key, quindi identici in
+	// ogni lente (ricerca, iniziativa, pipeline). Un errore di lettura fallisce
+	// la scheda: mai mostrare tacitamente zero tag quando il dato non si sa.
+	tagsByCompany, err := s.store.ListMATagsByCompanyKeys(ctx, []string{companyKey})
+	if err != nil {
+		return MACompanyOverview{}, err
+	}
+	overview.Tags = maTagsOrEmpty(tagsByCompany[companyKey])
 	cardsByInitiative := make(map[string][]string)
 	for _, card := range overview.Cards {
 		if card.InitiativeID == "" || card.CompanyKey == "" {
@@ -2728,6 +2859,15 @@ func (s *maService) getCardDossier(ctx context.Context, initiativeID, companyKey
 	return MACardDossier{Target: target, SessionID: sessionID, SessionTitle: session.Title, Card: *card, Provenances: provenances[companyKey]}, nil
 }
 
+// maTagsOrEmpty proietta l'entrata della mappa batch come array JSON sempre
+// presente: senza associazioni il contratto porta `[]`, mai null (issue #198).
+func maTagsOrEmpty(tags []MATag) []MATag {
+	if len(tags) == 0 {
+		return []MATag{}
+	}
+	return tags
+}
+
 // getInitiativeBoard assembles the board (B4 passo 1): l'Iniziativa, le
 // sessioni agganciate (chips) e le card decorate con stato dossier,
 // collisioni, badge registro e provenienze — tutto in query batch, mai N+1.
@@ -2774,6 +2914,12 @@ func (s *maService) getInitiativeBoard(ctx context.Context, initiativeID string)
 	if err != nil {
 		return MAInitiativeBoard{}, err
 	}
+	// Tag aziendali (issue #198): una sola lettura batch per tutte le chiavi
+	// della board, ordine = catalogo.
+	tagsByCompany, err := s.store.ListMATagsByCompanyKeys(ctx, companyKeys)
+	if err != nil {
+		return MAInitiativeBoard{}, err
+	}
 
 	views := make([]MAInitiativeCardView, 0, len(cards))
 	for _, card := range cards {
@@ -2783,6 +2929,7 @@ func (s *maService) getInitiativeBoard(ctx context.Context, initiativeID string)
 			RegistryFacts:    registryFacts[card.CompanyKey],
 			Provenances:      provenances[card.CompanyKey],
 			LastEvent:        latestEvents[card.CompanyKey],
+			Tags:             maTagsOrEmpty(tagsByCompany[card.CompanyKey]),
 		}
 		for _, other := range activeCards[card.CompanyKey] {
 			if other.InitiativeID == initiativeID {
@@ -2873,6 +3020,12 @@ func (s *maService) getPipeline(ctx context.Context) (MAPipelineResponse, error)
 	if err != nil {
 		return MAPipelineResponse{}, err
 	}
+	// Tag aziendali (issue #198): una sola lettura batch per tutte le chiavi
+	// della pipeline, ordine = catalogo.
+	tagsByCompany, err := s.store.ListMATagsByCompanyKeys(ctx, allKeys)
+	if err != nil {
+		return MAPipelineResponse{}, err
+	}
 
 	views := make([]MAPipelineCardView, 0)
 	for _, ic := range all {
@@ -2895,6 +3048,7 @@ func (s *maService) getPipeline(ctx context.Context) (MAPipelineResponse, error)
 				RegistryFacts:    facts[card.CompanyKey],
 				Provenances:      provenances[card.CompanyKey],
 				LastEvent:        events[card.CompanyKey],
+				Tags:             maTagsOrEmpty(tagsByCompany[card.CompanyKey]),
 			}
 			for _, other := range activeCards[card.CompanyKey] {
 				if other.InitiativeID == ic.init.ID {
