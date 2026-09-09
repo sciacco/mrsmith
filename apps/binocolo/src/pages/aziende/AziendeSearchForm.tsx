@@ -1,5 +1,5 @@
 import { Button, Icon, MoneyInput, MultiSelect, SingleSelect, ToggleSwitch } from '@mrsmith/ui';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { MACompanySearchAreas } from '../../api/types';
 import styles from './AziendePage.module.css';
 
@@ -52,7 +52,7 @@ export function territorySummary(draft: Pick<CompanySearchDraft, 'include' | 'ex
   return `${included}, esclusa ${excluded}`;
 }
 
-export function AziendeSearchForm({ draft, onChange, onSearch, onReset, areas, areasLoading, areasError, onRetryAreas }: {
+export function AziendeSearchForm({ draft, onChange, onSearch, onReset, areas, areasLoading, areasError, onRetryAreas, tagFilter }: {
   draft: CompanySearchDraft;
   onChange: (draft: CompanySearchDraft) => void;
   onSearch: () => void;
@@ -61,6 +61,7 @@ export function AziendeSearchForm({ draft, onChange, onSearch, onReset, areas, a
   areasLoading: boolean;
   areasError: boolean;
   onRetryAreas: () => void;
+  tagFilter?: ReactNode;
 }) {
   const [showExclusions, setShowExclusions] = useState(draft.exclude.length > 0);
   const [submitted, setSubmitted] = useState(false);
@@ -152,10 +153,13 @@ export function AziendeSearchForm({ draft, onChange, onSearch, onReset, areas, a
         <label htmlFor="company-annotation">Testo nelle annotazioni</label>
         <input id="company-annotation" value={draft.annotation} maxLength={500} onChange={(event) => set('annotation', event.target.value)} placeholder="Es. passaggio generazionale" />
       </div>
-      <div className={styles.field}>
-        <span className={styles.fieldLabel}>NDA</span>
-        <SingleSelect options={NDA_OPTIONS} selected={draft.nda || null} onChange={(value) => set('nda', value ?? '')} placeholder="Qualsiasi" allowClear clearLabel="Qualsiasi" searchable={false} ariaLabel="NDA" />
-        <p className={styles.hint}>Si basa sugli accordi registrati nella scheda azienda, non sulla fase delle card.</p>
+      <div className={styles.ndaRow}>
+        <div className={styles.field}>
+          <span className={styles.fieldLabel}>NDA</span>
+          <SingleSelect options={NDA_OPTIONS} selected={draft.nda || null} onChange={(value) => set('nda', value ?? '')} placeholder="Qualsiasi" allowClear clearLabel="Qualsiasi" searchable={false} ariaLabel="NDA" />
+          <p className={styles.hint}>Si basa sugli accordi registrati nella scheda azienda, non sulla fase delle card.</p>
+        </div>
+        {tagFilter}
       </div>
       <div className={styles.formActions}>
         <Button type="button" onClick={validateAndSearch} leftIcon={<Icon name="search" size={16} />}>Cerca</Button>

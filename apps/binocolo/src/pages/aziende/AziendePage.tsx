@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Button, Icon, MultiSelect, SearchInput, Skeleton, StatusBadge, VisuallyHidden, type StatusBadgeVariant } from '@mrsmith/ui';
 import { formatCurrency, formatNumber } from '@mrsmith/format';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApiClient } from '../../api/client';
 import type { MACompanySearchAreas, MACompanySearchResponse, MACompanySearchRow } from '../../api/types';
@@ -160,6 +160,23 @@ export function AziendePage() {
     </th>;
   }
 
+  // Il controllo tag vive dentro la riga del campo che lo accompagna (ricerca
+  // libera in modalità semplice, NDA in avanzata): stessa struttura campo
+  // etichetta + controllo + nota, così le due colonne restano allineate.
+  const tagFilterId = useId();
+  const tagFilter = (
+    <div className={styles.tagFilter} role="group" aria-labelledby={tagFilterId}>
+      <span className={styles.fieldLabel} id={tagFilterId}>Tag aziendali</span>
+      {catalog.isLoading ? <div className={styles.tagFilterSkeleton}><Skeleton rows={1} /></div>
+        : catalog.isError ? <div className={styles.tagCatalogError} role="alert">Tag non disponibili. <Button type="button" variant="ghost" onClick={() => void catalog.refetch()}>Riprova</Button></div>
+        : <MultiSelect options={(catalog.data ?? []).map((tag) => ({ value: tag.id, label: tag.name }))} selected={selectedTags} onChange={applyTags} placeholder="Filtra per tag aziendali" />}
+      <div className={styles.tagFooter}>
+        <p className={styles.hint}>Mostra solo le aziende che hanno tutti i tag selezionati.</p>
+        {selectedTags.length > 0 && <Button type="button" variant="ghost" size="sm" onClick={() => applyTags([])}>Azzera tag</Button>}
+      </div>
+    </div>
+  );
+
   return (
     <div className={styles.page}>
       <header className={styles.header}>
@@ -171,25 +188,16 @@ export function AziendePage() {
           <Button variant={mode === 'simple' ? 'primary' : 'ghost'} aria-pressed={mode === 'simple'} onClick={() => setMode('simple')}>Ricerca semplice</Button>
           <Button variant={mode === 'advanced' ? 'primary' : 'ghost'} aria-pressed={mode === 'advanced'} onClick={() => setMode('advanced')}>Ricerca avanzata</Button>
         </div>
-        <div className={styles.tagFilter}>
-          <div className={styles.tagFilterHead}>
-            <span className={styles.fieldLabel} id="aziende-tag-filter">Tag aziendali</span>
-            {selectedTags.length > 0 && <Button type="button" variant="ghost" onClick={() => applyTags([])}>Azzera tag</Button>}
-          </div>
-          {/* Il MultiSelect condiviso non espone un'etichetta accessibile: il
-              gruppo con aria-labelledby è ciò che il consumer può aggiungere
-              senza toccare il componente. */}
-          <div role="group" aria-labelledby="aziende-tag-filter">
-            {catalog.isLoading ? <div className={styles.tagFilterSkeleton}><Skeleton rows={1} /></div>
-              : catalog.isError ? <div className={styles.tagCatalogError} role="alert">Tag non disponibili. <Button type="button" variant="ghost" onClick={() => void catalog.refetch()}>Riprova</Button></div>
-              : <MultiSelect options={(catalog.data ?? []).map((tag) => ({ value: tag.id, label: tag.name }))} selected={selectedTags} onChange={applyTags} placeholder="Filtra per tag aziendali" />}
-          </div>
-          <p className={styles.hint}>Mostra solo le aziende che hanno tutti i tag selezionati.</p>
-        </div>
         {mode === 'simple' ? <div className={styles.simpleSearch}>
-          <SearchInput value={query} onChange={setQuery} placeholder="Ragione sociale, P.IVA o codice fiscale" ariaLabel="Cerca un’azienda nel corpus analizzato" autoFocus />
-          <p className={styles.hint}>{queryReady ? searchHint(query) : 'Inserisci almeno 2 caratteri.'}</p>
-        </div> : <AziendeSearchForm draft={draft} onChange={setDraft} onSearch={applySearch} onReset={() => setDraft(emptyCompanySearch())} areas={areas.data} areasLoading={areas.isLoading} areasError={areas.isError} onRetryAreas={() => void areas.refetch()} />}
+          <div className={styles.searchRow}>
+            <div className={styles.searchField}>
+              <span className={styles.fieldLabel}>Ricerca libera</span>
+              <SearchInput value={query} onChange={setQuery} placeholder="Ragione sociale, P.IVA o codice fiscale" ariaLabel="Cerca un’azienda nel corpus analizzato" autoFocus />
+              <p className={styles.hint}>{queryReady ? searchHint(query) : 'Inserisci almeno 2 caratteri.'}</p>
+            </div>
+            {tagFilter}
+          </div>
+        </div> : <AziendeSearchForm draft={draft} onChange={setDraft} onSearch={applySearch} onReset={() => setDraft(emptyCompanySearch())} areas={areas.data} areasLoading={areas.isLoading} areasError={areas.isError} onRetryAreas={() => void areas.refetch()} tagFilter={tagFilter} />}
       </section>
 
       <section className={styles.results} aria-busy={searching} aria-label="Risultati della ricerca">
