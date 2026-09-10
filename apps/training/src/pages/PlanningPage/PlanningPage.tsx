@@ -38,7 +38,7 @@ import styles from "./PlanningPage.module.css";
 
 const views: Array<[PlanningView, string]> = [
   ["operative", "Operativa"],
-  ["reminders", "Promemoria"],
+  ["reminders", "In scadenza"],
   ["suspended", "Sospese"],
   ["history", "Storico"],
 ];
@@ -312,7 +312,9 @@ export function PlanningPage() {
           <p>
             {filters.view === "operative"
               ? "Attività formative da seguire per corso."
-              : `Corsi nella vista ${views.find(([view]) => view === filters.view)?.[1].toLowerCase()}.`}
+              : filters.view === "reminders"
+                ? "Corsi con un richiamo di promemoria odierno o scaduto."
+                : `Corsi nella vista ${views.find(([view]) => view === filters.view)?.[1].toLowerCase()}.`}
           </p>
         </div>
         <div className={styles.headerActions}>
@@ -323,7 +325,7 @@ export function PlanningPage() {
               variant="secondary"
               onClick={() => updateList({ view: "reminders", offset: 0 })}
             >
-              {n(list.data!.dueCoursesTotal)} corsi con promemoria
+              {n(list.data!.dueCoursesTotal)} corsi in scadenza
             </Button>
           )}
         </div>
