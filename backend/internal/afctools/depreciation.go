@@ -324,7 +324,7 @@ func depreciationDateOnly(raw *string) *string {
 
 // depreciationExportHeaders are the Italian column labels, in endpoint order.
 var depreciationExportHeaders = []string{
-	"Ditta", "Gruppo", "Specie", "Sottospecie", "Descrizione sottospecie", "Progressivo",
+	"Ditta", "Gruppo", "Categoria", "Sottocategoria", "Descrizione sottocategoria", "Progressivo",
 	"Codice cespite", "Codice immobilizzo", "Descrizione immobilizzo", "Conto immobilizzo",
 	"Conto fondo ammortamento", "Conto costo ammortamento", "Matricola", "Descrizione",
 	"% ammortamento civilistico", "Quota ammortamento civilistico", "Anno acquisto",

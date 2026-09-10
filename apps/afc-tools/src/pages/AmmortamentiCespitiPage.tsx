@@ -50,9 +50,9 @@ const TOTAL_KEYS: ColumnKey[] = [
 const ALL_COLUMNS: ColumnDef[] = [
   { key: 'company', label: 'Ditta', kind: 'int' },
   { key: 'group', label: 'Gruppo', kind: 'int' },
-  { key: 'category', label: 'Specie', kind: 'text' },
-  { key: 'subcategory', label: 'Sottospecie', kind: 'int' },
-  { key: 'subcategory_description', label: 'Descrizione sottospecie', kind: 'text' },
+  { key: 'category', label: 'Categoria', kind: 'text' },
+  { key: 'subcategory', label: 'Sottocategoria', kind: 'int' },
+  { key: 'subcategory_description', label: 'Descrizione sottocategoria', kind: 'text' },
   { key: 'progress', label: 'Progressivo', kind: 'int' },
   { key: 'asset_code', label: 'Codice cespite', kind: 'int' },
   { key: 'fixed_asset_code', label: 'Codice immobilizzo', kind: 'int' },
@@ -324,10 +324,10 @@ export default function AmmortamentiCespitiPage() {
             options={subcategoryOptions}
             selected={subcategory}
             onChange={setSubcategory}
-            placeholder="Sottospecie"
+            placeholder="Sottocategoria"
             allowClear
             searchable
-            ariaLabel="Filtra per sottospecie"
+            ariaLabel="Filtra per sottocategoria"
           />
         </div>
         <div className={styles.viewToggle}>
@@ -381,7 +381,7 @@ export default function AmmortamentiCespitiPage() {
           </div>
           <div className={styles.emptyTitle}>Nessun cespite corrisponde ai filtri</div>
           <div className={styles.emptyDesc}>
-            Modifica la ricerca o la sottospecie, oppure svuotale per vedere tutti i cespiti dell'anno.
+            Modifica la ricerca o la sottocategoria, oppure svuotale per vedere tutti i cespiti dell'anno.
           </div>
         </div>
       )}
