@@ -327,7 +327,7 @@ var depreciationExportHeaders = []string{
 	"Ditta", "Gruppo", "Categoria", "Sottocategoria", "Descrizione sottocategoria", "Progressivo",
 	"Codice cespite", "Codice immobilizzo", "Descrizione immobilizzo", "Conto immobilizzo",
 	"Conto fondo ammortamento", "Conto costo ammortamento", "Matricola", "Descrizione",
-	"% ammortamento civilistico", "Quota ammortamento civilistico", "Anno acquisto",
+	"% ammortamento", "Quota ammortamento", "Anno acquisto",
 	"Anno vendita", "Costo storico", "Ammortamento precedente", "Ammortamento ordinario",
 	"Residuo iniziale", "Quota anno in corso", "Residuo da ammortizzare", "Vendita",
 	"Data attivazione", "Data disattivazione", "Note",
