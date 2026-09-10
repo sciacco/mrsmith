@@ -1,12 +1,12 @@
 openapi: 3.0.9
 info:
-  version: 2.10.7
+  version: 1.15.0
   title: Mistra NG Internal API
   license:
     name: CDLAN
     url: https://www.cdlan.it
   description: |
-    # Mistra NG Internal API Reference Build: 2.10.7
+    # Mistra NG Internal API Reference Build: 1.15.0
 servers:
   - url: /
 security:
@@ -42,6 +42,8 @@ tags:
     description: endpoints to manage files
   - name: documents
     description: endpoints to manage docs
+  - name: erp
+    description: ''
 paths:
   /users/v2/user:
     get:
@@ -1513,6 +1515,72 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/kit-coverage'
+        '400':
+          $ref: '#/components/responses/400'
+        '403':
+          $ref: '#/components/responses/403'
+        '404':
+          $ref: '#/components/responses/404'
+        '500':
+          $ref: '#/components/responses/500'
+  /coworking/v2/get-coworking-availability:
+    get:
+      summary: get coworking room
+      operationId: GetCoworkingAvailability
+      tags:
+        - calendar
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          description: start date to check coworking
+          schema:
+            type: string
+            format: date-time
+        - name: end_date
+          in: query
+          description: end date to check coworking
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: n_position
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Get availability results
+          content:
+            application/json:
+              schema:
+                type: boolean
+        '400':
+          $ref: '#/components/responses/400'
+        '403':
+          $ref: '#/components/responses/403'
+        '500':
+          $ref: '#/components/responses/500'
+  /coworking/v1/book-coworking:
+    post:
+      summary: new coworking booking
+      operationId: bookCoworking
+      tags:
+        - calendar
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/reservation'
+      responses:
+        '200':
+          description: Successfully booked coworking space
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/message'
         '400':
           $ref: '#/components/responses/400'
         '403':
@@ -4203,6 +4271,92 @@ paths:
           $ref: '#/components/responses/403'
         '500':
           $ref: '#/components/responses/500'
+  /arak/rda/v1/attachments:
+    get:
+      summary: Get all attachments for purchase orders
+      operationId: GetAllAttachmentsForPO
+      description: Returns a paginated list of attachments for purchase orders
+      tags:
+        - arak-rda
+      parameters:
+        - name: Requester-Email
+          in: header
+          required: true
+          description: Email of the user performing the request
+          schema:
+            type: string
+            format: email
+        - name: page_number
+          in: query
+          required: true
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+        - name: disable_pagination
+          in: query
+          required: false
+          description: If true, returns all results in a single page
+          schema:
+            type: boolean
+        - name: attachment_type
+          in: query
+          required: false
+          description: Filter attachments by type
+          schema:
+            type: string
+            enum:
+              - quote
+              - transport_document
+              - other
+        - name: start_date
+          in: query
+          required: false
+          description: Filter attachments by date
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          required: false
+          description: Filter attachments by date
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Successfully retrieved attachments for purchase orders
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - total_number
+                  - current_page
+                  - total_pages
+                  - items
+                properties:
+                  total_number:
+                    type: integer
+                  current_page:
+                    type: integer
+                  total_pages:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/attachment-get'
+        '400':
+          $ref: '#/components/responses/400'
+        '403':
+          $ref: '#/components/responses/403'
+        '500':
+          $ref: '#/components/responses/500'
   /arak/rda/v1/po:
     post:
       summary: new PO request
@@ -5914,6 +6068,67 @@ paths:
           $ref: '#/components/responses/404'
         '500':
           $ref: '#/components/responses/500'
+  /erp/v1/report/depreciation-of-fixed-assets:
+    get:
+      summary: report of fixed assets' depreciation
+      operationId: DepreciationOfFixedAssetReport
+      tags:
+        - erp
+      parameters:
+        - name: page_number
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: disable_pagination
+          in: query
+          required: false
+          description: provides all results in a single page
+          schema:
+            type: boolean
+        - name: year
+          in: query
+          required: false
+          description: anno [default=current]
+          schema:
+            type: integer
+            format: int64
+        - name: company
+          in: query
+          required: false
+          description: ditta [default=1]
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Successfully retrieved list
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - total_number
+                  - current_page
+                  - total_pages
+                  - items
+                properties:
+                  total_number:
+                    type: integer
+                  current_page:
+                    type: integer
+                  total_pages:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/depreciation-of-fixed-assets'
+        '400':
+          $ref: '#/components/responses/400'
+        '403':
+          $ref: '#/components/responses/403'
+        '500':
+          $ref: '#/components/responses/500'
 components:
   securitySchemes:
     oauth2:
@@ -6850,6 +7065,54 @@ components:
         address_id:
           type: integer
           format: int64
+    coworking-user:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        profile_id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        surname:
+          type: string
+        company:
+          type: string
+        email:
+          type: string
+          format: email
+      required:
+        - id
+        - profile_id
+        - name
+        - surname
+        - company
+        - email
+    reservation:
+      type: object
+      properties:
+        start_date:
+          type: string
+          format: date-time
+        end_date:
+          type: string
+          format: date-time
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/coworking-user'
+        room:
+          type: string
+          enum:
+            - full
+            - users
+      required:
+        - start_date
+        - end_date
+        - users
+        - room
     kit-brief:
       type: object
       required:
@@ -8725,6 +8988,60 @@ components:
           type: string
           description: Description of the article
           example: High quality industrial widget
+    attachment-get:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        po_id:
+          type: integer
+          format: int64
+        po_code:
+          type: string
+        po_project:
+          type: string
+        po_object:
+          type: string
+        requester_first_name:
+          type: string
+        requester_last_name:
+          type: string
+        requester_email:
+          type: string
+        cost_center:
+          type: string
+        attachment_type:
+          type: string
+          description: The type of attachment
+          enum:
+            - quote
+            - transport_document
+            - other
+        file_name:
+          type: string
+          description: Original file name
+        budget_id:
+          type: integer
+          format: int64
+        budget_user_id:
+          type: integer
+          format: int64
+        created_at:
+          type: string
+          format: date-time
+          description: Timestamp when the attachment was created
+      required:
+        - id
+        - po_id
+        - po_code
+        - requester_first_name
+        - requester_last_name
+        - requester_email
+        - attachment_type
+        - file_name
+        - budget_id
+        - created_at
     approver-brief:
       type: object
       properties:
@@ -9741,6 +10058,111 @@ components:
           description: actual rational number for the increment
       required:
         - increment_promise
+    depreciation-of-fixed-assets:
+      type: object
+      required:
+        - company
+        - group
+        - subcategory
+        - progress
+        - asset_code
+        - fixed_asset_code
+        - sale_amount
+      properties:
+        company:
+          type: integer
+          format: int64
+          description: Ditta
+        group:
+          type: integer
+          format: int64
+          description: Gruppo
+        category:
+          type: string
+          description: Specie
+        subcategory:
+          type: integer
+          format: int64
+          description: Sottospecie
+        subcategory_description:
+          type: string
+          description: Descriz_Sottospecie
+        progress:
+          type: integer
+          format: int64
+          description: Progress
+        asset_code:
+          type: integer
+          format: int64
+          description: Codice_Cespite
+        fixed_asset_code:
+          type: integer
+          format: int64
+          description: Codice_immobilizzo
+        fixed_asset_description:
+          description: Descrizione_immobilizzo
+          type: string
+        fixed_asset_account:
+          type: string
+          description: Conto_immobilizzo
+        depreciation_fund_account:
+          type: string
+          description: Conto_fdo_amm
+        depreciation_expense_account:
+          type: string
+          description: Conto_costo_amm
+        serial_number:
+          type: string
+          description: Matricola
+        description:
+          type: string
+          description: Descrizione
+        statutory_depreciation_rate:
+          type: string
+          description: '%_Ammortamento_civilistico'
+        statutory_depreciation_amount:
+          type: string
+          description: Quota_amm_civilistico
+        purchase_year:
+          type: integer
+          format: int64
+          description: Anno_acquisto
+        sale_year:
+          type: integer
+          format: int64
+          description: Anno_vendita
+        historical_cost:
+          type: string
+          description: Costo storico
+        prior_depreciation:
+          type: string
+          description: Amm_Prec
+        ordinary_depreciation:
+          type: string
+          description: Amm. Ordinario
+        initial_residual_value:
+          type: string
+          description: Residuo_Amm_iniziale
+        current_year_depreciation:
+          type: string
+          description: Amm_ordinario_anno_in_corso
+        residual_to_depreciate:
+          type: string
+          description: Rediduo_da_amm
+        sale_amount:
+          type: string
+          description: Vendita
+        activation_date:
+          type: string
+          format: date-time
+          description: Data_attivazione
+        deactivation_date:
+          type: string
+          format: date-time
+          description: Data_disattivazione
+        notes:
+          type: string
+          description: Note
   responses:
     '200':
       description: Ok
