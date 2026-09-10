@@ -65,6 +65,10 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	// Alyante — Report DDT cespiti
 	handle("GET /afc-tools/v1/ddt-cespiti", h.handleDdtCespiti)
 
+	// Mistra — Ammortamenti cespiti (registro annuale)
+	handle("GET /afc-tools/v1/cespiti/ammortamenti", h.handleDepreciation)
+	handle("GET /afc-tools/v1/cespiti/ammortamenti/export", h.handleDepreciationExport)
+
 	// Arak — RDA DDT Purchase Order
 	handle("GET /afc-tools/v1/rda/ddt", h.handleRDADDT)
 	handle("POST /afc-tools/v1/rda/ddt/download", h.handleRDADDTDownload)

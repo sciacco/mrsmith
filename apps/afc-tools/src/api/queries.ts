@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useApiClient } from './client';
 import type {
+  DepreciationRow,
   DdtCespitoRow,
   EnergiaColoDetailRow,
   EnergiaColoPivotRow,
@@ -127,4 +128,22 @@ export async function downloadRdaDdtZip(
   poIds: number[],
 ): Promise<Blob> {
   return api.postBlob('/afc-tools/v1/rda/ddt/download', { from, to, poIds });
+}
+
+// Ammortamenti cespiti: annual depreciation register for the given year.
+export function useDepreciationRows(year: number) {
+  const api = useApiClient();
+  return useQuery<DepreciationRow[]>({
+    queryKey: ['afc-tools', 'cespiti', 'ammortamenti', year],
+    queryFn: () => api.get<DepreciationRow[]>(`/afc-tools/v1/cespiti/ammortamenti?year=${year}`),
+  });
+}
+
+// Downloads the backend-generated Excel register (all columns of the year)
+// over the authenticated blob endpoint.
+export async function downloadDepreciationExcel(
+  api: ReturnType<typeof useApiClient>,
+  year: number,
+): Promise<Blob> {
+  return api.getBlob(`/afc-tools/v1/cespiti/ammortamenti/export?year=${year}`);
 }

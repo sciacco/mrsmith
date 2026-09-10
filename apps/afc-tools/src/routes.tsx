@@ -10,6 +10,7 @@ import OrdiniSalesPage from './pages/OrdiniSalesPage';
 import OrdiniSalesDetailPage from './pages/OrdiniSalesDetailPage';
 import ReportDdtCespitiPage from './pages/ReportDdtCespitiPage';
 import DdtPurchaseOrderPage from './pages/DdtPurchaseOrderPage';
+import AmmortamentiCespitiPage from './pages/AmmortamentiCespitiPage';
 
 export const routes: RouteObject[] = [
   { index: true, element: <Navigate to="/ordini-sales" replace /> },
@@ -23,6 +24,7 @@ export const routes: RouteObject[] = [
   { path: 'ordini-sales/:id', element: <OrdiniSalesDetailPage /> },
   { path: 'report-ddt-cespiti', element: <ReportDdtCespitiPage /> },
   { path: 'ddt-purchase-order', element: <DdtPurchaseOrderPage /> },
+  { path: 'ammortamenti-cespiti', element: <AmmortamentiCespitiPage /> },
   { path: 'stato-aziende', element: <StatoAziendePage /> },
   { path: 'anomalie-mor', element: <AnomalieMorPage /> },
   { path: 'accounting-timoo', element: <AccountingTimooPage /> },

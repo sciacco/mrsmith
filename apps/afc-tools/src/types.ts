@@ -222,3 +222,37 @@ export interface TransactionsExportResponse {
   renderUrl: string;
   reportName: string;
 }
+
+// Ammortamenti cespiti: one fixed-asset depreciation register line for a year.
+// Mirrors backend/internal/afctools/depreciation.go DepreciationRow. Percentages
+// and amounts arrive from the backend as numbers; date-times as civil days.
+export interface DepreciationRow {
+  company: number;
+  group: number;
+  category: string | null;
+  subcategory: number;
+  subcategory_description: string | null;
+  progress: number;
+  asset_code: number;
+  fixed_asset_code: number;
+  fixed_asset_description: string | null;
+  fixed_asset_account: string | null;
+  depreciation_fund_account: string | null;
+  depreciation_expense_account: string | null;
+  serial_number: string | null;
+  description: string | null;
+  statutory_depreciation_rate: number | null;
+  statutory_depreciation_amount: number | null;
+  purchase_year: number | null;
+  sale_year: number | null;
+  historical_cost: number | null;
+  prior_depreciation: number | null;
+  ordinary_depreciation: number | null;
+  initial_residual_value: number | null;
+  current_year_depreciation: number | null;
+  residual_to_depreciate: number | null;
+  sale_amount: number | null;
+  activation_date: string | null;
+  deactivation_date: string | null;
+  notes: string | null;
+}

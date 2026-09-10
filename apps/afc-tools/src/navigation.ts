@@ -31,6 +31,7 @@ export const afcToolsNavSections: NavSection[] = [
       { label: 'Nuovi articoli', path: '/nuovi-articoli' },
       { label: 'DDT per cespiti', path: '/report-ddt-cespiti' },
       { label: 'DDT Purchase Order', path: '/ddt-purchase-order' },
+      { label: 'Ammortamenti cespiti', path: '/ammortamenti-cespiti' },
     ],
   },
   {
