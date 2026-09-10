@@ -299,9 +299,7 @@ export default function AmmortamentiCespitiPage() {
 
       <TableToolbar className={styles.toolbar}>
         <div className={styles.yearField}>
-          <label className={styles.fieldLabel} htmlFor="ammortamenti-year">
-            Anno
-          </label>
+          <span className={styles.fieldLabel}>Anno</span>
           <SingleSelect
             options={yearOptions}
             selected={year}
