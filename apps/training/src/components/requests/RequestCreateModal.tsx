@@ -1,7 +1,9 @@
 // Registrazione di una richiesta formativa per conto della persona (#157,
-// §Richieste 3). Dati original-only: nessuna modifica dopo la creazione, il
-// backend non la espone. Il team si precompila quando l'appartenenza attiva
-// e unica, altrimenti si sceglie tra quelle della persona.
+// §Richieste 3; #200). Dati original-only: nessuna modifica dopo la
+// creazione, il backend non la espone. Il team e obbligatorio solo quando
+// la persona ha appartenenze attive: precompilato quando l'appartenenza
+// attiva e unica, altrimenti si sceglie tra quelle della persona; senza
+// appartenenze la richiesta si registra senza team.
 
 import { useMemo, useState } from 'react';
 import { Button, Modal, MultiSelect, SingleSelect, VisuallyHidden } from '@mrsmith/ui';
@@ -38,6 +40,7 @@ export function RequestCreateModal({ open, onClose, onCreated }: RequestCreateMo
 
   const person = (people.data ?? []).find((p) => p.id === employeeId);
   const activeTeams = person?.teams ?? [];
+  const teamRequired = activeTeams.length > 0;
 
   function handleEmployeeChange(id: string | null) {
     setEmployeeId(id ?? '');
@@ -47,7 +50,7 @@ export function RequestCreateModal({ open, onClose, onCreated }: RequestCreateMo
 
   const canSubmit =
     employeeId !== '' &&
-    teamId !== '' &&
+    (!teamRequired || teamId !== '') &&
     motivation.trim() !== '' &&
     (courseMode === 'catalog' ? courseId !== '' : newCourseTitle.trim() !== '');
 
@@ -65,7 +68,7 @@ export function RequestCreateModal({ open, onClose, onCreated }: RequestCreateMo
     try {
       const response = await createRequest.mutateAsync({
         employeeId,
-        selectedTeamId: teamId,
+        selectedTeamId: teamId || undefined,
         courseId: courseMode === 'catalog' ? courseId : undefined,
         newCourseTitle: courseMode === 'new' ? newCourseTitle.trim() : undefined,
         skillAreas: skillAreaIds.map((areaId) => ({
@@ -108,18 +111,30 @@ export function RequestCreateModal({ open, onClose, onCreated }: RequestCreateMo
         <label className={styles.field}>
           <span className={styles.labelHead}>
             Team
-            <span className={styles.requiredMarker} aria-hidden="true" />
-            <VisuallyHidden>obbligatorio</VisuallyHidden>
+            {teamRequired && (
+              <>
+                <span className={styles.requiredMarker} aria-hidden="true" />
+                <VisuallyHidden>obbligatorio</VisuallyHidden>
+              </>
+            )}
           </span>
           <SingleSelect
             options={activeTeams.map((t) => ({ value: t.id, label: t.name }))}
             selected={teamId || null}
             onChange={(v) => setTeamId(v ?? '')}
-            placeholder={employeeId === '' ? 'Seleziona prima la persona' : 'Seleziona team...'}
+            placeholder={
+              employeeId === ''
+                ? 'Seleziona prima la persona'
+                : teamRequired
+                  ? 'Seleziona team...'
+                  : 'Senza team'
+            }
             disabled={activeTeams.length <= 1}
           />
-          {employeeId !== '' && activeTeams.length === 0 && (
-            <span className={styles.hint}>La persona non ha appartenenze attive a nessun team.</span>
+          {employeeId !== '' && !teamRequired && (
+            <span className={styles.hint}>
+              La persona non ha appartenenze attive: la richiesta si registra senza team.
+            </span>
           )}
         </label>
 

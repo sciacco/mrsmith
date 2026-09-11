@@ -1,13 +1,16 @@
-// Dettaglio richiesta (#157, §Richieste 2/4/5/6; #171): faccia originale
-// modificabile (finche la richiesta non e chiusa; la persona e invariata)
-// separata dalla faccia accolta, fatti come cronologia (parere, decisione,
-// esito, iscrizione generata), azioni guidate per parere TL (riscrivibile),
-// decisione con accoglimento anti-doppione (riscrivibile anche a richiesta
-// chiusa da decisione) e ritiro. Nessuna state machine locale: la
-// sequenzialita e l'override vivono nel backend, qui si offrono le azioni
-// coerenti coi fatti gia caricati e si mostrano per intero i 4xx.
+// Dettaglio richiesta (#157, §Richieste 2/4/5/6; #171; #200): faccia
+// originale modificabile (finche la richiesta non e chiusa; la persona e
+// invariata) separata dalla faccia accolta, fatti come cronologia (parere,
+// decisione, esito, iscrizione generata), azioni guidate per parere TL
+// (consultativo, riscrivibile), decisione con accoglimento anti-doppione
+// (riscrivibile anche a richiesta chiusa da decisione) e ritiro. Il parere
+// TL non e prerequisito della decisione (#200): la decisione People e
+// disponibile su ogni richiesta aperta senza decisione, con o senza parere
+// e con o senza team. Nessuna state machine locale: la sequenzialita e
+// l'override vivono nel backend, qui si offrono le azioni coerenti coi
+// fatti gia caricati e si mostrano per intero i 4xx.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, Drawer, Modal, MultiSelect, Skeleton, SingleSelect, StatusBadge, useToast, VisuallyHidden } from '@mrsmith/ui';
 import {
@@ -65,6 +68,7 @@ interface RequestDetailDrawerProps {
 export function RequestDetailDrawer({ id, onClose }: RequestDetailDrawerProps) {
   const { toast } = useToast();
   const detail = useRequestDetail(id);
+  const teams = useTrainingTeams();
   const withdrawRequest = useWithdrawRequest();
 
   const suspendRequest = useSuspendRequest();
@@ -84,11 +88,21 @@ export function RequestDetailDrawer({ id, onClose }: RequestDetailDrawerProps) {
   const isOpen = !!request && !request.outcome;
   const isSuspended = !!request?.suspendedAt;
   const needsOpinion = isOpen && !request?.tlOpinion;
-  const needsDecision = isOpen && !!request?.tlOpinion && !request?.decision;
+  const needsDecision = isOpen && !request?.decision;
   // Riscrittura decisione su richiesta chiusa da decisione (accepted|rejected);
   // withdrawn resta terminale (#171).
   const canRewriteDecision =
     !!request && (request.outcome === 'accepted' || request.outcome === 'rejected');
+  // Il parere TL si offre solo quando la richiesta ha un team con almeno un
+  // lead attivo (#200). Team assente, team senza lead o anagrafica team non
+  // ancora caricata: il bottone resta nascosto, senza mai bloccare la
+  // decisione People, che non dipende ne dal parere ne dal team.
+  const teamWithLeads = useMemo(() => {
+    const teamId = request?.requested.selectedTeamId;
+    if (!teamId) return null;
+    return (teams.data ?? []).find((t) => t.id === teamId) ?? null;
+  }, [teams.data, request]);
+  const canRecordTLOpinion = (teamWithLeads?.leads.length ?? 0) > 0;
 
   async function handleWithdraw() {
     setWithdrawError(null);
@@ -145,9 +159,11 @@ export function RequestDetailDrawer({ id, onClose }: RequestDetailDrawerProps) {
                   Sospendi
                 </Button>
               )}
-              <Button variant="secondary" size="md" onClick={() => setShowTLOpinion(true)}>
-                {needsOpinion ? 'Registra parere TL' : 'Riscrivi parere TL'}
-              </Button>
+              {canRecordTLOpinion && (
+                <Button variant="secondary" size="md" onClick={() => setShowTLOpinion(true)}>
+                  {needsOpinion ? 'Registra parere TL' : 'Riscrivi parere TL'}
+                </Button>
+              )}
               {needsDecision && (
                 <Button variant="primary" size="md" onClick={() => setShowDecision(true)}>
                   Registra decisione
@@ -188,7 +204,11 @@ export function RequestDetailDrawer({ id, onClose }: RequestDetailDrawerProps) {
                   </div>
                   <div className={styles.item}>
                     <dt>Team</dt>
-                    <dd>{request.requested.selectedTeamName}</dd>
+                    <dd>
+                      {request.requested.selectedTeamName ?? (
+                        <span className={styles.muted}>Senza team</span>
+                      )}
+                    </dd>
                   </div>
                   <div className={styles.item}>
                     <dt>Corso o titolo</dt>
@@ -299,7 +319,7 @@ export function RequestDetailDrawer({ id, onClose }: RequestDetailDrawerProps) {
                         {request.tlOpinion.reason && ` · ${request.tlOpinion.reason}`}
                       </span>
                     ) : (
-                      <span className={localStyles.timelineMuted}>Non ancora registrato</span>
+                      <span className={localStyles.timelineMuted}>Non registrato</span>
                     )}
                   </li>
                   <li>
@@ -315,7 +335,7 @@ export function RequestDetailDrawer({ id, onClose }: RequestDetailDrawerProps) {
                         {request.decision.reason}
                       </span>
                     ) : (
-                      <span className={localStyles.timelineMuted}>Non ancora registrata</span>
+                      <span className={localStyles.timelineMuted}>Non registrata</span>
                     )}
                   </li>
                   <li>
@@ -524,7 +544,7 @@ function TLOpinionForm({ request, onClose }: { request: RequestDetail; onClose: 
       <div className={formStyles.body}>
         <label className={formStyles.field}>
           <span className={formStyles.labelHead}>
-            Lead del team {request.requested.selectedTeamName}
+            Lead del team {request.requested.selectedTeamName ?? ''}
             <span className={formStyles.requiredMarker} aria-hidden="true" />
             <VisuallyHidden>obbligatorio</VisuallyHidden>
           </span>
@@ -984,14 +1004,18 @@ function OriginalDataForm({ request, onClose }: { request: RequestDetail; onClos
     ),
   );
   const [motivation, setMotivation] = useState(requested.motivation);
-  const [teamId, setTeamId] = useState(requested.selectedTeamId);
+  const [teamId, setTeamId] = useState(requested.selectedTeamId ?? '');
   const [desiredStart, setDesiredStart] = useState(requested.desiredStart ?? '');
   const [desiredEnd, setDesiredEnd] = useState(requested.desiredEnd ?? '');
   const [error, setError] = useState<string | null>(null);
 
+  // Team obbligatorio solo quando la persona ha appartenenze attive (#200);
+  // prima del caricamento delle persone si resta sul caso conservativo.
+  const teamOptional = people.isSuccess && activeTeams.length === 0;
+
   const canSubmit =
     motivation.trim() !== '' &&
-    teamId !== '' &&
+    (teamOptional || teamId !== '') &&
     (courseMode === 'catalog' ? courseId !== '' : newCourseTitle.trim() !== '');
 
   async function submit() {
@@ -1013,7 +1037,7 @@ function OriginalDataForm({ request, onClose }: { request: RequestDetail; onClos
               : undefined,
         })),
         motivation: motivation.trim(),
-        selectedTeamId: teamId,
+        selectedTeamId: teamId || undefined,
         desiredStart: desiredStart || undefined,
         desiredEnd: desiredEnd || undefined,
       };
@@ -1038,15 +1062,25 @@ function OriginalDataForm({ request, onClose }: { request: RequestDetail; onClos
         <label className={formStyles.field}>
           <span className={formStyles.labelHead}>
             Team
-            <span className={formStyles.requiredMarker} aria-hidden="true" />
-            <VisuallyHidden>obbligatorio</VisuallyHidden>
+            {!teamOptional && (
+              <>
+                <span className={formStyles.requiredMarker} aria-hidden="true" />
+                <VisuallyHidden>obbligatorio</VisuallyHidden>
+              </>
+            )}
           </span>
           <SingleSelect
             options={activeTeams.map((t) => ({ value: t.id, label: t.name }))}
             selected={teamId || null}
             onChange={(v) => setTeamId(v ?? '')}
-            placeholder={activeTeams.length === 0 ? 'Nessuna appartenenza attiva' : 'Seleziona team...'}
+            placeholder={teamOptional ? 'Senza team' : 'Seleziona team...'}
+            disabled={activeTeams.length === 0}
           />
+          {teamOptional && (
+            <span className={formStyles.hint}>
+              La persona non ha appartenenze attive: la richiesta si salva senza team.
+            </span>
+          )}
         </label>
 
         <div className={formStyles.toggleGroup}>

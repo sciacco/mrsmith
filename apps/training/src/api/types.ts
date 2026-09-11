@@ -834,7 +834,7 @@ export interface RequestInput {
   newCourseTitle?: string;
   skillAreas?: RequestSkillAreaInput[];
   motivation: string;
-  selectedTeamId: string;
+  selectedTeamId?: string;
   desiredStart?: string;
   desiredEnd?: string;
   priority?: number;
@@ -879,12 +879,14 @@ export interface RequestDecisionInput {
 // RequestOriginalDataInput sostituisce i dati originali di una richiesta
 // aperta (#171): corso a catalogo o titolo nuovo (alternativi), aree con
 // livelli, motivazione, team e date desiderate. La persona e invariata.
+// Il team e obbligatorio solo quando la persona ha appartenenze attive;
+// selectedTeamId omesso = nessun team (#200).
 export interface RequestOriginalDataInput {
   courseId?: string;
   newCourseTitle?: string;
   skillAreas?: RequestSkillAreaInput[];
   motivation: string;
-  selectedTeamId: string;
+  selectedTeamId?: string;
   desiredStart?: string;
   desiredEnd?: string;
 }
@@ -893,7 +895,7 @@ export interface RequestListRow {
   id: string;
   employeeName: string;
   courseTitle?: string;
-  selectedTeamName: string;
+  selectedTeamName?: string;
   priority?: number;
   reminderText?: string;
   reminderAt?: string;
@@ -922,8 +924,10 @@ export interface RequestOriginalData {
   courseTitle?: string;
   skillAreas: RequestAreaRef[];
   motivation: string;
-  selectedTeamId: string;
-  selectedTeamName: string;
+  // Team assente quando la persona non ha appartenenze attive (#200):
+  // entrambi i campi sono omessi dal JSON, non null.
+  selectedTeamId?: string;
+  selectedTeamName?: string;
   desiredStart?: string;
   desiredEnd?: string;
 }

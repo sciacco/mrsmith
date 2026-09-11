@@ -57,6 +57,11 @@
   color: var(--color-text);
 }
 
+/* Valore de-enfatizzato nei dettagli (es. «Senza team», #200). */
+.muted {
+  color: var(--color-text-faint);
+}
+
 .item a {
   color: var(--color-accent);
 }

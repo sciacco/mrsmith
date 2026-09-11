@@ -143,6 +143,12 @@
   border-radius: var(--radius-sm);
 }
 
+/* #200 — celle con valore de-enfatizzato (es. «Senza team»), distinti dai
+   valori assenti che restano «—». */
+.table td .mutedCell {
+  color: var(--color-text-faint);
+}
+
 .empty {
   display: flex;
   flex-direction: column;

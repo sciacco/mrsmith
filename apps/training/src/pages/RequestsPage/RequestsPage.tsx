@@ -157,7 +157,9 @@ export function RequestsPage() {
                       {row.suspendedAt && <StatusBadge value="suspended" label="Sospesa" variant="warning" />}
                     </span>
                   </td>
-                  <td>{row.selectedTeamName}</td>
+                  <td>
+                    {row.selectedTeamName ?? <span className={styles.mutedCell}>Senza team</span>}
+                  </td>
                   <td>
                     {row.priority != null ? (
                       <StatusBadge value="priority" label={`P${row.priority}`} variant="neutral" />
