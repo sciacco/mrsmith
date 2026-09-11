@@ -1009,13 +1009,37 @@ function OriginalDataForm({ request, onClose }: { request: RequestDetail; onClos
   const [desiredEnd, setDesiredEnd] = useState(requested.desiredEnd ?? '');
   const [error, setError] = useState<string | null>(null);
 
-  // Team obbligatorio solo quando la persona ha appartenenze attive (#200);
-  // prima del caricamento delle persone si resta sul caso conservativo.
-  const teamOptional = people.isSuccess && activeTeams.length === 0;
+  // Il risultato e attendibile solo quando la query e riuscita e la persona
+  // e stata trovata: errore, caricamento o persona assente non equivalgono a
+  // zero appartenenze (#200).
+  const teamsLoaded = people.isSuccess && person !== undefined;
+  const teamOptional = teamsLoaded && activeTeams.length === 0;
+
+  // Allinea il solo stato del form alle appartenenze correnti. Con un team la
+  // scelta e obbligata e non svuotabile; con piu team un ID storico estraneo
+  // viene azzerato e resta necessario scegliere un valore valido.
+  useEffect(() => {
+    if (!teamsLoaded) return;
+    if (activeTeams.length === 0) {
+      if (teamId !== '') setTeamId('');
+      return;
+    }
+    if (activeTeams.length === 1) {
+      const onlyTeamId = activeTeams[0]?.id ?? '';
+      if (teamId !== onlyTeamId) setTeamId(onlyTeamId);
+      return;
+    }
+    if (teamId !== '' && activeTeams.some((team) => team.id === teamId)) return;
+    if (teamId !== '') setTeamId('');
+  }, [activeTeams, teamId, teamsLoaded]);
+
+  const teamSelectionValid =
+    teamsLoaded &&
+    (activeTeams.length === 0 ? teamId === '' : activeTeams.some((team) => team.id === teamId));
 
   const canSubmit =
     motivation.trim() !== '' &&
-    (teamOptional || teamId !== '') &&
+    teamSelectionValid &&
     (courseMode === 'catalog' ? courseId !== '' : newCourseTitle.trim() !== '');
 
   async function submit() {
@@ -1072,7 +1096,7 @@ function OriginalDataForm({ request, onClose }: { request: RequestDetail; onClos
           <SingleSelect
             options={activeTeams.map((t) => ({ value: t.id, label: t.name }))}
             selected={teamId || null}
-            onChange={(v) => setTeamId(v ?? '')}
+            onChange={(v) => setTeamId(activeTeams.length === 1 ? (activeTeams[0]?.id ?? '') : (v ?? ''))}
             placeholder={teamOptional ? 'Senza team' : 'Seleziona team...'}
             disabled={activeTeams.length === 0}
           />
