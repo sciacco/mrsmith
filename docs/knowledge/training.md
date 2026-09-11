@@ -3,11 +3,20 @@
 Knowledge entries specific to `apps/training`.
 Part of the Implementation Knowledge Handbook — see [docs/IMPLEMENTATION-KNOWLEDGE.md](../IMPLEMENTATION-KNOWLEDGE.md) for the index, entry format, and placement rules.
 
+### Training Request Team Is Optional Only Without Active Memberships; People Decides Without TL Opinion
+
+- Context: `apps/training` training requests (`/richieste`), decision workflow, work queue (`/`), planning (`/pianificazione`); `training.training_request.selected_team_id` is nullable since migration `149_training_request_optional_team.sql` (#200).
+- Discovery: the team on a request is mandatory **only** when the person has at least one active team membership (`training.team_membership.end_date IS NULL`); when present it must be one of those memberships. A person with no memberships keeps a fully operative teamless request. The TL opinion is a consultative fact, never a prerequisite: People can accept or reject any open request with, without, or against a recorded opinion, and no opinion is ever generated implicitly. `RecordTLOpinion` requires the request to have a team and the signer to be an active lead of that team.
+- Practical rule: never reintroduce an opinion-based gate or a synthetic "pending opinion" queue. The single decision queue is all and only requests with `outcome IS NULL`, `suspended_at IS NULL`, `people_decision IS NULL`. Any read of request team must be nullable end-to-end (LEFT JOIN / `COALESCE`, `omitempty` in JSON so absence = key omitted, `?? 'Senza team'` / `Non registrato` neutral labels in UI, no empty option in team filters). Backend error codes: `selected_team_required` (memberships exist, team empty), `selected_team_invalid` (team foreign to the person), `request_without_team` (opinion on a teamless request).
+- Evidence: `backend/internal/training/store_requests.go` (`validateSelectedTeam`, `requestDecisionPolicy`, `lockRequestFacts`, `RecordTLOpinion`), `store_queues.go` (`QueueRequestsAwaitingDecision`), `store_planning.go` + `planning_projection.go` (nullable `*PlanningRef` team), `types_requests.go`/`types_queues.go`/`types_planning.go` (`omitempty`), frontend `apps/training/src/api/types.ts`, `components/requests/*`, `pages/WorkQueuePage`, `pages/PlanningPage/PlanningCourseDrawer.tsx`.
+- Used by: request registration/edit/decision flows, the «Da decidere» queue, planning projections and team filters, person scheda.
+- Open questions: none.
+
 ### Training Directory Shows Facts, Not Synthetic Chips
 
 - Context: `apps/training` People directory (`/persone`) and backend `GET /training/v1/people`.
 - Discovery: the pre-rebuild directory (task 6 of #137 replaced it, migration `129_training_domain_restructure.sql`) exposed synthetic action-flag chips (`da_pianificare`, `compliance_gap`, …) computed from dormant HR-ish state. The rebuilt domain drops that layer entirely: the directory row carries only facts already on `training.employee` and its live joins — `status`, `directoryExempt`, current team memberships (with `role`), custom-group memberships. It does not compute or expose any derived planning flag.
-- Practical rule: keep the directory a facts table. Actionable signals (requests without opinion, uncovered seats, expiring coverage, stale enrollments…) belong to the work queue (`/`, `backend/internal/training/handler_queues.go`) and to the person's rule-coverage list (`GetPersonDetail`), never to a synthetic chip recomputed on the directory row itself.
+- Practical rule: keep the directory a facts table. Actionable signals (undecided requests, uncovered seats, expiring coverage, stale enrollments…) belong to the work queue (`/`, `backend/internal/training/handler_queues.go`) and to the person's rule-coverage list (`GetPersonDetail`), never to a synthetic chip recomputed on the directory row itself.
 - Evidence: `backend/internal/training/store_people_reads.go` (`ListPeople`, `GetPersonDetail`), `backend/internal/training/types_reads.go` (`PersonListRow`, `PersonDetail`), `apps/training/src/pages/PeoplePage/PeoplePage.tsx`, `apps/training/src/pages/PersonPage/PersonPage.tsx`.
 - Used by: `apps/training` `/persone` directory and `/persone/:id` scheda formativa.
 - Open questions: none.

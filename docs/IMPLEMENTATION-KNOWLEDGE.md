@@ -166,6 +166,7 @@ Use this format for new knowledge entries:
 ### Training — [`knowledge/training.md`](knowledge/training.md)
 
 - [Training Directory Chips Are Action-First](knowledge/training.md#training-directory-chips-are-action-first)
+- [Training Request Team Is Optional Only Without Active Memberships; People Decides Without TL Opinion](knowledge/training.md#training-request-team-is-optional-only-without-active-memberships-people-decides-without-tl-opinion)
 - [Training Rule Populations Stay Training-Side](knowledge/training.md#training-rule-populations-stay-training-side)
 - [Training Compliance Courses Become Mandatory Through Rules](knowledge/training.md#training-compliance-courses-become-mandatory-through-rules)
 - [Training People Admin Can Create Local Employees](knowledge/training.md#training-people-admin-can-create-local-employees)
