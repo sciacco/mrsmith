@@ -12,15 +12,16 @@ package training
 // per conto della persona. Corso a catalogo e titolo nuovo sono alternativi:
 // un titolo e l'embrione di un corso, quindi il backend riusa il corso
 // esistente con lo stesso nome oppure lo crea (solo nome) nella stessa
-// transazione — ogni richiesta aggancia sempre un corso. Il team scelto deve
-// essere tra le appartenenze attive della persona.
+// transazione — ogni richiesta aggancia sempre un corso. Il team scelto e
+// obbligatorio solo se la persona ha appartenenze attive; quando presente
+// deve essere tra queste (#200).
 type RequestInput struct {
 	EmployeeID     string                  `json:"employeeId"`
 	CourseID       string                  `json:"courseId,omitempty"`
 	NewCourseTitle string                  `json:"newCourseTitle,omitempty"`
 	SkillAreas     []RequestSkillAreaInput `json:"skillAreas,omitempty"`
 	Motivation     string                  `json:"motivation"`
-	SelectedTeamID string                  `json:"selectedTeamId"`
+	SelectedTeamID string                  `json:"selectedTeamId,omitempty"`
 	DesiredStart   string                  `json:"desiredStart,omitempty"` // YYYY-MM-DD
 	DesiredEnd     string                  `json:"desiredEnd,omitempty"`   // YYYY-MM-DD
 	// Priorita facoltativa (1 = piu importante, senza unicita) e annotazioni
@@ -51,16 +52,17 @@ type RequestAnnotationsInput struct {
 
 // RequestOriginalDataInput sostituisce i dati originali di una richiesta
 // aperta (#171): corso a catalogo o titolo nuovo (alternativi; un titolo e
-// l'embrione di un corso), aree con livelli, motivazione, team scelto e
-// date desiderate. La persona e invariata (correzione = ritiro + nuova
-// richiesta); priorita, nota e promemoria restano sul PUT annotations.
-// Stesse validazioni di RequestInput.
+// l'embrione di un corso), aree con livelli, motivazione, team scelto
+// (obbligatorio solo se la persona ha appartenenze attive; quando presente
+// deve essere tra queste) e date desiderate. La persona e invariata
+// (correzione = ritiro + nuova richiesta); priorita, nota e promemoria
+// restano sul PUT annotations. Stesse validazioni di RequestInput.
 type RequestOriginalDataInput struct {
 	CourseID       string                  `json:"courseId,omitempty"`
 	NewCourseTitle string                  `json:"newCourseTitle,omitempty"`
 	SkillAreas     []RequestSkillAreaInput `json:"skillAreas,omitempty"`
 	Motivation     string                  `json:"motivation"`
-	SelectedTeamID string                  `json:"selectedTeamId"`
+	SelectedTeamID string                  `json:"selectedTeamId,omitempty"`
 	DesiredStart   string                  `json:"desiredStart,omitempty"` // YYYY-MM-DD
 	DesiredEnd     string                  `json:"desiredEnd,omitempty"`   // YYYY-MM-DD
 }
@@ -75,8 +77,9 @@ type TLOpinionInput struct {
 	Reason         string `json:"reason,omitempty"`
 }
 
-// RequestDecisionInput registra la decisione People. La prima decisione
-// richiede il parere TL (sequenzialita iniziale); la riscrittura e ammessa
+// RequestDecisionInput registra la decisione People: la prima decisione e
+// ammessa su richiesta aperta, senza prerequisito di parere TL (#200); il
+// parere resta un fatto consultivo facoltativo. La riscrittura e ammessa
 // anche a richiesta chiusa da decisione. La motivazione e facoltativa:
 // nell'accoglimento con parere sfavorevole e anche la motivazione
 // dell'override (D5). Accepted e obbligatorio se la richiesta viene
@@ -112,8 +115,8 @@ type RequestListRow struct {
 	CourseID       string         `json:"courseId,omitempty"`
 	CourseTitle    string         `json:"courseTitle,omitempty"`
 	SkillAreas     []SkillAreaRef `json:"skillAreas"`
-	SelectedTeamID string         `json:"selectedTeamId"`
-	SelectedTeam   string         `json:"selectedTeamName"`
+	SelectedTeamID string         `json:"selectedTeamId,omitempty"`
+	SelectedTeam   string         `json:"selectedTeamName,omitempty"`
 	Priority       *int           `json:"priority,omitempty"`
 	ReminderText   string         `json:"reminderText,omitempty"`
 	ReminderAt     string         `json:"reminderAt,omitempty"`
@@ -140,8 +143,8 @@ type RequestOriginalData struct {
 	CourseTitle      string           `json:"courseTitle,omitempty"`
 	SkillAreas       []RequestAreaRef `json:"skillAreas"`
 	Motivation       string           `json:"motivation"`
-	SelectedTeamID   string           `json:"selectedTeamId"`
-	SelectedTeamName string           `json:"selectedTeamName"`
+	SelectedTeamID   string           `json:"selectedTeamId,omitempty"`
+	SelectedTeamName string           `json:"selectedTeamName,omitempty"`
 	DesiredStart     string           `json:"desiredStart,omitempty"`
 	DesiredEnd       string           `json:"desiredEnd,omitempty"`
 }

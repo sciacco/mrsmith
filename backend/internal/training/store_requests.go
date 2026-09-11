@@ -9,15 +9,16 @@ import (
 	"strings"
 )
 
-// Richieste formative (#140, §4-Richieste, decisioni D5 e D8; #171).
+// Richieste formative (#140, §4-Richieste, decisioni D5 e D8; #171; #200).
 //
 // I dati originali della richiesta sono modificabili finche la richiesta
 // non e chiusa (esito assente; vale anche da sospesa): la persona resta
 // invariata (correzione = ritiro + nuova richiesta). Parere TL e decisione
-// People sono riscrivibili finche la richiesta non e chiusa; il parere e
-// ammesso solo a richiesta aperta, la decisione e riscrivibile anche a
+// People sono riscrivibili finche la richiesta non e chiusa; il parere e un
+// fatto consultivo facoltativo, ammesso solo a richiesta aperta e con team,
+// la decisione People e ammessa anche senza parere ed e riscrivibile anche a
 // richiesta chiusa da decisione (accepted|rejected); withdrawn resta
-// terminale. Sequenzialita e override vivono in requestDecisionPolicy;
+// terminale. Transizioni e override vivono in requestDecisionPolicy;
 // l'accoglimento e una transazione unica; l'audit conserva la storia.
 
 const (
@@ -46,7 +47,7 @@ type requestPolicyFacts struct {
 	PeopleDecision string
 }
 
-// requestDecisionPolicy e l'UNICO punto che codifica la sequenzialita e
+// requestDecisionPolicy e l'UNICO punto che codifica le transizioni e
 // l'override del workflow richieste (D5; #171): cambiare la policy non
 // riscrive i fatti storici gia registrati, resta nell'audit.
 //
@@ -54,9 +55,9 @@ type requestPolicyFacts struct {
 //   - edit_original: ammessa solo su richiesta aperta (esito assente);
 //   - parere TL: registrabile e riscrivibile solo su richiesta aperta; vale
 //     l'ultimo, la motivazione e facoltativa;
-//   - decisione People: prima decisione solo su richiesta aperta e con il
-//     parere TL presente (sequenzialita iniziale); riscrittura ammessa anche
-//     a richiesta chiusa da decisione (outcome accepted|rejected),
+//   - decisione People: prima decisione ammessa su richiesta aperta, senza
+//     prerequisito di parere TL (#200); riscrittura ammessa anche a
+//     richiesta chiusa da decisione (outcome accepted|rejected),
 //     motivazione facoltativa; withdrawn resta terminale (nessuna azione);
 //   - accoglimento con parere sfavorevole = override, ammesso: la
 //     motivazione facoltativa della decisione e la motivazione
@@ -76,9 +77,8 @@ func requestDecisionPolicy(facts requestPolicyFacts, action string) error {
 	case requestActionDecision:
 		switch facts.Outcome {
 		case "":
-			if facts.TLOpinion == "" {
-				return conflictError("tl_opinion_required", "decisione ammessa solo con il parere TL registrato")
-			}
+			// Prima decisione ammessa su richiesta aperta, senza
+			// prerequisito di parere TL (#200).
 		case requestDecisionAccepted, requestDecisionRejected:
 			// Riscrittura ammessa.
 		case requestOutcomeWithdrawn:
@@ -101,7 +101,7 @@ func (s *SQLStore) lockRequestFacts(ctx context.Context, tx *sql.Tx, id string) 
 SELECT
   r.id::text,
   r.employee_id::text,
-  r.selected_team_id::text,
+  COALESCE(r.selected_team_id::text, ''),
   COALESCE(r.outcome, ''),
   COALESCE(r.tl_opinion, ''),
   COALESCE(r.people_decision, '')
@@ -126,22 +126,38 @@ FOR UPDATE`
 	return facts, nil
 }
 
-// ensureSelectedTeamMembership verifica che il team scelto sia tra le
-// appartenenze attive della persona (membership attiva = end_date IS NULL).
-func (s *SQLStore) ensureSelectedTeamMembership(ctx context.Context, q sqlRunner, employeeID, teamID string) error {
-	var ok bool
-	err := q.QueryRowContext(ctx, `
-SELECT EXISTS (
-  SELECT 1
-  FROM training.team_membership tm
-  WHERE tm.employee_id = $1::uuid
-    AND tm.team_id = $2::uuid
-    AND tm.end_date IS NULL
-)`, employeeID, teamID).Scan(&ok)
+// validateSelectedTeam verifica il team scelto secondo la regola condizionata
+// (#200): se la persona non ha appartenenze attive (end_date IS NULL) la
+// richiesta puo non avere team; se ne ha almeno una il team e obbligatorio e
+// deve essere tra queste. Il controllo gira nella stessa transazione della
+// scrittura.
+func (s *SQLStore) validateSelectedTeam(ctx context.Context, tx *sql.Tx, employeeID, teamID string) error {
+	var hasActive, teamAmongActive bool
+	err := tx.QueryRowContext(ctx, `
+SELECT
+  EXISTS (
+    SELECT 1
+    FROM training.team_membership tm
+    WHERE tm.employee_id = $1::uuid
+      AND tm.end_date IS NULL
+  ),
+  EXISTS (
+    SELECT 1
+    FROM training.team_membership tm
+    WHERE tm.employee_id = $1::uuid
+      AND tm.team_id = NULLIF($2, '')::uuid
+      AND tm.end_date IS NULL
+  )`, employeeID, teamID).Scan(&hasActive, &teamAmongActive)
 	if err != nil {
-		return fmt.Errorf("check training request team membership: %w", err)
+		return fmt.Errorf("check training request team: %w", err)
 	}
-	if !ok {
+	if teamID == "" {
+		if hasActive {
+			return validationError("selected_team_required", "team obbligatorio: la persona ha appartenenze attive")
+		}
+		return nil
+	}
+	if !teamAmongActive {
 		return validationError("selected_team_invalid", "il team scelto non e tra le appartenenze attive della persona")
 	}
 	return nil
@@ -210,7 +226,7 @@ SELECT
   r.created_at::text
 FROM training.training_request r
 JOIN training.employee e ON e.id = r.employee_id
-JOIN training.team t ON t.id = r.selected_team_id
+LEFT JOIN training.team t ON t.id = r.selected_team_id
 LEFT JOIN training.course c ON c.id = r.course_id
 WHERE ($1 = 'all')
    OR ($1 = 'open' AND r.outcome IS NULL AND r.suspended_at IS NULL)
@@ -229,6 +245,7 @@ LIMIT 1000`
 		var row RequestListRow
 		var areasRaw string
 		var priority sql.NullInt64
+		var teamID, teamName sql.NullString
 		if err := rows.Scan(
 			&row.ID,
 			&row.EmployeeID,
@@ -237,8 +254,8 @@ LIMIT 1000`
 			&row.CourseID,
 			&row.CourseTitle,
 			&areasRaw,
-			&row.SelectedTeamID,
-			&row.SelectedTeam,
+			&teamID,
+			&teamName,
 			&priority,
 			&row.ReminderText,
 			&row.ReminderAt,
@@ -255,6 +272,8 @@ LIMIT 1000`
 			return nil, fmt.Errorf("decode training request skill areas: %w", err)
 		}
 		row.Priority = nullInt(priority)
+		row.SelectedTeamID = teamID.String
+		row.SelectedTeam = teamName.String
 		result = append(result, row)
 	}
 	return result, rows.Err()
@@ -319,7 +338,7 @@ SELECT
   r.updated_at::text
 FROM training.training_request r
 JOIN training.employee e ON e.id = r.employee_id
-JOIN training.team t ON t.id = r.selected_team_id
+LEFT JOIN training.team t ON t.id = r.selected_team_id
 LEFT JOIN training.course c ON c.id = r.course_id
 LEFT JOIN training.employee sb ON sb.id = r.suspended_by
 LEFT JOIN training.employee tl ON tl.id = r.tl_opinion_by
@@ -337,6 +356,8 @@ WHERE r.id = $1::uuid`
 		acceptedCourse    string
 		requestedAreasRaw string
 		priority          sql.NullInt64
+		teamID            sql.NullString
+		teamName          sql.NullString
 	)
 	err := s.db.QueryRowContext(ctx, q, id).Scan(
 		&detail.ID,
@@ -347,8 +368,8 @@ WHERE r.id = $1::uuid`
 		&detail.Requested.CourseTitle,
 		&requestedAreasRaw,
 		&detail.Requested.Motivation,
-		&detail.Requested.SelectedTeamID,
-		&detail.Requested.SelectedTeamName,
+		&teamID,
+		&teamName,
 		&detail.Requested.DesiredStart,
 		&detail.Requested.DesiredEnd,
 		&priority,
@@ -388,6 +409,8 @@ WHERE r.id = $1::uuid`
 	if err != nil {
 		return RequestDetail{}, fmt.Errorf("load training request detail: %w", err)
 	}
+	detail.Requested.SelectedTeamID = teamID.String
+	detail.Requested.SelectedTeamName = teamName.String
 	if err := json.Unmarshal([]byte(requestedAreasRaw), &detail.Requested.SkillAreas); err != nil {
 		return RequestDetail{}, fmt.Errorf("decode training request skill areas: %w", err)
 	}
@@ -559,9 +582,6 @@ func (s *SQLStore) CreateRequest(ctx context.Context, principal Principal, input
 		return ActionResponse{}, validationError("motivation_required", "motivazione obbligatoria")
 	}
 	teamID := strings.TrimSpace(input.SelectedTeamID)
-	if teamID == "" {
-		return ActionResponse{}, validationError("selected_team_required", "team obbligatorio")
-	}
 	desiredStart, err := parseOptionalDate(input.DesiredStart)
 	if err != nil {
 		return ActionResponse{}, validationError("invalid_desired_start", "data inizio desiderata non valida")
@@ -604,7 +624,7 @@ func (s *SQLStore) CreateRequest(ctx context.Context, principal Principal, input
 			}
 			courseID = id
 		}
-		if err := s.ensureSelectedTeamMembership(ctx, tx, employeeID, teamID); err != nil {
+		if err := s.validateSelectedTeam(ctx, tx, employeeID, teamID); err != nil {
 			return err
 		}
 
@@ -639,7 +659,7 @@ RETURNING id::text`
 			employeeID,
 			courseID,
 			motivation,
-			teamID,
+			nullableUUID(teamID),
 			strings.TrimSpace(input.DesiredStart),
 			strings.TrimSpace(input.DesiredEnd),
 			input.Priority,
@@ -691,6 +711,9 @@ func (s *SQLStore) RecordTLOpinion(ctx context.Context, principal Principal, id 
 		}
 		if err := requestDecisionPolicy(facts, requestActionTLOpinion); err != nil {
 			return err
+		}
+		if facts.SelectedTeamID == "" {
+			return validationError("request_without_team", "il parere TL richiede una richiesta con team")
 		}
 		if err := s.ensureLeadOfSelectedTeam(ctx, tx, leadID, facts.SelectedTeamID); err != nil {
 			return err
@@ -1083,9 +1106,6 @@ func (s *SQLStore) UpdateRequestOriginalData(ctx context.Context, principal Prin
 		return ActionResponse{}, validationError("motivation_required", "motivazione obbligatoria")
 	}
 	teamID := strings.TrimSpace(input.SelectedTeamID)
-	if teamID == "" {
-		return ActionResponse{}, validationError("selected_team_required", "team obbligatorio")
-	}
 	desiredStart, err := parseOptionalDate(input.DesiredStart)
 	if err != nil {
 		return ActionResponse{}, validationError("invalid_desired_start", "data inizio desiderata non valida")
@@ -1125,9 +1145,9 @@ func (s *SQLStore) UpdateRequestOriginalData(ctx context.Context, principal Prin
 			}
 			courseID = resolved
 		}
-		// La persona e invariata: il team scelto deve essere tra le
-		// appartenenze attive della persona della richiesta.
-		if err := s.ensureSelectedTeamMembership(ctx, tx, facts.EmployeeID, teamID); err != nil {
+		// La persona e invariata: il team scelto segue la regola condizionata
+		// (obbligatorio solo con appartenenze attive, altrimenti facoltativo).
+		if err := s.validateSelectedTeam(ctx, tx, facts.EmployeeID, teamID); err != nil {
 			return err
 		}
 		before, err := entitySnapshot(ctx, tx, "training_request", id)
@@ -1146,7 +1166,7 @@ WHERE id = $1::uuid`,
 			id,
 			courseID,
 			motivation,
-			teamID,
+			nullableUUID(teamID),
 			strings.TrimSpace(input.DesiredStart),
 			strings.TrimSpace(input.DesiredEnd),
 		); err != nil {
