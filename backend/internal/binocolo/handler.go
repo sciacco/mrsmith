@@ -712,7 +712,7 @@ func (h *Handler) handleSetMACardState(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	subject, email := companySearchRefreshActor(r.Context())
-	card, err := h.ma.setCardState(r.Context(), id, companyKey, body.State, body.RecontactOn, subject, email)
+	card, err := h.ma.setCardState(r.Context(), id, companyKey, body, subject, email)
 	if err != nil {
 		h.maFailure(w, r, "ma_card_state_set", err, "initiative_id", id, "company_key", companyKey)
 		return

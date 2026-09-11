@@ -1942,6 +1942,11 @@ func (f *fakeMAWorkspaceStore) UpsertMAInitiativeCard(context.Context, MAInitiat
 	return nil
 }
 
+func (f *fakeMAWorkspaceStore) SaveMAInitiativeCardWithOutcome(_ context.Context, _ MAInitiativeCard, outcome MATargetOutcome) error {
+	f.outcomes = append(f.outcomes, outcome)
+	return nil
+}
+
 func (f *fakeMAWorkspaceStore) ListMAInitiativeCards(context.Context, string) ([]MAInitiativeCard, error) {
 	return nil, nil
 }

@@ -3104,26 +3104,61 @@ func (s *maService) requireOperationalInitiativeCard(ctx context.Context, initia
 	return *card, nil
 }
 
-// setCardState applica una transizione libera fra i 7 stati non terminali
+// maDateOrNull serializza una data di calendario opzionale per i payload del
+// diario: l'assenza è un null esplicito, così anche l'azzeramento resta
+// leggibile nello storico (issue #201).
+func maDateOrNull(value *time.Time) any {
+	if value == nil {
+		return nil
+	}
+	return value.Format("2006-01-02")
+}
+
+// sameMADate confronta due date di calendario opzionali al giorno, non
+// all'istante: il driver può restituirle con fuso/orario diversi da quelli con
+// cui sono state salvate.
+func sameMADate(a, b *time.Time) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return a.Format("2006-01-02") == b.Format("2006-01-02")
+}
+
+// setCardState applica una transizione libera fra gli 8 stati non terminali
 // (KANBAN-V2-PLAN.md §1.1: nessun vincolo di sequenza). I terminali passano da
 // /close, `rimossa` da /remove, e l'uscita da un terminale solo da /reopen.
-func (s *maService) setCardState(ctx context.Context, initiativeID, companyKey, state string, recontactOn *string, subject, email string) (MAInitiativeCard, error) {
+// `visit_on` vive solo in `visita` (issue #201): entrando da un altro stato
+// parte vuota (assente o null che sia); riselezionando `visita` il campo
+// assente conserva la data corrente, null la cancella e una data ISO la
+// sostituisce; ogni altra transizione la azzera indipendentemente dal payload.
+func (s *maService) setCardState(ctx context.Context, initiativeID, companyKey string, input MACardStateRequest, subject, email string) (MAInitiativeCard, error) {
 	companyKey = normalizeMACompanyKey(companyKey)
-	// Solo i 7 non-terminali: i terminali passano da /close, `rimossa` da /remove.
+	state := input.State
+	// Solo gli 8 non-terminali: i terminali passano da /close, `rimossa` da /remove.
 	if !validMACardState(state) || isMACardTerminalState(state) || state == maCardStateRimossa {
 		return MAInitiativeCard{}, fmt.Errorf("%w: state", errMAStrategyInvalid)
 	}
 	// recontact_on è informativa e valida solo verso `ricontattare`; ogni altra
 	// transizione azzera la data (chip solo in follow-up, vincolo non-CRM).
 	var recontact *time.Time
-	if state == maCardStateRicontattare && recontactOn != nil {
-		if raw := strings.TrimSpace(*recontactOn); raw != "" {
+	if state == maCardStateRicontattare && input.RecontactOn != nil {
+		if raw := strings.TrimSpace(*input.RecontactOn); raw != "" {
 			parsed, err := time.Parse("2006-01-02", raw)
 			if err != nil {
 				return MAInitiativeCard{}, fmt.Errorf("%w: recontactOn", errMAStrategyInvalid)
 			}
 			recontact = &parsed
 		}
+	}
+	// visit_on è una data di calendario pura, validata alla consegna (mai un
+	// datetime) anche quando la transizione non la porterebbe comunque in card.
+	var requestedVisit *time.Time
+	if input.VisitOn.Set && input.VisitOn.Valid {
+		parsed, err := time.Parse("2006-01-02", strings.TrimSpace(input.VisitOn.Value))
+		if err != nil {
+			return MAInitiativeCard{}, fmt.Errorf("%w: visitOn", errMAStrategyInvalid)
+		}
+		requestedVisit = &parsed
 	}
 	card, err := s.requireOperationalInitiativeCard(ctx, initiativeID, companyKey)
 	if err != nil {
@@ -3136,16 +3171,40 @@ func (s *maService) setCardState(ctx context.Context, initiativeID, companyKey, 
 		return MAInitiativeCard{}, fmt.Errorf("%w: card terminale o rimossa, usare /reopen", errMAStrategyInvalid)
 	}
 	from := card.State
+	previousVisit := card.VisitOn
+	// La data corrente appartiene all'attuale permanenza in `visita`: in
+	// riselezione il campo assente la conserva; fuori da `visita` non può vivere.
+	var nextVisit *time.Time
+	if state == maCardStateVisita {
+		switch {
+		case from != maCardStateVisita:
+			// Ingresso da un altro stato: assente/null → vuota, data → impostata.
+			nextVisit = requestedVisit
+		case input.VisitOn.Set:
+			// Riselezione con patch esplicita: null cancella, ISO sostituisce.
+			nextVisit = requestedVisit
+		default:
+			// Riselezione senza patch: la data corrente resta.
+			nextVisit = previousVisit
+		}
+	}
+	// Stessa permanenza in visita, data invariata e nient'altro da bonificare:
+	// niente da registrare, il no-op non tocca la card né sporca il diario.
+	if from == maCardStateVisita && state == maCardStateVisita && card.RecontactOn == nil && sameMADate(previousVisit, nextVisit) {
+		return card, nil
+	}
 	card.State = state
 	card.RecontactOn = recontact // set su `ricontattare`, azzerata altrove
-	if err := s.store.UpsertMAInitiativeCard(ctx, card); err != nil {
-		return MAInitiativeCard{}, err
-	}
+	card.VisitOn = nextVisit     // viva solo in `visita`, azzerata altrove
 	payload := map[string]any{"from": from, "to": state}
 	if recontact != nil {
 		payload["recontactOn"] = recontact.Format("2006-01-02")
 	}
-	if err := s.store.InsertMATargetOutcome(ctx, MATargetOutcome{
+	if !sameMADate(previousVisit, nextVisit) {
+		payload["visitOnFrom"] = maDateOrNull(previousVisit)
+		payload["visitOnTo"] = maDateOrNull(nextVisit)
+	}
+	if err := s.store.SaveMAInitiativeCardWithOutcome(ctx, card, MATargetOutcome{
 		InitiativeID:     initiativeID,
 		CompanyKey:       companyKey,
 		Event:            maEventStato,
@@ -3200,20 +3259,24 @@ func (s *maService) closeCard(ctx context.Context, initiativeID, companyKey stri
 	if err != nil {
 		return MACardCloseResponse{}, err
 	}
+	previousVisit := card.VisitOn
 	card.State = input.State
 	card.Esito = esito
 	card.RecontactOn = nil // una chiusura esce dal follow-up
+	card.VisitOn = nil     // e anche da una visita in corso: la data non sopravvive
 	now := time.Now()
 	card.ClosedAt = &now
-	if err := s.store.UpsertMAInitiativeCard(ctx, card); err != nil {
-		return MACardCloseResponse{}, err
+	payload := map[string]any{"stato": input.State, "esito": esito}
+	if previousVisit != nil {
+		payload["visitOnFrom"] = maDateOrNull(previousVisit)
+		payload["visitOnTo"] = nil
 	}
-	if err := s.store.InsertMATargetOutcome(ctx, MATargetOutcome{
+	if err := s.store.SaveMAInitiativeCardWithOutcome(ctx, card, MATargetOutcome{
 		InitiativeID:     initiativeID,
 		CompanyKey:       companyKey,
 		Event:            maEventChiusura,
 		Note:             note,
-		Payload:          maTraceJSON(map[string]any{"stato": input.State, "esito": esito}),
+		Payload:          maTraceJSON(payload),
 		CreatedBySubject: subject,
 		CreatedByEmail:   email,
 	}); err != nil {
@@ -3256,15 +3319,24 @@ func (s *maService) removeCard(ctx context.Context, initiativeID, companyKey str
 	if err != nil {
 		return MACardRemoveResponse{}, err
 	}
+	previousVisit := card.VisitOn
 	card.State = maCardStateRimossa
-	if err := s.store.UpsertMAInitiativeCard(ctx, card); err != nil {
-		return MACardRemoveResponse{}, err
+	card.VisitOn = nil // uscire dalla lavorazione azzera la data visita
+	// L'evento porta i campi visita solo quando qualcosa è stato azzerato:
+	// senza data non c'è nulla da raccontare e il payload resta quello storico.
+	var removePayload json.RawMessage
+	if previousVisit != nil {
+		removePayload = maTraceJSON(map[string]any{
+			"visitOnFrom": maDateOrNull(previousVisit),
+			"visitOnTo":   nil,
+		})
 	}
-	if err := s.store.InsertMATargetOutcome(ctx, MATargetOutcome{
+	if err := s.store.SaveMAInitiativeCardWithOutcome(ctx, card, MATargetOutcome{
 		InitiativeID:     initiativeID,
 		CompanyKey:       companyKey,
 		Event:            maEventCardRimossa,
 		Note:             reason,
+		Payload:          removePayload,
 		CreatedBySubject: subject,
 		CreatedByEmail:   email,
 	}); err != nil {
@@ -3317,11 +3389,9 @@ func (s *maService) reopenCard(ctx context.Context, initiativeID, companyKey, su
 	card.State = maCardStateApprofondimento
 	card.Esito = ""
 	card.RecontactOn = nil
+	card.VisitOn = nil // una riapertura non ripristina la visita precedente
 	card.ClosedAt = nil
-	if err := s.store.UpsertMAInitiativeCard(ctx, card); err != nil {
-		return MAInitiativeCard{}, err
-	}
-	if err := s.store.InsertMATargetOutcome(ctx, MATargetOutcome{
+	if err := s.store.SaveMAInitiativeCardWithOutcome(ctx, card, MATargetOutcome{
 		InitiativeID:     initiativeID,
 		CompanyKey:       companyKey,
 		Event:            maEventCardRiaperta,

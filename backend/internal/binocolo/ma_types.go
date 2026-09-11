@@ -1,6 +1,7 @@
 package binocolo
 
 import (
+	"bytes"
 	"encoding/json"
 	"time"
 )
@@ -943,10 +944,43 @@ type MACreateInitiativeCardResponse struct {
 // MACardStateRequest drives POST .../cards/{companyKey}/state: free transitions
 // among the 8 non-terminal states (terminals go through /close, rimossa through
 // /remove). RecontactOn (ISO date) is valid only toward `ricontattare`; a
-// transition away from `ricontattare` clears the date.
+// transition away from `ricontattare` clears the date. VisitOn è una data di
+// calendario viva solo in `visita` ed è tri-stato: assente conserva la data
+// corrente (riselezionando `visita`) e lascia vuoto entrando da un altro stato,
+// null la cancella esplicitamente, una stringa ISO la imposta/sostituisce.
 type MACardStateRequest struct {
-	State       string  `json:"state"`
-	RecontactOn *string `json:"recontactOn,omitempty"`
+	State       string           `json:"state"`
+	RecontactOn *string          `json:"recontactOn,omitempty"`
+	VisitOn     MAVisitDatePatch `json:"visitOn"`
+}
+
+// MAVisitDatePatch è il payload tri-stato di `visitOn`. encoding/json invoca
+// UnmarshalJSON solo quando il campo è presente, quindi Set distingue l'assenza
+// (conserva) dal null esplicito (cancella), e Valid distingue il null dalla
+// stringa di data. Stesso pattern di nullableBoolPatch (internal/rdf/handler.go).
+type MAVisitDatePatch struct {
+	Set   bool
+	Valid bool
+	Value string
+}
+
+// UnmarshalJSON implements json.Unmarshaler: null → solo Set, stringa →
+// Set+Valid. Un valore non stringa è un errore di decodifica, che l'handler
+// espone come 400 invalid_json; la data malformata è rifiutata dal service.
+func (p *MAVisitDatePatch) UnmarshalJSON(data []byte) error {
+	p.Set = true
+	if bytes.Equal(bytes.TrimSpace(data), []byte("null")) {
+		p.Valid = false
+		p.Value = ""
+		return nil
+	}
+	var value string
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	p.Valid = true
+	p.Value = value
+	return nil
 }
 
 // MACardCloseRequest drives POST .../cards/{companyKey}/close as a terminal

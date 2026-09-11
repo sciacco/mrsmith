@@ -171,6 +171,9 @@ type maWorkspaceStore interface {
 	SetMASessionInitiative(ctx context.Context, sessionID, initiativeID string) error
 	GetMAInitiativeCard(ctx context.Context, initiativeID, companyKey string) (*MAInitiativeCard, error)
 	UpsertMAInitiativeCard(ctx context.Context, card MAInitiativeCard) error
+	// SaveMAInitiativeCardWithOutcome persiste card ed evento di diario in una
+	// sola transazione (issue #201): stato e storico non possono divergere.
+	SaveMAInitiativeCardWithOutcome(ctx context.Context, card MAInitiativeCard, outcome MATargetOutcome) error
 	ListMAInitiativeCards(ctx context.Context, initiativeID string) ([]MAInitiativeCard, error)
 	ListMAActiveCardsByCompany(ctx context.Context, companyKeys []string) (map[string][]MAInitiativeCard, error)
 	ListMARatings(ctx context.Context, sessionID string) (map[string]int, error)
@@ -2774,6 +2777,12 @@ func (s *SQLStore) InsertMATargetOutcome(ctx context.Context, outcome MATargetOu
 	if s == nil || s.db == nil {
 		return errors.New("binocolo ma store not configured")
 	}
+	return insertMATargetOutcome(ctx, s.db, outcome)
+}
+
+// insertMATargetOutcome is the shared body of the plain append and the
+// card-state transaction, so both paths write the exact same row.
+func insertMATargetOutcome(ctx context.Context, exec maCardEventExec, outcome MATargetOutcome) error {
 	var sessionID any
 	if outcome.SessionID != "" {
 		sessionID = outcome.SessionID
@@ -2794,7 +2803,7 @@ func (s *SQLStore) InsertMATargetOutcome(ctx context.Context, outcome MATargetOu
 	if !outcome.CreatedAt.IsZero() {
 		createdAt = outcome.CreatedAt
 	}
-	if _, err := s.db.ExecContext(ctx, `
+	if _, err := exec.ExecContext(ctx, `
 INSERT INTO binocolo.ma_target_outcome (id, session_id, initiative_id, company_key, event, note, payload, created_by_subject, created_by_email, created_at)
 VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7::jsonb, $8, $9, COALESCE($10::timestamptz, now()))
 `, id, sessionID, initiativeID, outcome.CompanyKey, outcome.Event, nullString(outcome.Note), string(payload), nullString(outcome.CreatedBySubject), nullString(outcome.CreatedByEmail), createdAt); err != nil {
@@ -3112,12 +3121,25 @@ WHERE initiative_id = $1::uuid AND company_key = $2
 	return &card, nil
 }
 
+// maCardEventExec è soddisfatta da *sql.DB e *sql.Tx: la coppia di scritture
+// card+evento gira o in autonomia (upsert/append semplici) o dentro un'unica
+// transazione (SaveMAInitiativeCardWithOutcome, issue #201).
+type maCardEventExec interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
 // UpsertMAInitiativeCard inserts or updates a card. Callers own the state
 // machine (ensureInitiativeCard, B4 transitions) — this is a plain write.
 func (s *SQLStore) UpsertMAInitiativeCard(ctx context.Context, card MAInitiativeCard) error {
 	if s == nil || s.db == nil {
 		return errors.New("binocolo ma store not configured")
 	}
+	return upsertMAInitiativeCard(ctx, s.db, card)
+}
+
+// upsertMAInitiativeCard is the shared body of the plain write and of the
+// transactional card+event save.
+func upsertMAInitiativeCard(ctx context.Context, exec maCardEventExec, card MAInitiativeCard) error {
 	if card.InitiativeID == "" || card.CompanyKey == "" {
 		return errors.New("ma initiative card: missing initiative or company key")
 	}
@@ -3125,7 +3147,7 @@ func (s *SQLStore) UpsertMAInitiativeCard(ctx context.Context, card MAInitiative
 	if card.CreatedFromSession != "" {
 		createdFromSession = card.CreatedFromSession
 	}
-	if _, err := s.db.ExecContext(ctx, `
+	if _, err := exec.ExecContext(ctx, `
 INSERT INTO binocolo.ma_initiative_card (
     initiative_id, company_key, company_name, vat_code, tax_code, province, origin,
     state, esito, created_from_session, created_at, updated_at, closed_at, recontact_on, visit_on)
@@ -3145,6 +3167,31 @@ ON CONFLICT (initiative_id, company_key) DO UPDATE SET
 `, card.InitiativeID, card.CompanyKey, card.CompanyName, card.VATCode, card.TaxCode, card.Province,
 		card.Origin, card.State, card.Esito, createdFromSession, card.ClosedAt, card.RecontactOn, card.VisitOn); err != nil {
 		return fmt.Errorf("upsert ma initiative card: %w", err)
+	}
+	return nil
+}
+
+// SaveMAInitiativeCardWithOutcome persiste la card e l'evento di diario che la
+// racconta in un'unica transazione (issue #201): o riescono entrambi o nessuno
+// dei due. È il confine transazionale delle transizioni di stato card (state,
+// close, remove, reopen e cambio della sola data visita).
+func (s *SQLStore) SaveMAInitiativeCardWithOutcome(ctx context.Context, card MAInitiativeCard, outcome MATargetOutcome) error {
+	if s == nil || s.db == nil {
+		return errors.New("binocolo ma store not configured")
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin ma card state save: %w", err)
+	}
+	defer tx.Rollback()
+	if err := upsertMAInitiativeCard(ctx, tx, card); err != nil {
+		return err
+	}
+	if err := insertMATargetOutcome(ctx, tx, outcome); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit ma card state save: %w", err)
 	}
 	return nil
 }
