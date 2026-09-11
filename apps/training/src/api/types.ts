@@ -45,40 +45,19 @@ export interface LookupResponse {
 
 // ── Code operative (#140, sola lettura) ──
 
-export interface QueueLeadRef {
-  employeeId: string;
-  name: string;
-  email: string;
-}
-
-export interface RequestWithoutTLOpinionRow {
-  requestId: string;
-  employeeId: string;
-  employeeName: string;
-  selectedTeamId: string;
-  selectedTeamName: string;
-  teamLeads: QueueLeadRef[];
-  courseId?: string;
-  courseTitle?: string;
-  ageDays: number;
-  createdAt: string;
-}
-
-export interface RequestsWithoutTLOpinionResponse {
-  requests: RequestWithoutTLOpinionRow[];
-}
-
 export type TLOpinion = "favorable" | "unfavorable";
 
+// Richiesta aperta senza decisione People (#200): con o senza team scelto e
+// con o senza parere TL, presente solo quando registrato.
 export interface RequestAwaitingDecisionRow {
   requestId: string;
   employeeId: string;
   employeeName: string;
-  selectedTeamId: string;
-  selectedTeamName: string;
+  selectedTeamId?: string;
+  selectedTeamName?: string;
   courseId?: string;
   courseTitle?: string;
-  tlOpinion: TLOpinion;
+  tlOpinion?: TLOpinion;
   tlOpinionById?: string;
   tlOpinionByName?: string;
   tlOpinionAt?: string;

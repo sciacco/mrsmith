@@ -66,7 +66,6 @@ import type {
   RequestListResponse,
   RequestOriginalDataInput,
   RequestsAwaitingDecisionResponse,
-  RequestsWithoutTLOpinionResponse,
   RoundsWithoutEventResponse,
   RuleDetail,
   RuleEventResponse,
@@ -341,19 +340,6 @@ export function useEventDetail(id: string | undefined) {
     queryKey: ["training", "events", id],
     queryFn: () => api.get<EventDetail>(`${TRAINING_PREFIX}/events/${id}`),
     enabled: id !== undefined && id !== "",
-  });
-}
-
-export function useRequestsWithoutTLOpinion() {
-  const api = useApiClient();
-  return useQuery({
-    queryKey: ["training", "queues", "requests-without-tl-opinion"],
-    queryFn: async () =>
-      (
-        await api.get<RequestsWithoutTLOpinionResponse>(
-          `${TRAINING_PREFIX}/queues/requests-without-tl-opinion`,
-        )
-      ).requests,
   });
 }
 

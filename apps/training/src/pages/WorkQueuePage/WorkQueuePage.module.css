@@ -141,6 +141,12 @@
   white-space: nowrap;
 }
 
+/* #200 — celle con valore de-enfatizzato (es. «Senza team», «Non
+   registrato»), distinti dai valori assenti che restano «—». */
+.table td .mutedCell {
+  color: var(--color-text-faint);
+}
+
 .numCell {
   text-align: right !important;
   font-variant-numeric: tabular-nums;

@@ -7,7 +7,6 @@ import {
   useExpiringCertifications,
   useExpiringCoverage,
   useRequestsAwaitingDecision,
-  useRequestsWithoutTLOpinion,
   useRoundsWithoutEvent,
   useSeatRuleCoverage,
   useStaleEnrollments,
@@ -22,7 +21,6 @@ import type {
   ExpiringPersonRow,
   ExpiringSeatRuleRow,
   RequestAwaitingDecisionRow,
-  RequestWithoutTLOpinionRow,
   RoundWithoutEventRow,
   SeatRuleCoverageRow,
   StaleEnrollmentRow,
@@ -273,7 +271,6 @@ export function WorkQueuePage() {
     setParams(nextParams, { replace: true });
   }
 
-  const withoutOpinion = useRequestsWithoutTLOpinion();
   const awaitingDecision = useRequestsAwaitingDecision();
   const seatCoverage = useSeatRuleCoverage();
   const expiring = useExpiringCoverage(withinDays);
@@ -289,7 +286,6 @@ export function WorkQueuePage() {
   const unassignedEnrollments = (events.data ?? []).filter((e) => e.flags.unassignedEnrollments);
 
   const queries = [
-    withoutOpinion,
     awaitingDecision,
     seatCoverage,
     expiring,
@@ -303,7 +299,6 @@ export function WorkQueuePage() {
   const allLoaded = queries.every((q) => !q.isLoading);
   const anyError = queries.some((q) => q.isError);
   const totalCount =
-    (withoutOpinion.data?.length ?? 0) +
     (awaitingDecision.data?.length ?? 0) +
     (seatCoverage.data?.length ?? 0) +
     (expiring.data ? expiring.data.people.length + expiring.data.seatRules.length : 0) +
@@ -347,29 +342,7 @@ export function WorkQueuePage() {
           <section className={styles.group}>
             <h2 className={styles.groupTitle}>Richieste</h2>
             <QueueSection
-              title="Senza parere TL"
-              count={withoutOpinion.data?.length}
-              isLoading={withoutOpinion.isLoading}
-              isError={withoutOpinion.isError}
-              isEmpty={(withoutOpinion.data?.length ?? 0) === 0}
-              emptyMessage="Nessuna richiesta senza parere TL."
-            >
-              <QueueTable<RequestWithoutTLOpinionRow>
-                rows={withoutOpinion.data ?? []}
-                rowKey={(r) => r.requestId}
-                linkTo={(r) => `/richieste?id=${r.requestId}`}
-                columns={[
-                  { header: 'Persona', render: (r) => r.employeeName },
-                  { header: 'Corso', render: (r) => r.courseTitle || '—' },
-                  { header: 'Team', render: (r) => r.selectedTeamName },
-                  { header: 'Lead abilitati', render: (r) => names(r.teamLeads) },
-                  { header: 'Età', align: 'right', render: (r) => ageLabel(r.ageDays) },
-                ]}
-              />
-            </QueueSection>
-
-            <QueueSection
-              title="Con parere, senza decisione"
+              title="Da decidere"
               count={awaitingDecision.data?.length}
               isLoading={awaitingDecision.isLoading}
               isError={awaitingDecision.isError}
@@ -383,16 +356,23 @@ export function WorkQueuePage() {
                 columns={[
                   { header: 'Persona', render: (r) => r.employeeName },
                   { header: 'Corso', render: (r) => r.courseTitle || '—' },
-                  { header: 'Team', render: (r) => r.selectedTeamName },
+                  {
+                    header: 'Team',
+                    render: (r) =>
+                      r.selectedTeamName ?? <span className={styles.mutedCell}>Senza team</span>,
+                  },
                   {
                     header: 'Parere',
-                    render: (r) => (
-                      <StatusBadge
-                        value={r.tlOpinion}
-                        label={TL_OPINION_LABELS[r.tlOpinion]}
-                        variant={tlOpinionVariant(r.tlOpinion)}
-                      />
-                    ),
+                    render: (r) =>
+                      r.tlOpinion ? (
+                        <StatusBadge
+                          value={r.tlOpinion}
+                          label={TL_OPINION_LABELS[r.tlOpinion]}
+                          variant={tlOpinionVariant(r.tlOpinion)}
+                        />
+                      ) : (
+                        <span className={styles.mutedCell}>Non registrato</span>
+                      ),
                   },
                   { header: 'Motivazione', render: (r) => r.tlOpinionReason || '—' },
                   { header: 'Età', align: 'right', render: (r) => ageLabel(r.ageDays) },

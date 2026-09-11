@@ -144,114 +144,12 @@ LIMIT 1000`)
 	return names, rows.Err()
 }
 
-// teamLeads carica i lead attivi di un team (role='lead', end_date IS NULL):
-// stessa definizione della validazione del parere TL (D5).
-func (s *SQLStore) teamLeads(ctx context.Context, teamID string) ([]QueueLeadRef, error) {
-	rows, err := s.db.QueryContext(ctx, `
-SELECT tm.employee_id::text, concat(e.last_name, ' ', e.first_name), e.email::text
-FROM training.team_membership tm
-JOIN training.employee e ON e.id = tm.employee_id
-WHERE tm.team_id = $1::uuid
-  AND tm.role = 'lead'
-  AND tm.end_date IS NULL
-ORDER BY 2, 1
-LIMIT 20`, teamID)
-	if err != nil {
-		return nil, fmt.Errorf("list training team leads: %w", err)
-	}
-	defer rows.Close()
+// ── Coda 2: richieste aperte senza decisione People (#200) ──
 
-	leads := make([]QueueLeadRef, 0)
-	for rows.Next() {
-		var lead QueueLeadRef
-		if err := rows.Scan(&lead.EmployeeID, &lead.Name, &lead.Email); err != nil {
-			return nil, fmt.Errorf("scan training team lead: %w", err)
-		}
-		leads = append(leads, lead)
-	}
-	return leads, rows.Err()
-}
-
-// ── Coda 1: richieste aperte senza parere TL ──
-
-// QueueRequestsWithoutTLOpinion elenca le richieste aperte (outcome IS NULL,
-// indice parziale idx_training_request_open) senza parere TL, con i lead del
-// team scelto come contatto. Le piu vecchie prima.
-func (s *SQLStore) QueueRequestsWithoutTLOpinion(ctx context.Context) ([]RequestWithoutTLOpinionRow, error) {
-	const query = `
-SELECT
-  r.id::text,
-  r.employee_id::text,
-  concat(e.last_name, ' ', e.first_name),
-  r.selected_team_id::text,
-  t.name,
-  COALESCE(r.course_id::text, ''),
-  COALESCE(c.title, ''),
-  r.created_at::date,
-  r.created_at::text
-FROM training.training_request r
-JOIN training.employee e ON e.id = r.employee_id
-JOIN training.team t ON t.id = r.selected_team_id
-LEFT JOIN training.course c ON c.id = r.course_id
-WHERE r.outcome IS NULL
-  AND r.suspended_at IS NULL
-  AND r.tl_opinion IS NULL
-ORDER BY r.created_at, r.id
-LIMIT 500`
-	rows, err := s.db.QueryContext(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("list training requests without tl opinion: %w", err)
-	}
-	defer rows.Close()
-
-	today := dateOnly(time.Now())
-	result := make([]RequestWithoutTLOpinionRow, 0)
-	for rows.Next() {
-		var (
-			row       RequestWithoutTLOpinionRow
-			createdOn time.Time
-		)
-		if err := rows.Scan(
-			&row.RequestID,
-			&row.EmployeeID,
-			&row.EmployeeName,
-			&row.SelectedTeamID,
-			&row.SelectedTeamName,
-			&row.CourseID,
-			&row.CourseTitle,
-			&createdOn,
-			&row.CreatedAt,
-		); err != nil {
-			return nil, fmt.Errorf("scan training request without tl opinion: %w", err)
-		}
-		row.AgeDays = daysBetween(createdOn, today)
-		result = append(result, row)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	// I lead si risolvono per team, una volta sola per team.
-	leadsByTeam := make(map[string][]QueueLeadRef)
-	for i := range result {
-		teamID := result[i].SelectedTeamID
-		leads, ok := leadsByTeam[teamID]
-		if !ok {
-			leads, err = s.teamLeads(ctx, teamID)
-			if err != nil {
-				return nil, err
-			}
-			leadsByTeam[teamID] = leads
-		}
-		result[i].TeamLeads = leads
-	}
-	return result, nil
-}
-
-// ── Coda 2: richieste con parere TL e senza decisione People ──
-
-// QueueRequestsAwaitingDecision elenca le richieste aperte con parere TL
-// registrato e senza decisione People, con esito e motivazione del parere.
+// QueueRequestsAwaitingDecision elenca tutte le richieste aperte senza
+// decisione People: con o senza team scelto e con o senza parere TL, che
+// quando presente e mostrato come informazione, non come passo in attesa
+// (#200). Le piu vecchie prima.
 func (s *SQLStore) QueueRequestsAwaitingDecision(ctx context.Context) ([]RequestAwaitingDecisionRow, error) {
 	const query = `
 SELECT
@@ -262,7 +160,7 @@ SELECT
   t.name,
   COALESCE(r.course_id::text, ''),
   COALESCE(c.title, ''),
-  r.tl_opinion,
+  COALESCE(r.tl_opinion, ''),
   COALESCE(r.tl_opinion_by::text, ''),
   COALESCE(tl.last_name || ' ' || tl.first_name, ''),
   COALESCE(r.tl_opinion_at::text, ''),
@@ -271,12 +169,11 @@ SELECT
   r.created_at::text
 FROM training.training_request r
 JOIN training.employee e ON e.id = r.employee_id
-JOIN training.team t ON t.id = r.selected_team_id
+LEFT JOIN training.team t ON t.id = r.selected_team_id
 LEFT JOIN training.course c ON c.id = r.course_id
 LEFT JOIN training.employee tl ON tl.id = r.tl_opinion_by
 WHERE r.outcome IS NULL
   AND r.suspended_at IS NULL
-  AND r.tl_opinion IS NOT NULL
   AND r.people_decision IS NULL
 ORDER BY r.created_at, r.id
 LIMIT 500`
@@ -291,14 +188,16 @@ LIMIT 500`
 	for rows.Next() {
 		var (
 			row       RequestAwaitingDecisionRow
+			teamID    sql.NullString
+			teamName  sql.NullString
 			createdOn time.Time
 		)
 		if err := rows.Scan(
 			&row.RequestID,
 			&row.EmployeeID,
 			&row.EmployeeName,
-			&row.SelectedTeamID,
-			&row.SelectedTeamName,
+			&teamID,
+			&teamName,
 			&row.CourseID,
 			&row.CourseTitle,
 			&row.TLOpinion,
@@ -310,6 +209,13 @@ LIMIT 500`
 			&row.CreatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan training request awaiting decision: %w", err)
+		}
+		// Team assente: i campi restano vuoti e vengono omessi (omitempty).
+		if teamID.Valid {
+			row.SelectedTeamID = teamID.String
+		}
+		if teamName.Valid {
+			row.SelectedTeamName = teamName.String
 		}
 		row.AgeDays = daysBetween(createdOn, today)
 		result = append(result, row)

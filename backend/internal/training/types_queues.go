@@ -4,43 +4,18 @@ package training
 // lettura: query sui fatti del dominio, nessuna tabella di to-do e nessuna
 // scadenza automatica.
 
-// QueueLeadRef e un lead attivo del team scelto sulla richiesta, esposto come
-// contatto per il sollecito del parere.
-type QueueLeadRef struct {
-	EmployeeID string `json:"employeeId"`
-	Name       string `json:"name"`
-	Email      string `json:"email"`
-}
-
-// RequestWithoutTLOpinionRow e una richiesta aperta senza parere TL (coda 1).
-type RequestWithoutTLOpinionRow struct {
-	RequestID        string         `json:"requestId"`
-	EmployeeID       string         `json:"employeeId"`
-	EmployeeName     string         `json:"employeeName"`
-	SelectedTeamID   string         `json:"selectedTeamId"`
-	SelectedTeamName string         `json:"selectedTeamName"`
-	TeamLeads        []QueueLeadRef `json:"teamLeads"`
-	CourseID         string         `json:"courseId,omitempty"`
-	CourseTitle      string         `json:"courseTitle,omitempty"`
-	AgeDays          int            `json:"ageDays"`
-	CreatedAt        string         `json:"createdAt"`
-}
-
-type RequestsWithoutTLOpinionResponse struct {
-	Requests []RequestWithoutTLOpinionRow `json:"requests"`
-}
-
-// RequestAwaitingDecisionRow e una richiesta aperta con parere TL e senza
-// decisione People (coda 2), con esito e motivazione del parere.
+// RequestAwaitingDecisionRow e una richiesta aperta senza decisione People
+// (coda 2): con o senza team scelto e con o senza parere TL, esposto quando
+// presente (#200).
 type RequestAwaitingDecisionRow struct {
 	RequestID        string `json:"requestId"`
 	EmployeeID       string `json:"employeeId"`
 	EmployeeName     string `json:"employeeName"`
-	SelectedTeamID   string `json:"selectedTeamId"`
-	SelectedTeamName string `json:"selectedTeamName"`
+	SelectedTeamID   string `json:"selectedTeamId,omitempty"`
+	SelectedTeamName string `json:"selectedTeamName,omitempty"`
 	CourseID         string `json:"courseId,omitempty"`
 	CourseTitle      string `json:"courseTitle,omitempty"`
-	TLOpinion        string `json:"tlOpinion"`
+	TLOpinion        string `json:"tlOpinion,omitempty"`
 	TLOpinionByID    string `json:"tlOpinionById,omitempty"`
 	TLOpinionByName  string `json:"tlOpinionByName,omitempty"`
 	TLOpinionAt      string `json:"tlOpinionAt,omitempty"`
