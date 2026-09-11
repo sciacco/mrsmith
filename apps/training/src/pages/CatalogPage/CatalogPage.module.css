@@ -5,3 +5,11 @@
   gap: var(--space-4);
   flex-wrap: wrap;
 }
+
+/* Il container del SingleSelect è width: 100%: senza un limite esplicito
+   occupa l'intera riga dei filtri e spinge il toggle su una riga separata.
+   Larghezza allineata agli altri filtri a tendina (TableToolbar: 240px). */
+.tagFilter {
+  width: 240px;
+  max-width: 100%;
+}

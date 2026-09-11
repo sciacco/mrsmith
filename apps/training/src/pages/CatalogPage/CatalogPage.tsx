@@ -173,15 +173,17 @@ export function CatalogPage() {
                 onChange={setOnlyToCurate}
                 label="Solo da curare (importati dal sync)"
               />
-              <SingleSelect
-                options={tagOptions}
-                selected={selectedTag}
-                onChange={setSelectedTag}
-                placeholder="Tutti i tag"
-                allowClear
-                clearLabel="Tutti i tag"
-                ariaLabel="Filtra per tag"
-              />
+              <div className={styles.tagFilter}>
+                <SingleSelect
+                  options={tagOptions}
+                  selected={selectedTag}
+                  onChange={setSelectedTag}
+                  placeholder="Tutti i tag"
+                  allowClear
+                  clearLabel="Tutti i tag"
+                  ariaLabel="Filtra per tag"
+                />
+              </div>
             </div>
             <Button variant="primary" size="md" leftIcon={<Icon name="plus" size={16} />} onClick={() => setShowCreate(true)}>
               Nuovo corso
