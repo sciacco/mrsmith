@@ -31,7 +31,7 @@ type PlanningArea struct {
 type PlanningRequestItem struct {
 	ID                    string         `json:"id"`
 	Employee              PlanningRef    `json:"employee"`
-	Team                  PlanningRef    `json:"team"`
+	Team                  *PlanningRef   `json:"team"`
 	Course                PlanningRef    `json:"course"`
 	Priority              *int           `json:"priority"`
 	CreatedAt             string         `json:"createdAt"`

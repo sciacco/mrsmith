@@ -1422,7 +1422,7 @@ export interface PlanningRequestArea extends PlanningRef {
 export interface PlanningRequestItem {
   id: string;
   employee: PlanningRef;
-  team: PlanningRef;
+  team: PlanningRef | null;
   course: PlanningRef;
   priority: number | null;
   createdAt: string;

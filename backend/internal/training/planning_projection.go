@@ -30,7 +30,8 @@ type planningCourse struct {
 }
 type planningRequest struct {
 	ID, CourseID, CourseTitle              string
-	Employee, Team                         PlanningRef
+	Employee                               PlanningRef
+	Team                                   *PlanningRef
 	Priority                               *int
 	CreatedAt                              string
 	Areas                                  []PlanningArea
@@ -453,8 +454,11 @@ func filterPlanningCourses(ctx context.Context, items []CourseSummary, f Plannin
 			if j%128 == 0 && ctx.Err() != nil {
 				return nil, ctx.Err()
 			}
-			searchable += " " + r.Employee.Name + " " + r.Team.Name
-			teamOK := f.TeamID == "" || r.Team.ID == f.TeamID
+			searchable += " " + r.Employee.Name
+			if r.Team != nil {
+				searchable += " " + r.Team.Name
+			}
+			teamOK := f.TeamID == "" || (r.Team != nil && r.Team.ID == f.TeamID)
 			if (f.EmployeeID == "" || f.EmployeeID == r.Employee.ID) && teamOK {
 				matching[r.Employee.ID] = true
 			}
@@ -730,7 +734,9 @@ func projectPlanningFilters(ctx context.Context, s PlanningSnapshot) (PlanningFi
 		}
 		if relevant[r.CourseID] {
 			people[r.Employee.ID] = r.Employee
-			teams[r.Team.ID] = r.Team
+			if r.Team != nil {
+				teams[r.Team.ID] = *r.Team
+			}
 			for _, a := range r.Areas {
 				areas[a.ID] = a.PlanningRef
 			}
@@ -911,7 +917,9 @@ func projectPlanningCourseDetail(ctx context.Context, s PlanningSnapshot, po map
 		eventOptions = append(eventOptions, PlanningRef{ID: e.ID, Name: e.Title})
 	}
 	for _, r := range reqs {
-		teamSet[r.Team.ID] = r.Team
+		if r.Team != nil {
+			teamSet[r.Team.ID] = *r.Team
+		}
 	}
 	for i, en := range s.Enrollments {
 		if i%128 == 0 && ctx.Err() != nil {
@@ -968,7 +976,7 @@ func projectPlanningItems(ctx context.Context, s PlanningSnapshot, today, course
 			} else if x.Suspended {
 				status = "suspended"
 			}
-			if (f.Q == "" || strings.Contains(strings.ToLower(x.Employee.Name), strings.ToLower(f.Q))) && (f.TeamID == "" || x.Team.ID == f.TeamID) && (f.Status == "" || status == f.Status) {
+			if (f.Q == "" || strings.Contains(strings.ToLower(x.Employee.Name), strings.ToLower(f.Q))) && (f.TeamID == "" || (x.Team != nil && x.Team.ID == f.TeamID)) && (f.Status == "" || status == f.Status) {
 				filtered = append(filtered, x)
 			}
 		}

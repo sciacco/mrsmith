@@ -384,7 +384,7 @@ function RequestCard({
         </Link>
       </strong>
       <span>
-        {request.team.name} ·{" "}
+        {request.team?.name ?? "Senza team"} ·{" "}
         {request.priority === null
           ? "Nessuna priorità"
           : `Priorità ${request.priority}`}{" "}
