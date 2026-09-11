@@ -1,4 +1,4 @@
-import { useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, Drawer, Icon, Skeleton, VisuallyHidden, useToast } from '@mrsmith/ui';
 import type { MAInitiativeCardView } from '../../../api/types';
@@ -86,6 +86,9 @@ export function CardDrawer({
   cohortKeys: string[];
   onClose: () => void;
   onChanged: () => void;
+  /** Cambio stato; il terzo argomento è la data opzionale dello stato attivo
+   *  (`recontactOn` in ricontattare, `visitOn` in visita): undefined = proprietà
+   *  assente, null = cancella la data, stringa ISO = la imposta/sostituisce. */
   onSetState: (companyKey: string, state: string, recontactOn?: string | null) => void;
   onOpenTerminal: (card: MAInitiativeCardView, target: TerminalTarget) => void;
   onReopen: (companyKey: string) => void;
@@ -104,11 +107,25 @@ export function CardDrawer({
   const [announcement, setAnnouncement] = useState('');
   const [launching, setLaunching] = useState(false);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  // Campo Data visita (issue #201): il valore digitato resta in locale finché
+  // non è confermato dal server, così il rollback di un salvataggio fallito non
+  // cancella la correzione e «Riprova» può rispedirla.
+  const [visitDraft, setVisitDraft] = useState<string | null>(null);
+  // Cambio card o uscita da Visita: la bozza non appartiene più al campo.
+  useEffect(() => {
+    setVisitDraft(null);
+  }, [card.companyKey, card.state]);
 
   const terminal = isTerminalState(card.state);
   const removed = card.state === 'rimossa';
   const ds = dossierState(card.dossierStatus);
   const canLaunch = ds === 'none' || ds === 'failed';
+  // Valore del campo: la bozza locale vince sulla card (non ancora confermata).
+  // Se dopo un rollback i due divergono, il salvataggio è fallito e la bozza
+  // resta correggibile: l'errore contestuale lo mostra accanto al campo.
+  const confirmedVisit = card.visitOn ? card.visitOn.slice(0, 10) : '';
+  const visitDate = visitDraft ?? confirmedVisit;
+  const visitSaveFailed = visitDraft !== null && visitDraft !== confirmedVisit;
 
   const announce = (message: string) => {
     setAnnouncement('');
@@ -145,6 +162,11 @@ export function CardDrawer({
     } finally {
       setLaunching(false);
     }
+  };
+
+  const retryVisitDate = () => {
+    // `null` esplicito: riclicca la cancellazione se la bozza è vuota.
+    onSetState(card.companyKey, 'visita', visitDraft || null);
   };
 
   const facts = card.registryFacts ?? [];
@@ -217,7 +239,17 @@ export function CardDrawer({
                       type="button"
                       className={[styles.stationBtn, card.state === state.key ? styles.stationOn : ''].filter(Boolean).join(' ')}
                       style={stateVars(state.key) as CSSProperties}
-                      onClick={() => onSetState(card.companyKey, state.key)}
+                      onClick={() =>
+                        // Riselezionando Visita la data mostrata nel campo viaggia
+                        // con la transizione: conserva quella confermata o ritenta
+                        // quella corretta dopo un errore; a campo vuoto resta
+                        // assente (il backend la conserva da sé).
+                        onSetState(
+                          card.companyKey,
+                          state.key,
+                          state.key === 'visita' ? visitDate || undefined : undefined,
+                        )
+                      }
                     >
                       <span className={styles.stepCircle}>{idx + 1}</span>
                       <span className={styles.stepLabel}>{state.label}</span>
@@ -226,6 +258,40 @@ export function CardDrawer({
                   </div>
                 ))}
               </div>
+
+              {card.state === 'visita' ? (
+                <div className={styles.field}>
+                  <label htmlFor="card-visit-date">Data visita (opzionale)</label>
+                  <input
+                    id="card-visit-date"
+                    className={styles.input}
+                    type="date"
+                    value={visitDate}
+                    aria-invalid={visitSaveFailed}
+                    aria-describedby={visitSaveFailed ? 'card-visit-date-error' : undefined}
+                    onChange={(e) => {
+                      setVisitDraft(e.target.value);
+                      onSetState(card.companyKey, 'visita', e.target.value || null);
+                    }}
+                  />
+                  {visitSaveFailed ? (
+                    <div
+                      id="card-visit-date-error"
+                      className={styles.activityError}
+                      style={{ marginTop: 'var(--space-2)' }}
+                      role="alert"
+                    >
+                      <Icon name="triangle-alert" size={16} />
+                      <div>
+                        <p>Data non salvata. Riprova.</p>
+                        <Button variant="secondary" size="sm" onClick={retryVisitDate}>
+                          Riprova
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
 
               {card.state === 'ricontattare' ? (
                 <div className={styles.field}>

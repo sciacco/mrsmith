@@ -14,6 +14,7 @@ import type {
   MACardRemoveResponse,
   MACreateInitiativeCardResponse,
   MAInitiativeBoard,
+  MAInitiativeCard,
   MAInitiativeCardView,
   MASessionListResponse,
 } from '../../../api/types';
@@ -78,19 +79,46 @@ export function useBoardData(initiativeId: string) {
     );
   }
 
-  // Spostamento di stato OPTIMISTIC (drag, tasti 1..7, azione drawer).
+  // Spostamento di stato OPTIMISTIC (drag, tasti 1..8, azione drawer). Il terzo
+  // argomento di onSetState trasporta la data opzionale dello stato attivo:
+  // `recontactOn` in `ricontattare`, `visitOn` in `visita`.
   const setState = useMutation({
-    mutationFn: (v: { companyKey: string; state: string; recontactOn?: string | null }) =>
-      api.post(`${cardsUrl(v.companyKey)}/state`, { state: v.state, recontactOn: v.recontactOn ?? undefined }),
+    mutationFn: (v: { companyKey: string; state: string; recontactOn?: string | null }) => {
+      const body: { state: string; recontactOn?: string | null; visitOn?: string | null } = { state: v.state };
+      // Tri-stato anche sul filo: `undefined` lascia la proprietà assente
+      // (riselezionando `visita` il backend conserva la data corrente),
+      // `null` la cancella esplicitamente, la data ISO la imposta.
+      if (v.recontactOn !== undefined) {
+        if (v.state === 'visita') body.visitOn = v.recontactOn;
+        else body.recontactOn = v.recontactOn;
+      }
+      return api.post<MAInitiativeCard>(`${cardsUrl(v.companyKey)}/state`, body);
+    },
     onMutate: async (v) => {
       await qc.cancelQueries({ queryKey: key });
       const prev = qc.getQueryData<MAInitiativeBoard>(key);
+      const current = prev?.cards.find((c) => c.companyKey === v.companyKey);
       patchCard(v.companyKey, {
         state: v.state,
         // recontact_on vive solo in `ricontattare`; ogni altra transizione la azzera.
         recontactOn: v.state === 'ricontattare' ? (v.recontactOn ?? undefined) : undefined,
+        // visit_on vive solo in `visita`: riselezionando senza data il valore
+        // corrente resta, ogni altra transizione lo azzera subito (come il backend).
+        visitOn:
+          v.state === 'visita'
+            ? v.recontactOn === undefined
+              ? current?.state === 'visita'
+                ? current.visitOn
+                : undefined
+              : (v.recontactOn ?? undefined)
+            : undefined,
       });
       return { prev };
+    },
+    onSuccess: (card) => {
+      // La risposta è l'autorità sulla card: il valore confermato sostituisce
+      // subito quello ottimistico, senza attendere il refetch dell'invalidation.
+      patchCard(card.companyKey, { state: card.state, recontactOn: card.recontactOn, visitOn: card.visitOn });
     },
     onError: (e, _v, ctx) => {
       if (ctx?.prev) qc.setQueryData(key, ctx.prev);

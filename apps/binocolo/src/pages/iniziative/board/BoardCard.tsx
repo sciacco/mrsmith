@@ -1,5 +1,6 @@
 import { forwardRef, useLayoutEffect, useRef, useState, type CSSProperties, type HTMLAttributes } from 'react';
 import { useDraggable } from '@dnd-kit/core';
+import { formatLocalDate } from '@mrsmith/format';
 import { Icon, Tooltip } from '@mrsmith/ui';
 import type { MAInitiativeCardView, MACardProvenance } from '../../../api/types';
 import { MATagChips } from '../../../components/tags/MATagChips';
@@ -81,6 +82,9 @@ export const BoardCard = forwardRef<HTMLDivElement, BoardCardProps>(function Boa
   const terminal = isTerminalState(card.state);
   const facts = card.registryFacts ?? [];
   const collisions = card.collisions ?? [];
+  // Data civile `YYYY-MM-DD` formattata senza conversioni di fuso: vietato
+  // `new Date("YYYY-MM-DD")`, che in fusi negativi sposta il giorno.
+  const visitLabel = card.state === 'visita' ? formatLocalDate(card.visitOn) : null;
 
   return (
     <div
@@ -145,6 +149,12 @@ export const BoardCard = forwardRef<HTMLDivElement, BoardCardProps>(function Boa
           <span className={styles.recdate}>
             <Icon name="calendar" size={10} />
             {new Intl.DateTimeFormat('it-IT').format(new Date(card.recontactOn))}
+          </span>
+        ) : null}
+        {visitLabel ? (
+          <span className={styles.recdate}>
+            <Icon name="calendar" size={10} />
+            {visitLabel}
           </span>
         ) : null}
         {terminal && card.esito ? (
