@@ -1,15 +1,16 @@
-/* #170: gruppo filtri della vista Corsi — toggle "Da curare" + filtro per tag. */
-.filters {
+/* Barra strumenti della vista Corsi (#170, ridisegno tabella): ricerca e
+   filtri a sinistra, azione primaria a destra sulla stessa riga. */
+.toolbarRow {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: var(--space-4);
   flex-wrap: wrap;
 }
 
-/* Il container del SingleSelect è width: 100%: senza un limite esplicito
-   occupa l'intera riga dei filtri e spinge il toggle su una riga separata.
-   Larghezza allineata agli altri filtri a tendina (TableToolbar: 240px). */
-.tagFilter {
-  width: 240px;
-  max-width: 100%;
+/* Il TableToolbar occupa la larghezza residua; min-width: 0 le permette di
+   restringersi invece di spingere il pulsante a capo troppo presto. */
+.toolbar {
+  flex: 1 1 22rem;
+  min-width: 0;
 }

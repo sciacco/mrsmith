@@ -114,8 +114,17 @@
   color: var(--color-warning-strong);
 }
 
+/* L'altezza massima è ciò che rende davvero appiccicosa l'intestazione delle
+   colonne: `overflow-x: auto` rende automatico anche l'asse verticale, quindi
+   il contenitore è già lo scorrevole di riferimento per `position: sticky`,
+   ma senza un limite d'altezza non scorre mai e l'intestazione non si aggancia
+   a nulla. Il calcolo lascia sopra l'intestazione dell'app, il titolo di
+   pagina e la barra strumenti; le tabelle corte restano alte quanto il
+   contenuto. Stessa ricetta della matrice presenze (.matrixWrap), qui
+   rapportata all'altezza della finestra perché la tabella è l'intera pagina. */
 .tableWrap {
-  overflow-x: auto;
+  overflow: auto;
+  max-height: calc(100vh - 18rem);
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-md);
@@ -142,6 +151,7 @@
 .table th {
   position: sticky;
   top: 0;
+  z-index: 1;
   background: var(--color-bg-elevated);
   font-weight: 500;
   color: var(--color-text-muted);

@@ -58,8 +58,17 @@
   font-size: 0.875rem;
 }
 
+/* L'altezza massima è ciò che rende davvero appiccicosa l'intestazione delle
+   colonne: `overflow-x: auto` rende automatico anche l'asse verticale, quindi
+   il contenitore è già lo scorrevole di riferimento per `position: sticky`,
+   ma senza un limite d'altezza non scorre mai e l'intestazione non si aggancia
+   a nulla. Il calcolo lascia sopra l'intestazione dell'app, il titolo di
+   pagina e la barra strumenti; le tabelle corte restano alte quanto il
+   contenuto. Stessa ricetta della matrice presenze (.matrixWrap), qui
+   rapportata all'altezza della finestra perché la tabella è l'intera pagina. */
 .tableWrap {
-  overflow-x: auto;
+  overflow: auto;
+  max-height: calc(100vh - 18rem);
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-md);
@@ -87,6 +96,7 @@
 .table th {
   position: sticky;
   top: 0;
+  z-index: 1;
   background: var(--color-bg-elevated);
   font-weight: 600;
   color: var(--color-text-muted);
@@ -105,10 +115,53 @@
 }
 
 /* #170.D — celle con testo lungo/note che devono andare a capo e non
-   traboccare, mantenendo lo scroll orizzontale della tabella. */
+   traboccare, mantenendo lo scroll orizzontale della tabella.
+   `break-word` e non `anywhere`: con `anywhere` i punti di a capo entrano nel
+   calcolo della larghezza minima della cella, che scende a un carattere; le
+   altre celle sono `nowrap` e quindi incomprimibili, e il dimensionamento
+   automatico scarica su questa colonna tutto il deficit di larghezza,
+   schiacciandola. `break-word` spezza solo le parole più lunghe della colonna
+   e lascia intatta la larghezza minima. */
 .table td.wrapCell {
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+}
+
+/* Riga secondaria sotto il valore principale della cella (area di competenza,
+   certificazione a cui porta il corso): qualifica il titolo senza pretendere
+   una colonna propria a larghezza variabile. */
+.table td .cellSecondary {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+/* Colonna primaria: assorbe tutto lo spazio in eccesso invece di lasciarlo
+   distribuire fra tutte le colonne. Con il dimensionamento automatico
+   `width: 100%` non impone una larghezza, chiede il residuo: le altre
+   colonne restano a misura del contenuto. */
+.table th.colPrimary {
+  width: 100%;
+}
+
+/* Colonne numeriche: allineate a destra con cifre di larghezza fissa, così i
+   valori si incolonnano (UI-UX §13.1). */
+.table th.cellNum,
+.table td.cellNum {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Testo libero che non deve allargare la colonna oltre misura. Il limite va
+   sull'elemento interno: `max-width` su una cella viene ignorato quando la
+   tabella usa il dimensionamento automatico. */
+.table td .truncate {
+  display: block;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* #170.D — gruppi di badge/testi accanto al titolo (sospeso, promemoria)
@@ -124,6 +177,9 @@
   padding: 0;
   border: none;
   background: none;
+  /* I browser centrano il testo dei button: senza questo un titolo che va a
+     capo risulta centrato invece che allineato alla colonna. */
+  text-align: left;
   color: var(--color-text);
   font: inherit;
   font-weight: 600;

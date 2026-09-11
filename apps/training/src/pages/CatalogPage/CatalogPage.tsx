@@ -4,8 +4,7 @@
 
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { formatCurrency } from '@mrsmith/format';
-import { Button, Icon, SingleSelect, Skeleton, StatusBadge, ToggleSwitch } from '@mrsmith/ui';
+import { Button, Icon, SearchInput, SingleSelect, Skeleton, StatusBadge, TableToolbar } from '@mrsmith/ui';
 import { useTrainingCourses } from '../../api/queries';
 import type { CourseListRow } from '../../api/types';
 import { AnagraficheSection } from '../../components/catalog/AnagraficheSection';
@@ -27,6 +26,30 @@ import styles from './CatalogPage.module.css';
 // Anagrafiche resta la gestione anagrafica di base, non duplicata qui.
 type View = 'corsi' | 'anagrafiche' | 'certificazioni' | 'percorsi';
 
+// Filtro di stato dei Corsi. «Da curare» assorbe l'interruttore precedente
+// (corsi importati dal sync e mai attivati): era un caso a sé accanto ai
+// filtri, qui è uno stato come gli altri. Nessuna selezione = tutti i corsi,
+// così all'apertura la lista resta quella di prima.
+const COURSE_STATUS_OPTIONS = [
+  { value: 'attivi', label: 'Attivi' },
+  { value: 'archiviati', label: 'Archiviati' },
+  { value: 'da-curare', label: 'Da curare' },
+];
+
+// Riga secondaria della cella Corso: prima area di competenza con il conteggio
+// delle altre, poi la certificazione a cui il corso porta. Sono dati di
+// lunghezza variabile: come colonne dettavano la larghezza della tabella,
+// qui qualificano il titolo e si restringono dai filtri.
+function courseSubtitle(row: CourseListRow): string | null {
+  const parts: string[] = [];
+  const [firstArea, ...otherAreas] = row.skillAreas;
+  if (firstArea) {
+    parts.push(otherAreas.length > 0 ? `${firstArea.name} +${otherAreas.length}` : firstArea.name);
+  }
+  if (row.leadsToCertName) parts.push(`\u2192 ${row.leadsToCertName}`);
+  return parts.length > 0 ? parts.join(' \u00b7 ') : null;
+}
+
 export function CatalogPage() {
   const [params, setParams] = useSearchParams();
   const rawView = params.get('vista');
@@ -35,11 +58,13 @@ export function CatalogPage() {
   const selectedId = params.get('id');
   const selectedCertId = params.get('certId');
   const selectedPathId = params.get('pathId');
-  // #170: filtro per tag dei soli Corsi, persistito nell'URL ('tag' assente/vuoto = nessun filtro).
+  // #170: filtri dei soli Corsi, persistiti nell'URL (parametro assente/vuoto = nessun filtro).
   const selectedTag = params.get('tag') || null;
+  const selectedArea = params.get('area') || null;
+  const selectedStatus = params.get('stato') || null;
 
   const [showCreate, setShowCreate] = useState(false);
-  const [onlyToCurate, setOnlyToCurate] = useState(false);
+  const [query, setQuery] = useState('');
 
   const courses = useTrainingCourses();
   // Opzioni dei tag calcolate su TUTTI i corsi caricati: non si restringono
@@ -54,27 +79,51 @@ export function CatalogPage() {
     return tags.map((tag) => ({ value: tag, label: tag }));
   }, [courses.data, selectedTag]);
 
+  // Aree di competenza presenti nel catalogo, dedotte dai corsi caricati:
+  // stessa regola dei tag, così il filtro non si restringe da solo.
+  const areaOptions = useMemo(() => {
+    const byId = new Map<string, string>();
+    for (const c of courses.data ?? []) {
+      for (const a of c.skillAreas) byId.set(a.id, a.name);
+    }
+    const areas = [...byId].map(([value, label]) => ({ value, label }));
+    areas.sort((a, b) => new Intl.Collator('it').compare(a.label, b.label));
+    return areas;
+  }, [courses.data]);
+
   const filtered = useMemo(() => {
+    const needle = query.trim().toLowerCase();
     const rows = courses.data ?? [];
     return rows.filter((c) => {
-      if (onlyToCurate && !(!c.active && c.factorialTrainingId)) return false;
+      if (selectedStatus === 'attivi' && !c.active) return false;
+      if (selectedStatus === 'archiviati' && c.active) return false;
+      if (selectedStatus === 'da-curare' && !(!c.active && c.factorialTrainingId)) return false;
       if (selectedTag && !c.tags.includes(selectedTag)) return false;
-      return true;
+      if (selectedArea && !c.skillAreas.some((a) => a.id === selectedArea)) return false;
+      if (!needle) return true;
+      return [c.title, c.vendorName, ...c.skillAreas.map((a) => a.name)]
+        .filter((v): v is string => Boolean(v))
+        .some((v) => v.toLowerCase().includes(needle));
     });
-  }, [courses.data, onlyToCurate, selectedTag]);
+  }, [courses.data, query, selectedArea, selectedStatus, selectedTag]);
 
-  function setSelectedTag(next: string | null) {
+  const activeFilterCount = [selectedTag, selectedArea, selectedStatus].filter(Boolean).length;
+  const hasCourseFilters = activeFilterCount > 0 || query.trim().length > 0;
+
+  function setCourseFilter(name: 'tag' | 'area' | 'stato', next: string | null) {
     const nextParams = new URLSearchParams(params);
-    if (next) nextParams.set('tag', next);
-    else nextParams.delete('tag');
+    if (next) nextParams.set(name, next);
+    else nextParams.delete(name);
     setParams(nextParams, { replace: true });
   }
 
-  // Azzera i filtri dei Corsi (tag + "Da curare") lasciando intatti gli altri parametri.
+  // Azzera ricerca e filtri dei Corsi lasciando intatti gli altri parametri.
   function resetCourseFilters() {
     const nextParams = new URLSearchParams(params);
     nextParams.delete('tag');
-    setOnlyToCurate(false);
+    nextParams.delete('area');
+    nextParams.delete('stato');
+    setQuery('');
     setParams(nextParams, { replace: true });
   }
 
@@ -165,26 +214,48 @@ export function CatalogPage() {
 
       {view === 'corsi' ? (
         <>
-          <div className={listStyles.header}>
-            <div className={styles.filters}>
-              <ToggleSwitch
-                id="courses-to-curate"
-                checked={onlyToCurate}
-                onChange={setOnlyToCurate}
-                label="Solo da curare (importati dal sync)"
+          <div className={styles.toolbarRow}>
+            <TableToolbar
+              className={styles.toolbar}
+              activeFilterCount={activeFilterCount}
+              filters={
+                <>
+                  <SingleSelect
+                    options={areaOptions}
+                    selected={selectedArea}
+                    onChange={(v) => setCourseFilter('area', v)}
+                    placeholder="Area di competenza"
+                    allowClear
+                    clearLabel="Tutte le aree"
+                    ariaLabel="Filtra per area di competenza"
+                  />
+                  <SingleSelect
+                    options={tagOptions}
+                    selected={selectedTag}
+                    onChange={(v) => setCourseFilter('tag', v)}
+                    placeholder="Tag"
+                    allowClear
+                    clearLabel="Tutti i tag"
+                    ariaLabel="Filtra per tag"
+                  />
+                  <SingleSelect
+                    options={COURSE_STATUS_OPTIONS}
+                    selected={selectedStatus}
+                    onChange={(v) => setCourseFilter('stato', v)}
+                    placeholder="Stato"
+                    allowClear
+                    clearLabel="Tutti gli stati"
+                    ariaLabel="Filtra per stato"
+                  />
+                </>
+              }
+            >
+              <SearchInput
+                value={query}
+                onChange={setQuery}
+                placeholder="Cerca per titolo, area o fornitore..."
               />
-              <div className={styles.tagFilter}>
-                <SingleSelect
-                  options={tagOptions}
-                  selected={selectedTag}
-                  onChange={setSelectedTag}
-                  placeholder="Tutti i tag"
-                  allowClear
-                  clearLabel="Tutti i tag"
-                  ariaLabel="Filtra per tag"
-                />
-              </div>
-            </div>
+            </TableToolbar>
             <Button variant="primary" size="md" leftIcon={<Icon name="plus" size={16} />} onClick={() => setShowCreate(true)}>
               Nuovo corso
             </Button>
@@ -206,43 +277,33 @@ export function CatalogPage() {
               </Button>
             </div>
           ) : filtered.length === 0 ? (
-            selectedTag ? (
-              <div className={listStyles.empty}>
-                <p className={listStyles.emptyTitle}>Nessun corso corrisponde ai filtri</p>
-                <p className={listStyles.emptyDescription}>Modifica o azzera i filtri per vedere altri corsi.</p>
+            <div className={listStyles.empty}>
+              <p className={listStyles.emptyTitle}>Nessun corso corrisponde alla ricerca</p>
+              <p className={listStyles.emptyDescription}>Modifica o azzera ricerca e filtri per vedere altri corsi.</p>
+              {hasCourseFilters && (
                 <Button variant="secondary" size="md" onClick={resetCourseFilters}>
                   Azzera filtri
                 </Button>
-              </div>
-            ) : (
-              <div className={listStyles.empty}>
-                <p className={listStyles.emptyTitle}>Nessun corso da curare</p>
-                <p className={listStyles.emptyDescription}>Nessun corso importato dal sync in attesa di attivazione.</p>
-                <Button variant="secondary" size="md" onClick={resetCourseFilters}>
-                  Mostra tutti i corsi
-                </Button>
-              </div>
-            )
+              )}
+            </div>
           ) : (
             <div className={listStyles.tableWrap}>
               <table className={listStyles.table}>
                 <thead>
                   <tr>
-                    <th>Titolo</th>
-                    <th>Area</th>
+                    <th className={listStyles.colPrimary}>Corso</th>
                     <th>Fornitore</th>
                     <th>Modalità</th>
-                    <th>Durata / prezzo</th>
-                    <th>Certificazione</th>
-                    <th>Compliance</th>
-                    <th>Attivo</th>
+                    <th className={listStyles.cellNum}>Ore</th>
+                    <th>Stato</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((row: CourseListRow) => (
-                    <tr key={row.id} className={listStyles.row} onClick={() => openDetail(row.id)}>
-                      <td className={listStyles.wrapCell}>
-                        <span className={listStyles.inlineBadges}>
+                  {filtered.map((row: CourseListRow) => {
+                    const subtitle = courseSubtitle(row);
+                    return (
+                      <tr key={row.id} className={listStyles.row} onClick={() => openDetail(row.id)}>
+                        <td className={listStyles.wrapCell}>
                           <button
                             type="button"
                             className={listStyles.rowLink}
@@ -253,47 +314,51 @@ export function CatalogPage() {
                           >
                             {row.title}
                           </button>
-                          {row.suspendedAt && <StatusBadge value="suspended" label="Sospeso" variant="warning" />}
-                          <ReminderBadge
-                            text={row.reminderText}
-                            date={row.reminderAt}
-                            neutral={Boolean(row.suspendedAt)}
-                          />
-                        </span>
-                      </td>
-                      <td>{row.skillAreas.length > 0 ? row.skillAreas.map((a) => a.name).join(', ') : '—'}</td>
-                      <td>{row.vendorName || PROVIDER_KIND_LABELS[row.providerKind] || '—'}</td>
-                      <td>{DELIVERY_MODE_LABELS[row.deliveryMode] ?? row.deliveryMode}</td>
-                      <td>
-                        {row.defaultHours !== undefined ? `${row.defaultHours} h` : '—'}
-                        {row.defaultCost !== undefined ? ` · ${formatCurrency(row.defaultCost) ?? '—'}` : ''}
-                      </td>
-                      <td>
-                        {row.leadsToCertId ? (
-                          <button
-                            type="button"
-                            className={listStyles.rowLink}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openCertification(row.leadsToCertId as string);
-                            }}
-                          >
-                            {row.leadsToCertName}
-                          </button>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                      <td>
-                        {row.complianceRelated ? (
-                          <StatusBadge value="compliance" label={row.complianceFramework || 'Sì'} variant="warning" />
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                      <td>{row.active ? 'Sì' : 'No'}</td>
-                    </tr>
-                  ))}
+                          {subtitle && <span className={listStyles.cellSecondary}>{subtitle}</span>}
+                        </td>
+                        <td>
+                          {row.vendorName ? (
+                            <span className={listStyles.truncate} title={row.vendorName}>
+                              {row.vendorName}
+                            </span>
+                          ) : (
+                            // Senza fornitore resta il tipo di erogazione (Interna/Esterna):
+                            // de-enfatizzato, perché non è una ragione sociale.
+                            <span className={listStyles.mutedCell}>
+                              {PROVIDER_KIND_LABELS[row.providerKind] ?? '—'}
+                            </span>
+                          )}
+                        </td>
+                        <td>{DELIVERY_MODE_LABELS[row.deliveryMode] ?? row.deliveryMode}</td>
+                        <td className={listStyles.cellNum}>{row.defaultHours ?? '—'}</td>
+                        <td>
+                          {/* Solo le eccezioni: un corso attivo e senza segnalazioni lascia
+                              la cella vuota, così le righe da guardare si trovano a colpo d'occhio. */}
+                          <span className={listStyles.inlineBadges}>
+                            {row.suspendedAt && <StatusBadge value="suspended" label="Sospeso" variant="warning" />}
+                            {!row.active &&
+                              (row.factorialTrainingId ? (
+                                <StatusBadge value="to_curate" label="Da curare" variant="warning" />
+                              ) : (
+                                <StatusBadge value="archived" label="Archiviato" variant="neutral" />
+                              ))}
+                            {row.complianceRelated && (
+                              <StatusBadge
+                                value="compliance"
+                                label={row.complianceFramework || 'Compliance'}
+                                variant="warning"
+                              />
+                            )}
+                            <ReminderBadge
+                              text={row.reminderText}
+                              date={row.reminderAt}
+                              neutral={Boolean(row.suspendedAt)}
+                            />
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
