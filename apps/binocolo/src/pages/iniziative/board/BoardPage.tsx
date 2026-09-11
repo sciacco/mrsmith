@@ -120,7 +120,7 @@ export function BoardPage() {
 
   const cards = board?.cards ?? [];
 
-  // Chiave FLIP: cambio vista + spostamenti optimistic senza drag (1..7, drawer,
+  // Chiave FLIP: cambio vista + spostamenti optimistic senza drag (1..8, drawer,
   // conferma terminale) + collasso animano. La firma è (companyKey=stato) ordinata:
   // un refetch che non muove nessuna card lascia la firma invariata → nessun FLIP
   // (structural sharing, §8.3); un cambio di stato la fa cambiare → le card volano.
@@ -544,7 +544,7 @@ export function BoardPage() {
         <Modal open onClose={() => setHelpOpen(false)} title="Scorciatoie">
           <ul style={{ margin: 0, paddingLeft: 18, fontSize: '0.8125rem', lineHeight: 1.9 }}>
             <li><b>/</b> — cerca · <b>j/k</b> — azienda successiva/precedente · <b>Invio</b> — apri</li>
-            <li><b>1…7</b> — sposta nello stato · <b>w</b>/<b>x</b> — WON / KO target</li>
+            <li><b>1…8</b> — sposta nello stato · <b>w</b>/<b>x</b> — WON / KO target</li>
             <li><b>c</b> — comprimi stato · <b>Spazio</b> + frecce — trascina da tastiera · <b>Esc</b> — chiudi</li>
           </ul>
         </Modal>

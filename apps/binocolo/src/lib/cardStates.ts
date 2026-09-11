@@ -10,6 +10,7 @@ export type CardStateKey =
   | 'da_contattare'
   | 'primo_contatto'
   | 'primo_incontro'
+  | 'visita'
   | 'nda'
   | 'loi'
   | 'ricontattare'
@@ -21,19 +22,20 @@ export type CardStateKey =
 export interface CardStateMeta {
   key: CardStateKey;
   label: string;
-  /** Sigla della strip funnel: APP/DC/PC/PI/NDA/LOI/R/W/KN/KT. */
+  /** Sigla della strip funnel: APP/DC/PC/PI/VI/NDA/LOI/R/W/KN/KT. */
   abbr: string;
   macrofase: MacrofaseKey;
   terminal: boolean;
 }
 
-/** I 10 stati operativi in ordine di funnel. `rimossa` è fuori board (errore di
+/** Gli 11 stati operativi in ordine di funnel. `rimossa` è fuori board (errore di
  *  triage, mai un verdetto): ha solo una label, non compare qui. */
 export const CARD_STATES: CardStateMeta[] = [
   { key: 'approfondimento', label: 'Approfondimento', abbr: 'APP', macrofase: 'origination', terminal: false },
   { key: 'da_contattare', label: 'Da contattare', abbr: 'DC', macrofase: 'origination', terminal: false },
   { key: 'primo_contatto', label: 'Primo contatto', abbr: 'PC', macrofase: 'origination', terminal: false },
   { key: 'primo_incontro', label: 'Primo incontro', abbr: 'PI', macrofase: 'engagement', terminal: false },
+  { key: 'visita', label: 'Visita', abbr: 'VI', macrofase: 'engagement', terminal: false },
   { key: 'nda', label: 'NDA', abbr: 'NDA', macrofase: 'engagement', terminal: false },
   { key: 'loi', label: 'LOI', abbr: 'LOI', macrofase: 'engagement', terminal: false },
   { key: 'ricontattare', label: 'Ricontattare', abbr: 'R', macrofase: 'followup', terminal: false },
@@ -47,7 +49,7 @@ export const REMOVED_STATE_LABEL = 'Rimossa';
 
 const STATE_BY_KEY = new Map<string, CardStateMeta>(CARD_STATES.map((s) => [s.key, s]));
 
-/** I 7 stati non terminali, in ordine di funnel (colonne della board attiva). */
+/** Gli 8 stati non terminali, in ordine di funnel (colonne della board attiva). */
 export const ACTIVE_STATES: CardStateMeta[] = CARD_STATES.filter((s) => !s.terminal);
 /** I 3 stati terminali (Esito). Si raggiungono da /close, non da /state. */
 export const TERMINAL_STATES: CardStateMeta[] = CARD_STATES.filter((s) => s.terminal);
@@ -65,7 +67,7 @@ export interface MacrofaseMeta {
 
 export const MACROFASI: MacrofaseMeta[] = [
   { key: 'origination', label: 'Origination', num: '01', states: ['approfondimento', 'da_contattare', 'primo_contatto'], activeView: true },
-  { key: 'engagement', label: 'Engagement', num: '02', states: ['primo_incontro', 'nda', 'loi'], activeView: true },
+  { key: 'engagement', label: 'Engagement', num: '02', states: ['primo_incontro', 'visita', 'nda', 'loi'], activeView: true },
   { key: 'followup', label: 'Follow-up', num: '03', states: ['ricontattare'], activeView: true },
   { key: 'esito', label: 'Esito', num: '04', states: ['won', 'ko_nostro', 'ko_target'], activeView: false },
 ];

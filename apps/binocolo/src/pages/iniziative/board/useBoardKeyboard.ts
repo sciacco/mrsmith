@@ -4,7 +4,7 @@ import type { TerminalTarget } from './TerminalModal';
 
 /** Scorciatoie della board (KANBAN-V2-PLAN.md §6.2). `/` focus ricerca; j/k e frecce
  *  spostano il focus fra le card ([data-flip-id], rese focusabili da @dnd-kit);
- *  Enter apre il drawer; 1..7 spostano la card a fuoco nello stato n-esimo
+ *  Enter apre il drawer; 1..8 spostano la card a fuoco nello stato n-esimo
  *  non-terminale; w/x aprono la modale terminale; c comprime la colonna/stato; ? il
  *  popover aiuto. Il drag-da-tastiera vero (Space+frecce) è del KeyboardSensor. */
 export function useBoardKeyboard(opts: {
@@ -84,7 +84,7 @@ export function useBoardKeyboard(opts: {
           if (card?.dataset.state) onToggleCollapse(card.dataset.state);
           break;
         default:
-          if (companyKey && /^[1-7]$/.test(e.key)) {
+          if (companyKey && /^[1-8]$/.test(e.key)) {
             const st = ACTIVE_STATES[Number(e.key) - 1];
             if (st) {
               onMoveToState(companyKey, st.key);
