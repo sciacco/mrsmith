@@ -361,6 +361,7 @@ export interface MAInitiativeCard {
   state: string;
   esito?: string;
   recontactOn?: string;
+  visitOn?: string;
   createdFromSession?: string;
   createdAt: string;
   updatedAt: string;

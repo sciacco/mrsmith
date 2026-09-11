@@ -446,7 +446,7 @@ const (
 	maCardOriginDirect = "direct"
 
 	// Stati della card di lavorazione v2 (ma_initiative_card, migrazione 112,
-	// KANBAN-V2-PLAN.md §1.1), in ordine di funnel: 7 non-terminali + 3
+	// KANBAN-V2-PLAN.md §1.1), in ordine di funnel: 8 non-terminali + 3
 	// terminali. "rimossa" non è mai una colonna del board (errore di triage,
 	// mai un verdetto). L'esito è testo libero (vocabolario solo suggerito lato
 	// applicativo), obbligatorio non-vuoto solo per i KO.
@@ -454,6 +454,7 @@ const (
 	maCardStateDaContattare    = "da_contattare"
 	maCardStatePrimoContatto   = "primo_contatto"
 	maCardStatePrimoIncontro   = "primo_incontro"
+	maCardStateVisita          = "visita"
 	maCardStateNDA             = "nda"
 	maCardStateLOI             = "loi"
 	maCardStateRicontattare    = "ricontattare"
@@ -463,7 +464,7 @@ const (
 	maCardStateRimossa         = "rimossa"
 )
 
-// maCardActiveStates elenca i 7 stati non terminali (ordine di funnel): usati
+// maCardActiveStates elenca gli 8 stati non terminali (ordine di funnel): usati
 // per il filtro "attiva" delle collisioni cross-iniziativa (PRD §6.1) e dei
 // badge nelle proiezioni.
 var maCardActiveStates = []string{
@@ -471,6 +472,7 @@ var maCardActiveStates = []string{
 	maCardStateDaContattare,
 	maCardStatePrimoContatto,
 	maCardStatePrimoIncontro,
+	maCardStateVisita,
 	maCardStateNDA,
 	maCardStateLOI,
 	maCardStateRicontattare,
@@ -497,7 +499,7 @@ func isMACardTerminalState(state string) bool {
 func validMACardState(state string) bool {
 	switch state {
 	case maCardStateApprofondimento, maCardStateDaContattare, maCardStatePrimoContatto,
-		maCardStatePrimoIncontro, maCardStateNDA, maCardStateLOI, maCardStateRicontattare,
+		maCardStatePrimoIncontro, maCardStateVisita, maCardStateNDA, maCardStateLOI, maCardStateRicontattare,
 		maCardStateWon, maCardStateKONostro, maCardStateKOTarget, maCardStateRimossa:
 		return true
 	default:
@@ -616,6 +618,7 @@ type MAInitiativeCard struct {
 	State              string     `json:"state"`
 	Esito              string     `json:"esito,omitempty"`
 	RecontactOn        *time.Time `json:"recontactOn,omitempty"`
+	VisitOn            *time.Time `json:"visitOn,omitempty"`
 	CreatedFromSession string     `json:"createdFromSession,omitempty"`
 	CreatedAt          time.Time  `json:"createdAt"`
 	UpdatedAt          time.Time  `json:"updatedAt"`
@@ -938,7 +941,7 @@ type MACreateInitiativeCardResponse struct {
 }
 
 // MACardStateRequest drives POST .../cards/{companyKey}/state: free transitions
-// among the 7 non-terminal states (terminals go through /close, rimossa through
+// among the 8 non-terminal states (terminals go through /close, rimossa through
 // /remove). RecontactOn (ISO date) is valid only toward `ricontattare`; a
 // transition away from `ricontattare` clears the date.
 type MACardStateRequest struct {

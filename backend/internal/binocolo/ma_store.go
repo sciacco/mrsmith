@@ -3087,14 +3087,14 @@ func (s *SQLStore) GetMAInitiativeCard(ctx context.Context, initiativeID, compan
 	row := s.db.QueryRowContext(ctx, `
 SELECT initiative_id::text, company_key, company_name, vat_code, tax_code, province,
        origin, state, COALESCE(esito, ''), COALESCE(created_from_session::text, ''),
-       created_at, updated_at, closed_at, recontact_on
+       created_at, updated_at, closed_at, recontact_on, visit_on
 FROM binocolo.ma_initiative_card
 WHERE initiative_id = $1::uuid AND company_key = $2
 `, initiativeID, companyKey)
 	var card MAInitiativeCard
-	var closedAt, recontactOn sql.NullTime
+	var closedAt, recontactOn, visitOn sql.NullTime
 	if err := row.Scan(&card.InitiativeID, &card.CompanyKey, &card.CompanyName, &card.VATCode, &card.TaxCode,
-		&card.Province, &card.Origin, &card.State, &card.Esito, &card.CreatedFromSession, &card.CreatedAt, &card.UpdatedAt, &closedAt, &recontactOn); err != nil {
+		&card.Province, &card.Origin, &card.State, &card.Esito, &card.CreatedFromSession, &card.CreatedAt, &card.UpdatedAt, &closedAt, &recontactOn, &visitOn); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -3105,6 +3105,9 @@ WHERE initiative_id = $1::uuid AND company_key = $2
 	}
 	if recontactOn.Valid {
 		card.RecontactOn = &recontactOn.Time
+	}
+	if visitOn.Valid {
+		card.VisitOn = &visitOn.Time
 	}
 	return &card, nil
 }
@@ -3125,8 +3128,8 @@ func (s *SQLStore) UpsertMAInitiativeCard(ctx context.Context, card MAInitiative
 	if _, err := s.db.ExecContext(ctx, `
 INSERT INTO binocolo.ma_initiative_card (
     initiative_id, company_key, company_name, vat_code, tax_code, province, origin,
-    state, esito, created_from_session, created_at, updated_at, closed_at, recontact_on)
-VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, NULLIF($9, ''), $10::uuid, now(), now(), $11, $12)
+    state, esito, created_from_session, created_at, updated_at, closed_at, recontact_on, visit_on)
+VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, NULLIF($9, ''), $10::uuid, now(), now(), $11, $12, $13)
 ON CONFLICT (initiative_id, company_key) DO UPDATE SET
     company_name = CASE WHEN EXCLUDED.company_name <> '' THEN EXCLUDED.company_name ELSE binocolo.ma_initiative_card.company_name END,
     vat_code     = CASE WHEN EXCLUDED.vat_code <> '' THEN EXCLUDED.vat_code ELSE binocolo.ma_initiative_card.vat_code END,
@@ -3137,9 +3140,10 @@ ON CONFLICT (initiative_id, company_key) DO UPDATE SET
     esito        = EXCLUDED.esito,
     updated_at   = now(),
     closed_at    = EXCLUDED.closed_at,
-    recontact_on = EXCLUDED.recontact_on
+    recontact_on = EXCLUDED.recontact_on,
+    visit_on     = EXCLUDED.visit_on
 `, card.InitiativeID, card.CompanyKey, card.CompanyName, card.VATCode, card.TaxCode, card.Province,
-		card.Origin, card.State, card.Esito, createdFromSession, card.ClosedAt, card.RecontactOn); err != nil {
+		card.Origin, card.State, card.Esito, createdFromSession, card.ClosedAt, card.RecontactOn, card.VisitOn); err != nil {
 		return fmt.Errorf("upsert ma initiative card: %w", err)
 	}
 	return nil
@@ -3153,7 +3157,7 @@ func (s *SQLStore) ListMAInitiativeCards(ctx context.Context, initiativeID strin
 	rows, err := s.db.QueryContext(ctx, `
 SELECT initiative_id::text, company_key, company_name, vat_code, tax_code, province,
        origin, state, COALESCE(esito, ''), COALESCE(created_from_session::text, ''),
-       created_at, updated_at, closed_at, recontact_on
+       created_at, updated_at, closed_at, recontact_on, visit_on
 FROM binocolo.ma_initiative_card
 WHERE initiative_id = $1::uuid
 ORDER BY updated_at DESC
@@ -3165,9 +3169,9 @@ ORDER BY updated_at DESC
 	out := []MAInitiativeCard{}
 	for rows.Next() {
 		var card MAInitiativeCard
-		var closedAt, recontactOn sql.NullTime
+		var closedAt, recontactOn, visitOn sql.NullTime
 		if err := rows.Scan(&card.InitiativeID, &card.CompanyKey, &card.CompanyName, &card.VATCode, &card.TaxCode,
-			&card.Province, &card.Origin, &card.State, &card.Esito, &card.CreatedFromSession, &card.CreatedAt, &card.UpdatedAt, &closedAt, &recontactOn); err != nil {
+			&card.Province, &card.Origin, &card.State, &card.Esito, &card.CreatedFromSession, &card.CreatedAt, &card.UpdatedAt, &closedAt, &recontactOn, &visitOn); err != nil {
 			return nil, fmt.Errorf("scan ma initiative card: %w", err)
 		}
 		if closedAt.Valid {
@@ -3175,6 +3179,9 @@ ORDER BY updated_at DESC
 		}
 		if recontactOn.Valid {
 			card.RecontactOn = &recontactOn.Time
+		}
+		if visitOn.Valid {
+			card.VisitOn = &visitOn.Time
 		}
 		out = append(out, card)
 	}
