@@ -85,6 +85,9 @@ export const BoardCard = forwardRef<HTMLDivElement, BoardCardProps>(function Boa
   // Data civile `YYYY-MM-DD` formattata senza conversioni di fuso: vietato
   // `new Date("YYYY-MM-DD")`, che in fusi negativi sposta il giorno.
   const visitLabel = card.state === 'visita' ? formatLocalDate(card.visitOn) : null;
+  // Stessa data civile del chip visita: il valore arriva come `...T00:00:00Z`, la
+  // data letterale della stringa è quella salvata, senza conversioni di fuso.
+  const recontactLabel = card.state === 'ricontattare' ? formatLocalDate(card.recontactOn) : null;
 
   return (
     <div
@@ -145,10 +148,10 @@ export const BoardCard = forwardRef<HTMLDivElement, BoardCardProps>(function Boa
             {initiativeChip}
           </span>
         ) : null}
-        {card.state === 'ricontattare' && card.recontactOn ? (
+        {recontactLabel ? (
           <span className={styles.recdate}>
             <Icon name="calendar" size={10} />
-            {new Intl.DateTimeFormat('it-IT').format(new Date(card.recontactOn))}
+            {recontactLabel}
           </span>
         ) : null}
         {visitLabel ? (
