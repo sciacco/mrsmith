@@ -181,12 +181,12 @@ rollback-prod:        ## Retag + restart di una release remota con RELEASE_TS=YY
 
 .PHONY: test
 test:                 ## Tutti i test
-	cd backend && $(RUN_ENV) 'go test ./...'
+	cd backend && go test ./...
 	pnpm -r --if-present test
 
 .PHONY: test-backend
 test-backend:         ## Solo test Go
-	cd backend && $(RUN_ENV) 'go test ./...'
+	cd backend && go test ./...
 
 .PHONY: test-frontend
 test-frontend:        ## Solo test frontend
