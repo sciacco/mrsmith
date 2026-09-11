@@ -3,7 +3,6 @@ package notifications
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -336,9 +335,9 @@ func filterClaimedDeliveries(deliveries []ClaimedDelivery, notificationID int64)
 
 func openNotificationTestDB(t *testing.T) *sql.DB {
 	t.Helper()
-	dsn := notificationTestDSN(t)
+	dsn := notificationTestDSN()
 	if dsn == "" {
-		t.Skip("set NOTIFICATIONS_TEST_DSN or backend/.env ANISETTA_DSN to run SQLStore integration tests")
+		t.Skip("set NOTIFICATIONS_TEST_DSN to run SQLStore integration tests against a throwaway PostgreSQL")
 	}
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
@@ -355,30 +354,12 @@ func openNotificationTestDB(t *testing.T) *sql.DB {
 	return db
 }
 
-func notificationTestDSN(t *testing.T) string {
-	t.Helper()
-	if value := strings.TrimSpace(os.Getenv("NOTIFICATIONS_TEST_DSN")); value != "" {
-		return value
-	}
-	if value := strings.TrimSpace(os.Getenv("ANISETTA_DSN")); value != "" {
-		return value
-	}
-	for _, path := range []string{".env", "../../.env", "../.env"} {
-		raw, err := os.ReadFile(path)
-		if err != nil {
-			if errors.Is(err, os.ErrNotExist) {
-				continue
-			}
-			t.Fatalf("read %s: %v", path, err)
-		}
-		for _, line := range strings.Split(string(raw), "\n") {
-			line = strings.TrimSpace(line)
-			if strings.HasPrefix(line, "ANISETTA_DSN=") {
-				return strings.TrimSpace(strings.TrimPrefix(line, "ANISETTA_DSN="))
-			}
-		}
-	}
-	return ""
+// notificationTestDSN is the explicit opt-in for the SQLStore integration
+// tests. It intentionally ignores ANISETTA_DSN and backend/.env: that file is
+// sops-encrypted locally, so the value there is ciphertext that pgx can only
+// fail to dial, turning an unconfigured run into a failure instead of a skip.
+func notificationTestDSN() string {
+	return strings.TrimSpace(os.Getenv("NOTIFICATIONS_TEST_DSN"))
 }
 
 func seedNotificationType(t *testing.T, db *sql.DB) string {
