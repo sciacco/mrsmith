@@ -438,6 +438,7 @@ export function BoardPage() {
           onClose={() => { setSelectedKey(null); setTagsOpen(false); }}
           onChanged={() => void data.refetch()}
           onSetState={(companyKey, state, recontactOn) => data.setState.mutate({ companyKey, state, recontactOn })}
+          stateSaving={data.setState.isPending}
           onOpenTerminal={openTerminal}
           onReopen={(companyKey) => data.reopenCard.mutate(companyKey, { onSuccess: () => toast('Azienda rimessa in lavorazione.', 'success') })}
           onRemove={(card) => setRemoveCard(card)}

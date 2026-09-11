@@ -119,6 +119,7 @@ export function useBoardData(initiativeId: string) {
       // La risposta è l'autorità sulla card: il valore confermato sostituisce
       // subito quello ottimistico, senza attendere il refetch dell'invalidation.
       patchCard(card.companyKey, { state: card.state, recontactOn: card.recontactOn, visitOn: card.visitOn });
+      void qc.invalidateQueries({ queryKey: ['ma-company-activity', card.companyKey] });
     },
     onError: (e, _v, ctx) => {
       if (ctx?.prev) qc.setQueryData(key, ctx.prev);

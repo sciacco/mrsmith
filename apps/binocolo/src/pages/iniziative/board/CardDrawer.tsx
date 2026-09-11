@@ -73,6 +73,7 @@ export function CardDrawer({
   onClose,
   onChanged,
   onSetState,
+  stateSaving,
   onOpenTerminal,
   onReopen,
   onRemove,
@@ -90,6 +91,7 @@ export function CardDrawer({
    *  (`recontactOn` in ricontattare, `visitOn` in visita): undefined = proprietà
    *  assente, null = cancella la data, stringa ISO = la imposta/sostituisce. */
   onSetState: (companyKey: string, state: string, recontactOn?: string | null) => void;
+  stateSaving: boolean;
   onOpenTerminal: (card: MAInitiativeCardView, target: TerminalTarget) => void;
   onReopen: (companyKey: string) => void;
   onRemove: (card: MAInitiativeCardView) => void;
@@ -267,6 +269,7 @@ export function CardDrawer({
                     className={styles.input}
                     type="date"
                     value={visitDate}
+                    disabled={stateSaving}
                     aria-invalid={visitSaveFailed}
                     aria-describedby={visitSaveFailed ? 'card-visit-date-error' : undefined}
                     onChange={(e) => {
@@ -284,7 +287,7 @@ export function CardDrawer({
                       <Icon name="triangle-alert" size={16} />
                       <div>
                         <p>Data non salvata. Riprova.</p>
-                        <Button variant="secondary" size="sm" onClick={retryVisitDate}>
+                        <Button variant="secondary" size="sm" onClick={retryVisitDate} disabled={stateSaving}>
                           Riprova
                         </Button>
                       </div>
