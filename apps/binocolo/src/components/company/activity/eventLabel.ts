@@ -7,6 +7,30 @@ const AGREEMENT_FIELD_LABELS: Record<string, string> = { kind: 'Tipo', signedOn:
 
 const dateLabel = (value?: string | null) => formatLocalDate(value) ?? '';
 
+/** Valore di una data civile di payload: `YYYY-MM-DD` formattata senza conversioni
+ *  di fuso (mai `new Date("YYYY-MM-DD")`); null/vuoto restano null. */
+function visitDateValue(value: unknown): string | null {
+  if (typeof value !== 'string' || value === '') return null;
+  return formatLocalDate(value) ?? value;
+}
+
+/** Dettaglio leggibile della transizione di `visit_on` nel diario (issue #201).
+ *  I campi compaiono solo quando la data è cambiata; un null esplicito racconta
+ *  l'azzeramento. Nei `stato` la permanenza in `visita` (`to`) distingue la
+ *  cancellazione manuale dall'azzeramento automatico in uscita; per chiusura e
+ *  rimozione la data è sempre azzerata dall'uscita. `null` quando l'evento non
+ *  porta i campi (payload storici: resa invariata). */
+function visitDateDetail(payload: Record<string, unknown>): string | null {
+  if (!('visitOnFrom' in payload) && !('visitOnTo' in payload)) return null;
+  const from = visitDateValue(payload.visitOnFrom);
+  const to = visitDateValue(payload.visitOnTo);
+  if (to) return from ? `Data visita: ${from} → ${to}` : `Data visita: ${to}`;
+  if (from) {
+    return payload.to === 'visita' ? `Data visita: ${from} → cancellata` : `Data visita azzerata (era ${from})`;
+  }
+  return 'Data visita aggiornata';
+}
+
 function agreementKindLabel(kind: unknown): string {
   return typeof kind === 'string' ? AGREEMENT_KIND_LABELS[kind] ?? kind : 'Accordo';
 }
@@ -28,12 +52,16 @@ export function eventLabel(event: MATargetOutcome, sessionMap: Map<string, strin
     case 'stato': {
       const from = payload && typeof payload.from === 'string' ? stateLabel(payload.from) : null;
       const to = payload && typeof payload.to === 'string' ? stateLabel(payload.to) : null;
-      return from && to ? `${from} → ${to}` : `Stato aggiornato${event.note ? ` — ${event.note}` : ''}`;
+      const base = from && to ? `${from} → ${to}` : `Stato aggiornato${event.note ? ` — ${event.note}` : ''}`;
+      const detail = payload ? visitDateDetail(payload) : null;
+      return detail ? `${base} · ${detail}` : base;
     }
     case 'chiusura': {
       const state = payload && typeof payload.stato === 'string' ? stateLabel(payload.stato) : 'Chiusura';
       const outcome = payload && typeof payload.esito === 'string' && payload.esito ? ` — ${esitoLabel(payload.esito)}` : '';
-      return event.note ? `${state}${outcome}: ${event.note}` : `${state}${outcome}`;
+      const base = event.note ? `${state}${outcome}: ${event.note}` : `${state}${outcome}`;
+      const detail = payload ? visitDateDetail(payload) : null;
+      return detail ? `${base} · ${detail}` : base;
     }
     case 'card_creata': {
       const rating = payload && typeof payload.rating === 'number' ? payload.rating : 0;
@@ -43,7 +71,10 @@ export function eventLabel(event: MATargetOutcome, sessionMap: Map<string, strin
       return `Aggiunta${title ? ` da ${title}` : ''}${stars}${event.note ? ` — ${event.note}` : ''}`;
     }
     case 'card_riaperta': return 'Rimessa in lavorazione';
-    case 'card_rimossa': return 'Rimossa dalla lavorazione';
+    case 'card_rimossa': {
+      const detail = payload ? visitDateDetail(payload) : null;
+      return detail ? `Rimossa dalla lavorazione · ${detail}` : 'Rimossa dalla lavorazione';
+    }
     case 'dominio_verificato': {
       const outcome = payload && typeof payload.esito === 'string' ? payload.esito : 'non_verificabile';
       if (outcome === 'confermato') return 'Verifica automatica dominio: confermata';
