@@ -509,18 +509,6 @@ export function PlanningPage() {
         onClose={closeDrawer}
         onEditReminder={editReminder}
         onExternal={saveExternalContext}
-        onSwitchCourse={(id) => {
-          const query = new URLSearchParams(params);
-          query.set("drawer", id);
-          [
-            "itemQ",
-            "itemTeam",
-            "itemEvent",
-            "itemStatus",
-            "itemOffset",
-          ].forEach((key) => query.delete(key));
-          setParams(query);
-        }}
       />
       <PlanningReminderModal
         reminder={reminder}

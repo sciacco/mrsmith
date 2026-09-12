@@ -73,9 +73,9 @@ func (s *SQLStore) loadPlanningSnapshot(ctx context.Context, courseID string) (P
 		in = ` IN (SELECT id FROM training.course WHERE id=$1::uuid)`
 		scopeArgs = []any{courseID}
 	}
-	requestScope := `(r.course_id` + in + ` OR r.id IN (SELECT en.source_request_id FROM training.enrollment en JOIN training.training_event ev ON ev.id=en.event_id WHERE ev.course_id` + in + ` AND en.source_request_id IS NOT NULL) OR r.resulting_enrollment_id IN (SELECT en.id FROM training.enrollment en JOIN training.training_event ev ON ev.id=en.event_id WHERE ev.course_id` + in + `))`
+	requestScope := `((CASE WHEN r.outcome = 'accepted' THEN r.accepted_course_id ELSE r.course_id END)` + in + ` OR r.id IN (SELECT en.source_request_id FROM training.enrollment en JOIN training.training_event ev ON ev.id=en.event_id WHERE ev.course_id` + in + ` AND en.source_request_id IS NOT NULL) OR r.resulting_enrollment_id IN (SELECT en.id FROM training.enrollment en JOIN training.training_event ev ON ev.id=en.event_id WHERE ev.course_id` + in + `))`
 	requestArgs := scopeArgs
-	rows, err = tx.QueryContext(ctx, `SELECT DISTINCT r.id::text,r.course_id::text,oc.title,e.id::text,concat(e.last_name,' ',e.first_name),t.id::text,t.name,r.priority,r.created_at,NULLIF(r.tl_opinion,''),NULLIF(r.people_decision,''),NULLIF(r.outcome,''),r.suspended_at IS NOT NULL,NULLIF(r.reminder_text,''),r.reminder_at::text,ac.id::text,ac.title,r.accepted_event_id::text,r.resulting_enrollment_id::text FROM training.training_request r JOIN training.employee e ON e.id=r.employee_id LEFT JOIN training.team t ON t.id=r.selected_team_id LEFT JOIN training.course ac ON ac.id=r.accepted_course_id JOIN training.course oc ON oc.id=r.course_id WHERE `+requestScope, requestArgs...)
+	rows, err = tx.QueryContext(ctx, `SELECT DISTINCT r.id::text,COALESCE(r.course_id::text,''),COALESCE(oc.title,''),r.description,e.id::text,concat(e.last_name,' ',e.first_name),t.id::text,t.name,r.priority,r.created_at,NULLIF(r.tl_opinion,''),NULLIF(r.people_decision,''),NULLIF(r.outcome,''),r.suspended_at IS NOT NULL,NULLIF(r.reminder_text,''),r.reminder_at::text,ac.id::text,ac.title,r.accepted_event_id::text,r.resulting_enrollment_id::text FROM training.training_request r JOIN training.employee e ON e.id=r.employee_id LEFT JOIN training.team t ON t.id=r.selected_team_id LEFT JOIN training.course ac ON ac.id=r.accepted_course_id LEFT JOIN training.course oc ON oc.id=r.course_id WHERE `+requestScope, requestArgs...)
 	if err != nil {
 		return snap, fmt.Errorf("load planning requests: %w", err)
 	}
@@ -85,7 +85,7 @@ func (s *SQLStore) loadPlanningSnapshot(ctx context.Context, courseID string) (P
 		var teamID, teamName sql.NullString
 		var pri sql.NullInt64
 		var created time.Time
-		if err := rows.Scan(&x.ID, &x.CourseID, &x.CourseTitle, &x.Employee.ID, &x.Employee.Name, &teamID, &teamName, &pri, &created, &tl, &pd, &out, &x.Suspended, &text, &date, &acid, &acname, &aeid, &reid); err != nil {
+		if err := rows.Scan(&x.ID, &x.CourseID, &x.CourseTitle, &x.Description, &x.Employee.ID, &x.Employee.Name, &teamID, &teamName, &pri, &created, &tl, &pd, &out, &x.Suspended, &text, &date, &acid, &acname, &aeid, &reid); err != nil {
 			rows.Close()
 			return snap, err
 		}
@@ -277,7 +277,7 @@ func (s *SQLStore) loadPlanningSnapshot(ctx context.Context, courseID string) (P
 		return snap, err
 	}
 	rows.Close()
-	rows, err = tx.QueryContext(ctx, `SELECT tm.employee_id::text,t.id::text,t.name FROM training.team_membership tm JOIN training.team t ON t.id=tm.team_id WHERE tm.end_date IS NULL AND tm.employee_id IN (SELECT employee_id FROM training.training_request WHERE course_id`+in+` UNION SELECT en.employee_id FROM training.enrollment en JOIN training.training_event ev ON ev.id=en.event_id WHERE ev.course_id`+in+`)`, scopeArgs...)
+	rows, err = tx.QueryContext(ctx, `SELECT tm.employee_id::text,t.id::text,t.name FROM training.team_membership tm JOIN training.team t ON t.id=tm.team_id WHERE tm.end_date IS NULL AND tm.employee_id IN (SELECT r.employee_id FROM training.training_request r WHERE `+requestScope+` UNION SELECT en.employee_id FROM training.enrollment en JOIN training.training_event ev ON ev.id=en.event_id WHERE ev.course_id`+in+`)`, scopeArgs...)
 	if err != nil {
 		return snap, fmt.Errorf("load planning current teams: %w", err)
 	}

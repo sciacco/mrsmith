@@ -8,6 +8,7 @@ package training
 // (coda 2): con o senza team scelto e con o senza parere TL, esposto quando
 // presente (#200).
 type RequestAwaitingDecisionRow struct {
+	Description      string `json:"description"`
 	RequestID        string `json:"requestId"`
 	EmployeeID       string `json:"employeeId"`
 	EmployeeName     string `json:"employeeName"`

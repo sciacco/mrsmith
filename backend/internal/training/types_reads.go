@@ -108,6 +108,7 @@ type PersonEnrollmentRef struct {
 // PersonRequestRef e una richiesta formativa della persona; Outcome e nil
 // quando la richiesta e ancora aperta.
 type PersonRequestRef struct {
+	Description string  `json:"description"`
 	ID          string  `json:"id"`
 	CourseTitle string  `json:"courseTitle,omitempty"`
 	Outcome     *string `json:"outcome"`

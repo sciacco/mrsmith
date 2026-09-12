@@ -50,6 +50,7 @@ export type TLOpinion = "favorable" | "unfavorable";
 // Richiesta aperta senza decisione People (#200): con o senza team scelto e
 // con o senza parere TL, presente solo quando registrato.
 export interface RequestAwaitingDecisionRow {
+  description: string;
   requestId: string;
   employeeId: string;
   employeeName: string;
@@ -629,6 +630,7 @@ export interface PersonEnrollmentRef {
 }
 
 export interface PersonRequestRef {
+  description: string;
   id: string;
   courseTitle?: string;
   outcome: string | null;
@@ -810,7 +812,7 @@ export interface RequestSkillAreaInput {
 export interface RequestInput {
   employeeId: string;
   courseId?: string;
-  newCourseTitle?: string;
+  description?: string;
   skillAreas?: RequestSkillAreaInput[];
   motivation: string;
   selectedTeamId?: string;
@@ -856,13 +858,13 @@ export interface RequestDecisionInput {
 }
 
 // RequestOriginalDataInput sostituisce i dati originali di una richiesta
-// aperta (#171): corso a catalogo o titolo nuovo (alternativi), aree con
+// aperta (#171): descrizione e corso facoltativo, aree con
 // livelli, motivazione, team e date desiderate. La persona e invariata.
 // Il team e obbligatorio solo quando la persona ha appartenenze attive;
 // selectedTeamId omesso = nessun team (#200).
 export interface RequestOriginalDataInput {
   courseId?: string;
-  newCourseTitle?: string;
+  description?: string;
   skillAreas?: RequestSkillAreaInput[];
   motivation: string;
   selectedTeamId?: string;
@@ -871,6 +873,7 @@ export interface RequestOriginalDataInput {
 }
 
 export interface RequestListRow {
+  description: string;
   id: string;
   employeeName: string;
   courseTitle?: string;
@@ -897,6 +900,7 @@ export interface RequestAreaRef {
 }
 
 export interface RequestOriginalData {
+  description: string;
   employeeId: string;
   courseId?: string;
   employeeName: string;
@@ -1421,9 +1425,10 @@ export interface PlanningRequestArea extends PlanningRef {
 
 export interface PlanningRequestItem {
   id: string;
+  description: string;
   employee: PlanningRef;
   team: PlanningRef | null;
-  course: PlanningRef;
+  course: PlanningRef | null;
   priority: number | null;
   createdAt: string;
   areas: PlanningRequestArea[];

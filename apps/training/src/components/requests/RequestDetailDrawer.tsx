@@ -143,7 +143,7 @@ export function RequestDetailDrawer({ id, onClose }: RequestDetailDrawerProps) {
         open
         onClose={onClose}
         title={request?.requested.employeeName ?? 'Richiesta'}
-        subtitle={request ? request.requested.courseTitle : undefined}
+        subtitle={request?.requested.description}
         size="lg"
         footer={
           isOpen ? (
@@ -212,8 +212,12 @@ export function RequestDetailDrawer({ id, onClose }: RequestDetailDrawerProps) {
                     </dd>
                   </div>
                   <div className={styles.item}>
-                    <dt>Corso o titolo</dt>
-                    <dd>{request.requested.courseTitle}</dd>
+                    <dt>Descrizione</dt>
+                    <dd>{request.requested.description}</dd>
+                  </div>
+                  <div className={styles.item}>
+                    <dt>Corso</dt>
+                    <dd>{request.requested.courseTitle || '—'}</dd>
                   </div>
                   <div className={styles.item}>
                     <dt>Aree di competenza (attuale → atteso)</dt>
@@ -985,7 +989,7 @@ function DecisionForm({ request, onClose }: { request: RequestDetail; onClose: (
   );
 }
 
-// ── Modifica dei dati originali (#171): corso o titolo nuovo, aree con
+// ── Modifica dei dati originali (#171): descrizione e corso facoltativo, aree con
 // livelli, motivazione, team (persona invariata) e date desiderate. Reusa i
 // pezzi della creazione: select del team tra le appartenenze attive della
 // persona, editor aree/livelli. Ammessa solo a richiesta aperta. ──
@@ -1001,9 +1005,9 @@ function OriginalDataForm({ request, onClose }: { request: RequestDetail; onClos
   const person = (people.data ?? []).find((p) => p.id === requested.employeeId);
   const activeTeams = person?.teams ?? [];
 
-  const [courseMode, setCourseMode] = useState<'catalog' | 'new'>(requested.courseId ? 'catalog' : 'new');
+  const [courseMode, setCourseMode] = useState<'catalog' | 'description'>(requested.courseId ? 'catalog' : 'description');
   const [courseId, setCourseId] = useState(requested.courseId ?? '');
-  const [newCourseTitle, setNewCourseTitle] = useState(requested.courseTitle ?? '');
+  const [description, setDescription] = useState(requested.description);
   const [skillAreaIds, setSkillAreaIds] = useState<string[]>(requested.skillAreas.map((a) => a.id));
   const [areaLevels, setAreaLevels] = useState<Record<string, { current: string; target: string }>>(
     Object.fromEntries(
@@ -1050,7 +1054,7 @@ function OriginalDataForm({ request, onClose }: { request: RequestDetail; onClos
   const canSubmit =
     motivation.trim() !== '' &&
     teamSelectionValid &&
-    (courseMode === 'catalog' ? courseId !== '' : newCourseTitle.trim() !== '');
+    (courseMode === 'catalog' ? courseId !== '' : description.trim() !== '');
 
   async function submit() {
     if (!canSubmit) return;
@@ -1058,7 +1062,7 @@ function OriginalDataForm({ request, onClose }: { request: RequestDetail; onClos
     try {
       const input: RequestOriginalDataInput = {
         courseId: courseMode === 'catalog' ? courseId : undefined,
-        newCourseTitle: courseMode === 'new' ? newCourseTitle.trim() : undefined,
+        description: courseMode === 'description' ? description.trim() : undefined,
         skillAreas: skillAreaIds.map((areaId) => ({
           id: areaId,
           levelCurrent:
@@ -1126,11 +1130,11 @@ function OriginalDataForm({ request, onClose }: { request: RequestDetail; onClos
             Corso a catalogo
           </Button>
           <Button
-            variant={courseMode === 'new' ? 'primary' : 'secondary'}
+            variant={courseMode === 'description' ? 'primary' : 'secondary'}
             size="sm"
-            onClick={() => setCourseMode('new')}
+            onClick={() => setCourseMode('description')}
           >
-            Nuovo corso
+            Senza corso
           </Button>
         </div>
         {courseMode === 'catalog' ? (
@@ -1146,16 +1150,13 @@ function OriginalDataForm({ request, onClose }: { request: RequestDetail; onClos
           </label>
         ) : (
           <label className={formStyles.field}>
-            Titolo
+            Descrizione
             <input
               className={formStyles.input}
-              value={newCourseTitle}
-              onChange={(e) => setNewCourseTitle(e.target.value)}
-              placeholder="Titolo della formazione desiderata"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Descrivi la formazione desiderata"
             />
-            <span className={formStyles.hint}>
-              Il titolo entra a catalogo come corso da completare; se esiste già un corso con lo stesso nome, la richiesta si aggancia a quello.
-            </span>
           </label>
         )}
 

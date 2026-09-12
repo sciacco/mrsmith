@@ -29,10 +29,11 @@ type PlanningArea struct {
 	LevelTarget  *int `json:"levelTarget"`
 }
 type PlanningRequestItem struct {
+	Description           string         `json:"description"`
 	ID                    string         `json:"id"`
 	Employee              PlanningRef    `json:"employee"`
 	Team                  *PlanningRef   `json:"team"`
-	Course                PlanningRef    `json:"course"`
+	Course                *PlanningRef   `json:"course"` // original course, not attribution
 	Priority              *int           `json:"priority"`
 	CreatedAt             string         `json:"createdAt"`
 	Areas                 []PlanningArea `json:"areas"`

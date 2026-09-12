@@ -28,9 +28,9 @@ export function RequestCreateModal({ open, onClose, onCreated }: RequestCreateMo
 
   const [employeeId, setEmployeeId] = useState('');
   const [teamId, setTeamId] = useState('');
-  const [courseMode, setCourseMode] = useState<'catalog' | 'new'>('catalog');
+  const [courseMode, setCourseMode] = useState<'catalog' | 'description'>('catalog');
   const [courseId, setCourseId] = useState('');
-  const [newCourseTitle, setNewCourseTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [skillAreaIds, setSkillAreaIds] = useState<string[]>([]);
   const [areaLevels, setAreaLevels] = useState<Record<string, { current: string; target: string }>>({});
   const [priority, setPriority] = useState<number | null>(null);
@@ -53,7 +53,7 @@ export function RequestCreateModal({ open, onClose, onCreated }: RequestCreateMo
     employeeId !== '' &&
     (!teamRequired || teamId !== '') &&
     motivation.trim() !== '' &&
-    (courseMode === 'catalog' ? courseId !== '' : newCourseTitle.trim() !== '');
+    (courseMode === 'catalog' ? courseId !== '' : description.trim() !== '');
 
   const employeeOptions = useMemo(
     () =>
@@ -71,7 +71,7 @@ export function RequestCreateModal({ open, onClose, onCreated }: RequestCreateMo
         employeeId,
         selectedTeamId: teamId || undefined,
         courseId: courseMode === 'catalog' ? courseId : undefined,
-        newCourseTitle: courseMode === 'new' ? newCourseTitle.trim() : undefined,
+        description: courseMode === 'description' ? description.trim() : undefined,
         skillAreas: skillAreaIds.map((areaId) => ({
           id: areaId,
           levelCurrent: areaLevels[areaId]?.current !== undefined && areaLevels[areaId]?.current !== ''
@@ -152,11 +152,11 @@ export function RequestCreateModal({ open, onClose, onCreated }: RequestCreateMo
           </Button>
           <Button
             type="button"
-            variant={courseMode === 'new' ? 'primary' : 'secondary'}
+            variant={courseMode === 'description' ? 'primary' : 'secondary'}
             size="sm"
-            onClick={() => setCourseMode('new')}
+            onClick={() => setCourseMode('description')}
           >
-            Nuovo corso
+            Senza corso
           </Button>
         </div>
         {courseMode === 'catalog' ? (
@@ -172,16 +172,13 @@ export function RequestCreateModal({ open, onClose, onCreated }: RequestCreateMo
           </label>
         ) : (
           <label className={styles.field}>
-            Titolo
+            Descrizione
             <input
               className={styles.input}
-              value={newCourseTitle}
-              onChange={(e) => setNewCourseTitle(e.target.value)}
-              placeholder="Titolo della formazione desiderata"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Descrivi la formazione desiderata"
             />
-            <span className={styles.hint}>
-              Il titolo entra a catalogo come corso da completare; se esiste già un corso con lo stesso nome, la richiesta si aggancia a quello.
-            </span>
           </label>
         )}
 

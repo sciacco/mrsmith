@@ -9,16 +9,14 @@ package training
 // richiesta chiusa da decisione); il ritiro e un esito terminale distinto.
 
 // RequestInput sono i dati originali della richiesta, registrati da People
-// per conto della persona. Corso a catalogo e titolo nuovo sono alternativi:
-// un titolo e l'embrione di un corso, quindi il backend riusa il corso
-// esistente con lo stesso nome oppure lo crea (solo nome) nella stessa
-// transazione — ogni richiesta aggancia sempre un corso. Il team scelto e
-// obbligatorio solo se la persona ha appartenenze attive; quando presente
-// deve essere tra queste (#200).
+// per conto della persona. Con un corso selezionato la descrizione copia il
+// titolo; senza corso la descrizione e obbligatoria e non crea corsi.
+// Il team scelto e obbligatorio solo se la persona ha appartenenze attive;
+// quando presente deve essere tra queste (#200).
 type RequestInput struct {
 	EmployeeID     string                  `json:"employeeId"`
 	CourseID       string                  `json:"courseId,omitempty"`
-	NewCourseTitle string                  `json:"newCourseTitle,omitempty"`
+	Description    string                  `json:"description,omitempty"`
 	SkillAreas     []RequestSkillAreaInput `json:"skillAreas,omitempty"`
 	Motivation     string                  `json:"motivation"`
 	SelectedTeamID string                  `json:"selectedTeamId,omitempty"`
@@ -51,15 +49,14 @@ type RequestAnnotationsInput struct {
 }
 
 // RequestOriginalDataInput sostituisce i dati originali di una richiesta
-// aperta (#171): corso a catalogo o titolo nuovo (alternativi; un titolo e
-// l'embrione di un corso), aree con livelli, motivazione, team scelto
-// (obbligatorio solo se la persona ha appartenenze attive; quando presente
-// deve essere tra queste) e date desiderate. La persona e invariata
+// aperta (#171): descrizione e corso facoltativo, aree con livelli,
+// motivazione, team scelto (obbligatorio solo se la persona ha appartenenze
+// attive; quando presente deve essere tra queste) e date desiderate. La persona e invariata
 // (correzione = ritiro + nuova richiesta); priorita, nota e promemoria
 // restano sul PUT annotations. Stesse validazioni di RequestInput.
 type RequestOriginalDataInput struct {
 	CourseID       string                  `json:"courseId,omitempty"`
-	NewCourseTitle string                  `json:"newCourseTitle,omitempty"`
+	Description    string                  `json:"description,omitempty"`
 	SkillAreas     []RequestSkillAreaInput `json:"skillAreas,omitempty"`
 	Motivation     string                  `json:"motivation"`
 	SelectedTeamID string                  `json:"selectedTeamId,omitempty"`
@@ -108,6 +105,7 @@ type RequestAcceptedInput struct {
 // ── Letture ──
 
 type RequestListRow struct {
+	Description    string         `json:"description"`
 	ID             string         `json:"id"`
 	EmployeeID     string         `json:"employeeId"`
 	EmployeeName   string         `json:"employeeName"`
@@ -136,6 +134,7 @@ type RequestListResponse struct {
 // espressa dalla persona: modificabile finche la richiesta non e chiusa
 // (PUT /requests/{id}/original; la persona e invariata).
 type RequestOriginalData struct {
+	Description      string           `json:"description"`
 	EmployeeID       string           `json:"employeeId"`
 	EmployeeName     string           `json:"employeeName"`
 	EmployeeEmail    string           `json:"employeeEmail"`

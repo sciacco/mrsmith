@@ -223,7 +223,8 @@ SELECT
   COALESCE(r.people_decision, ''),
   COALESCE(r.outcome, ''),
   COALESCE(r.closed_at::text, ''),
-  r.created_at::text
+  r.created_at::text,
+  r.description
 FROM training.training_request r
 JOIN training.employee e ON e.id = r.employee_id
 LEFT JOIN training.team t ON t.id = r.selected_team_id
@@ -265,6 +266,7 @@ LIMIT 1000`
 			&row.Outcome,
 			&row.ClosedAt,
 			&row.CreatedAt,
+			&row.Description,
 		); err != nil {
 			return nil, fmt.Errorf("scan training request: %w", err)
 		}
@@ -335,7 +337,8 @@ SELECT
   COALESCE(r.accepted_notes, ''),
   COALESCE(r.resulting_enrollment_id::text, ''),
   r.created_at::text,
-  r.updated_at::text
+  r.updated_at::text,
+  r.description
 FROM training.training_request r
 JOIN training.employee e ON e.id = r.employee_id
 LEFT JOIN training.team t ON t.id = r.selected_team_id
@@ -402,6 +405,7 @@ WHERE r.id = $1::uuid`
 		&detail.ResultingEnrollmentID,
 		&detail.CreatedAt,
 		&detail.UpdatedAt,
+		&detail.Requested.Description,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return RequestDetail{}, notFoundError("request_not_found", "richiesta non trovata")
@@ -570,12 +574,9 @@ func (s *SQLStore) CreateRequest(ctx context.Context, principal Principal, input
 		return ActionResponse{}, validationError("employee_required", "persona obbligatoria")
 	}
 	courseID := strings.TrimSpace(input.CourseID)
-	newCourseTitle := strings.TrimSpace(input.NewCourseTitle)
-	if courseID == "" && newCourseTitle == "" {
-		return ActionResponse{}, validationError("course_or_title_required", "indicare il corso a catalogo oppure il titolo del corso da creare")
-	}
-	if courseID != "" && newCourseTitle != "" {
-		return ActionResponse{}, validationError("course_xor_title", "corso a catalogo e titolo nuovo sono alternativi")
+	description := strings.TrimSpace(input.Description)
+	if courseID == "" && description == "" {
+		return ActionResponse{}, validationError("description_required", "descrizione obbligatoria senza corso")
 	}
 	motivation := strings.TrimSpace(input.Motivation)
 	if motivation == "" {
@@ -611,18 +612,13 @@ func (s *SQLStore) CreateRequest(ctx context.Context, principal Principal, input
 			return err
 		}
 		if courseID != "" {
-			if err := s.ensureCourseExists(ctx, tx, courseID); err != nil {
-				return err
+			err := tx.QueryRowContext(ctx, `SELECT title FROM training.course WHERE id = $1::uuid`, courseID).Scan(&description)
+			if errors.Is(err, sql.ErrNoRows) {
+				return validationError("course_not_found", "corso non trovato")
 			}
-		} else {
-			// Un titolo e l'embrione di un corso: si riusa il corso con lo
-			// stesso titolo se esiste, altrimenti nasce l'embrione (solo nome;
-			// la completezza della scheda arriva con la maturazione).
-			id, err := s.resolveOrCreateEmbryoCourse(ctx, tx, principal, newCourseTitle)
 			if err != nil {
-				return err
+				return fmt.Errorf("load training request course title: %w", err)
 			}
-			courseID = id
 		}
 		if err := s.validateSelectedTeam(ctx, tx, employeeID, teamID); err != nil {
 			return err
@@ -639,7 +635,8 @@ INSERT INTO training.training_request (
   priority,
   notes,
   reminder_text,
-  reminder_at
+  reminder_at,
+  description
 ) VALUES (
   $1::uuid,
   $2::uuid,
@@ -650,14 +647,15 @@ INSERT INTO training.training_request (
   $7,
   NULLIF($8, ''),
   NULLIF($9, ''),
-  $10::date
+  $10::date,
+  $11
 )
 RETURNING id::text`
 		if err := tx.QueryRowContext(
 			ctx,
 			stmt,
 			employeeID,
-			courseID,
+			nullableUUID(courseID),
 			motivation,
 			nullableUUID(teamID),
 			strings.TrimSpace(input.DesiredStart),
@@ -666,6 +664,7 @@ RETURNING id::text`
 			strings.TrimSpace(input.Notes),
 			strings.TrimSpace(input.ReminderText),
 			reminderAt,
+			description,
 		).Scan(&response.ID); err != nil {
 			return fmt.Errorf("create training request: %w", err)
 		}
@@ -1080,7 +1079,7 @@ WHERE id = $1::uuid`, id); err != nil {
 }
 
 // UpdateRequestOriginalData sostituisce i dati originali della richiesta
-// (corso o titolo nuovo, aree con livelli, motivazione, team, date
+// (descrizione e corso facoltativo, aree con livelli, motivazione, team, date
 // desiderate) su richiesta aperta (esito assente; vale anche da sospesa).
 // La persona e invariata (correzione = ritiro + nuova richiesta); priorita,
 // nota e promemoria restano sul PUT annotations. Modello: CreateRequest
@@ -1094,12 +1093,9 @@ func (s *SQLStore) UpdateRequestOriginalData(ctx context.Context, principal Prin
 		return ActionResponse{}, validationError("missing_id", "id richiesta obbligatorio")
 	}
 	courseID := strings.TrimSpace(input.CourseID)
-	newCourseTitle := strings.TrimSpace(input.NewCourseTitle)
-	if courseID == "" && newCourseTitle == "" {
-		return ActionResponse{}, validationError("course_or_title_required", "indicare il corso a catalogo oppure il titolo del corso da creare")
-	}
-	if courseID != "" && newCourseTitle != "" {
-		return ActionResponse{}, validationError("course_xor_title", "corso a catalogo e titolo nuovo sono alternativi")
+	description := strings.TrimSpace(input.Description)
+	if courseID == "" && description == "" {
+		return ActionResponse{}, validationError("description_required", "descrizione obbligatoria senza corso")
 	}
 	motivation := strings.TrimSpace(input.Motivation)
 	if motivation == "" {
@@ -1132,18 +1128,13 @@ func (s *SQLStore) UpdateRequestOriginalData(ctx context.Context, principal Prin
 			return err
 		}
 		if courseID != "" {
-			if err := s.ensureCourseExists(ctx, tx, courseID); err != nil {
-				return err
+			err := tx.QueryRowContext(ctx, `SELECT title FROM training.course WHERE id = $1::uuid`, courseID).Scan(&description)
+			if errors.Is(err, sql.ErrNoRows) {
+				return validationError("course_not_found", "corso non trovato")
 			}
-		} else {
-			// Un titolo e l'embrione di un corso: si riusa il corso con lo
-			// stesso titolo se esiste, altrimenti nasce l'embrione (come in
-			// creazione).
-			resolved, err := s.resolveOrCreateEmbryoCourse(ctx, tx, principal, newCourseTitle)
 			if err != nil {
-				return err
+				return fmt.Errorf("load training request course title: %w", err)
 			}
-			courseID = resolved
 		}
 		// La persona e invariata: il team scelto segue la regola condizionata
 		// (obbligatorio solo con appartenenze attive, altrimenti facoltativo).
@@ -1161,14 +1152,16 @@ SET course_id = $2::uuid,
     selected_team_id = $4::uuid,
     desired_start = NULLIF($5, '')::date,
     desired_end = NULLIF($6, '')::date,
+    description = $7,
     updated_at = now()
 WHERE id = $1::uuid`,
 			id,
-			courseID,
+			nullableUUID(courseID),
 			motivation,
 			nullableUUID(teamID),
 			strings.TrimSpace(input.DesiredStart),
 			strings.TrimSpace(input.DesiredEnd),
+			description,
 		); err != nil {
 			return fmt.Errorf("update training request original data: %w", err)
 		}

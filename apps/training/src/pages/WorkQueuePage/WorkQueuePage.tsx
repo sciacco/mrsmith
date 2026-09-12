@@ -355,6 +355,7 @@ export function WorkQueuePage() {
                 linkTo={(r) => `/richieste?id=${r.requestId}`}
                 columns={[
                   { header: 'Persona', render: (r) => r.employeeName },
+                  { header: 'Descrizione', render: (r) => r.description },
                   { header: 'Corso', render: (r) => r.courseTitle || '—' },
                   {
                     header: 'Team',

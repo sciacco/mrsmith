@@ -1,6 +1,6 @@
 // Lista delle richieste formative (#157, §Richieste 1): filtro server
-// state=open|closed|all (default aperte) + ricerca client su persona, corso
-// o titolo libero e team. Il rimando dalla coda di lavoro apre il dettaglio
+// state=open|closed|all (default aperte) + ricerca client su persona,
+// descrizione, corso e team. Il rimando dalla coda di lavoro apre il dettaglio
 // via ?id=, letto anche qui per il deep link.
 
 import { useMemo, useState } from 'react';
@@ -55,7 +55,7 @@ export function RequestsPage() {
     const rows = requests.data ?? [];
     if (!query) return rows;
     return rows.filter((r) =>
-      [r.employeeName, r.courseTitle, r.selectedTeamName]
+      [r.employeeName, r.description, r.courseTitle, r.selectedTeamName]
         .filter((v): v is string => Boolean(v))
         .some((v) => v.toLowerCase().includes(query)),
     );
@@ -92,7 +92,7 @@ export function RequestsPage() {
           />
         }
       >
-        <SearchInput value={q} onChange={setQ} placeholder="Cerca per persona, corso o team..." />
+        <SearchInput value={q} onChange={setQ} placeholder="Cerca per persona, descrizione, corso o team..." />
       </TableToolbar>
 
       {requests.isLoading ? (
@@ -126,7 +126,8 @@ export function RequestsPage() {
             <thead>
               <tr>
                 <th>Persona</th>
-                <th>Corso o titolo</th>
+                <th>Descrizione</th>
+                <th>Corso</th>
                 <th>Team</th>
                 <th>Priorità</th>
                 <th>Promemoria</th>
@@ -153,10 +154,11 @@ export function RequestsPage() {
                   </td>
                   <td className={styles.wrapCell}>
                     <span className={styles.inlineBadges}>
-                      {row.courseTitle || '—'}
+                      {row.description}
                       {row.suspendedAt && <StatusBadge value="suspended" label="Sospesa" variant="warning" />}
                     </span>
                   </td>
+                  <td className={styles.wrapCell}>{row.courseTitle || '—'}</td>
                   <td>
                     {row.selectedTeamName ?? <span className={styles.mutedCell}>Senza team</span>}
                   </td>

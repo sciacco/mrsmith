@@ -150,7 +150,7 @@ SELECT
   ), '[]')::text,
   COALESCE((
     SELECT json_agg(json_build_object(
-      'id', r.id::text, 'courseTitle', COALESCE(rc.title, ''),
+      'id', r.id::text, 'description', r.description, 'courseTitle', COALESCE(rc.title, ''),
       'outcome', r.outcome, 'createdAt', r.created_at::text
     ) ORDER BY r.created_at DESC)
     FROM training.training_request r

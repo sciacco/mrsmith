@@ -44,7 +44,6 @@ interface Props {
   onClose: () => void;
   onEditReminder: (reminder: PlanningReminder, trigger: HTMLElement) => void;
   onExternal: (event: MouseEvent<HTMLAnchorElement>) => void;
-  onSwitchCourse: (id: string) => void;
 }
 
 export function PlanningCourseDrawer({
@@ -55,7 +54,6 @@ export function PlanningCourseDrawer({
   onClose,
   onEditReminder,
   onExternal,
-  onSwitchCourse,
 }: Props) {
   const detail = usePlanningCourseDetail(courseId ?? undefined);
   const items = usePlanningItems(courseId ?? undefined, params);
@@ -148,7 +146,6 @@ export function PlanningCourseDrawer({
           onEditReminder={onEditReminder}
           onExternal={onExternal}
           onRetry={() => items.refetch()}
-          onSwitchCourse={onSwitchCourse}
         />
       </div>
     </Drawer>
@@ -217,7 +214,6 @@ function DrawerItems({
   onEditReminder,
   onExternal,
   onRetry,
-  onSwitchCourse,
 }: {
   data: PlanningItemsResponse | undefined;
   error: boolean;
@@ -226,7 +222,6 @@ function DrawerItems({
   onEditReminder: Props["onEditReminder"];
   onExternal: Props["onExternal"];
   onRetry: () => void;
-  onSwitchCourse: (id: string) => void;
 }) {
   if (loading && !data) return <Skeleton rows={5} />;
   if (!data || data.kind !== section) {
@@ -272,7 +267,6 @@ function DrawerItems({
               key={item.id}
               request={item}
               onExternal={onExternal}
-              onSwitchCourse={onSwitchCourse}
             />
           )}
         />
@@ -364,11 +358,9 @@ function EnrollmentCard({
 function RequestCard({
   request,
   onExternal,
-  onSwitchCourse,
 }: {
   request: PlanningRequestItem;
   onExternal: Props["onExternal"];
-  onSwitchCourse: (id: string) => void;
 }) {
   const areaLevels = request.areas
     .map(
@@ -383,6 +375,8 @@ function RequestCard({
           {request.employee.name}
         </Link>
       </strong>
+      <span>{request.description}</span>
+      <span>Corso originale: {request.course?.name ?? "—"}</span>
       <span>
         {request.team?.name ?? "Senza team"} ·{" "}
         {request.priority === null
@@ -399,14 +393,6 @@ function RequestCard({
         <Link to={`/richieste?id=${request.id}`} onClick={onExternal}>
           Apri richiesta
         </Link>
-        {request.acceptedCourse && (
-          <button
-            className={styles.textButton}
-            onClick={() => onSwitchCourse(request.acceptedCourse!.id)}
-          >
-            Corso accolto: {request.acceptedCourse.name}
-          </button>
-        )}
         {request.acceptedEventId && (
           <Link to={`/eventi/${request.acceptedEventId}`} onClick={onExternal}>
             Evento accolto

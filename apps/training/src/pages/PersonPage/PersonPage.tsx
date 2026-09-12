@@ -149,7 +149,8 @@ export function PersonPage() {
             <table className={listStyles.table}>
               <thead>
                 <tr>
-                  <th>Corso o titolo</th>
+                  <th>Descrizione</th>
+                  <th>Corso</th>
                   <th>Esito</th>
                   <th>Creata il</th>
                   <th />
@@ -158,6 +159,7 @@ export function PersonPage() {
               <tbody>
                 {person.requests.map((r) => (
                   <tr key={r.id}>
+                    <td>{r.description}</td>
                     <td>{r.courseTitle || '—'}</td>
                     <td>{r.outcome ? (REQUEST_OUTCOME_LABELS[r.outcome] ?? r.outcome) : 'Aperta'}</td>
                     <td>{formatInstantDate(r.createdAt)}</td>

@@ -166,7 +166,8 @@ SELECT
   COALESCE(r.tl_opinion_at::text, ''),
   COALESCE(r.tl_opinion_reason, ''),
   r.created_at::date,
-  r.created_at::text
+  r.created_at::text,
+  r.description
 FROM training.training_request r
 JOIN training.employee e ON e.id = r.employee_id
 LEFT JOIN training.team t ON t.id = r.selected_team_id
@@ -207,6 +208,7 @@ LIMIT 500`
 			&row.TLOpinionReason,
 			&createdOn,
 			&row.CreatedAt,
+			&row.Description,
 		); err != nil {
 			return nil, fmt.Errorf("scan training request awaiting decision: %w", err)
 		}

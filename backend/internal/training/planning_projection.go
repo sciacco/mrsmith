@@ -29,7 +29,7 @@ type planningCourse struct {
 	ReminderDate     *string
 }
 type planningRequest struct {
-	ID, CourseID, CourseTitle              string
+	ID, CourseID, CourseTitle, Description string
 	Employee                               PlanningRef
 	Team                                   *PlanningRef
 	Priority                               *int
@@ -42,6 +42,19 @@ type planningRequest struct {
 	AcceptedCourse                         *PlanningRef
 	AcceptedEventID, ResultingEnrollmentID *string
 }
+
+// attributedCourseID leaves the original course untouched. Accepted requests
+// belong only to the accepted course; other requests need an original course.
+func (r planningRequest) attributedCourseID() string {
+	if r.Outcome != nil && *r.Outcome == requestDecisionAccepted {
+		if r.AcceptedCourse != nil {
+			return r.AcceptedCourse.ID
+		}
+		return ""
+	}
+	return r.CourseID
+}
+
 type planningEvent struct {
 	ID, CourseID, Title, Origin                                 string
 	Cancelled                                                   bool
@@ -157,7 +170,9 @@ func planningIndexes(ctx context.Context, s PlanningSnapshot) (map[string]planni
 		if i%256 == 0 && ctx.Err() != nil {
 			return nil, nil, nil, nil, nil, ctx.Err()
 		}
-		rs[r.CourseID] = append(rs[r.CourseID], r)
+		if id := r.attributedCourseID(); id != "" {
+			rs[id] = append(rs[id], r)
+		}
 	}
 	for i, e := range s.Events {
 		if i%256 == 0 && ctx.Err() != nil {
@@ -613,7 +628,7 @@ func restrictPlanningSnapshot(ctx context.Context, s PlanningSnapshot, courseIDs
 		if i%256 == 0 && ctx.Err() != nil {
 			return PlanningCandidateSnapshot{}, ctx.Err()
 		}
-		if courseIDs[r.CourseID] || requestIDs[r.ID] || (r.ResultingEnrollmentID != nil && enrollmentIDs[*r.ResultingEnrollmentID]) {
+		if courseIDs[r.attributedCourseID()] || requestIDs[r.ID] || (r.ResultingEnrollmentID != nil && enrollmentIDs[*r.ResultingEnrollmentID]) {
 			out.Requests = append(out.Requests, r)
 		}
 	}
@@ -707,7 +722,9 @@ func projectPlanningFilters(ctx context.Context, s PlanningSnapshot) (PlanningFi
 		if i%256 == 0 && ctx.Err() != nil {
 			return PlanningFiltersResponse{}, ctx.Err()
 		}
-		relevant[r.CourseID] = true
+		if id := r.attributedCourseID(); id != "" {
+			relevant[id] = true
+		}
 	}
 	for i, e := range s.Events {
 		if i%256 == 0 && ctx.Err() != nil {
@@ -732,7 +749,7 @@ func projectPlanningFilters(ctx context.Context, s PlanningSnapshot) (PlanningFi
 		if i%256 == 0 && ctx.Err() != nil {
 			return PlanningFiltersResponse{}, ctx.Err()
 		}
-		if relevant[r.CourseID] {
+		if relevant[r.attributedCourseID()] {
 			people[r.Employee.ID] = r.Employee
 			if r.Team != nil {
 				teams[r.Team.ID] = *r.Team
@@ -787,12 +804,12 @@ func projectPlanningFilters(ctx context.Context, s PlanningSnapshot) (PlanningFi
 	}
 	return out, nil
 }
-func planningRequestItem(r planningRequest, courses map[string]planningCourse, courseSuspended bool) PlanningRequestItem {
-	c := courses[r.CourseID]
-	if c.Title == "" {
-		c = planningCourse{ID: r.CourseID, Title: r.CourseTitle}
+func planningRequestItem(r planningRequest, courseSuspended bool) PlanningRequestItem {
+	var originalCourse *PlanningRef
+	if r.CourseID != "" {
+		originalCourse = &PlanningRef{ID: r.CourseID, Name: r.CourseTitle}
 	}
-	return PlanningRequestItem{ID: r.ID, Employee: r.Employee, Team: r.Team, Course: PlanningRef{ID: c.ID, Name: c.Title}, Priority: r.Priority, CreatedAt: r.CreatedAt, Areas: sortedPlanningAreas(r.Areas), TLOpinion: r.TLOpinion, PeopleDecision: r.PeopleDecision, Outcome: r.Outcome, Suspended: r.Suspended || courseSuspended, Operative: r.Outcome == nil && !r.Suspended && !courseSuspended, AcceptedCourse: r.AcceptedCourse, AcceptedEventID: r.AcceptedEventID, ResultingEnrollmentID: r.ResultingEnrollmentID}
+	return PlanningRequestItem{ID: r.ID, Description: r.Description, Employee: r.Employee, Team: r.Team, Course: originalCourse, Priority: r.Priority, CreatedAt: r.CreatedAt, Areas: sortedPlanningAreas(r.Areas), TLOpinion: r.TLOpinion, PeopleDecision: r.PeopleDecision, Outcome: r.Outcome, Suspended: r.Suspended || courseSuspended, Operative: r.Outcome == nil && !r.Suspended && !courseSuspended, AcceptedCourse: r.AcceptedCourse, AcceptedEventID: r.AcceptedEventID, ResultingEnrollmentID: r.ResultingEnrollmentID}
 }
 func planningEventItem(e planningEvent, ens []planningEnrollment) PlanningEventItem {
 	return PlanningEventItem{ID: e.ID, Title: e.Title, CourseID: e.CourseID, Origin: e.Origin, Cancelled: e.Cancelled, Operative: planningOperationalEvent(e, ens), SessionsCount: e.SessionsCount, StartsAt: e.StartsAt, EndsAt: e.EndsAt, DueOn: e.DueOn, EnrollmentsCount: len(ens), EnrollmentsByStatus: planningDeliveryCounts(ens), WithoutSessions: e.WithoutSessions, UnassignedEnrollments: e.UnassignedEnrollments, NeedsReconciliation: e.NeedsReconciliation}
@@ -807,7 +824,7 @@ func planningScopedRequests(ctx context.Context, s PlanningSnapshot, courseID st
 		if i%256 == 0 && ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		if r.CourseID == courseID {
+		if r.attributedCourseID() == courseID {
 			out = append(out, r)
 		}
 	}
@@ -906,7 +923,7 @@ func projectPlanningCourseDetail(ctx context.Context, s PlanningSnapshot, po map
 	}
 	ri := make([]PlanningRequestItem, 0, len(reqs))
 	for _, r := range reqs {
-		ri = append(ri, planningRequestItem(r, cs, cs[r.CourseID].Suspended))
+		ri = append(ri, planningRequestItem(r, cs[courseID].Suspended))
 	}
 	sort.Slice(ri, func(i, j int) bool { return requestLess(ri[i], ri[j]) })
 	ei := []PlanningEventItem{}
@@ -960,7 +977,7 @@ func projectPlanningItems(ctx context.Context, s PlanningSnapshot, today, course
 			return PlanningItemsResponse{}, err
 		}
 		for _, r := range reqs {
-			all = append(all, planningRequestItem(r, cs, cs[r.CourseID].Suspended))
+			all = append(all, planningRequestItem(r, cs[courseID].Suspended))
 		}
 		resp.UnfilteredTotal = len(all)
 		filtered := []PlanningRequestItem{}
