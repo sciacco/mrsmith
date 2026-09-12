@@ -169,6 +169,7 @@ func RegisterRoutes(mux *http.ServeMux, deps Deps) {
 	// registrazione delegata ai file dedicati.
 	h.registerRuleRoutes(mux, protect)
 	h.registerRequestRoutes(mux, protect)
+	h.registerNeedRoutes(mux, protect)
 	h.registerQueueRoutes(mux, protect)
 
 	// Letture di dominio e gruppi locali (#152, slice 1 del task 6):

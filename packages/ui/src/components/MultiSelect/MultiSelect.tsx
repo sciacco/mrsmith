@@ -85,7 +85,11 @@ export function MultiSelect<T extends number | string = number>({
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -110,6 +114,16 @@ export function MultiSelect<T extends number | string = number>({
       <div
         ref={triggerRef}
         className={`${styles.trigger} ${open ? styles.triggerOpen : ''}`}
+        role="button"
+        tabIndex={0}
+        aria-label={placeholder}
+        aria-expanded={open}
+        onKeyDown={(e) => {
+          if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            setOpen(!open);
+          }
+        }}
         onClick={() => setOpen(!open)}
       >
         {selectedOptions.length > 0 ? (
@@ -118,6 +132,7 @@ export function MultiSelect<T extends number | string = number>({
               <span key={o.value} className={styles.chip}>
                 {o.label}
                 <button
+                  type="button"
                   className={styles.chipRemove}
                   onClick={(e) => {
                     e.stopPropagation();

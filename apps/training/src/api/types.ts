@@ -4,6 +4,76 @@
 // solo gli endpoint di questa slice: /me, /lookups, le 8 code operative,
 // /events. Gli altri endpoint arrivano con le slice che li usano.
 
+export type NeedStatus = "new" | "scouting" | "finalizing" | "closed" | "cancelled";
+
+export interface NeedInput {
+  description: string;
+  status: NeedStatus;
+  finalCourseId?: string;
+  skillAreaIds?: string[];
+  notes?: string;
+  reminderText?: string;
+  reminderAt?: string;
+}
+
+export interface Need extends Omit<NeedInput, "skillAreaIds"> {
+  id: string;
+  finalCourseTitle?: string;
+  skillAreas: SkillAreaRef[];
+  candidatesCount: number;
+  requestsCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NeedCandidateInput {
+  courseId?: string;
+  newCourseTitle?: string;
+  notes?: string;
+  rank?: number;
+}
+
+export interface NeedCandidate {
+  courseId: string;
+  courseTitle: string;
+  isActive: boolean;
+  notes?: string;
+  rank?: number;
+}
+
+export interface NeedRequest {
+  id: string;
+  description: string;
+  employeeId: string;
+  employeeName: string;
+  outcome?: string;
+  suspendedAt?: string;
+  acceptedCourseId?: string;
+  acceptedCourseTitle?: string;
+  acceptedEventId?: string;
+}
+
+export interface NeedDetail extends Need {
+  candidates: NeedCandidate[];
+  requests: NeedRequest[];
+  coverage: (RequestCoverage & { employeeId: string; employeeName: string })[];
+}
+
+export interface NeedAcceptInput {
+  eventId?: string;
+  vendorId?: string;
+  periodStart?: string;
+  periodEnd?: string;
+  notes?: string;
+  reason?: string;
+}
+
+export interface NeedAcceptResponse {
+  acceptedRequestIds: string[];
+  excludedRequests: NeedRequest[];
+  eventId?: string;
+}
+
 export interface Principal {
   subject: string;
   email: string;
@@ -944,10 +1014,12 @@ export interface RequestAcceptedData {
 
 export interface RequestCoverageEnrollment {
   enrollmentId: string;
+  eventId: string;
   completedOn: string;
 }
 
 export interface RequestCoverageAward {
+  awardId: string;
   certificationName: string;
   awardedOn: string;
   expiresOn?: string;

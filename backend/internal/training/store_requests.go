@@ -960,24 +960,9 @@ FOR UPDATE OF en`, accepted.ExistingEnrollmentID).Scan(
 			return err
 		}
 		if acceptedEventID == "" {
-			// Nessun evento adatto esistente: viene creato contestualmente.
-			if err := tx.QueryRowContext(ctx, `
-INSERT INTO training.training_event (course_id, title, origin, source_request_id)
-VALUES (
-  $1::uuid,
-  (SELECT c.title FROM training.course c WHERE c.id = $1::uuid),
-  'request', $2::uuid)
-RETURNING id::text`, accepted.CourseID, facts.ID).Scan(&acceptedEventID); err != nil {
-				return fmt.Errorf("create training event from request: %w", err)
-			}
-			if err := copyCourseTrainers(ctx, tx, acceptedEventID, accepted.CourseID); err != nil {
-				return err
-			}
-			afterEvent, err := entitySnapshot(ctx, tx, "training_event", acceptedEventID)
+			var err error
+			acceptedEventID, err = s.createRequestEvent(ctx, tx, principal, accepted.CourseID, facts.ID)
 			if err != nil {
-				return err
-			}
-			if err := s.audit(ctx, tx, principal, "training_event", acceptedEventID, "create", nil, afterEvent); err != nil {
 				return err
 			}
 		}
@@ -1032,6 +1017,28 @@ WHERE id = $1::uuid`,
 		return fmt.Errorf("accept training request: %w", err)
 	}
 	return nil
+}
+
+// Condiviso dall'accoglimento individuale e collettivo; nessuna transazione propria.
+func (s *SQLStore) createRequestEvent(ctx context.Context, tx *sql.Tx, principal Principal, courseID, requestID string) (string, error) {
+	var id string
+	if err := tx.QueryRowContext(ctx, `
+INSERT INTO training.training_event (course_id, title, origin, source_request_id)
+VALUES ($1::uuid, (SELECT title FROM training.course WHERE id = $1::uuid), 'request', $2::uuid)
+RETURNING id::text`, courseID, requestID).Scan(&id); err != nil {
+		return "", fmt.Errorf("create training event from request: %w", err)
+	}
+	if err := copyCourseTrainers(ctx, tx, id, courseID); err != nil {
+		return "", err
+	}
+	after, err := entitySnapshot(ctx, tx, "training_event", id)
+	if err != nil {
+		return "", err
+	}
+	if err := s.audit(ctx, tx, principal, "training_event", id, "create", nil, after); err != nil {
+		return "", err
+	}
+	return id, nil
 }
 
 func (s *SQLStore) WithdrawRequest(ctx context.Context, principal Principal, id string) (ActionResponse, error) {

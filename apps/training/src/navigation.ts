@@ -19,6 +19,7 @@ export const trainingNavGroups: TrainingNavGroup[] = [
   { label: 'Coda', items: [{ label: 'Coda', path: '/' }] },
   { label: 'Pianificazione', items: [{ label: 'Pianificazione', path: '/pianificazione' }] },
   { label: 'Richieste', items: [{ label: 'Richieste', path: '/richieste' }] },
+  { label: 'Esigenze', items: [{ label: 'Esigenze', path: '/esigenze' }] },
   { label: 'Regole', items: [{ label: 'Regole', path: '/regole' }] },
   { label: 'Eventi', items: [{ label: 'Eventi', path: '/eventi' }] },
   { label: 'Persone', items: [{ label: 'Persone', path: '/persone' }] },

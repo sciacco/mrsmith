@@ -1,0 +1,78 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding-bottom: var(--space-12);
+  animation: pageEnter 0.5s var(--ease-out) both;
+}
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+.title {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.new { --c: var(--color-info); --tint: var(--color-info-subtle); --strong: var(--color-info-strong); }
+.scouting { --c: var(--color-accent); --tint: var(--color-accent-subtle); --strong: var(--color-accent); }
+.finalizing { --c: var(--color-warning); --tint: var(--color-warning-subtle); --strong: var(--color-warning-strong); }
+.closed { --c: var(--color-success); --tint: var(--color-success-subtle); --strong: var(--color-success-strong); }
+.cancelled { --c: var(--color-text-faint); --tint: var(--color-surface); --strong: var(--color-text-muted); }
+.column { flex: 1 0 14rem; }
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  cursor: default;
+}
+.cardTitle {
+  color: var(--color-text);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.5;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.cardTitle:hover { color: var(--color-accent); }
+.cardTitle:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: var(--space-1);
+  border-radius: var(--radius-sm);
+}
+.meta {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--space-16) var(--space-8);
+  gap: var(--space-3);
+  color: var(--color-text-secondary);
+}
+.emptyIcon {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  color: var(--color-text-faint);
+}
+@media (max-width: 640px) {
+  .columns { flex-direction: column; }
+  .column { flex: auto; width: 100%; max-height: none; }
+}

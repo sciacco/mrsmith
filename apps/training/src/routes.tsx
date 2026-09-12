@@ -14,11 +14,15 @@ import { CertificationsPage } from './pages/CatalogPage/CertificationsPage';
 import { PathsPage } from './pages/CatalogPage/PathsPage';
 import { ReportPage } from './pages/ReportPage/ReportPage';
 import { PlanningPage } from './pages/PlanningPage/PlanningPage';
+import { NeedsPage } from './pages/NeedsPage/NeedsPage';
+import { NeedDetailPage } from './pages/NeedDetailPage/NeedDetailPage';
 
 export const routes: RouteObject[] = [
   { index: true, element: <WorkQueuePage /> },
   { path: 'pianificazione', element: <PlanningPage /> },
   { path: 'richieste', element: <RequestsPage /> },
+  { path: 'esigenze', element: <NeedsPage /> },
+  { path: 'esigenze/:id', element: <NeedDetailPage /> },
   { path: 'regole', element: <RulesPage /> },
   { path: 'eventi', element: <EventsPage /> },
   { path: 'eventi/:id', element: <EventDetailPage /> },

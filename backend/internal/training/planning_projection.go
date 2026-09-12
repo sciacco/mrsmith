@@ -3,6 +3,7 @@ package training
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -41,18 +42,34 @@ type planningRequest struct {
 	ReminderDate                           *string
 	AcceptedCourse                         *PlanningRef
 	AcceptedEventID, ResultingEnrollmentID *string
+	NeedCourseIDs                          []string // Distinct candidates of live needs, loaded with the snapshot.
 }
 
-// attributedCourseID leaves the original course untouched. Accepted requests
-// belong only to the accepted course; other requests need an original course.
-func (r planningRequest) attributedCourseID() string {
+// Acceptance wins. Only operative requests inherit candidates from needs;
+// without an attribution from needs, retain the original-course behavior.
+func (r planningRequest) attributedCourseIDs() []string {
 	if r.Outcome != nil && *r.Outcome == requestDecisionAccepted {
 		if r.AcceptedCourse != nil {
-			return r.AcceptedCourse.ID
+			return []string{r.AcceptedCourse.ID}
 		}
-		return ""
+		return nil
 	}
-	return r.CourseID
+	if r.Outcome == nil && !r.Suspended && len(r.NeedCourseIDs) > 0 {
+		return r.NeedCourseIDs
+	}
+	if r.CourseID != "" {
+		return []string{r.CourseID}
+	}
+	return nil
+}
+
+func (r planningRequest) attributedToAny(courseIDs map[string]bool) bool {
+	for _, id := range r.attributedCourseIDs() {
+		if courseIDs[id] {
+			return true
+		}
+	}
+	return false
 }
 
 type planningEvent struct {
@@ -170,7 +187,7 @@ func planningIndexes(ctx context.Context, s PlanningSnapshot) (map[string]planni
 		if i%256 == 0 && ctx.Err() != nil {
 			return nil, nil, nil, nil, nil, ctx.Err()
 		}
-		if id := r.attributedCourseID(); id != "" {
+		for _, id := range r.attributedCourseIDs() {
 			rs[id] = append(rs[id], r)
 		}
 	}
@@ -628,7 +645,7 @@ func restrictPlanningSnapshot(ctx context.Context, s PlanningSnapshot, courseIDs
 		if i%256 == 0 && ctx.Err() != nil {
 			return PlanningCandidateSnapshot{}, ctx.Err()
 		}
-		if courseIDs[r.attributedCourseID()] || requestIDs[r.ID] || (r.ResultingEnrollmentID != nil && enrollmentIDs[*r.ResultingEnrollmentID]) {
+		if r.attributedToAny(courseIDs) || requestIDs[r.ID] || (r.ResultingEnrollmentID != nil && enrollmentIDs[*r.ResultingEnrollmentID]) {
 			out.Requests = append(out.Requests, r)
 		}
 	}
@@ -722,7 +739,7 @@ func projectPlanningFilters(ctx context.Context, s PlanningSnapshot) (PlanningFi
 		if i%256 == 0 && ctx.Err() != nil {
 			return PlanningFiltersResponse{}, ctx.Err()
 		}
-		if id := r.attributedCourseID(); id != "" {
+		for _, id := range r.attributedCourseIDs() {
 			relevant[id] = true
 		}
 	}
@@ -749,7 +766,7 @@ func projectPlanningFilters(ctx context.Context, s PlanningSnapshot) (PlanningFi
 		if i%256 == 0 && ctx.Err() != nil {
 			return PlanningFiltersResponse{}, ctx.Err()
 		}
-		if relevant[r.attributedCourseID()] {
+		if r.attributedToAny(relevant) {
 			people[r.Employee.ID] = r.Employee
 			if r.Team != nil {
 				teams[r.Team.ID] = *r.Team
@@ -824,7 +841,7 @@ func planningScopedRequests(ctx context.Context, s PlanningSnapshot, courseID st
 		if i%256 == 0 && ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		if r.attributedCourseID() == courseID {
+		if slices.Contains(r.attributedCourseIDs(), courseID) {
 			out = append(out, r)
 		}
 	}

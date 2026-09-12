@@ -10,6 +10,25 @@ import (
 	"time"
 )
 
+// Matches planningRequest.attributedCourseIDs: a live, open need contributes
+// all candidates; a closed need contributes only its final course. DISTINCT
+// removes repeated request/course links through different needs.
+const planningNeedCoursesSQL = `ARRAY(
+ SELECT DISTINCT nc.course_id
+ FROM training.training_need_request nr
+ JOIN training.training_need n ON n.id = nr.need_id
+ JOIN training.training_need_course nc ON nc.need_id = n.id
+ WHERE nr.request_id = r.id AND n.deleted_at IS NULL
+   AND r.outcome IS NULL AND r.suspended_at IS NULL
+   AND (n.status IN ('new', 'scouting', 'finalizing')
+     OR (n.status = 'closed' AND nc.course_id = n.final_course_id))
+ ORDER BY nc.course_id
+)`
+
+const planningAttributedCoursesSQL = `(CASE WHEN r.outcome = 'accepted'
+ THEN array_remove(ARRAY[r.accepted_course_id], NULL)
+ ELSE COALESCE(NULLIF(` + planningNeedCoursesSQL + `, '{}'::uuid[]), array_remove(ARRAY[r.course_id], NULL)) END)`
+
 // loadPlanningSnapshot reads the complete local planning graph under one
 // repeatable-read, read-only transaction. It intentionally has no LIMIT and
 // performs no remote calls. courseID is an internal detail scope only.
@@ -73,9 +92,9 @@ func (s *SQLStore) loadPlanningSnapshot(ctx context.Context, courseID string) (P
 		in = ` IN (SELECT id FROM training.course WHERE id=$1::uuid)`
 		scopeArgs = []any{courseID}
 	}
-	requestScope := `((CASE WHEN r.outcome = 'accepted' THEN r.accepted_course_id ELSE r.course_id END)` + in + ` OR r.id IN (SELECT en.source_request_id FROM training.enrollment en JOIN training.training_event ev ON ev.id=en.event_id WHERE ev.course_id` + in + ` AND en.source_request_id IS NOT NULL) OR r.resulting_enrollment_id IN (SELECT en.id FROM training.enrollment en JOIN training.training_event ev ON ev.id=en.event_id WHERE ev.course_id` + in + `))`
+	requestScope := `(` + planningAttributedCoursesSQL + ` && ARRAY(SELECT c.id FROM training.course c` + scope + `) OR r.id IN (SELECT en.source_request_id FROM training.enrollment en JOIN training.training_event ev ON ev.id=en.event_id WHERE ev.course_id` + in + ` AND en.source_request_id IS NOT NULL) OR r.resulting_enrollment_id IN (SELECT en.id FROM training.enrollment en JOIN training.training_event ev ON ev.id=en.event_id WHERE ev.course_id` + in + `))`
 	requestArgs := scopeArgs
-	rows, err = tx.QueryContext(ctx, `SELECT DISTINCT r.id::text,COALESCE(r.course_id::text,''),COALESCE(oc.title,''),r.description,e.id::text,concat(e.last_name,' ',e.first_name),t.id::text,t.name,r.priority,r.created_at,NULLIF(r.tl_opinion,''),NULLIF(r.people_decision,''),NULLIF(r.outcome,''),r.suspended_at IS NOT NULL,NULLIF(r.reminder_text,''),r.reminder_at::text,ac.id::text,ac.title,r.accepted_event_id::text,r.resulting_enrollment_id::text FROM training.training_request r JOIN training.employee e ON e.id=r.employee_id LEFT JOIN training.team t ON t.id=r.selected_team_id LEFT JOIN training.course ac ON ac.id=r.accepted_course_id LEFT JOIN training.course oc ON oc.id=r.course_id WHERE `+requestScope, requestArgs...)
+	rows, err = tx.QueryContext(ctx, `SELECT DISTINCT r.id::text,COALESCE(r.course_id::text,''),COALESCE(oc.title,''),r.description,e.id::text,concat(e.last_name,' ',e.first_name),t.id::text,t.name,r.priority,r.created_at,NULLIF(r.tl_opinion,''),NULLIF(r.people_decision,''),NULLIF(r.outcome,''),r.suspended_at IS NOT NULL,NULLIF(r.reminder_text,''),r.reminder_at::text,ac.id::text,ac.title,r.accepted_event_id::text,r.resulting_enrollment_id::text,to_json(`+planningNeedCoursesSQL+`)::text FROM training.training_request r JOIN training.employee e ON e.id=r.employee_id LEFT JOIN training.team t ON t.id=r.selected_team_id LEFT JOIN training.course ac ON ac.id=r.accepted_course_id LEFT JOIN training.course oc ON oc.id=r.course_id WHERE `+requestScope, requestArgs...)
 	if err != nil {
 		return snap, fmt.Errorf("load planning requests: %w", err)
 	}
@@ -85,9 +104,14 @@ func (s *SQLStore) loadPlanningSnapshot(ctx context.Context, courseID string) (P
 		var teamID, teamName sql.NullString
 		var pri sql.NullInt64
 		var created time.Time
-		if err := rows.Scan(&x.ID, &x.CourseID, &x.CourseTitle, &x.Description, &x.Employee.ID, &x.Employee.Name, &teamID, &teamName, &pri, &created, &tl, &pd, &out, &x.Suspended, &text, &date, &acid, &acname, &aeid, &reid); err != nil {
+		var needCourses string
+		if err := rows.Scan(&x.ID, &x.CourseID, &x.CourseTitle, &x.Description, &x.Employee.ID, &x.Employee.Name, &teamID, &teamName, &pri, &created, &tl, &pd, &out, &x.Suspended, &text, &date, &acid, &acname, &aeid, &reid, &needCourses); err != nil {
 			rows.Close()
 			return snap, err
+		}
+		if err := json.Unmarshal([]byte(needCourses), &x.NeedCourseIDs); err != nil {
+			rows.Close()
+			return snap, fmt.Errorf("decode planning need courses: %w", err)
 		}
 		x.CreatedAt = created.UTC().Format(time.RFC3339)
 		if teamID.Valid {

@@ -21,6 +21,11 @@
   border-color: var(--color-text-muted);
 }
 
+.trigger:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: var(--space-1);
+}
+
 .triggerOpen {
   border-color: var(--color-accent);
   background: var(--color-bg-elevated);

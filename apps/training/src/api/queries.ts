@@ -39,6 +39,12 @@ import type {
   GroupMembersInput,
   LookupResponse,
   MeResponse,
+  Need,
+  NeedDetail,
+  NeedInput,
+  NeedCandidateInput,
+  NeedAcceptInput,
+  NeedAcceptResponse,
   ParticipationInput,
   PathAssignmentInput,
   PathAssignmentUpdateInput,
@@ -707,6 +713,67 @@ export function useDeleteExpense() {
 }
 
 // ── Richieste formative (#157) ──
+
+export function useNeeds() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ["training", "needs"],
+    queryFn: async () => (await api.get<{ needs: Need[] }>(`${TRAINING_PREFIX}/needs`)).needs,
+  });
+}
+
+export function useNeedDetail(id: string | undefined) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ["training", "needs", id],
+    queryFn: () => api.get<NeedDetail>(`${TRAINING_PREFIX}/needs/${id}`),
+    enabled: Boolean(id),
+  });
+}
+
+export function useSaveNeed() {
+  return useTrainingMutation<{ id?: string; input: NeedInput }, ActionResponse>(
+    (api, { id, input }) => id
+      ? api.put(`${TRAINING_PREFIX}/needs/${id}`, input)
+      : api.post(`${TRAINING_PREFIX}/needs`, input),
+  );
+}
+
+export function useDeleteNeed() {
+  return useTrainingMutation<string, ActionResponse>((api, id) => api.delete(`${TRAINING_PREFIX}/needs/${id}`));
+}
+
+export function useSaveNeedCandidate() {
+  return useTrainingMutation<{ id: string; courseId?: string; input: NeedCandidateInput }, ActionResponse>(
+    (api, { id, courseId, input }) => courseId
+      ? api.put(`${TRAINING_PREFIX}/needs/${id}/courses/${courseId}`, input)
+      : api.post(`${TRAINING_PREFIX}/needs/${id}/courses`, input),
+  );
+}
+
+export function useRemoveNeedCandidate() {
+  return useTrainingMutation<{ id: string; courseId: string }, ActionResponse>(
+    (api, { id, courseId }) => api.delete(`${TRAINING_PREFIX}/needs/${id}/courses/${courseId}`),
+  );
+}
+
+export function useAddNeedRequests() {
+  return useTrainingMutation<{ id: string; requestIds: string[] }, ActionResponse>(
+    (api, { id, requestIds }) => api.post(`${TRAINING_PREFIX}/needs/${id}/requests`, { requestIds }),
+  );
+}
+
+export function useRemoveNeedRequest() {
+  return useTrainingMutation<{ id: string; requestId: string }, ActionResponse>(
+    (api, { id, requestId }) => api.delete(`${TRAINING_PREFIX}/needs/${id}/requests/${requestId}`),
+  );
+}
+
+export function useAcceptNeed() {
+  return useTrainingMutation<{ id: string; input: NeedAcceptInput }, NeedAcceptResponse>(
+    (api, { id, input }) => api.post(`${TRAINING_PREFIX}/needs/${id}/accept`, input),
+  );
+}
 
 export function useTrainingRequests(
   state: "open" | "suspended" | "closed" | "all",
