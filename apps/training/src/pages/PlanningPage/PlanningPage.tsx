@@ -644,7 +644,7 @@ function CourseRow({
             </button>
             <Link
               className={styles.catalogLink}
-              to={`/catalogo?id=${course.id}`}
+              to={`/catalogo/corsi?id=${course.id}`}
               onClick={onExternal}
             >
               Apri corso<VisuallyHidden>: {course.title}</VisuallyHidden>
@@ -911,7 +911,7 @@ function Empty({
           Rimuovi filtri
         </Button>
       ) : (
-        <Link to="/catalogo" onClick={onExternal}>
+        <Link to="/catalogo/corsi" onClick={onExternal}>
           Apri Catalogo
         </Link>
       )}

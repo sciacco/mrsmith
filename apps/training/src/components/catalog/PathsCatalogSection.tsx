@@ -1,7 +1,7 @@
 // Percorsi di catalogo (#162, §Catalogo 5): elenco, creazione/modifica
 // dell'anagrafica (disattivazione tramite il campo active, stesso idioma di
 // CourseInput.active). Passi, assegnatari e progresso vivono nel dettaglio
-// (PathDetailDrawer.tsx), indirizzato da CatalogPage con lo stesso idioma a
+// (PathDetailDrawer.tsx), indirizzato da PathsPage con lo stesso idioma a
 // parametro di query di corsi e certificazioni (onOpen).
 
 import { useState } from 'react';

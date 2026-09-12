@@ -7,7 +7,11 @@ import { RequestsPage } from './pages/RequestsPage/RequestsPage';
 import { RulesPage } from './pages/RulesPage/RulesPage';
 import { PeoplePage } from './pages/PeoplePage/PeoplePage';
 import { PersonPage } from './pages/PersonPage/PersonPage';
-import { CatalogPage } from './pages/CatalogPage/CatalogPage';
+import { CatalogRedirect } from './pages/CatalogPage/CatalogRedirect';
+import { CoursesPage } from './pages/CatalogPage/CoursesPage';
+import { AnagrafichePage } from './pages/CatalogPage/AnagrafichePage';
+import { CertificationsPage } from './pages/CatalogPage/CertificationsPage';
+import { PathsPage } from './pages/CatalogPage/PathsPage';
 import { ReportPage } from './pages/ReportPage/ReportPage';
 import { PlanningPage } from './pages/PlanningPage/PlanningPage';
 
@@ -20,7 +24,11 @@ export const routes: RouteObject[] = [
   { path: 'eventi/:id', element: <EventDetailPage /> },
   { path: 'persone', element: <PeoplePage /> },
   { path: 'persone/:id', element: <PersonPage /> },
-  { path: 'catalogo', element: <CatalogPage /> },
+  { path: 'catalogo', element: <CatalogRedirect /> },
+  { path: 'catalogo/corsi', element: <CoursesPage /> },
+  { path: 'catalogo/anagrafiche', element: <AnagrafichePage /> },
+  { path: 'catalogo/certificazioni', element: <CertificationsPage /> },
+  { path: 'catalogo/percorsi', element: <PathsPage /> },
   { path: 'report', element: <ReportPage /> },
   { path: 'factorial', element: <FactorialPage /> },
   { path: '*', element: <Navigate to="/" replace /> },

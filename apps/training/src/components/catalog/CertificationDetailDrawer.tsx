@@ -156,7 +156,7 @@ export function CertificationDetailDrawer({ id, onClose }: { id: string; onClose
                 <ul className={localStyles.refList}>
                   {certification.courses.map((c) => (
                     <li key={c.id}>
-                      <Link to={`/catalogo?vista=corsi&id=${c.id}`}>{c.title}</Link>
+                      <Link to={`/catalogo/corsi?id=${c.id}`}>{c.title}</Link>
                       <StatusBadge
                         value={c.active ? 'active' : 'inactive'}
                         label={c.active ? 'Attivo' : 'Archiviato'}
