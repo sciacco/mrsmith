@@ -99,6 +99,23 @@
   padding: var(--space-5) 0 var(--space-6);
 }
 
+/* Riga con proporzioni non uguali: priorità 25% + aree 75% nel form di
+   registrazione richiesta (#richieste). */
+.rowPriorityAreas {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.rowPriorityAreas > *:first-child {
+  flex: 0 0 25%;
+  min-width: 0;
+}
+
+.rowPriorityAreas > *:last-child {
+  flex: 1 1 75%;
+  min-width: 0;
+}
+
 @media (max-width: 640px) {
   .bodyModal {
     padding: var(--space-4) 0 var(--space-5);
@@ -107,6 +124,12 @@
     flex-direction: column;
   }
   .bodyModal .row > * {
+    flex: none;
+  }
+  .bodyModal .rowPriorityAreas {
+    flex-direction: column;
+  }
+  .bodyModal .rowPriorityAreas > * {
     flex: none;
   }
   .bodyModal .toggleGroup,

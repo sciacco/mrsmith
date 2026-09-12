@@ -9,6 +9,7 @@ import { useMemo, useState } from 'react';
 import { Button, Modal, MultiSelect, SingleSelect, VisuallyHidden } from '@mrsmith/ui';
 import { useCreateRequest, useTrainingLookups, useTrainingPeople, useTrainingSkillAreas } from '../../api/queries';
 import { LEVEL_OPTIONS } from '../../lib/levels';
+import { PRIORITY_OPTIONS, PRIORITY_NONE_LABEL } from '../../lib/priority';
 import { describeApiError } from '../events/apiErrors';
 import { ErrorPanel } from '../events/ErrorPanel';
 import styles from './requestShared.module.css';
@@ -32,7 +33,7 @@ export function RequestCreateModal({ open, onClose, onCreated }: RequestCreateMo
   const [newCourseTitle, setNewCourseTitle] = useState('');
   const [skillAreaIds, setSkillAreaIds] = useState<string[]>([]);
   const [areaLevels, setAreaLevels] = useState<Record<string, { current: string; target: string }>>({});
-  const [priority, setPriority] = useState('');
+  const [priority, setPriority] = useState<number | null>(null);
   const [motivation, setMotivation] = useState('');
   const [desiredStart, setDesiredStart] = useState('');
   const [desiredEnd, setDesiredEnd] = useState('');
@@ -80,7 +81,7 @@ export function RequestCreateModal({ open, onClose, onCreated }: RequestCreateMo
             ? Number(areaLevels[areaId]?.target)
             : undefined,
         })),
-        priority: priority !== '' ? Number(priority) : undefined,
+        priority: priority ?? undefined,
         motivation: motivation.trim(),
         desiredStart: desiredStart || undefined,
         desiredEnd: desiredEnd || undefined,
@@ -92,51 +93,53 @@ export function RequestCreateModal({ open, onClose, onCreated }: RequestCreateMo
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Registra richiesta" size="md">
+    <Modal open={open} onClose={onClose} title="Registra richiesta" size="lg">
       <div className={`${styles.body} ${styles.bodyModal}`}>
-        <label className={styles.field}>
-          <span className={styles.labelHead}>
-            Persona
-            <span className={styles.requiredMarker} aria-hidden="true" />
-            <VisuallyHidden>obbligatorio</VisuallyHidden>
-          </span>
-          <SingleSelect
-            options={employeeOptions}
-            selected={employeeId || null}
-            onChange={handleEmployeeChange}
-            placeholder="Seleziona persona..."
-            searchable
-          />
-        </label>
-        <label className={styles.field}>
-          <span className={styles.labelHead}>
-            Team
-            {teamRequired && (
-              <>
-                <span className={styles.requiredMarker} aria-hidden="true" />
-                <VisuallyHidden>obbligatorio</VisuallyHidden>
-              </>
-            )}
-          </span>
-          <SingleSelect
-            options={activeTeams.map((t) => ({ value: t.id, label: t.name }))}
-            selected={teamId || null}
-            onChange={(v) => setTeamId(v ?? '')}
-            placeholder={
-              employeeId === ''
-                ? 'Seleziona prima la persona'
-                : teamRequired
-                  ? 'Seleziona team...'
-                  : 'Senza team'
-            }
-            disabled={activeTeams.length <= 1}
-          />
-          {employeeId !== '' && !teamRequired && (
-            <span className={styles.hint}>
-              La persona non ha appartenenze attive: la richiesta si registra senza team.
+        <div className={styles.row}>
+          <label className={styles.field}>
+            <span className={styles.labelHead}>
+              Persona
+              <span className={styles.requiredMarker} aria-hidden="true" />
+              <VisuallyHidden>obbligatorio</VisuallyHidden>
             </span>
-          )}
-        </label>
+            <SingleSelect
+              options={employeeOptions}
+              selected={employeeId || null}
+              onChange={handleEmployeeChange}
+              placeholder="Seleziona persona..."
+              searchable
+            />
+          </label>
+          <label className={styles.field}>
+            <span className={styles.labelHead}>
+              Team
+              {teamRequired && (
+                <>
+                  <span className={styles.requiredMarker} aria-hidden="true" />
+                  <VisuallyHidden>obbligatorio</VisuallyHidden>
+                </>
+              )}
+            </span>
+            <SingleSelect
+              options={activeTeams.map((t) => ({ value: t.id, label: t.name }))}
+              selected={teamId || null}
+              onChange={(v) => setTeamId(v ?? '')}
+              placeholder={
+                employeeId === ''
+                  ? 'Seleziona prima la persona'
+                  : teamRequired
+                    ? 'Seleziona team...'
+                    : 'Senza team'
+              }
+              disabled={activeTeams.length <= 1}
+            />
+          </label>
+        </div>
+        {employeeId !== '' && !teamRequired && (
+          <span className={styles.hint}>
+            La persona non ha appartenenze attive: la richiesta si registra senza team.
+          </span>
+        )}
 
         <div className={styles.toggleGroup}>
           <Button
@@ -182,15 +185,28 @@ export function RequestCreateModal({ open, onClose, onCreated }: RequestCreateMo
           </label>
         )}
 
-        <label className={styles.field}>
-          Aree di competenza
-          <MultiSelect<string>
-            options={(skillAreas.data ?? []).map((a) => ({ value: a.id, label: a.name }))}
-            selected={skillAreaIds}
-            onChange={setSkillAreaIds}
-            placeholder="Nessuna area"
-          />
-        </label>
+        <div className={styles.rowPriorityAreas}>
+          <label className={styles.field}>
+            Priorità
+            <SingleSelect<number>
+              options={PRIORITY_OPTIONS}
+              selected={priority}
+              onChange={setPriority}
+              placeholder={PRIORITY_NONE_LABEL}
+              allowClear
+              clearLabel={PRIORITY_NONE_LABEL}
+            />
+          </label>
+          <label className={styles.field}>
+            Aree di competenza
+            <MultiSelect<string>
+              options={(skillAreas.data ?? []).map((a) => ({ value: a.id, label: a.name }))}
+              selected={skillAreaIds}
+              onChange={setSkillAreaIds}
+              placeholder="Nessuna area"
+            />
+          </label>
+        </div>
         {skillAreaIds.map((areaId) => {
           const area = (skillAreas.data ?? []).find((a) => a.id === areaId);
           const areaName = area?.name ?? 'Area';
@@ -227,18 +243,6 @@ export function RequestCreateModal({ open, onClose, onCreated }: RequestCreateMo
             </div>
           );
         })}
-
-        <label className={styles.field}>
-          Priorità (1 = più importante)
-          <input
-            type="number"
-            min={1}
-            className={styles.input}
-            value={priority}
-            onChange={(e) => setPriority(e.target.value)}
-          />
-          <span className={styles.hint}>Facoltativa: lascia vuoto se non è stata indicata.</span>
-        </label>
 
         <label className={styles.field}>
           <span className={styles.labelHead}>

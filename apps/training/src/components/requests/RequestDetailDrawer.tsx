@@ -43,6 +43,7 @@ import { ErrorPanel } from '../events/ErrorPanel';
 import { formatDateOnly, formatInstantDate } from '../events/eventFormat';
 import { REQUEST_OUTCOME_LABELS, TL_OPINION_LABELS } from '../../lib/labels';
 import { LEVEL_OPTIONS } from '../../lib/levels';
+import { PRIORITY_OPTIONS, PRIORITY_NONE_LABEL, priorityDisplayLabel } from '../../lib/priority';
 import { outcomeVariant, tlOpinionVariant } from './requestVariants';
 import formStyles from './requestShared.module.css';
 import styles from './drawerShared.module.css';
@@ -241,7 +242,7 @@ export function RequestDetailDrawer({ id, onClose }: RequestDetailDrawerProps) {
                 <dl className={styles.grid}>
                   <div className={styles.item}>
                     <dt>Priorità</dt>
-                    <dd>{request.priority ?? '—'}</dd>
+                    <dd>{priorityDisplayLabel(request.priority)}</dd>
                   </div>
                   <div className={`${styles.item} ${styles.full}`}>
                     <dt>Promemoria</dt>
@@ -440,7 +441,15 @@ function AnnotationsForm({ request, onClose }: { request: RequestDetail; onClose
   const [notes, setNotes] = useState(request.notes ?? '');
   const [reminderText, setReminderText] = useState(request.reminderText ?? '');
   const [reminderAt, setReminderAt] = useState(request.reminderAt ?? '');
-  const [priority, setPriority] = useState(request.priority !== undefined ? String(request.priority) : '');
+  const [priority, setPriority] = useState<number | null>(request.priority ?? null);
+  const priorityOptions = useMemo(() => {
+    const current = request.priority;
+    if (current !== undefined && !PRIORITY_OPTIONS.some((o) => o.value === current)) {
+      // Valore legacy fuori scala: si mantiene e si mostra come numero (fallback = il valore stesso).
+      return [{ value: current, label: String(current) }, ...PRIORITY_OPTIONS];
+    }
+    return PRIORITY_OPTIONS;
+  }, [request.priority]);
   const [error, setError] = useState<string | null>(null);
 
   async function submit() {
@@ -452,7 +461,7 @@ function AnnotationsForm({ request, onClose }: { request: RequestDetail; onClose
           notes: notes.trim() || undefined,
           reminderText: reminderText.trim() || undefined,
           reminderAt: reminderAt || undefined,
-          priority: priority !== '' ? Number(priority) : undefined,
+          priority: priority ?? undefined,
         },
       });
       toast('Annotazioni aggiornate');
@@ -466,13 +475,14 @@ function AnnotationsForm({ request, onClose }: { request: RequestDetail; onClose
     <Modal open onClose={onClose} title="Annotazioni di pianificazione" size="sm">
       <div className={`${formStyles.body} ${formStyles.bodyModal}`}>
         <label className={formStyles.field}>
-          Priorità (1 = più importante)
-          <input
-            type="number"
-            min={1}
-            className={formStyles.input}
-            value={priority}
-            onChange={(e) => setPriority(e.target.value)}
+          Priorità
+          <SingleSelect<number>
+            options={priorityOptions}
+            selected={priority}
+            onChange={setPriority}
+            placeholder={PRIORITY_NONE_LABEL}
+            allowClear
+            clearLabel={PRIORITY_NONE_LABEL}
           />
         </label>
         <label className={formStyles.field}>
