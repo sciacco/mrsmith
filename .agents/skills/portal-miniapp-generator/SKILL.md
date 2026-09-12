@@ -32,7 +32,7 @@ Do not use this skill when:
 - extracting business behavior from a legacy source without an approved migration spec
 - working on the Matrix-style launcher UI instead of a mini-app workspace
 - performing the blocking UI review of a planned or implemented mini-app screen
-- doing scoped UI/styling work on an existing mini-app (a screen, a component, a table/form/drawer) — use `tintoretto` (`.agents/skills/tintoretto/`)
+- doing scoped UI/styling work on an existing mini-app — use `tintoretto` (`.agents/skills/tintoretto/`) only when its applicability criteria are met; handle maintenance excluded by `AGENTS.md` directly without a design workflow
 
 Use these companion skills first when needed:
 - `legacy-app-auditor` for reverse engineering non-Appsmith source applications

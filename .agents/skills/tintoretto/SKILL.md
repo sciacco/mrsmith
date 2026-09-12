@@ -1,13 +1,21 @@
 ---
 name: tintoretto
-description: Self-contained design-execution skill for MrSmith mini-apps. Use for any scoped UI/frontend design or styling work under apps/ — new screens, restyling, shared-component usage, tables, forms, drawers, empty states. Applies docs/UI-UX.md as the canonical design system, embeds the visual-design and copy craft (no external skill dependencies), and finishes with type-check + UI smoke test. Not for whole-app planning (portal-miniapp-generator), blocking approval (portal-miniapp-ui-review), or full-app remediation (portal-miniapp-ui-fixer).
+description: Design and implement scoped MrSmith mini-app UI changes that require decisions about layout, visual hierarchy, interaction patterns, or component composition. Apply docs/UI-UX.md and verify the affected UI. Do not invoke for literal text replacements, typos, mechanical corrections, routine wiring, or logic-only frontend fixes that preserve the existing design. Not for whole-app planning, blocking UI approval, or full-app remediation.
 user-invocable: true
 allowed-tools: Read Grep Glob Bash Edit Write
 ---
 
 # Tintoretto — design execution for MrSmith mini-apps
 
-Self-contained design skill for scoped UI work. **System rules** live in `docs/UI-UX.md`; **design craft** lives here. If this file and that document ever disagree, `docs/UI-UX.md` wins.
+Self-contained design skill for scoped UI work that requires design decisions. **System rules** live in `docs/UI-UX.md`; **design craft** lives here. If this file and that document ever disagree, `docs/UI-UX.md` wins.
+
+## Applicability
+
+- Use this workflow when the task requires UI design decisions: new screens, redesigned sections, interaction patterns, or changes to layout, visual hierarchy, and component composition.
+- Handle literal copy replacements, typos, mechanical corrections (including restoring an existing style), routine wiring, and logic-only fixes directly when they preserve the existing design. Touching `apps/`, TSX, or CSS is not sufficient reason to activate this workflow. Assess design impact, not the number of changed lines.
+- If this skill was loaded for an excluded task, skip the design workflow below, including reference loading, reconnaissance, planning, and design checklists. Loading the skill does not make an excluded task design work.
+
+For excluded tasks, choose verification based on the actual change: inspect the diff and affected occurrences for literal copy edits; use relevant type-checks and functional checks for props or logic changes; use a targeted visual check when a CSS correction or text change needs rendering verification. Type-check and browser smoke are not mandatory merely because a frontend file changed. Honor any explicit verification requirements for the task.
 
 ## Rule sources
 
@@ -16,14 +24,16 @@ Self-contained design skill for scoped UI work. **System rules** live in `docs/U
 
 ## Workflow
 
+The following steps apply only to design tasks within the scope above.
+
 1. **Read `docs/UI-UX.md`** (at minimum §0 and the sections relevant to the task).
 2. **Recon before invention.** Look at 1–2 comparable screens in sibling apps (`apps/*`) and at `packages/ui` before designing anything new. If a shared component or an established pattern covers the need, use it.
-3. **Plan, then critique the plan** (see *Design craft* below). For routine work — wiring a form, adding a table column — the design system alone is enough; skip straight to implementation.
+3. **Plan, then critique the plan** for design decisions that need resolving (see *Design craft* below). When the requirements and an established pattern already determine the design, implement directly.
 4. **Implement** with token discipline: CSS Modules, theme tokens only, documented recipes for the two allowed literal exceptions (page background, entrance keyframes).
 5. **Verify** — both are mandatory:
    - `pnpm --filter <app> exec tsc --noEmit` (never bare `npx tsc`).
    - UI smoke test in a real browser: reuse the already-running dev server (`make dev` / Vite) — never kill or restart it. If browser automation is needed, use `playwright-cli` from `artifacts/{harness}/` where `{harness}` is the harness name: first check `command -v playwright-cli`, then fall back to `npx playwright-cli` if needed. Do **not** report browser automation unavailable merely because `require('playwright')` or `pnpm exec playwright` fails; those are different from the harness CLI. A passing build is not a rendering guarantee.
-6. **Self-check** against `docs/UI-UX.md` §19 and the *rejected patterns* list before declaring done.
+6. **Self-check** — use the full `docs/UI-UX.md` §19 checklist for new screens. For changes to existing screens, check only the affected areas and relevant *rejected patterns*.
 
 ## Design craft
 

@@ -37,9 +37,10 @@
 - Write all temporary files (screenshots, scratch outputs, intermediate artifacts) under `artifacts/{agent}/` at the repo root, where `{agent}` is the harness name (e.g. `artifacts/claude/`, `artifacts/codex/`). Never use `/tmp` or other paths. The whole `artifacts/` directory is gitignored.
 
 ## UI/UX
-- [`docs/UI-UX.md`](docs/UI-UX.md) — Mandatory reference for all UI, frontend, and mini-app work. Agents must read it before planning or implementing UI changes and treat it as the canonical design-system source unless the user explicitly overrides it.
+- [`docs/UI-UX.md`](docs/UI-UX.md) — Canonical design-system source unless the user explicitly overrides it. Read §0 and the relevant sections before planning or implementing UI design changes. Maintenance tasks excluded from design workflows below do not require loading this document unless a design-system rule is relevant to the fix.
 - For any new portal mini-app or mini-app UI review, use `.agents/skills/portal-miniapp-generator/` as the canonical workflow.
-- For scoped UI/styling work on an existing mini-app (a screen, a component, a table/form/drawer), use the `tintoretto` skill (`.agents/skills/tintoretto/`) — self-contained: it applies `docs/UI-UX.md`, embeds the visual-design and copy craft, and mandates the type-check + smoke-test verification.
+- Use `tintoretto` (`.agents/skills/tintoretto/`) for scoped mini-app work that requires decisions about layout, visual hierarchy, interaction patterns, or component composition.
+- Handle literal copy edits, typos, mechanical corrections (including restoring an existing style), routine wiring, and logic-only frontend fixes directly when they preserve the existing design. These tasks do not require a design skill, UI agent delegation, or their workflows. Choose verification based on the actual change; type-check and browser smoke are not mandatory merely because a frontend file changed. Assess design impact, not file location or the number of changed lines.
 
 ## Keycloak Roles
 - Follow the naming convention `app_{appname}_access` for app-level access roles (e.g., `app_budget_access`, `app_compliance_access`).

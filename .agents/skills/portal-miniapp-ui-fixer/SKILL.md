@@ -33,7 +33,8 @@ Do not use this skill when:
 - reviewing a screen without making changes
 - working on the Matrix-style portal launcher instead of a mini-app workspace
 - the task is primarily backend behavior rather than UI correction
-- the work is craft-driven design/styling (a new screen, a component, a table/form/drawer) not driven by review findings or family drift — use `tintoretto` (`.agents/skills/tintoretto/`)
+- the task is maintenance excluded from design workflows by `AGENTS.md` — handle it directly with verification proportionate to the change
+- the work is craft-driven design/styling not driven by review findings or family drift — use `tintoretto` (`.agents/skills/tintoretto/`) only when its applicability criteria are met
 
 # Required input
 

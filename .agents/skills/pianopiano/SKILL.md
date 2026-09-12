@@ -25,7 +25,7 @@ The skill is **planning-only** unless the user explicitly also asks to create or
 
 1. Identify what actually changes and what remains unchanged before investigating.
 2. Read applicable `AGENTS.md` files, `docs/IMPLEMENTATION-PLANNING.md` and `docs/IMPLEMENTATION-KNOWLEDGE.md`; load only relevant handbook entries.
-3. For UI work, read `docs/UI-UX.md` and the matching skill. For a scoped change in an existing mini-app, use `.agents/skills/tintoretto/SKILL.md`.
+3. For UI work, follow the design-workflow applicability rules in `AGENTS.md`. Read `docs/UI-UX.md` and consult the matching skill only when applicable; for scoped mini-app design work, consult `.agents/skills/tintoretto/SKILL.md` when its applicability criteria are met. Maintenance excluded by `AGENTS.md` does not require a design workflow.
 4. Follow database safety: never connect to a database configured in an env file. Use versioned schemas/specifications and source code; ask the user for a data inspection only when genuinely necessary.
 
 ### Investigate only the affected chain
@@ -58,7 +58,7 @@ Both reviews are required before delivery, but their reports are not deliverable
 
 Check the draft against inspected sources and applicable rules. Reopen sources when support is uncertain. Confirm the files, APIs, components, data semantics and affected integration points actually support the proposed work. Replace unsupported claims with explicit proposals, investigate consequential uncertainties, or remove the claims.
 
-Apply relevant repo-fit checks and, for UI work, `docs/UI-UX.md` §19. Do not turn these internal checks into new project scope or mandatory sections about unchanged systems.
+Apply relevant repo-fit checks and, for new UI screens, the full `docs/UI-UX.md` §19 checklist. For existing screens, check only the affected areas when design-system checks apply. Do not turn these internal checks into new project scope or mandatory sections about unchanged systems.
 
 ### Subtractive review
 
