@@ -51,18 +51,22 @@ INSERT INTO training.enrollment (
   objective,
   notes
 ) VALUES ($1::uuid, $2::uuid, 'planned', 'direct', NULLIF($3, ''), NULLIF($4, ''))
+ON CONFLICT (employee_id, event_id) DO NOTHING
 RETURNING id::text, delivery_status`
-		if err := tx.QueryRowContext(
+		err = tx.QueryRowContext(
 			ctx,
 			stmt,
 			employeeID,
 			eventID,
 			strings.TrimSpace(input.Objective),
 			strings.TrimSpace(input.Notes),
-		).Scan(&response.ID, &response.Status); err != nil {
-			if isUniqueViolation(err, "") {
-				return conflictError("already_enrolled", "la persona e gia iscritta all'evento")
-			}
+		).Scan(&response.ID, &response.Status)
+		// DO NOTHING invece dell'errore di unicita: la transazione resta viva
+		// e si puo leggere la riga che blocca per dire cosa la blocca davvero.
+		if errors.Is(err, sql.ErrNoRows) {
+			return enrollmentConflictError(ctx, tx, employeeID, eventID)
+		}
+		if err != nil {
 			return fmt.Errorf("create training enrollment: %w", err)
 		}
 		after, err := entitySnapshot(ctx, tx, "enrollment", response.ID)
@@ -76,6 +80,26 @@ RETURNING id::text, delivery_status`
 		return nil
 	})
 	return response, err
+}
+
+// enrollmentConflictError distingue le due facce dell'unicita (persona,
+// evento): iscrizione viva o annullata. L'annullata occupa il posto ma non e
+// un'iscrizione, e dirlo evita di mandare a cercare nell'elenco dell'evento
+// una persona che li non compare.
+func enrollmentConflictError(ctx context.Context, tx *sql.Tx, employeeID, eventID string) error {
+	var status string
+	err := tx.QueryRowContext(ctx, `
+SELECT delivery_status
+FROM training.enrollment
+WHERE employee_id = $1::uuid AND event_id = $2::uuid`, employeeID, eventID).Scan(&status)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("load conflicting training enrollment: %w", err)
+	}
+	if status == deliveryCancelled {
+		return conflictError("enrollment_cancelled",
+			"la persona ha un'iscrizione annullata su questo evento: riaprila per iscriverla di nuovo")
+	}
+	return conflictError("already_enrolled", "la persona e gia iscritta all'evento")
 }
 
 // UpdateEnrollmentFacts e l'update unico dei fatti senza effetti di stato:

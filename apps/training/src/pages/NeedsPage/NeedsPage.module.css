@@ -1,3 +1,139 @@
+/* Struttura della board: colonne, card e trascinamento. Copiate dalla board
+   di Binocolo (iniziative) e da qui indipendenti: i colori arrivano da --c,
+   --tint e --strong, che le classi di stato qui sotto definiscono per ogni
+   stato dell'esigenza.
+   Stanno in testa al file perche' le regole locali le rifiniscono: .card e
+   .cardTitle vincono a parita' di specificita' solo se dichiarate dopo. */
+.cols {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+}
+.kcol {
+  flex: 0 0 258px;
+  /* min-width:0 impedisce alla colonna di crescere oltre i 258px per contenuto
+     largo (nota lunga senza-a-capo): il default min-width:auto lo farebbe. */
+  min-width: 0;
+  width: 258px;
+  background: var(--tint);
+  border: 1px solid color-mix(in srgb, var(--c) 26%, var(--color-border));
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  max-height: 80vh;
+  transition: box-shadow var(--duration-fast) var(--ease-out);
+}
+.kcolHead {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 13px 11px;
+  border-top: 3px solid var(--c);
+  border-bottom: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+.kcolHead .dot {
+  width: 9px;
+  height: 9px;
+  border-radius: var(--radius-full);
+  background: var(--c);
+  flex: none;
+}
+.kcolHead .nm {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+}
+.cnt {
+  margin-left: auto;
+  font: 800 0.8125rem/1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  color: var(--strong);
+  background: var(--color-bg-elevated);
+  border: 1px solid color-mix(in srgb, var(--c) 30%, transparent);
+  min-width: 22px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  padding: 0 6px;
+}
+.kcolBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  overflow-y: auto;
+  min-width: 0;
+}
+.kcol.dropTarget {
+  box-shadow: 0 0 0 2px var(--c) inset;
+}
+.kcard {
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-subtle);
+  border-left: 3px solid var(--c);
+  border-radius: var(--radius-md);
+  padding: 11px 12px 10px;
+  box-shadow: var(--shadow-md);
+  cursor: grab;
+  transition: transform var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+.kcard:hover {
+  transform: translateY(-1px);
+  border-color: var(--c);
+  box-shadow: var(--shadow-lg);
+}
+.kcard:focus-visible {
+  outline: 2px solid transparent;
+  box-shadow: 0 0 0 3px var(--color-accent-glow), var(--shadow-lg);
+}
+.kcard.dragging {
+  opacity: 0.4;
+}
+.cardName {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.cardName .grab {
+  margin-left: auto;
+  color: var(--color-text-faint);
+  flex: none;
+  margin-top: 2px;
+}
+@keyframes dragLift {
+  from {
+    transform: scale(1) rotate(0deg);
+    box-shadow: var(--shadow-md);
+  }
+  to {
+    transform: scale(1.04) rotate(2deg);
+    box-shadow: var(--shadow-lg);
+  }
+}
+.dragOverlay {
+  width: 236px;
+  cursor: grabbing;
+  animation: dragLift 150ms var(--ease-spring) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dragOverlay {
+    animation: none;
+    transform: scale(1.02);
+    box-shadow: var(--shadow-lg);
+  }
+}
+
 .page {
   display: flex;
   flex-direction: column;

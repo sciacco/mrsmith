@@ -7,7 +7,6 @@ import { RequestsPage } from './pages/RequestsPage/RequestsPage';
 import { RulesPage } from './pages/RulesPage/RulesPage';
 import { PeoplePage } from './pages/PeoplePage/PeoplePage';
 import { PersonPage } from './pages/PersonPage/PersonPage';
-import { CatalogRedirect } from './pages/CatalogPage/CatalogRedirect';
 import { CoursesPage } from './pages/CatalogPage/CoursesPage';
 import { AnagrafichePage } from './pages/CatalogPage/AnagrafichePage';
 import { CertificationsPage } from './pages/CatalogPage/CertificationsPage';
@@ -28,7 +27,8 @@ export const routes: RouteObject[] = [
   { path: 'eventi/:id', element: <EventDetailPage /> },
   { path: 'persone', element: <PeoplePage /> },
   { path: 'persone/:id', element: <PersonPage /> },
-  { path: 'catalogo', element: <CatalogRedirect /> },
+  // Il gruppo Catalogo non ha una pagina propria: apre la prima sottopagina.
+  { path: 'catalogo', element: <Navigate to="/catalogo/corsi" replace /> },
   { path: 'catalogo/corsi', element: <CoursesPage /> },
   { path: 'catalogo/anagrafiche', element: <AnagrafichePage /> },
   { path: 'catalogo/certificazioni', element: <CertificationsPage /> },

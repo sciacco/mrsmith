@@ -969,9 +969,10 @@ FOR UPDATE OF en`, accepted.ExistingEnrollmentID).Scan(
 		if err := tx.QueryRowContext(ctx, `
 INSERT INTO training.enrollment (employee_id, event_id, delivery_status, origin, source_request_id)
 VALUES ($1::uuid, $2::uuid, 'planned', 'request', $3::uuid)
+ON CONFLICT (employee_id, event_id) DO NOTHING
 RETURNING id::text`, facts.EmployeeID, acceptedEventID, facts.ID).Scan(&resultingEnrollmentID); err != nil {
-			if isUniqueViolation(err, "") {
-				return conflictError("already_enrolled", "la persona e gia iscritta all'evento")
+			if errors.Is(err, sql.ErrNoRows) {
+				return enrollmentConflictError(ctx, tx, facts.EmployeeID, acceptedEventID)
 			}
 			return fmt.Errorf("create training enrollment from request: %w", err)
 		}

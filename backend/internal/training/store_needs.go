@@ -7,9 +7,21 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 func (s *SQLStore) ListNeeds(ctx context.Context, id string) ([]Need, error) {
+	// Id vuoto = elenco completo; un id malformato non è un errore del server:
+	// vale come esigenza inesistente, come per un uuid valido ma assente.
+	id = strings.TrimSpace(id)
+	if id != "" {
+		parsed, err := uuid.Parse(id)
+		if err != nil {
+			return nil, notFoundError("need_not_found", "esigenza non trovata")
+		}
+		id = parsed.String()
+	}
 	rows, err := s.db.QueryContext(ctx, `
 SELECT n.id::text, n.description, n.status, COALESCE(n.final_course_id::text, ''),
   COALESCE(c.title, ''), COALESCE(n.notes, ''), COALESCE(n.reminder_text, ''),
@@ -370,9 +382,14 @@ func (s *SQLStore) AcceptNeed(ctx context.Context, principal Principal, id strin
 				open = append(open, r)
 			}
 		}
-		// Nessun lavoro: niente evento, iscrizioni o decisioni nuove.
+		// Nessun lavoro: niente evento, iscrizioni o decisioni nuove,
+		// quindi nemmeno audit dell'esigenza o bump di updated_at.
 		if len(open) == 0 {
 			return nil
+		}
+		needBefore, err := needSnapshot(ctx, tx, id)
+		if err != nil {
+			return err
 		}
 		if accepted.EventID == "" {
 			accepted.EventID, err = s.createRequestEvent(ctx, tx, principal, accepted.CourseID, open[0].ID)
@@ -398,9 +415,16 @@ func (s *SQLStore) AcceptNeed(ctx context.Context, principal Principal, id strin
 		actorID := s.actorEmployeeID(ctx, tx, principal)
 		for _, r := range open {
 			accepted.ExistingEnrollmentID = ""
-			err := tx.QueryRowContext(ctx, `SELECT id::text FROM training.enrollment WHERE employee_id = $1::uuid AND event_id = $2::uuid FOR UPDATE`, r.EmployeeID, accepted.EventID).Scan(&accepted.ExistingEnrollmentID)
+			// L'indice unico (employee_id, event_id) vieta una seconda
+			// iscrizione: se quella esistente è annullata l'accoglimento si
+			// ferma, ma dice di chi è l'iscrizione che lo blocca.
+			enrollmentStatus := ""
+			err := tx.QueryRowContext(ctx, `SELECT id::text, delivery_status FROM training.enrollment WHERE employee_id = $1::uuid AND event_id = $2::uuid FOR UPDATE`, r.EmployeeID, accepted.EventID).Scan(&accepted.ExistingEnrollmentID, &enrollmentStatus)
 			if err != nil && !errors.Is(err, sql.ErrNoRows) {
 				return err
+			}
+			if enrollmentStatus == deliveryCancelled {
+				return conflictError("enrollment_cancelled", fmt.Sprintf("l'iscrizione di %s all'evento scelto è annullata", r.EmployeeName))
 			}
 			before, err := entitySnapshot(ctx, tx, "training_request", r.ID)
 			if err != nil {
@@ -418,6 +442,16 @@ func (s *SQLStore) AcceptNeed(ctx context.Context, principal Principal, id strin
 				return err
 			}
 			response.AcceptedRequestIDs = append(response.AcceptedRequestIDs, r.ID)
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE training.training_need SET updated_at = now() WHERE id = $1::uuid`, id); err != nil {
+			return err
+		}
+		needAfter, err := needSnapshot(ctx, tx, id)
+		if err != nil {
+			return err
+		}
+		if err := s.audit(ctx, tx, principal, "training_need", id, "accept", needBefore, needAfter); err != nil {
+			return err
 		}
 		response.EventID = accepted.EventID
 		return nil
