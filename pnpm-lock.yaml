@@ -1169,6 +1169,9 @@ importers:
 
   apps/training:
     dependencies:
+      '@dnd-kit/core':
+        specifier: ^6.3.1
+        version: 6.3.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@mrsmith/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
