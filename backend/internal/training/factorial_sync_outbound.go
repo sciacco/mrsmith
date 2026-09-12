@@ -785,7 +785,7 @@ func (s *SQLStore) createOrAdoptTraining(ctx context.Context, cli *factorial.Cli
 // maybeUpdateTraining aggiorna un Training gia' collegato se nome/descrizione/external locali divergono dal remoto.
 func (s *SQLStore) maybeUpdateTraining(ctx context.Context, cli *factorial.Client, idx graphIndex, course outboundCourseRow, trainingID string, dryRun bool, principal Principal, result *outboundSyncResult) error {
 	if !course.IsActive {
-		return nil // seed non ancora curato: il locale prevale solo dopo l'attivazione (#141)
+		return nil // corso importato non ancora attivato: il locale prevale solo dopo l'attivazione (#141)
 	}
 	remote, ok := idx.trainingByID[trainingID]
 	if !ok {

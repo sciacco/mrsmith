@@ -71,7 +71,7 @@ Names on the left are Factorial Trainings-API resources (`Trainings*` in `pkg/fa
 | `SessionAccessMembership` | `training.enrollment` + `training.enrollment_session` (session-level access; a remote access membership links both) |
 | `SessionAttendance` | `training.enrollment_session.participation_status` |
 
-Course-card fields seeded on import (August 2026 decisions, migration 135), all only while the local course is **not active** (once curated/activated the sync never touches the card again). Single exception — embryo adoption (#172): on the run that adopts a previously-unlinked course by exact title, the card is seeded once even if active (first contact with the sync, like a twin's birth); from the next run the course is correlated and the not-active gate applies again.
+Course-card fields seeded on import (August 2026 decisions, migration 135), all only while the local course is **not active** (once reviewed/activated the sync never touches the card again). Single exception — embryo adoption (#172): on the run that adopts a previously-unlinked course by exact title, the card is seeded once even if active (first contact with the sync, like a twin's birth); from the next run the course is correlated and the not-active gate applies again.
 
 - `Training.external_provider` → vendor registry get-or-create by case-insensitive name (`training.vendor`, citext unique) + `course.vendor_id`. The literal string `"null"` is junk and is discarded.
 - `Training.external` → `course.provider_kind` (`external`/`internal`). Real data is coherent: provider names exist only on external trainings; in the 3 observed category-vs-flag conflicts the flag wins.

@@ -1,5 +1,5 @@
 // Catalogo · Corsi (#158, §Catalogo 4-5, scomposta dalle sottoviste di
-// CatalogPage): elenco corsi con filtro "Da curare" (corsi inattivi importati
+// CatalogPage): elenco corsi con filtro "Da revisionare" (corsi inattivi importati
 // dal sync formativo Factorial e, da #170, filtro per tag), ricerca locale e
 // dettaglio via ?id=.
 
@@ -15,14 +15,14 @@ import { DELIVERY_MODE_LABELS, PROVIDER_KIND_LABELS } from '../../lib/labels';
 import listStyles from '../RequestsPage/listPage.module.css';
 import styles from './CoursesPage.module.css';
 
-// Filtro di stato dei Corsi. «Da curare» assorbe l'interruttore precedente
+// Filtro di stato dei Corsi. «Da revisionare» assorbe l'interruttore precedente
 // (corsi importati dal sync e mai attivati): era un caso a sé accanto ai
 // filtri, qui è uno stato come gli altri. Nessuna selezione = tutti i corsi,
 // così all'apertura la lista resta quella di prima.
 const COURSE_STATUS_OPTIONS = [
   { value: 'attivi', label: 'Attivi' },
   { value: 'archiviati', label: 'Archiviati' },
-  { value: 'da-curare', label: 'Da curare' },
+  { value: 'da-revisionare', label: 'Da revisionare' },
 ];
 
 // Riga secondaria della cella Corso: prima area di competenza con il conteggio
@@ -81,7 +81,7 @@ export function CoursesPage() {
     return rows.filter((c) => {
       if (selectedStatus === 'attivi' && !c.active) return false;
       if (selectedStatus === 'archiviati' && c.active) return false;
-      if (selectedStatus === 'da-curare' && !(!c.active && c.factorialTrainingId)) return false;
+      if (selectedStatus === 'da-revisionare' && !(!c.active && c.factorialTrainingId)) return false;
       if (selectedTag && !c.tags.includes(selectedTag)) return false;
       if (selectedArea && !c.skillAreas.some((a) => a.id === selectedArea)) return false;
       if (!needle) return true;
@@ -256,7 +256,7 @@ export function CoursesPage() {
                         {row.suspendedAt && <StatusBadge value="suspended" label="Sospeso" variant="warning" />}
                         {!row.active &&
                           (row.factorialTrainingId ? (
-                            <StatusBadge value="to_curate" label="Da curare" variant="warning" />
+                            <StatusBadge value="to_review" label="Da revisionare" variant="warning" />
                           ) : (
                             <StatusBadge value="archived" label="Archiviato" variant="neutral" />
                           ))}

@@ -230,7 +230,7 @@ export function CourseDetailDrawer({ id, onClose }: { id: string; onClose: () =>
                       {course.factorialTrainingId
                         ? course.active
                           ? 'Importato dal sync Factorial'
-                          : 'Importato dal sync Factorial — da curare'
+                          : 'Importato dal sync Factorial — da revisionare'
                         : 'Locale'}
                     </dd>
                   </div>

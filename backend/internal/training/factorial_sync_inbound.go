@@ -47,7 +47,8 @@ type courseSeedItem struct {
 	// da una richiesta, migrazione 142): la UPDATE scrive anche il
 	// correlatore factorial_training_id. Primo contatto col sync: i campi
 	// si seminano come alla nascita di un gemello; dal run successivo il
-	// corso e' correlato a tutti gli effetti (regola curato inclusa).
+	// corso e' correlato a tutti gli effetti (e, una volta attivo, il sync
+	// non lo tocca piu').
 	Adopt bool
 	// VendorName: fornitore abituale dal testo Factorial ("" = nessuno,
 	// scartata la spazzatura "null"); ProviderKind: erogazione dal flag
@@ -538,7 +539,8 @@ func removeGhostClasses(graph factorialTrainingGraph, ghosts map[string]struct{}
 }
 
 // courseSeed decide il seed del corso: nil quando il locale e' gia' attivo
-// (curato: il sync non lo tocca mai piu'), o quando tutti i campi seminati
+// (l'attivazione governa il sync: da li' in poi non lo tocca mai piu'), o
+// quando tutti i campi seminati
 // sono gia' allineati col remoto (idempotenza, anche a corso inattivo).
 // Campi seminati: titolo, descrizione, fornitore abituale (dal testo
 // external_provider, spazzatura "null" scartata), erogazione (dal flag

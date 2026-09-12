@@ -1,8 +1,8 @@
 // Editor corso di catalogo (#158, §Catalogo 4): upsert completo — erogazione
 // interna/esterna, fornitore obbligatorio solo per l'esterna, compliance con
 // framework in coppia (stesso idioma di ricorrenza/àncora nelle regole). Il
-// toggle «Attiva» copre anche l'attivazione in cura dei corsi importati dal
-// sync (corsi inattivi con factorialTrainingId).
+// toggle «Attiva» copre anche l'attivazione, dopo la revisione, dei corsi
+// importati dal sync (corsi inattivi con factorialTrainingId).
 
 import { useState } from 'react';
 import { Button, Modal, MoneyInput, MultiSelect, SingleSelect, ToggleSwitch, VisuallyHidden } from '@mrsmith/ui';

@@ -286,7 +286,7 @@ func TestComputeTrainingDiff_EmbryoAdoption(t *testing.T) {
 		}
 		diff := computeTrainingDiff(training, trainingClassPerimeter{}, local, nil)
 		if diff.Course != nil {
-			t.Fatalf("Course = %+v, want nil (correlato e attivo: curato, nessuna adozione)", diff.Course)
+			t.Fatalf("Course = %+v, want nil (correlato e attivo: nessuna adozione)", diff.Course)
 		}
 		if len(diff.Warnings) != 0 {
 			t.Fatalf("Warnings = %+v, want nessuno", diff.Warnings)
