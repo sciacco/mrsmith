@@ -21,7 +21,7 @@ const NeedCard = forwardRef<HTMLElement, { need: Need; overlay?: boolean } & HTM
           {overlay ? <span className={styles.cardTitle}>{need.description}</span> : <Link to={`/esigenze/${need.id}`} className={styles.cardTitle} draggable={false}>{need.description}</Link>}
           <Icon name="grip-vertical" size={14} className={styles.grab} />
         </div>
-        <p className={styles.meta}>{formatNumber(need.candidatesCount)} candidati · {formatNumber(need.requestsCount)} richieste</p>
+        <p className={styles.meta}>{formatNumber(need.candidatesCount)} corsi · {formatNumber(need.requestsCount)} richieste</p>
         {need.finalCourseTitle && <p className={styles.meta}>Definitivo: {need.finalCourseTitle}</p>}
         {need.reminderText && <p className={styles.meta}>{need.reminderAt ? `${formatLocalDate(need.reminderAt)} · ` : ''}{need.reminderText}</p>}
       </article>
@@ -92,7 +92,7 @@ export function NeedsPage() {
         <div className={styles.empty}>
           <div className={styles.emptyIcon}><Icon name="target" size={32} /></div>
           <strong>Nessuna esigenza formativa</strong>
-          <p className={styles.meta}>Crea un’esigenza e raccogli i corsi candidati. Puoi collegare le richieste in seguito.</p>
+          <p className={styles.meta}>Crea un’esigenza e seleziona i corsi da valutare. Puoi collegare le richieste in seguito.</p>
           <Button onClick={() => setCreating(true)}>Nuova esigenza</Button>
         </div>
       ) : (

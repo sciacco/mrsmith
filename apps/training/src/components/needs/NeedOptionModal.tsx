@@ -1,20 +1,20 @@
 import { useState, type FormEvent } from 'react';
 import { Button, Modal, SingleSelect, VisuallyHidden, useToast } from '@mrsmith/ui';
-import { useSaveNeedCandidate, useTrainingCourses } from '../../api/queries';
-import type { NeedCandidate, NeedDetail } from '../../api/types';
+import { useSaveNeedOption, useTrainingCourses } from '../../api/queries';
+import type { NeedOption, NeedDetail } from '../../api/types';
 import { describeApiError } from '../events/apiErrors';
 import { ErrorPanel } from '../events/ErrorPanel';
 import form from '../requests/requestShared.module.css';
 
-export function NeedCandidateModal({ need, candidate, onClose }: { need: NeedDetail; candidate?: NeedCandidate; onClose: () => void }) {
+export function NeedOptionModal({ need, option, onClose }: { need: NeedDetail; option?: NeedOption; onClose: () => void }) {
   const courses = useTrainingCourses();
-  const save = useSaveNeedCandidate();
+  const save = useSaveNeedOption();
   const { toast } = useToast();
   const [mode, setMode] = useState('existing');
   const [courseId, setCourseId] = useState('');
   const [title, setTitle] = useState('');
-  const [notes, setNotes] = useState(candidate?.notes ?? '');
-  const [rank, setRank] = useState(candidate?.rank?.toString() ?? '');
+  const [notes, setNotes] = useState(option?.notes ?? '');
+  const [rank, setRank] = useState(option?.rank?.toString() ?? '');
   const [error, setError] = useState<string | null>(null);
   const available = (courses.data ?? []).filter((c) => !need.candidates.some((n) => n.courseId === c.id));
 
@@ -22,22 +22,22 @@ export function NeedCandidateModal({ need, candidate, onClose }: { need: NeedDet
     event.preventDefault();
     setError(null);
     try {
-      await save.mutateAsync({ id: need.id, courseId: candidate?.courseId, input: {
-        courseId: !candidate && mode === 'existing' ? courseId : undefined,
-        newCourseTitle: !candidate && mode === 'new' ? title.trim() : undefined,
+      await save.mutateAsync({ id: need.id, courseId: option?.courseId, input: {
+        courseId: !option && mode === 'existing' ? courseId : undefined,
+        newCourseTitle: !option && mode === 'new' ? title.trim() : undefined,
         notes, rank: rank === '' ? undefined : Number(rank),
       } });
-      toast(candidate ? 'Candidato aggiornato' : 'Candidato aggiunto');
+      toast(option ? 'Corso aggiornato' : 'Corso aggiunto');
       onClose();
-    } catch (e) { setError(describeApiError(e, 'Salvataggio candidato non riuscito')); }
+    } catch (e) { setError(describeApiError(e, 'Salvataggio del corso non riuscito')); }
   }
 
   return (
-    <Modal open onClose={onClose} title={candidate ? 'Modifica candidato' : 'Aggiungi candidato'} size="lg">
+    <Modal open onClose={onClose} title={option ? 'Modifica corso' : 'Corso da aggiungere'} size="lg">
       <form className={`${form.body} ${form.bodyModal}`} onSubmit={submit}>
-        {candidate ? <strong>{candidate.courseTitle}</strong> : <>
-          <div className={form.field}>Candidato
-            <SingleSelect<string> ariaLabel="Candidato" options={[{ value: 'existing', label: 'Corso esistente' }, { value: 'new', label: 'Nuovo corso da titolo' }]} selected={mode} onChange={(v) => setMode(v ?? 'existing')} />
+        {option ? <strong>{option.courseTitle}</strong> : <>
+          <div className={form.field}>
+            <SingleSelect<string> options={[{ value: 'existing', label: 'Corso esistente' }, { value: 'new', label: 'Nuovo corso da titolo' }]} selected={mode} onChange={(v) => setMode(v ?? 'existing')} />
           </div>
           {mode === 'existing' ? <>
             <div className={form.field}>Corso
@@ -50,12 +50,12 @@ export function NeedCandidateModal({ need, candidate, onClose }: { need: NeedDet
             <span className={form.hint}>Fornitore, prezzo, ore e link si completano nella scheda corso.</span>
           </label>}
         </>}
-        <label className={form.field}>Nota sul candidato<textarea className={form.textarea} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} /></label>
-        <label className={form.field}>Rango<input className={form.input} type="number" step="1" value={rank} onChange={(e) => setRank(e.target.value)} /></label>
+        <label className={form.field}>Nota<textarea className={form.textarea} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} /></label>
+        <label className={form.field}>Posizione<input className={form.input} type="number" step="1" value={rank} onChange={(e) => setRank(e.target.value)} /></label>
         {error && <ErrorPanel message={error} />}
         <div className={form.actions}>
           <Button variant="ghost" onClick={onClose}>Annulla</Button>
-          <Button type="submit" loading={save.isPending} disabled={!candidate && !(mode === 'existing' ? courseId : title.trim())}>{candidate ? 'Salva modifiche' : 'Aggiungi candidato'}</Button>
+          <Button type="submit" loading={save.isPending} disabled={!option && !(mode === 'existing' ? courseId : title.trim())}>{option ? 'Salva modifiche' : 'Aggiungi corso'}</Button>
         </div>
       </form>
     </Modal>

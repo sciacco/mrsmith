@@ -35,7 +35,7 @@
   font-size: 0.9375rem;
   line-height: 1.5;
 }
-.candidate {
+.option {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);

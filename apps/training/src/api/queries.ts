@@ -42,7 +42,7 @@ import type {
   Need,
   NeedDetail,
   NeedInput,
-  NeedCandidateInput,
+  NeedOptionInput,
   NeedAcceptInput,
   NeedAcceptResponse,
   ParticipationInput,
@@ -743,15 +743,15 @@ export function useDeleteNeed() {
   return useTrainingMutation<string, ActionResponse>((api, id) => api.delete(`${TRAINING_PREFIX}/needs/${id}`));
 }
 
-export function useSaveNeedCandidate() {
-  return useTrainingMutation<{ id: string; courseId?: string; input: NeedCandidateInput }, ActionResponse>(
+export function useSaveNeedOption() {
+  return useTrainingMutation<{ id: string; courseId?: string; input: NeedOptionInput }, ActionResponse>(
     (api, { id, courseId, input }) => courseId
       ? api.put(`${TRAINING_PREFIX}/needs/${id}/courses/${courseId}`, input)
       : api.post(`${TRAINING_PREFIX}/needs/${id}/courses`, input),
   );
 }
 
-export function useRemoveNeedCandidate() {
+export function useRemoveNeedOption() {
   return useTrainingMutation<{ id: string; courseId: string }, ActionResponse>(
     (api, { id, courseId }) => api.delete(`${TRAINING_PREFIX}/needs/${id}/courses/${courseId}`),
   );

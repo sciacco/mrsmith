@@ -26,14 +26,14 @@ export interface Need extends Omit<NeedInput, "skillAreaIds"> {
   updatedAt: string;
 }
 
-export interface NeedCandidateInput {
+export interface NeedOptionInput {
   courseId?: string;
   newCourseTitle?: string;
   notes?: string;
   rank?: number;
 }
 
-export interface NeedCandidate {
+export interface NeedOption {
   courseId: string;
   courseTitle: string;
   isActive: boolean;
@@ -54,7 +54,7 @@ export interface NeedRequest {
 }
 
 export interface NeedDetail extends Need {
-  candidates: NeedCandidate[];
+  candidates: NeedOption[];
   requests: NeedRequest[];
   coverage: (RequestCoverage & { employeeId: string; employeeName: string })[];
 }
